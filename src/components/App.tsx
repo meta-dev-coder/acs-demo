@@ -35,6 +35,9 @@ export function App({ iTwinId, iModelId, changesetId }: AppProps) {
       viewCreatorOptions={viewCreatorOptions}
       enablePerformanceMonitors={false}
       onIModelConnected={handleConnected}
+      // Under a GitHub Pages sub-path (/acs-demo/), iTwin's localization is otherwise fetched
+      // from the site root (/locales/...) and 404s. Point it at the deployed base path.
+      i18nUrlTemplate={`${import.meta.env.BASE_URL}locales/{{lng}}/{{ns}}.json`}
       uiProviders={[]}
       defaultUiConfig={{
         hideNavigationAid: false,
