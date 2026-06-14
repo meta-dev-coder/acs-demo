@@ -88,8 +88,17 @@ export function SignInRedirect() {
   const { client } = useAuthorizationContext();
 
   useEffect(() => {
-    void client.handleSigninCallback();
+    // Process the OIDC code, then return to the app root (under the Pages base path).
+    // Without this the user is stranded on a blank /signin-callback page.
+    void client.handleSigninCallback().finally(() => {
+      const base = import.meta.env.BASE_URL || "/";
+      if (window.location.pathname !== base) window.location.replace(base);
+    });
   }, [client]);
 
-  return <></>;
+  return (
+    <div style={{ padding: 24, fontFamily: "Segoe UI, system-ui, sans-serif", color: "#93a1b0" }}>
+      Completing sign-in…
+    </div>
+  );
 }
