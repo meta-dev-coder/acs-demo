@@ -91,6 +91,8 @@ export function SignInRedirect() {
     // Process the OIDC code, then return to the app root (under the Pages base path).
     // Without this the user is stranded on a blank /signin-callback page.
     void client.handleSigninCallback().finally(() => {
+      // Don't navigate inside the silent-renew iframe — only the top-level callback returns home.
+      if (window.self !== window.top) return;
       const base = import.meta.env.BASE_URL || "/";
       if (window.location.pathname !== base) window.location.replace(base);
     });
