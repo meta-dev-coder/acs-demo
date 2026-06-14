@@ -1,0 +1,17 @@
+{
+  "_comment": "Scenario B safety scoring + economics. Segment risk = weighted blend of incident frequency, severity mix, and lane-closure burden over the last 24 months. All tunable here, not in code.",
+  "referenceDate": "2026-06-14",
+  "severityWeight": { "minor": 1, "injury": 3, "serious": 6 },
+  "weights": { "frequency": 0.4, "severity": 0.35, "closure": 0.25 },
+  "normalizers": { "incidentsFull": 11, "severityScoreFull": 28, "closureMinFull": 700 },
+  "bands": { "redAtOrAbove": 0.6, "amberAtOrAbove": 0.32 },
+  "bandMeta": {
+    "red": { "label": "High risk", "color": "#d6332e" },
+    "amber": { "label": "Elevated", "color": "#f1a325" },
+    "green": { "label": "Low", "color": "#43933a" }
+  },
+  "economics": {
+    "tolledLaneRevenuePerHour": 7800,
+    "incidentResponseCostAvg": 5200
+  }
+}

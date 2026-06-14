@@ -1,0 +1,99 @@
+{
+  "_comment": "All weights, thresholds, recommended actions, crew time and closure logic live here — NOT in code (scope hard constraint). Tune freely without touching TS.",
+  "referenceDate": "2026-06-14",
+  "weights": {
+    "ageRatio": 0.28,
+    "openTickets": 0.2,
+    "recentWorkorders": 0.16,
+    "manufacturerEol": 0.16,
+    "exposureFactor": 0.1,
+    "overdueInspection": 0.1
+  },
+  "normalizers": {
+    "openTicketsFull": 4,
+    "recentWorkordersFull": 6,
+    "inspectionIntervalMonths": 12
+  },
+  "bands": {
+    "redAtOrAbove": 0.62,
+    "amberAtOrAbove": 0.4
+  },
+  "bandMeta": {
+    "red": { "label": "Act now", "color": "#d6332e" },
+    "amber": { "label": "Watch", "color": "#f1a325" },
+    "green": { "label": "Healthy", "color": "#43933a" }
+  },
+  "driverLabels": {
+    "ageRatio": "Past {pct}% of rated service life",
+    "openTickets": "{n} open maintenance tickets",
+    "recentWorkorders": "{n} reactive work orders in last 24 months",
+    "manufacturerEol": "Manufacturer end-of-life / no spares",
+    "exposureFactor": "High environmental exposure (heat / humidity / salt)",
+    "overdueInspection": "Inspection overdue by {months} months"
+  },
+  "recommendedActions": {
+    "toll_gantry": {
+      "red": "Replace SunPass reader/antenna head; schedule in a planned reversal window to protect tolling uptime.",
+      "amber": "Bench-test reader electronics at next planned window; pre-order antenna spare.",
+      "green": "No action; next routine inspection on schedule."
+    },
+    "access_gate": {
+      "red": "Replace gate actuator + limit switches; a stuck gate blocks the lane reversal.",
+      "amber": "Service actuator and lubricate; verify reversal interlock.",
+      "green": "No action; routine cycle test."
+    },
+    "lane_control": {
+      "red": "Replace overhead lane-control signal driver board before a reversal failure forces a manual closure.",
+      "amber": "Inspect LED driver and comms; schedule with adjacent assets.",
+      "green": "No action; routine check."
+    },
+    "ramp_signal": {
+      "red": "Replace ramp meter controller; coordinate with FDOT during off-peak.",
+      "amber": "Calibrate detection loop and timing.",
+      "green": "No action."
+    },
+    "detector": {
+      "red": "Replace failing detector station; degraded counts skew variable-pricing inputs.",
+      "amber": "Recalibrate detector; verify upstream comms.",
+      "green": "No action."
+    },
+    "dms": {
+      "red": "Replace DMS power supply / pixel modules; dark sign during reversal is a safety gap.",
+      "amber": "Pixel test and supply check at next window.",
+      "green": "No action."
+    },
+    "cctv": {
+      "red": "Replace camera + encoder; restore corridor coverage for incident verification.",
+      "amber": "Clean optics, check PTZ and stream health.",
+      "green": "No action."
+    },
+    "lighting": {
+      "red": "Replace luminaire driver(s); dark median segment elevates night crash risk.",
+      "amber": "Group re-lamp at next window.",
+      "green": "No action."
+    },
+    "controller_cabinet": {
+      "red": "Replace cabinet power/comms; cabinet outage takes a cluster of devices offline.",
+      "amber": "Thermal check, UPS battery test.",
+      "green": "No action."
+    }
+  },
+  "workPackage": {
+    "_comment": "Used by the multi-select 'proactive work package' rollup. crewHoursEach = wrench time if each asset is done as its own emergency callout; sharedSetupHours is the one-time mobilization saved when bundled into a single planned window.",
+    "crewHoursEach": {
+      "toll_gantry": 6,
+      "access_gate": 4,
+      "lane_control": 5,
+      "ramp_signal": 4,
+      "detector": 2,
+      "dms": 5,
+      "cctv": 2,
+      "lighting": 3,
+      "controller_cabinet": 4
+    },
+    "sharedSetupHoursPerClosure": 3,
+    "emergencyClosureHoursEach": 4,
+    "plannedClosureHours": 5,
+    "tolledLaneRevenuePerHour": 7800
+  }
+}

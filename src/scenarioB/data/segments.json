@@ -1,0 +1,13 @@
+{
+  "_comment": "Synthetic I-595 corridor segments for Scenario B (Safety Hotspot Predictor). EPSG:32617 endpoints (from_e/from_n -> to_e/to_n) for real placement on the reality mesh; u_from/u_to (0=west I-75/Sawgrass, 1=east I-95) for extents-normalized fallback. The deliberate red hotspot is SEG-CONN: the Express<->Turnpike connector merge, where PM-reversal queue spillback drives rear-end crashes.",
+  "segments": [
+    { "segment_id": "SEG-MN-W", "name": "I-595 Mainline — West (I-75 / Sawgrass)", "roadway": "i595_mainline", "direction": "EB", "from_e": 578200, "from_n": 2882980, "to_e": 581200, "to_n": 2883000, "u_from": 0.04, "u_to": 0.22, "length_m": 3000 },
+    { "segment_id": "SEG-MN-C", "name": "I-595 Mainline — Central (near SR 7 / US 441)", "roadway": "i595_mainline", "direction": "EB", "from_e": 581200, "from_n": 2883000, "to_e": 585600, "to_n": 2882990, "u_from": 0.22, "u_to": 0.50, "length_m": 4400 },
+    { "segment_id": "SEG-EXP-RVS", "name": "Express Toll — Reversible median segment", "roadway": "express_lane", "direction": "reversible", "from_e": 580200, "from_n": 2883015, "to_e": 588000, "to_n": 2883020, "u_from": 0.30, "u_to": 0.78, "length_m": 7800 },
+    { "segment_id": "SEG-SR84", "name": "State Road 84 — Frontage", "roadway": "sr84", "direction": "WB", "from_e": 582000, "from_n": 2882700, "to_e": 586500, "to_n": 2882710, "u_from": 0.28, "u_to": 0.58, "length_m": 4500 },
+    { "segment_id": "SEG-MN-E", "name": "I-595 Mainline — East approach to Turnpike", "roadway": "i595_mainline", "direction": "EB", "from_e": 585600, "from_n": 2882990, "to_e": 590000, "to_n": 2883000, "u_from": 0.50, "u_to": 0.82, "length_m": 4400 },
+    { "segment_id": "SEG-CONN", "name": "Express Toll <-> Turnpike Connector merge", "roadway": "turnpike_ramp", "direction": "EB", "from_e": 590000, "from_n": 2883000, "to_e": 591600, "to_n": 2883050, "u_from": 0.82, "u_to": 0.93, "length_m": 1700 },
+    { "segment_id": "SEG-TPK-S", "name": "Turnpike South Connector ramp (Bridge 01)", "roadway": "turnpike_ramp", "direction": "EB", "from_e": 591200, "from_n": 2882760, "to_e": 591800, "to_n": 2882500, "u_from": 0.88, "u_to": 0.98, "length_m": 900 },
+    { "segment_id": "SEG-TPK-N", "name": "Turnpike North Connector ramp (Bridge 02)", "roadway": "turnpike_ramp", "direction": "EB", "from_e": 591400, "from_n": 2883120, "to_e": 592000, "to_n": 2883400, "u_from": 0.89, "u_to": 0.99, "length_m": 900 }
+  ]
+}

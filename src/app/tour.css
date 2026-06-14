@@ -1,0 +1,76 @@
+.tour-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: rgba(6, 10, 15, 0.55);
+  pointer-events: none;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+.tour-card {
+  position: absolute;
+  pointer-events: auto;
+  width: 320px;
+  background: #18222e;
+  color: #e7edf3;
+  border: 1px solid #2f8fe0;
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+  padding: 16px 18px;
+}
+.tour-card .tour-step {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #6ab8f0;
+  text-transform: uppercase;
+}
+.tour-card h3 {
+  margin: 4px 0 6px;
+  font-size: 16px;
+}
+.tour-card p {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #c7d2dd;
+}
+.tour-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.tour-actions .spacer {
+  flex: 1;
+}
+.tour-actions button {
+  border: 1px solid #2a3543;
+  background: #1d2733;
+  color: #c7d2dd;
+  border-radius: 7px;
+  padding: 7px 13px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tour-actions button.primary {
+  background: #2f8fe0;
+  border-color: #2f8fe0;
+  color: #fff;
+}
+.tour-actions button:hover {
+  filter: brightness(1.1);
+}
+.tour-fab {
+  border: 1px solid #2a3543;
+  background: #1d2733;
+  color: #c7d2dd;
+  border-radius: 7px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tour-fab:hover {
+  background: #2a3543;
+  color: #fff;
+}

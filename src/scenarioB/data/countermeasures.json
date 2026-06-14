@@ -1,0 +1,49 @@
+{
+  "_comment": "Deterministic countermeasure catalog for the Scenario B before/after toggle. Each applies a fixed fractional reduction to incidents whose type AND/OR contributing factor it addresses. recommended_for maps a countermeasure to the segment it's the headline fix for.",
+  "countermeasures": [
+    {
+      "id": "CM-MERGE",
+      "name": "Extended acceleration lane + merge restripe",
+      "short": "Merge geometry fix",
+      "affected_types": ["rear_end", "sideswipe", "secondary"],
+      "affected_factors": ["merge_geometry", "queue_spillback"],
+      "reduction": 0.45,
+      "cost_usd": 850000,
+      "install_days": 90,
+      "recommended_for": ["SEG-CONN"]
+    },
+    {
+      "id": "CM-DYNQ",
+      "name": "Dynamic queue-warning + variable speed limits",
+      "short": "Queue-warning ITS",
+      "affected_types": ["rear_end", "secondary"],
+      "affected_factors": ["queue_spillback", "speed"],
+      "reduction": 0.35,
+      "cost_usd": 420000,
+      "install_days": 45,
+      "recommended_for": ["SEG-MN-E"]
+    },
+    {
+      "id": "CM-LIGHT",
+      "name": "Median lighting upgrade (LED, full-corridor)",
+      "short": "Lighting upgrade",
+      "affected_types": ["rear_end", "sideswipe"],
+      "affected_factors": ["lighting"],
+      "reduction": 0.25,
+      "cost_usd": 300000,
+      "install_days": 30,
+      "recommended_for": ["SEG-EXP-RVS"]
+    },
+    {
+      "id": "CM-SIGN",
+      "name": "Advance merge signage + high-friction surface",
+      "short": "Signage + HFST",
+      "affected_types": ["sideswipe", "rear_end"],
+      "affected_factors": ["merge_geometry", "wet_pavement"],
+      "reduction": 0.2,
+      "cost_usd": 120000,
+      "install_days": 14,
+      "recommended_for": ["SEG-TPK-S", "SEG-TPK-N", "SEG-MN-C"]
+    }
+  ]
+}

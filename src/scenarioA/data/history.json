@@ -1,0 +1,33 @@
+{
+  "_comment": "Synthetic maintenance history keyed by asset_tag (inspection / incident / work_order / ticket / task). Feeds the asset health card timeline. Densest for the red cluster so those cards tell a clear reactive-maintenance story.",
+  "records": [
+    { "asset_tag": "ITS-GAN-014", "type": "work_order", "date": "2026-03-02", "description": "Emergency call-out: intermittent SunPass read failures EB lane 2", "status": "closed", "severity": "high", "cost": 4200 },
+    { "asset_tag": "ITS-GAN-014", "type": "ticket", "date": "2026-04-18", "description": "Recurring transponder mis-reads reported by tolling back office", "status": "open", "severity": "high" },
+    { "asset_tag": "ITS-GAN-014", "type": "ticket", "date": "2026-05-22", "description": "Antenna head fault code F-12 repeating", "status": "open", "severity": "high" },
+    { "asset_tag": "ITS-GAN-014", "type": "inspection", "date": "2024-09-12", "description": "Annual inspection — reader electronics flagged near end-of-life", "status": "closed", "severity": "medium" },
+
+    { "asset_tag": "ITS-LCS-021", "type": "work_order", "date": "2026-01-18", "description": "Driver board replaced after dark segment during PM reversal", "status": "closed", "severity": "high", "cost": 2600 },
+    { "asset_tag": "ITS-LCS-021", "type": "ticket", "date": "2026-05-09", "description": "Flicker on overhead arrow during reversal cycle", "status": "open", "severity": "medium" },
+    { "asset_tag": "ITS-LCS-021", "type": "inspection", "date": "2024-11-01", "description": "Comms latency to cabinet ITS-CAB-005 noted", "status": "closed", "severity": "medium" },
+
+    { "asset_tag": "ITS-GATE-007", "type": "work_order", "date": "2026-04-09", "description": "Gate actuator stalled mid-cycle, manual reversal required", "status": "closed", "severity": "high", "cost": 3100 },
+    { "asset_tag": "ITS-GATE-007", "type": "ticket", "date": "2026-05-30", "description": "Limit switch intermittent — gate fails to confirm closed", "status": "open", "severity": "high" },
+    { "asset_tag": "ITS-GATE-007", "type": "task", "date": "2026-06-01", "description": "Schedule actuator replacement", "status": "open" },
+
+    { "asset_tag": "ITS-CAB-005", "type": "work_order", "date": "2026-02-20", "description": "UPS battery failure took connector device cluster offline 47 min", "status": "closed", "severity": "high", "cost": 5400 },
+    { "asset_tag": "ITS-CAB-005", "type": "ticket", "date": "2026-05-12", "description": "Cabinet over-temperature alarm during midday peak", "status": "open", "severity": "high" },
+    { "asset_tag": "ITS-CAB-005", "type": "inspection", "date": "2024-08-01", "description": "Power supply + comms switch flagged end-of-life", "status": "closed", "severity": "medium" },
+
+    { "asset_tag": "ITS-LCS-022", "type": "ticket", "date": "2026-05-02", "description": "Dimming LEDs on signal head", "status": "open", "severity": "medium" },
+    { "asset_tag": "ITS-DET-031", "type": "work_order", "date": "2025-11-01", "description": "Recalibrated loop after under-count vs gantry volumes", "status": "closed", "severity": "medium", "cost": 900 },
+    { "asset_tag": "ITS-DET-031", "type": "ticket", "date": "2026-04-25", "description": "Lane 1 counts drifting low", "status": "open", "severity": "medium" },
+
+    { "asset_tag": "ITS-DMS-009", "type": "work_order", "date": "2025-09-01", "description": "Two pixel modules replaced", "status": "closed", "severity": "low", "cost": 1200 },
+    { "asset_tag": "ITS-DMS-009", "type": "ticket", "date": "2026-05-01", "description": "Brightness uneven on right third of sign", "status": "open", "severity": "medium" },
+    { "asset_tag": "ITS-CCTV-040", "type": "ticket", "date": "2026-04-15", "description": "PTZ drift, occasional stream drop", "status": "open", "severity": "medium" },
+    { "asset_tag": "ITS-LGT-052", "type": "ticket", "date": "2026-03-28", "description": "Two luminaires out in median run", "status": "open", "severity": "medium" },
+
+    { "asset_tag": "ITS-GAN-002", "type": "inspection", "date": "2026-03-01", "description": "Routine inspection — all within spec", "status": "closed", "severity": "low" },
+    { "asset_tag": "ITS-LCS-010", "type": "inspection", "date": "2026-02-01", "description": "Routine inspection — nominal", "status": "closed", "severity": "low" }
+  ]
+}

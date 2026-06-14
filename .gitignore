@@ -1,0 +1,41 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies & build output
+/node_modules
+node_modules/
+/.pnp
+.pnp.js
+/coverage
+/build
+dist/
+*.tsbuildinfo
+
+# local env (kept out of git). .env.production IS committed for the Pages build.
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# dev / backend tooling — NOT part of the demo app (references the customer source iModel)
+scripts/
+
+# briefcases / snapshots / caches / heavy + customer inputs
+*.bim
+*.bim-*
+*.pdf
+*.xlsx
+*.jpeg
+*.jpg
+!public/**
+
+# logs / OS
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db
+
+# local editor/agent settings
+.claude/

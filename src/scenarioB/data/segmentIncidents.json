@@ -1,0 +1,36 @@
+{
+  "_comment": "Synthetic 24-month incident history keyed by segment_id. Feeds the Scenario B safety score + incident card. Concentrated on SEG-CONN (Express<->Turnpike connector merge) — rear-end + sideswipe from PM-reversal queue spillback and tight merge geometry — and SEG-MN-E (east approach queue).",
+  "incidents": [
+    { "incident_id": "INC-0001", "segment_id": "SEG-CONN", "date": "2025-08-14", "type": "rear_end", "severity": "injury", "lane_closure_min": 95, "contributing_factor": "queue_spillback" },
+    { "incident_id": "INC-0002", "segment_id": "SEG-CONN", "date": "2025-09-03", "type": "rear_end", "severity": "minor", "lane_closure_min": 40, "contributing_factor": "queue_spillback" },
+    { "incident_id": "INC-0003", "segment_id": "SEG-CONN", "date": "2025-09-22", "type": "sideswipe", "severity": "minor", "lane_closure_min": 30, "contributing_factor": "merge_geometry" },
+    { "incident_id": "INC-0004", "segment_id": "SEG-CONN", "date": "2025-10-11", "type": "rear_end", "severity": "serious", "lane_closure_min": 160, "contributing_factor": "queue_spillback" },
+    { "incident_id": "INC-0005", "segment_id": "SEG-CONN", "date": "2025-11-05", "type": "sideswipe", "severity": "injury", "lane_closure_min": 70, "contributing_factor": "merge_geometry" },
+    { "incident_id": "INC-0006", "segment_id": "SEG-CONN", "date": "2025-12-02", "type": "rear_end", "severity": "minor", "lane_closure_min": 35, "contributing_factor": "queue_spillback" },
+    { "incident_id": "INC-0007", "segment_id": "SEG-CONN", "date": "2026-01-19", "type": "rear_end", "severity": "injury", "lane_closure_min": 110, "contributing_factor": "queue_spillback" },
+    { "incident_id": "INC-0008", "segment_id": "SEG-CONN", "date": "2026-02-08", "type": "secondary", "severity": "minor", "lane_closure_min": 45, "contributing_factor": "queue_spillback" },
+    { "incident_id": "INC-0009", "segment_id": "SEG-CONN", "date": "2026-03-17", "type": "sideswipe", "severity": "minor", "lane_closure_min": 25, "contributing_factor": "merge_geometry" },
+    { "incident_id": "INC-0010", "segment_id": "SEG-CONN", "date": "2026-04-21", "type": "rear_end", "severity": "serious", "lane_closure_min": 145, "contributing_factor": "queue_spillback" },
+    { "incident_id": "INC-0011", "segment_id": "SEG-CONN", "date": "2026-05-13", "type": "rear_end", "severity": "minor", "lane_closure_min": 50, "contributing_factor": "speed" },
+
+    { "incident_id": "INC-0021", "segment_id": "SEG-MN-E", "date": "2025-08-30", "type": "rear_end", "severity": "minor", "lane_closure_min": 30, "contributing_factor": "queue_spillback" },
+    { "incident_id": "INC-0022", "segment_id": "SEG-MN-E", "date": "2025-10-19", "type": "rear_end", "severity": "injury", "lane_closure_min": 85, "contributing_factor": "queue_spillback" },
+    { "incident_id": "INC-0023", "segment_id": "SEG-MN-E", "date": "2025-12-14", "type": "breakdown", "severity": "minor", "lane_closure_min": 40, "contributing_factor": "speed" },
+    { "incident_id": "INC-0024", "segment_id": "SEG-MN-E", "date": "2026-02-27", "type": "rear_end", "severity": "minor", "lane_closure_min": 35, "contributing_factor": "queue_spillback" },
+    { "incident_id": "INC-0025", "segment_id": "SEG-MN-E", "date": "2026-04-30", "type": "sideswipe", "severity": "minor", "lane_closure_min": 25, "contributing_factor": "speed" },
+
+    { "incident_id": "INC-0031", "segment_id": "SEG-EXP-RVS", "date": "2025-09-12", "type": "sideswipe", "severity": "minor", "lane_closure_min": 20, "contributing_factor": "lighting" },
+    { "incident_id": "INC-0032", "segment_id": "SEG-EXP-RVS", "date": "2026-01-08", "type": "rear_end", "severity": "injury", "lane_closure_min": 60, "contributing_factor": "lighting" },
+    { "incident_id": "INC-0033", "segment_id": "SEG-EXP-RVS", "date": "2026-03-29", "type": "sideswipe", "severity": "minor", "lane_closure_min": 20, "contributing_factor": "merge_geometry" },
+
+    { "incident_id": "INC-0041", "segment_id": "SEG-MN-C", "date": "2025-11-22", "type": "rear_end", "severity": "minor", "lane_closure_min": 25, "contributing_factor": "wet_pavement" },
+    { "incident_id": "INC-0042", "segment_id": "SEG-MN-C", "date": "2026-02-15", "type": "breakdown", "severity": "minor", "lane_closure_min": 30, "contributing_factor": "speed" },
+
+    { "incident_id": "INC-0051", "segment_id": "SEG-TPK-S", "date": "2025-10-05", "type": "sideswipe", "severity": "minor", "lane_closure_min": 20, "contributing_factor": "merge_geometry" },
+    { "incident_id": "INC-0052", "segment_id": "SEG-TPK-S", "date": "2026-03-02", "type": "rear_end", "severity": "injury", "lane_closure_min": 65, "contributing_factor": "merge_geometry" },
+    { "incident_id": "INC-0061", "segment_id": "SEG-TPK-N", "date": "2026-01-30", "type": "sideswipe", "severity": "minor", "lane_closure_min": 20, "contributing_factor": "merge_geometry" },
+
+    { "incident_id": "INC-0071", "segment_id": "SEG-SR84", "date": "2025-12-20", "type": "rear_end", "severity": "minor", "lane_closure_min": 20, "contributing_factor": "wet_pavement" },
+    { "incident_id": "INC-0081", "segment_id": "SEG-MN-W", "date": "2026-02-03", "type": "breakdown", "severity": "minor", "lane_closure_min": 15, "contributing_factor": "speed" }
+  ]
+}
