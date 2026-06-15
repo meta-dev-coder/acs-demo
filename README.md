@@ -1,130 +1,134 @@
 # ACS I-595 Express — Operational Digital Twin (Demo)
 
-A Bentley **iTwin Viewer** app that turns the published I-595 Express corridor model into an
-operational twin. **Scenario A — ITS Asset Failure Prediction** is built and live; Scenario B
-(Safety Hotspot) is the documented Phase-2 roadmap.
+A Bentley **iTwin Viewer** app that turns the published I-595 Express corridor into a **photoreal
+operational twin** with predictive-maintenance and safety analytics, presented in a decision-support
+dashboard. Built for the ACS pitch demo (collaboration with Bentley).
 
-> Built for the ACS pitch demo. Accuracy is not the bar — the data is synthetic and shaped to read
-> like I-595 Express (SunPass gantries, reversible median express lanes, the Turnpike connector).
-> The point is a working, credible decision surface running on the real Bentley geometry.
+> Accuracy is not the bar — data is synthetic and shaped to read like I-595 Express (SunPass
+> gantries, reversible median express lanes, the Turnpike connector). The point is a working,
+> credible decision surface on the real Bentley geometry.
+>
+> **Note on scope:** this intentionally goes beyond the original `Tolling - ACS _ Scope.pdf` (which
+> specified a bare, in-model, map-off twin). At the team's direction it adds an **aerial base map**,
+> the **photoreal reality mesh**, and a **dashboard shell** to make it partnership-grade. The
+> map/mesh are read-only context; the customer's model is never modified.
 
 ---
 
-## What it does (Scenario A)
+## What it does
 
-- Opens the corridor in the iTwin Viewer with the **background map off** and **all default chrome
-  stripped** (no model tree, property grid, measure tools, or toolbars). The only persistent UI is
-  the **scenario switch + risk legend**.
-- Colors every roadside **ITS asset** (toll gantries, DMS, CCTV, detectors, lane-control, access
-  gates, ramp signals, lighting, cabinets) **green / amber / red by predicted failure risk**, shown
-  as in-scene markers on the model.
-- **Click an asset** → the camera frames it and an **anchored health card** shows the predicted
-  risk, the drivers ("why it's at risk"), the recommended action, asset details, and maintenance
-  history.
-- **Multi-select** several at-risk assets → a **proactive work package**: lane closures avoided,
-  crew hours saved, and toll revenue protected (bundling N emergency call-outs into one planned
-  window).
-- All weights, thresholds, recommended actions, and the work-package math live in
-  `src/scenarioA/config/scoringConfig.json` — **nothing is hardcoded**.
+**Shell** — top scenario tabs · left filterable, risk-sorted asset/segment **list** (click a row →
+the viewer frames it) · center embedded **iTwin Viewer** (photoreal reality mesh + aerial base map)
+· right **inspector** (follows selection) · bottom **KPI bar** · collapsible side panels · a
+**guided tour** ("Take a tour").
+
+**Scenario A — ITS Asset Failure Prediction.** Every roadside ITS asset (toll gantries, DMS, CCTV,
+detectors, lane-control, access gates, ramp signals, lighting, cabinets) is shown as a
+**green/amber/red risk pin** on the corridor. Click → inspector with predicted risk, drivers,
+history, **last work order / age-vs-rated-life / condition**, and recommended action. Build a
+**proactive work package** (lane closures avoided · crew hours saved · toll revenue protected).
+
+**Scenario B — Safety Hotspot Predictor.** Corridor **segments** colored by safety risk (WorldOverlay
+ribbons), a **pin on the top hotspot** (Express↔Turnpike connector), an incident card (count, type,
+severity mix, closure impact, contributing factors), and a **Before/After countermeasure toggle**
+that recolors the segment and shows crashes/closures avoided + revenue protected.
+
+All weights, thresholds, recommended actions, and countermeasure effects live in
+`src/scenarioA/config/scoringConfig.json`, `src/scenarioB/config/safetyConfig.json`, and
+`src/scenarioB/data/countermeasures.json` — **nothing scoring-related is hardcoded**.
 
 ---
 
 ## Prerequisites
 
-- **Node 22** (an `.nvmrc` is included): `nvm install 22 && nvm use 22`. (Node 24 can fail the
-  iTwin toolchain.)
+- **Node 22** (`.nvmrc` included): `nvm install 22 && nvm use 22`. (Node 24 can fail the iTwin toolchain.)
 
----
-
-## Step 0 — Access & the replica (DO THIS FIRST)
-
-Two things must exist before the app can open the model. **The app must only ever point at a COPY
-of the customer's model, never the live BST409 iModel** (customer hard rule).
-
-1. **Register an OIDC SPA client** — developer.bentley.com → My Apps → Register New → type **SPA**,
-   redirect URI `http://localhost:3000/signin-callback`, post-logout `http://localhost:3000`, scope
-   `itwin-platform`. Copy the **Client ID**. (Use Mike's Bentley account, which has access to BST409.)
-2. **Create the replica iModel** — see **[scripts/REPLICA.md](scripts/REPLICA.md)**. Quick version:
-   ```bash
-   export IMJS_ACCESS_TOKEN="<token from developer.bentley.com 'Try it'>"
-   npm run replica:list                              # find the BST409 iTwin + source iModel ids
-   npm run replica:create-itwin -- --name "ACS I-595 Demo (SuperDNA copy)"
-   npm run replica:clone -- --source <SOURCE_IMODEL_ID> --target-itwin <TARGET_ITWIN_ID>
-   ```
-   It prints the **replica** `IMJS_IMODEL_ID` and `IMJS_ITWIN_ID`.
-3. **Fill `.env`** with the Client ID and the **replica** iTwin/iModel ids (never the source).
-
----
-
-## Run
+## Run (local)
 
 ```bash
 nvm use 22
-npm install        # already done if node_modules exists
-npm start          # http://localhost:3000  (sign in as Mike on first load)
+npm install
+npm start                 # http://localhost:3000  (sign in as Mike)
+# or auto-restarting dev server with live reload:
+bash scripts/dev.sh
 ```
 
-On first connect the console prints how many assets scored red/amber and offers Phase-0 discovery:
+In the browser console you can run Phase-0 discovery against the loaded model:
 
 ```js
-await __acsDiscovery()   // enumerate ECClasses/categories/labels/extents of the loaded model
+await __acsDiscovery()    // ECClasses / categories / labels / extents — confirms assets are
+                          // point inventory (markers) vs. discrete elements
 ```
 
-Run that **once against the replica** to confirm the two load-bearing facts before the demo:
-whether ITS assets are discrete elements (they're likely **not** — markers handle that) and whether
-the roadway is segmentable (matters for Phase-2 Scenario B). See **Calibration** below.
+## Test
 
----
+```bash
+npm test                  # vitest — placement geometry + risk scoring (no auth / model needed)
+```
 
-## Demo flow (the 2-minute story)
+## Step 0 — access & the replica (one-time)
 
-1. Open zoomed out on the whole corridor — assets light up green/amber/red.
-2. Click the **red SunPass gantry** near the Turnpike connector → health card → "lost reads = lost
-   toll revenue; the fix is an emergency closure during a reversal."
-3. Click the other reds clustered at the **median reversal point** (gate, lane-control, cabinet).
-4. **Add them to a work package** → "3 emergency closures → 1 planned window" with crew hours saved
-   and revenue protected. ← the money shot.
+The app must only ever open a **copy** of the customer's model. See **[scripts/REPLICA.md](scripts/REPLICA.md)**.
+The copy is made with the transformer (`scripts/transformer/transform.mjs`), which also copies the
+**geolocation** (`ecefLocation`) — required for the base map + reality mesh to position correctly.
+Fill `.env` (local) / `.env.production` (Pages build) with the SPA client id + the **replica**
+iTwin/iModel ids (never the source).
 
-> **Live-demo insurance:** bank a screen recording of this flow early and keep it ready to cut to.
+## Deploy (GitHub Pages)
+
+Auto-deploys to https://meta-dev-coder.github.io/acs-demo/ on push to `master`
+(`.github/workflows/deploy.yml`). See **[DEPLOY.md](DEPLOY.md)** for the one-time Pages + OIDC
+redirect-URI setup and caveats.
 
 ---
 
 ## Project structure
 
 ```
-scripts/                 Replica tooling (clone / list / create-itwin) + REPLICA.md
-src/components/App.tsx    Viewer: chrome stripped, map off, mounts Scenario A
+src/components/App.tsx        Viewer host (chrome stripped, base map on, mounts the scene) + Shell
+src/components/Authorization  OIDC sign-in (+ callback returns to app for Pages SPA hosting)
+src/app/
+  Shell.tsx                   Dashboard: top tabs, left list, viewer panel, inspector, KPI bar
+  GuidedTour.tsx              Onboarding coach-marks
+  shell.css / tour.css        Styles
+src/scene/
+  init.ts                     onIModelConnected + viewport orchestration (top view, frame, mesh)
+  realityModels.ts            Attach BST409 reality meshes (read-only) + zoom
+  place.ts                    Corridor centerline (from road geometry) + on-road placement/snap
 src/scenarioA/
-  data/assets.json        Synthetic I-595 asset register (hero assets)
-  data/history.json       Inspection/incident/work-order/ticket/task records
-  config/scoringConfig.json  Weights, thresholds, actions, work-package math (tune here)
-  scoring.ts              Rule-based risk score + bands + drivers
-  placement.ts            Marker placement (extents-normalized now; EPSG:32617 after calibration)
-  decorator.ts            Marker / MarkerSet / Decorator colored by risk; click → inspect + frame
-  workPackage.ts          Proactive work-package rollup
-  discovery.ts            Phase-0 ECSQL discovery (await __acsDiscovery())
-  manager.ts              Wires scoring + placement + decorator on iModel connect
-  ui/ScenarioAOverlay.tsx Scenario switch, legend, anchored health card, work-package tray/card
+  data/assets.json, history.json    Synthetic I-595 asset register + maintenance history
+  config/scoringConfig.json   Weights, thresholds, actions, work-package math
+  scoring.ts                  Rule-based risk score + bands + drivers + age/condition
+  decorator.ts                Risk pin markers (Marker/MarkerSet); click → inspect + frame
+  workPackage.ts              Proactive work-package rollup
+  discovery.ts                Phase-0 ECSQL discovery (await __acsDiscovery())
+  store.ts                    Shared UI state for both scenarios (useSyncExternalStore)
+  viewportUtils.ts            Clean display (base map, smooth shade) + frame helpers
+src/scenarioB/
+  data/segments.json, segmentIncidents.json, countermeasures.json
+  config/safetyConfig.json    Safety weights/thresholds/economics
+  safetyScoring.ts            Segment safety score + deterministic countermeasure deltas
+  decorator.ts                Pickable WorldOverlay risk ribbons + hotspot pin
+  manager.ts                  Scores segments, builds ribbons, registers the decorator
+scripts/                      Replica/transformer tooling + dev.sh (not part of the deployed app)
 ```
 
-## Calibration (markers → true position)
+## Placement
 
-Markers default to **extents-normalized placement** (`PLACEMENT_MODE = "extents"` in
-`placement.ts`): they lay out along the model's longest horizontal axis using each asset's `u`/`v`,
-so they sit along the corridor on **any** loaded model with zero setup. To pin them to true
-EPSG:32617 coordinates after discovery, measure the spatial origin against 2–3 known landmarks, set
-`EPSG_ORIGIN` in `placement.ts`, and flip `PLACEMENT_MODE` to `"epsg32617"`.
-
-## Scenario B (Phase 2 — roadmap, not built)
-
-Color corridor **segments** by safety risk; click for an incident summary; toggle a countermeasure
-before/after. Deferred because segment coloring needs the roadway to exist as discrete linear
-elements (unverified) and it's the heaviest mechanic. The scenario switch shows it as "Phase 2."
+The loaded iModel is the **Express↔Turnpike connector** (a corridor-scale copy was deferred due to
+checkpoint-download timeouts). Placement derives a clean **corridor centerline** from the model's real
+road geometry: element origins are filtered to `projectExtents` (the connector parks ~16% of origins
+at the spatial origin `(0,0,0)`), then binned along the dominant axis (median per bin) into an ordered
+spine. Each asset/segment's synthetic UTM coordinate maps onto that spine (easting → distance along,
+northing → lateral offset); **asset pins additionally snap to the nearest real road element** so they
+always sit on the highway, and Scenario B ribbons follow the spine smoothly. The KPI bar shows
+`placement: road` and the view opens **top-down**. Guarded by `tests/placement.test.ts` (reproduces
+the `(0,0,0)`-stray regression that once flung the camera to the globe).
 
 ## Troubleshooting
 
-- **"Please add a valid OIDC client id"** → `.env` `IMJS_AUTH_CLIENT_CLIENT_ID` is empty.
-- **Auth redirect loops** → the SPA client's redirect URI must be exactly
-  `http://localhost:3000/signin-callback`.
-- **Model won't load / 401** → the signed-in account lacks access to the **replica** iTwin/iModel.
-- **Markers not where expected** → see Calibration (default placement is approximate by design).
+- **Blank base map / missing mesh** → the iModel must be geolocated (`isGeoLocated: true`); the
+  transformer copies `ecefLocation`. Verify offline: `node scripts/transformer/diag.mjs <cached.bim>`.
+- **`/signin-callback` 404 on Pages** → handled by the `404.html` SPA fallback (the deploy workflow
+  copies `index.html` → `404.html`); the 404 *status* on that one request is expected.
+- **Model won't load / 401** → the signed-in account lacks access to the replica iTwin/iModel.

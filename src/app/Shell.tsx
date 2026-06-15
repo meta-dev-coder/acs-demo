@@ -7,7 +7,7 @@
 import "./shell.css";
 import { type ReactNode, useMemo, useState } from "react";
 import { store, useScenarioState } from "../scenarioA/store";
-import { bandMeta } from "../scenarioA/scoring";
+import { ageYears, bandMeta, conditionLabel } from "../scenarioA/scoring";
 import { computeWorkPackage } from "../scenarioA/workPackage";
 import { frameWorld } from "../scenarioA/viewportUtils";
 import type { RiskBand, ScoredAsset } from "../scenarioA/types";
@@ -197,9 +197,16 @@ function AssetInspector({ asset }: { asset: ScoredAsset }) {
         <h4>Asset</h4>
         <dl className="sd-meta">
           <dt>Class</dt><dd>{asset.asset_class.replace(/_/g, " ")}</dd>
+          <dt>Condition</dt>
+          <dd style={{ color: bandMeta(asset.band).color }}>{conditionLabel(asset.band)}</dd>
+          <dt>Age vs. rated life</dt>
+          <dd>
+            {ageYears(asset.install_date)} / {asset.expected_life_years} yr
+            {" "}({Math.round((ageYears(asset.install_date) / asset.expected_life_years) * 100)}%)
+          </dd>
           <dt>Installed</dt><dd>{asset.install_date}</dd>
-          <dt>Rated life</dt><dd>{asset.expected_life_years} yr</dd>
           <dt>Last inspection</dt><dd>{asset.last_inspection_date}</dd>
+          <dt>Last work order</dt><dd>{asset.last_workorder_date}</dd>
           <dt>Open tickets</dt><dd>{asset.open_tickets}</dd>
         </dl>
       </div>
@@ -273,11 +280,13 @@ function SegmentInspector({ segment }: { segment: ScoredSegment }) {
       {!treated && (
         <>
           <div className="sd-sec">
-            <h4>Incident profile</h4>
+            <h4>Incident profile · 24 mo</h4>
             <dl className="sd-meta">
+              <dt>Crashes / year</dt><dd>{(segment.stats.count / 2).toFixed(1)}</dd>
               <dt>Injury / serious</dt><dd>{segment.stats.injuries} / {segment.stats.serious}</dd>
               <dt>Dominant type</dt><dd>{segment.stats.dominantType.replace(/_/g, " ")}</dd>
               <dt>Lane-closure burden</dt><dd>{Math.round(segment.stats.closureMin / 60)} hrs</dd>
+              <dt>Most recent</dt><dd>{segment.incidents[0]?.date ?? "—"}</dd>
             </dl>
           </div>
           <div className="sd-sec">
@@ -286,6 +295,20 @@ function SegmentInspector({ segment }: { segment: ScoredSegment }) {
               {segment.stats.factors.map((f) => (<span className="sd-tagchip" key={f}>{FACTOR[f] ?? f}</span>))}
             </div>
           </div>
+          {segment.incidents.length > 0 && (
+            <div className="sd-sec">
+              <h4>Recent incidents</h4>
+              <ul className="sd-tl">
+                {segment.incidents.slice(0, 5).map((i, k) => (
+                  <li key={i.incident_id ?? k}>
+                    <span className="when">{i.date}</span>
+                    <span className="ty">{i.type.replace(/_/g, " ")}</span> — {i.severity}
+                    {i.lane_closure_min ? ` · ${i.lane_closure_min}m closure` : ""}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </>
       )}
 

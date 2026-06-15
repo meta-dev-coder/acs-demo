@@ -63,6 +63,16 @@ export function bandMeta(band: RiskBand): BandMeta {
   return config.bandMeta[band];
 }
 
+/** Asset age in years vs the scoring reference date (for the health card). */
+export function ageYears(installDate: string): number {
+  return Math.max(0, Math.round(yearsBetween(installDate, REF)));
+}
+
+/** Plain-language condition derived from the risk band (for the health card). */
+export function conditionLabel(band: RiskBand): string {
+  return band === "red" ? "Poor" : band === "amber" ? "Fair" : "Good";
+}
+
 /** Compute the risk factors (each 0..1) for an asset. */
 function factors(a: RawAsset) {
   const ageRatio = clamp01(yearsBetween(a.install_date, REF) / a.expected_life_years);

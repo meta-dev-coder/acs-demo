@@ -23,6 +23,9 @@ jobs:
         with:
           node-version: 22
       - run: npm install
+        env:
+          # test-only dev dep; don't pull a ~150MB browser on the Pages runner
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
       # base path must match the repo name for project Pages (https://<user>.github.io/acs-demo/)
       - run: npm run build
         env:

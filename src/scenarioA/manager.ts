@@ -14,7 +14,8 @@ import { scoreAssets } from "./scoring";
 import { AssetDecorator } from "./decorator";
 import { store } from "./store";
 import { runDiscovery } from "./discovery";
-import { placePoints } from "../scene/place";
+import { getCenterline, corridorPoint, snapToRoad } from "../scene/place";
+import type { Point3d } from "@itwin/core-geometry";
 import type { HistoryRecord, RawAsset } from "./types";
 
 let decorator: AssetDecorator | undefined;
@@ -30,26 +31,26 @@ export function scoreAssetsIntoStore(iModel: IModelConnection): void {
 
   const reds = scored.filter((a) => a.band === "red").length;
   console.log(`[Scenario A] ${scored.length} ITS assets scored — ${reds} act-now.`);
+
+  // Auto-run discovery once so the "[discovery-summary]" line appears without typing in the console.
+  void runDiscovery(iModel);
 }
 
-export async function placeAndDecorateA(
-  vp: ScreenViewport,
-  zLevel: number
-): Promise<void> {
+export async function placeAndDecorateA(vp: ScreenViewport): Promise<void> {
   const scored = store.getSnapshot().assets;
-  const { pts, mode } = await placePoints(
-    vp.iModel,
-    scored.map((a) => ({ e: a.coord_e, n: a.coord_n, u: a.u, v: a.v })),
-    zLevel
+  const cl = await getCenterline(vp.iModel);
+  const worldByTag = new Map<string, Point3d>();
+  // Place along the corridor (preserves each asset's u/lateral intent), then snap to the nearest
+  // real road element so the pin always sits ON the highway, not on the median/embankment.
+  scored.forEach((a) =>
+    worldByTag.set(a.asset_tag, snapToRoad(corridorPoint(cl, a.coord_e, a.coord_n, 0), 8))
   );
-  const worldByTag = new Map<string, (typeof pts)[number]>();
-  scored.forEach((a, i) => worldByTag.set(a.asset_tag, pts[i]));
-  store.setWorldLocations(worldByTag, mode);
+  store.setWorldLocations(worldByTag, cl.pts.length > 1 ? "road" : "extents");
 
   if (!decorator) {
     decorator = new AssetDecorator();
     IModelApp.viewManager.addDecorator(decorator);
   }
   decorator.setAssets(scored, worldByTag);
-  console.log(`[Scenario A] markers placed via ${mode}.`);
+  console.log(`[Scenario A] ${scored.length} markers placed on corridor centerline (${cl.pts.length} pts).`);
 }

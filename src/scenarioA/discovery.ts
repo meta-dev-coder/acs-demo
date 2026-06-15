@@ -47,6 +47,16 @@ export async function runDiscovery(iModel: IModelConnection): Promise<void> {
   );
   console.log("%cGeometricElement3d classes (discrete 3D elements):", "font-weight:bold");
   console.table(classCounts);
+  // One copyable line (easy to paste back) summarising the load-bearing fact:
+  console.log(
+    "%c[discovery-summary] COPY THIS LINE → ",
+    "font-weight:bold;color:#2f8fe0",
+    classCounts.length
+      ? `GeometricElement3d classes: ${classCounts
+          .map((r: { cls?: string; n?: number }) => `${r.cls}=${r.n}`)
+          .join(", ")}`
+      : "GeometricElement3d: NONE — ITS assets are NOT discrete elements (markers are correct)."
+  );
   if (classCounts.length === 0)
     console.warn(
       "No GeometricElement3d rows — the ITS assets are almost certainly NOT discrete elements. " +

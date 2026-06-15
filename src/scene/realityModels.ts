@@ -12,6 +12,7 @@ import {
 } from "@itwin/core-common";
 import {
   type ContextRealityModelState,
+  IModelApp,
   type ScreenViewport,
 } from "@itwin/core-frontend";
 import { Range3d } from "@itwin/core-geometry";
@@ -35,18 +36,32 @@ const REALITY_MODELS: RealityModelSpec[] = [
   },
 ];
 
-export function attachRealityModels(vp: ScreenViewport): ContextRealityModelState[] {
+export async function attachRealityModels(
+  vp: ScreenViewport
+): Promise<ContextRealityModelState[]> {
   const style = vp.displayStyle;
   const attached: ContextRealityModelState[] = [];
+  // The viewer otherwise resolves reality data against the loaded iModel's iTwin (the copy),
+  // which 404s — the meshes live in BST409. Resolve the tileset URL under BST409 ourselves.
+  const rda = IModelApp.realityDataAccess as
+    | { getRealityDataUrl?: (iTwinId: string, id: string) => Promise<string> }
+    | undefined;
+
   for (const m of REALITY_MODELS) {
-    const rdSourceKey: RealityDataSourceKey = {
-      provider: RealityDataProvider.ContextShare,
-      format: RealityDataFormat.ThreeDTile,
-      id: m.id,
-      iTwinId: BST409_ITWIN_ID,
-    };
-    const props: ContextRealityModelProps = { tilesetUrl: "", rdSourceKey, name: m.name };
     try {
+      let props: ContextRealityModelProps;
+      if (rda?.getRealityDataUrl) {
+        const url = await rda.getRealityDataUrl(BST409_ITWIN_ID, m.id);
+        props = { tilesetUrl: url, name: m.name };
+      } else {
+        const rdSourceKey: RealityDataSourceKey = {
+          provider: RealityDataProvider.ContextShare,
+          format: RealityDataFormat.ThreeDTile,
+          id: m.id,
+          iTwinId: BST409_ITWIN_ID,
+        };
+        props = { tilesetUrl: "", rdSourceKey, name: m.name };
+      }
       attached.push(style.attachRealityModel(props));
     } catch (e) {
       console.warn(`[reality] failed to attach ${m.name}:`, e);

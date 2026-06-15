@@ -20,10 +20,10 @@ import { store } from "./store";
 import { frameWorld } from "./viewportUtils";
 
 const BAND_RANK: Record<RiskBand, number> = { red: 3, amber: 2, green: 1 };
-const DIAMETER: Record<RiskBand, number> = { red: 50, amber: 40, green: 28 };
+const DIAMETER: Record<RiskBand, number> = { red: 34, amber: 28, green: 22 };
 
 /** Draw a map-pin (teardrop) whose TIP sits on the asset, body + symbol above it. */
-function drawPin(
+export function drawPin(
   ctx: CanvasRenderingContext2D,
   radius: number,
   color: string,

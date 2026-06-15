@@ -11,10 +11,20 @@ import {
   useState,
 } from "react";
 import { BrowserAuthorizationClient } from "@itwin/browser-authorization";
+import { useNavigate } from "@tanstack/react-router";
 
 export enum AuthorizationState {
   Pending,
   Authorized,
+}
+
+/** Pathname of the OIDC redirect (e.g. "/signin-callback" locally, "/acs-demo/signin-callback" on Pages). */
+function callbackPathname(): string {
+  try {
+    return new URL(import.meta.env.IMJS_AUTH_CLIENT_REDIRECT_URI ?? "").pathname;
+  } catch {
+    return "/signin-callback";
+  }
 }
 
 export interface AuthorizationContext {
@@ -66,6 +76,9 @@ export function AuthorizationProvider(props: PropsWithChildren<unknown>) {
   }, [authClient]);
 
   useEffect(() => {
+    // On the OIDC callback route, the SignInRedirect component completes auth — don't also
+    // kick off silent/redirect here (it races the callback and can loop).
+    if (window.location.pathname === callbackPathname()) return;
     const signIn = async () => {
       try {
         await authClient.signInSilent();
@@ -86,17 +99,23 @@ export function AuthorizationProvider(props: PropsWithChildren<unknown>) {
 
 export function SignInRedirect() {
   const { client } = useAuthorizationContext();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // Process the OIDC code, then return to the app root (under the Pages base path).
-    // Without this the user is stranded on a blank /signin-callback page.
+    // Process the OIDC code, then SPA-navigate to the app root. Using the router (not
+    // window.location) keeps the in-memory token alive — a full reload would drop it and loop.
+    // Works for both localhost ("/") and Pages ("/acs-demo/") via the router basepath.
     void client.handleSigninCallback().finally(() => {
-      // Don't navigate inside the silent-renew iframe — only the top-level callback returns home.
-      if (window.self !== window.top) return;
-      const base = import.meta.env.BASE_URL || "/";
-      if (window.location.pathname !== base) window.location.replace(base);
+      if (window.self !== window.top) return; // silent-renew iframe: do nothing
+      void navigate({
+        to: "/",
+        search: {
+          iTwinId: import.meta.env.IMJS_ITWIN_ID as string,
+          iModelId: import.meta.env.IMJS_IMODEL_ID as string,
+        },
+      });
     });
-  }, [client]);
+  }, [client, navigate]);
 
   return (
     <div style={{ padding: 24, fontFamily: "Segoe UI, system-ui, sans-serif", color: "#93a1b0" }}>

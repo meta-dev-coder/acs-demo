@@ -16,7 +16,7 @@ export interface ScenarioState {
   inspectedTag: string | null;
   packageTags: string[];
   packageOpen: boolean;
-  placementMode: "gcs" | "extents" | "pending";
+  placementMode: "gcs" | "extents" | "road" | "pending";
   // Scenario B — safety hotspots
   segments: ScoredSegment[];
   segmentMidById: Map<string, Point3d>;
