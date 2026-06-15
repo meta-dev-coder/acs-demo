@@ -19,22 +19,6 @@ import type { Centerline } from "../scene/place";
 import { corridorPoint, smoothPolyline } from "../scene/place";
 import type { ExpressSection } from "./types";
 
-// ---------------------------------------------------------------------------
-// Lateral median offset
-//
-// The I-595 reversible express lanes sit in the barrier-separated median.
-// A positive offset (toward the median side) displaces the express ribbon
-// laterally away from the GP mainline so the two don't render coincident.
-//
-// Value chosen: 8 m — enough to be clearly visible in a top-down view of the
-// ~30 m wide corridor, but small enough to stay on the median pavement.
-// Clamped by corridorPoint()'s own CORRIDOR.latMax = 95 m so it can never
-// drift off-model.
-// ---------------------------------------------------------------------------
-/** Signed lateral offset (meters) applied to every express sub-section polyline sample.
- *  Positive = toward the "north" side in the UTM frame (the median for I-595 EB). */
-export const EXPRESS_MEDIAN_LATERAL = 8; // meters — verified to land on median pavement
-
 /** Number of sample points along each express sub-section polyline. */
 const POLYLINE_SAMPLES = 10;
 
@@ -42,7 +26,7 @@ const POLYLINE_SAMPLES = 10;
 const LIFT_Z = 3;
 
 // ---------------------------------------------------------------------------
-// corridorPoint lateral factor
+// corridorPoint lateral factor (dimensionless)
 //
 // corridorPoint(cl, e, n, liftZ, lateralFactor) applies:
 //   lateral = (n - CORRIDOR.nRef) * CORRIDOR.latScale * lateralFactor   (clamped to ±95 m)
@@ -50,24 +34,24 @@ const LIFT_Z = 3;
 // The SEG-EXP-RVS northing (2883015→2883020) is only 15–20 m north of nRef (2883000),
 // so (n - nRef) ≈ 15. With latScale=0.32, the raw offset = 15 × 0.32 ≈ 4.8 m per unit.
 //
-// To achieve EXPRESS_MEDIAN_LATERAL = 8 m we need:
-//   lateralFactor = 8 / (n_avg - nRef) / latScale  ≈ 8 / 15 / 0.32 ≈ 1.67
-//
-// However, because corridorPoint clamps at latMax = 95 m and the raw lateral from the
-// express northing already places the section near the median, we use lateralFactor = 1
-// (which preserves the express northing's natural ±15 m lateral), then ADD the
-// EXPRESS_MEDIAN_LATERAL constant as an explicit nudge via a separate step.
-//
-// Simpler, more explicit approach: use the existing corridorPoint() with lateralFactor=0
-// to get the centerline point, then displace the result laterally ourselves, since
-// pointAlong() is private. Instead, pass a scaled lateralFactor that achieves the desired
-// total lateral offset.
-//
 // We derive the factor empirically: the express northings are ~2883015, nRef = 2883000,
-// so (n - nRef) = ~15. latScale = 0.32. Target = 8 m → factor = 8 / (15 * 0.32) ≈ 1.67.
-// We round to 1.6 to keep it well within the clamped range.
+// so (n - nRef) = ~15. latScale = 0.32. Target ≈ 7.7 m on the median → factor = 1.6.
+// We round to 1.6 to keep it well within the clamped range (latMax = 95 m).
+//
+// Resulting placement: ~7.7 m off the mainline spine — sits visibly on the median
+// pavement and is distinct from the GP mainline (lateralFactor=0) in a top-down view.
 // ---------------------------------------------------------------------------
-const EXPRESS_LATERAL_FACTOR = 1.6; // ≈ 8 m on the median; corridorPoint clamps at ±95 m
+
+/**
+ * Dimensionless lateral scale factor passed to corridorPoint() for every express sub-section
+ * polyline sample.  corridorPoint multiplies this by (n − nRef) × latScale to get a lateral
+ * displacement in metres; with typical express northings (~2883015) and latScale=0.32 this
+ * produces ≈ 7.7 m of lateral offset, placing the ribbon on the barrier-separated median
+ * and making it visually distinct from the GP mainline (which uses lateralFactor=0).
+ *
+ * NOT a metre value — it is a dimensionless multiplier for the corridorPoint formula.
+ */
+export const EXPRESS_LATERAL_FACTOR = 1.6;
 
 /**
  * Build a smooth polyline for one express sub-section, placed on the central reversible

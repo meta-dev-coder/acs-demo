@@ -17,7 +17,7 @@
 import { describe, it, expect } from "vitest";
 import { Point3d, Range3d } from "@itwin/core-geometry";
 import { buildCenterline, corridorPoint, smoothPolyline } from "../src/scene/place";
-import { buildExpressPolyline, EXPRESS_MEDIAN_LATERAL } from "../src/scenarioC/placeTolling";
+import { buildExpressPolyline, EXPRESS_LATERAL_FACTOR } from "../src/scenarioC/placeTolling";
 import { EXPRESS_SECTIONS } from "../src/scenarioC/pricing";
 
 // ---------------------------------------------------------------------------
@@ -86,17 +86,19 @@ function hasPlanetScaleOrZero(poly: Point3d[]): boolean {
 // ---------------------------------------------------------------------------
 // § Express-section constants exported from placeTolling
 // ---------------------------------------------------------------------------
-describe("EXPRESS_MEDIAN_LATERAL constant", () => {
-  it("is a positive finite number (the median offset pushes express OFF the mainline spine)", () => {
-    expect(typeof EXPRESS_MEDIAN_LATERAL).toBe("number");
-    expect(isFinite(EXPRESS_MEDIAN_LATERAL)).toBe(true);
+describe("EXPRESS_LATERAL_FACTOR constant", () => {
+  it("is a positive finite number (the lateral scale factor pushes express OFF the mainline spine)", () => {
+    expect(typeof EXPRESS_LATERAL_FACTOR).toBe("number");
+    expect(isFinite(EXPRESS_LATERAL_FACTOR)).toBe(true);
     // Must be non-zero so express is distinguishable from GP mainline
-    expect(Math.abs(EXPRESS_MEDIAN_LATERAL)).toBeGreaterThan(0);
+    expect(Math.abs(EXPRESS_LATERAL_FACTOR)).toBeGreaterThan(0);
   });
 
-  it("is clamped to a reasonable median width (< 30 m) so it stays on pavement", () => {
-    // I-595 median is ~7.5 m wide; offset should be small but visible
-    expect(Math.abs(EXPRESS_MEDIAN_LATERAL)).toBeLessThan(30);
+  it("is a dimensionless scale factor in a sensible range (0 < factor < 20)", () => {
+    // Factor of 1.6 with typical northing delta ~15 m and latScale 0.32 yields ~7.7 m;
+    // guard both extremes: too small → invisible, too large → off-pavement
+    expect(EXPRESS_LATERAL_FACTOR).toBeGreaterThan(0);
+    expect(EXPRESS_LATERAL_FACTOR).toBeLessThan(20);
   });
 });
 
@@ -146,17 +148,29 @@ describe("buildExpressPolyline — per-section smooth polyline with median offse
 // § Lateral offset places express DISTINCT from the GP mainline (lateralFactor=0)
 // ---------------------------------------------------------------------------
 describe("Express lateral offset — distinct from GP mainline", () => {
-  it("express ribbon is laterally offset from the mainline centerline (not coincident)", () => {
-    // For each express section, the midpoint with the median offset should differ
-    // from the same point with lateralFactor=0 (the GP mainline position).
+  it("express ribbon midpoint (production path via buildExpressPolyline) is laterally offset from the mainline", () => {
+    // Use buildExpressPolyline() — the actual production code path — and measure the
+    // lateral distance from its midpoint to the same U-fraction with lateralFactor=0
+    // (i.e. the GP mainline position).  This verifies the real deployment offset, not
+    // a synthetic corridorPoint() call with an arbitrary factor.
     for (const section of EXPRESS_SECTIONS) {
-      const midE = (section.fromE + section.toE) / 2;
-      const midN = (section.fromN + section.toN) / 2;
-      const onMainline = corridorPoint(cl, midE, midN, 3, 0);
-      const onExpress  = corridorPoint(cl, midE, midN, 3, EXPRESS_MEDIAN_LATERAL);
-      const lateralDist = onMainline.distanceXY(onExpress);
-      // Should be distinguishably offset (at least 1 m in model space)
-      expect(lateralDist, `${section.sectionId}: express is coincident with GP mainline`).toBeGreaterThan(0.5);
+      const poly = buildExpressPolyline(cl, section);
+      // Take the actual midpoint of the produced polyline.
+      const midIdx = Math.floor(poly.length / 2);
+      const expressMid = poly[midIdx];
+
+      // Compare to the GP mainline at the same easting/northing sample (factor = 0).
+      const midE = section.fromE + (section.toE - section.fromE) * (midIdx / (poly.length - 1));
+      const midN = section.fromN + (section.toN - section.fromN) * (midIdx / (poly.length - 1));
+      const mainlineMid = corridorPoint(cl, midE, midN, 3, 0);
+
+      const lateralDist = expressMid.distanceXY(mainlineMid);
+
+      // Must be > 1 m (visibly distinct in a top-down corridor view) and
+      // < 30 m (within the ~7.5 m I-595 median + generous model-space tolerance).
+      // Production factor 1.6 with typical northing delta yields ≈ 7–8 m.
+      expect(lateralDist, `${section.sectionId}: express too close to GP mainline (${lateralDist.toFixed(2)} m)`).toBeGreaterThan(1);
+      expect(lateralDist, `${section.sectionId}: express too far from GP mainline (${lateralDist.toFixed(2)} m) — off the median`).toBeLessThan(30);
     }
   });
 });
