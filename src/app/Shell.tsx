@@ -72,8 +72,8 @@ function TopBar({
         ))}
       </div>
       <div className="spacer" />
-      {/* DataSourceSwitcher supports only A/B today; hidden for C */}
-      {(scenario === "A" || scenario === "B") && (
+      {/* DataSourceSwitcher supports A, B, and C */}
+      {(scenario === "A" || scenario === "B" || scenario === "C") && (
         <DataSourceSwitcher scenario={scenario} dataOpen={dataOpen} onToggleData={onToggleData} />
       )}
       <button className="tour-fab" onClick={onStartTour}>● Take a tour</button>
@@ -1153,7 +1153,7 @@ export function Shell({ viewer }: { viewer: ReactNode }) {
       )}
       <div className="sd-viewer">
         {viewer}
-        {dataOpen && (scenario === "A" || scenario === "B") && (
+        {dataOpen && (scenario === "A" || scenario === "B" || scenario === "C") && (
           <DataTablePanel scenario={scenario} onClose={() => setDataOpen(false)} />
         )}
       </div>
