@@ -24,6 +24,10 @@ import { storeC } from "../scenarioC/storeC";
 import { useScenarioCState } from "../scenarioC/useScenarioCState";
 import { LOS_COLORS } from "../scenarioC/decorator";
 import type { TimeBlock, PricingStrategy } from "../scenarioC/types";
+import { compareStore } from "../scenarioC/compareStore";
+import { useCompareState } from "../scenarioC/useCompareState";
+import { presentationStore } from "../scenarioC/presentationStore";
+import { usePresentationState } from "../scenarioC/usePresentationState";
 
 const BANDS: RiskBand[] = ["red", "amber", "green"];
 const fmt$ = (n: number) => `$${n.toLocaleString("en-US")}`;
@@ -222,9 +226,260 @@ const STRATEGY_LABELS: Record<PricingStrategy, string> = {
   aggressive: "Aggressive",
 };
 
+/* ---- Scenario C: Presentation mode controls ---- */
+function PresentationControls() {
+  const pres = usePresentationState();
+  const currentStep = pres.timeLapseSteps[pres.currentStepIndex];
+
+  return (
+    <div style={{
+      padding: "8px 14px",
+      borderTop: "1px solid var(--sd-line)",
+      background: pres.presentationMode ? "rgba(33,150,243,0.08)" : undefined,
+    }}>
+      {/* Presentation mode toggle */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <span style={{ fontSize: 11, color: "var(--sd-dim)", flex: 1 }}>Presentation mode</span>
+        <button
+          style={{
+            fontSize: 11, padding: "2px 10px", borderRadius: 4,
+            border: "1px solid var(--sd-line)",
+            background: pres.presentationMode ? "var(--sd-accent)" : "var(--sd-panel2)",
+            color: pres.presentationMode ? "#fff" : "var(--sd-dim)",
+            cursor: "pointer",
+          }}
+          onClick={() => presentationStore.setPresentationMode(!pres.presentationMode)}
+        >
+          {pres.presentationMode ? "ON" : "OFF"}
+        </button>
+      </div>
+
+      {/* AM Peak time-lapse controls — only visible when presentation mode is ON */}
+      {pres.presentationMode && (
+        <div>
+          <div style={{ fontSize: 11, color: "var(--sd-dim)", marginBottom: 4 }}>
+            Play AM Peak time-lapse
+          </div>
+          {/* Step label */}
+          <div style={{
+            fontSize: 12, fontWeight: 600, color: "var(--sd-text)",
+            marginBottom: 6,
+            padding: "3px 6px",
+            background: pres.tweenActive ? "rgba(33,150,243,0.15)" : "transparent",
+            borderRadius: 3,
+            transition: "background 0.3s ease",
+          }}>
+            {currentStep?.label ?? "—"}
+          </div>
+          {/* Step indicators */}
+          <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
+            {pres.timeLapseSteps.map((step, i) => (
+              <div
+                key={step.label}
+                style={{
+                  flex: 1, height: 4, borderRadius: 2,
+                  background: i <= pres.currentStepIndex ? "var(--sd-accent)" : "var(--sd-line)",
+                  transition: "background 0.4s ease",
+                }}
+              />
+            ))}
+          </div>
+          {/* Play / Pause / Reset buttons */}
+          <div style={{ display: "flex", gap: 6 }}>
+            {pres.isPlaying ? (
+              <button
+                className="sd-btn"
+                style={{ fontSize: 11, padding: "3px 10px", flex: 1 }}
+                onClick={() => presentationStore.pause()}
+              >
+                ⏸ Pause
+              </button>
+            ) : (
+              <button
+                className="sd-btn primary"
+                style={{ fontSize: 11, padding: "3px 10px", flex: 1 }}
+                onClick={() => presentationStore.play()}
+              >
+                ▶ Play AM Peak
+              </button>
+            )}
+            <button
+              className="sd-btn"
+              style={{ fontSize: 11, padding: "3px 8px" }}
+              onClick={() => presentationStore.resetTimeLapse()}
+              title="Reset to step 0"
+            >
+              ↺
+            </button>
+            <button
+              className="sd-btn"
+              style={{ fontSize: 11, padding: "3px 8px" }}
+              onClick={() => presentationStore.stepForward()}
+              title="Step forward (discrete beat)"
+            >
+              ⏭
+            </button>
+          </div>
+          {/* Demand flow + safety pulsing toggles */}
+          <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+            <button
+              style={{
+                fontSize: 10, padding: "2px 8px", borderRadius: 4, flex: 1,
+                border: "1px solid var(--sd-line)",
+                background: pres.demandFlowActive ? "#1565c0" : "var(--sd-panel2)",
+                color: pres.demandFlowActive ? "#fff" : "var(--sd-dim)",
+                cursor: "pointer",
+              }}
+              onClick={() => presentationStore.setDemandFlowActive(!pres.demandFlowActive)}
+            >
+              Demand flow
+            </button>
+            <button
+              style={{
+                fontSize: 10, padding: "2px 8px", borderRadius: 4, flex: 1,
+                border: "1px solid var(--sd-line)",
+                background: pres.safetyFlagPulsing ? "#b71c1c" : "var(--sd-panel2)",
+                color: pres.safetyFlagPulsing ? "#fff" : "var(--sd-dim)",
+                cursor: "pointer",
+              }}
+              onClick={() => presentationStore.setSafetyFlagPulsing(!pres.safetyFlagPulsing)}
+            >
+              Safety pulse
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---- Scenario C: Compare mode dual KPI panel ---- */
+function ComparePanel() {
+  const cmp = useCompareState();
+  const { kpiA, kpiB, pricedSectionsA, pricedSectionsB } = cmp;
+
+  return (
+    <div style={{ padding: "10px 14px", borderTop: "1px solid var(--sd-line)" }}>
+      <div style={{
+        fontSize: 11, color: "var(--sd-dim)", textTransform: "uppercase",
+        letterSpacing: "0.05em", marginBottom: 8
+      }}>
+        Compare · Strategy A vs B
+      </div>
+      {/* Strategy selectors */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 10, color: "var(--sd-dim)", marginBottom: 3 }}>Strategy A (left)</div>
+          <div className="sd-chips" style={{ padding: 0 }}>
+            {(["current_static", "moderate_variable", "aggressive"] as PricingStrategy[]).map((strat) => (
+              <span
+                key={strat}
+                className={`sd-chip${cmp.strategyA === strat ? " on" : ""}`}
+                onClick={() => compareStore.setStrategyA(strat)}
+                style={{ fontSize: 9 }}
+              >
+                {strat === "current_static" ? "Static" : strat === "moderate_variable" ? "Moderate" : "Aggressive"}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 10, color: "var(--sd-dim)", marginBottom: 3 }}>Strategy B (right)</div>
+          <div className="sd-chips" style={{ padding: 0 }}>
+            {(["current_static", "moderate_variable", "aggressive"] as PricingStrategy[]).map((strat) => (
+              <span
+                key={strat}
+                className={`sd-chip${cmp.strategyB === strat ? " on" : ""}`}
+                onClick={() => compareStore.setStrategyB(strat)}
+                style={{ fontSize: 9 }}
+              >
+                {strat === "current_static" ? "Static" : strat === "moderate_variable" ? "Moderate" : "Aggressive"}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+      {/* Dual KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+        {/* Strategy A KPIs */}
+        <div style={{
+          background: "var(--sd-panel2)", borderRadius: 6,
+          border: "1px solid var(--sd-line)", padding: "8px"
+        }}>
+          <div style={{ fontSize: 10, color: "var(--sd-accent)", fontWeight: 700, marginBottom: 6 }}>
+            Strategy A · {STRATEGY_LABELS[cmp.strategyA]}
+          </div>
+          <div style={{ fontSize: 11, marginBottom: 3 }}>
+            <span style={{ color: kpiA.speedHeld ? "#4caf50" : "#f44336", fontWeight: 700 }}>
+              {kpiA.speedHeld ? "✓" : "✗"}
+            </span> Speed held
+          </div>
+          <div style={{ fontSize: 11, marginBottom: 3 }}>
+            ${Math.round(kpiA.projectedRevenuePerHour).toLocaleString()}/hr
+          </div>
+          <div style={{ fontSize: 11, marginBottom: 3 }}>
+            {(kpiA.corridorUtilization * 100).toFixed(0)}% util
+          </div>
+          <div style={{ fontSize: 11, color: kpiA.safetyFlagCount > 0 ? "#cc0000" : "#4caf50" }}>
+            {kpiA.safetyFlagCount} safety flag{kpiA.safetyFlagCount !== 1 ? "s" : ""}
+          </div>
+          <div style={{ fontSize: 10, color: "var(--sd-dim)", marginTop: 4 }}>
+            Trip total: ${kpiA.corridorTotalRate.toFixed(2)}
+          </div>
+          {/* Section rates */}
+          <div style={{ borderTop: "1px solid var(--sd-line)", marginTop: 6, paddingTop: 4 }}>
+            {pricedSectionsA.map((sec) => (
+              <div key={sec.sectionId} style={{ fontSize: 10, display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: LOS_COLORS[sec.los] ?? "#888" }}>{sec.sectionId}</span>
+                <span>${sec.postedRate.toFixed(2)} · LOS {sec.los}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Strategy B KPIs */}
+        <div style={{
+          background: "var(--sd-panel2)", borderRadius: 6,
+          border: "1px solid var(--sd-line)", padding: "8px"
+        }}>
+          <div style={{ fontSize: 10, color: "#ff9800", fontWeight: 700, marginBottom: 6 }}>
+            Strategy B · {STRATEGY_LABELS[cmp.strategyB]}
+          </div>
+          <div style={{ fontSize: 11, marginBottom: 3 }}>
+            <span style={{ color: kpiB.speedHeld ? "#4caf50" : "#f44336", fontWeight: 700 }}>
+              {kpiB.speedHeld ? "✓" : "✗"}
+            </span> Speed held
+          </div>
+          <div style={{ fontSize: 11, marginBottom: 3 }}>
+            ${Math.round(kpiB.projectedRevenuePerHour).toLocaleString()}/hr
+          </div>
+          <div style={{ fontSize: 11, marginBottom: 3 }}>
+            {(kpiB.corridorUtilization * 100).toFixed(0)}% util
+          </div>
+          <div style={{ fontSize: 11, color: kpiB.safetyFlagCount > 0 ? "#cc0000" : "#4caf50" }}>
+            {kpiB.safetyFlagCount} safety flag{kpiB.safetyFlagCount !== 1 ? "s" : ""}
+          </div>
+          <div style={{ fontSize: 10, color: "var(--sd-dim)", marginTop: 4 }}>
+            Trip total: ${kpiB.corridorTotalRate.toFixed(2)}
+          </div>
+          {/* Section rates */}
+          <div style={{ borderTop: "1px solid var(--sd-line)", marginTop: 6, paddingTop: 4 }}>
+            {pricedSectionsB.map((sec) => (
+              <div key={sec.sectionId} style={{ fontSize: 10, display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: LOS_COLORS[sec.los] ?? "#888" }}>{sec.sectionId}</span>
+                <span>${sec.postedRate.toFixed(2)} · LOS {sec.los}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---- Scenario C left list ---- */
 function TollingLeftList() {
   const s = useScenarioCState();
+  const cmp = useCompareState();
 
   // Sort sections by utilization (highest first) — mirrors Scenario B's risk-sorted list
   const sorted = [...s.pricedSections].sort((a, b) => b.utilization - a.utilization);
@@ -287,11 +542,30 @@ function TollingLeftList() {
             Rate
           </button>
         </div>
+        {/* Compare mode toggle */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+          <span style={{ fontSize: 11, color: "var(--sd-dim)", flex: 1 }}>Compare A vs B</span>
+          <button
+            style={{
+              fontSize: 11, padding: "2px 10px", borderRadius: 4,
+              border: "1px solid var(--sd-line)",
+              background: cmp.compareMode ? "#1565c0" : "var(--sd-panel2)",
+              color: cmp.compareMode ? "#fff" : "var(--sd-dim)",
+              cursor: "pointer",
+            }}
+            onClick={() => compareStore.setCompareMode(!cmp.compareMode)}
+          >
+            {cmp.compareMode ? "ON" : "OFF"}
+          </button>
+        </div>
         {/* Next recompute chip (static, 15-min cadence) */}
         <div style={{ fontSize: 11, color: "var(--sd-dim)", marginTop: 8, padding: "4px 0" }}>
           Next recompute · 15-min beat
         </div>
       </div>
+
+      {/* Compare panel (shown when compareMode is ON) */}
+      {cmp.compareMode && <ComparePanel />}
 
       {/* Express sections sorted by utilization */}
       <div className="sd-list">
@@ -327,6 +601,9 @@ function TollingLeftList() {
           );
         })}
       </div>
+
+      {/* Presentation mode controls (always at bottom of left list for Scenario C) */}
+      <PresentationControls />
     </>
   );
 }
