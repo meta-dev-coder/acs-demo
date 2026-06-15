@@ -3,6 +3,9 @@
  * asset/segment list (left), a detail inspector (right), scenario tabs (top), and a KPI bar
  * (bottom). Selection is linked both ways via the shared store: click a list row -> frame in
  * the viewer; click in the viewer -> the row highlights and the inspector updates.
+ *
+ * M0 refactor: scenarios are now driven by SCENARIO_REGISTRY so adding C (Dynamic Tolling)
+ * and future scenarios is purely additive. The A/B panel components are unchanged.
  *--------------------------------------------------------------------------------------------*/
 import "./shell.css";
 import { type ReactNode, useMemo, useState } from "react";
@@ -15,6 +18,8 @@ import { bandMeta as segBandMeta } from "../scenarioB/safetyScoring";
 import type { ScoredSegment } from "../scenarioB/types";
 import { GuidedTour, shouldAutoStartTour } from "./GuidedTour";
 import { DataSourceSwitcher, DataTablePanel } from "./DataSource";
+import { SCENARIO_REGISTRY, ALL_SCENARIOS } from "./scenarioRegistry";
+import type { ScenarioKey } from "./scenarioRegistry";
 
 const BANDS: RiskBand[] = ["red", "amber", "green"];
 const fmt$ = (n: number) => `$${n.toLocaleString("en-US")}`;
@@ -37,7 +42,7 @@ function TopBar({
   dataOpen,
   onToggleData,
 }: {
-  scenario: "A" | "B";
+  scenario: ScenarioKey;
   onStartTour: () => void;
   dataOpen: boolean;
   onToggleData: () => void;
@@ -48,28 +53,29 @@ function TopBar({
         SuperDNA<span className="sub">I-595 Express · Operational Twin</span>
       </div>
       <div className="sd-tabs">
-        <button
-          className={`sd-tab ${scenario === "A" ? "active" : ""}`}
-          onClick={() => store.setScenario("A")}
-        >
-          Asset Reliability
-        </button>
-        <button
-          className={`sd-tab ${scenario === "B" ? "active" : ""}`}
-          onClick={() => store.setScenario("B")}
-        >
-          Safety Hotspots
-        </button>
+        {ALL_SCENARIOS.map((key) => (
+          <button
+            key={key}
+            className={`sd-tab ${scenario === key ? "active" : ""}`}
+            onClick={() => store.setScenario(key)}
+          >
+            {SCENARIO_REGISTRY[key].tabLabel}
+          </button>
+        ))}
       </div>
       <div className="spacer" />
-      <DataSourceSwitcher scenario={scenario} dataOpen={dataOpen} onToggleData={onToggleData} />
+      {/* DataSourceSwitcher supports only A/B today; hidden for C */}
+      {(scenario === "A" || scenario === "B") && (
+        <DataSourceSwitcher scenario={scenario} dataOpen={dataOpen} onToggleData={onToggleData} />
+      )}
       <button className="tour-fab" onClick={onStartTour}>● Take a tour</button>
     </div>
   );
 }
 
 /* ----------------------------------- left list ----------------------------------- */
-function Legend({ scenario }: { scenario: "A" | "B" }) {
+function Legend({ scenario }: { scenario: ScenarioKey }) {
+  if (scenario === "C") return null; // C has no risk-band legend in M0
   const meta = scenario === "A" ? bandMeta : segBandMeta;
   return (
     <div className="sd-legend-row">
@@ -83,11 +89,17 @@ function Legend({ scenario }: { scenario: "A" | "B" }) {
   );
 }
 
-function LeftPanel({ scenario, onCollapse }: { scenario: "A" | "B"; onCollapse: () => void }) {
+/* ---- Scenario A left list ---- */
+function AssetLeftList({
+  q,
+  band,
+  setBand,
+}: {
+  q: string;
+  band: RiskBand | "all";
+  setBand: (b: RiskBand | "all") => void;
+}) {
   const s = useScenarioState();
-  const [q, setQ] = useState("");
-  const [band, setBand] = useState<RiskBand | "all">("all");
-
   const ql = q.trim().toLowerCase();
   const assets = useMemo(
     () =>
@@ -100,31 +112,8 @@ function LeftPanel({ scenario, onCollapse }: { scenario: "A" | "B"; onCollapse: 
       ),
     [s.assets, band, ql]
   );
-  const segments = useMemo(
-    () =>
-      s.segments.filter(
-        (g) =>
-          (band === "all" || g.band === band) &&
-          (ql === "" || g.name.toLowerCase().includes(ql) || g.segment_id.toLowerCase().includes(ql))
-      ),
-    [s.segments, band, ql]
-  );
-  const meta = scenario === "A" ? bandMeta : segBandMeta;
-
   return (
-    <div className="sd-left">
-      <div className="sd-panel-h">
-        <button className="sd-collapse" title="Collapse" onClick={onCollapse}>‹</button>
-        <h3>{scenario === "A" ? "ITS Assets" : "Corridor Segments"}</h3>
-        <Legend scenario={scenario} />
-      </div>
-      <div className="sd-filter">
-        <input
-          placeholder={scenario === "A" ? "Search assets…" : "Search segments…"}
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-      </div>
+    <>
       <div className="sd-chips">
         {(["all", ...BANDS] as const).map((b) => (
           <span
@@ -132,46 +121,127 @@ function LeftPanel({ scenario, onCollapse }: { scenario: "A" | "B"; onCollapse: 
             className={`sd-chip ${band === b ? "on" : ""}`}
             onClick={() => setBand(b)}
           >
-            {b === "all" ? "All" : meta(b).label}
+            {b === "all" ? "All" : bandMeta(b).label}
           </span>
         ))}
       </div>
       <div className="sd-list">
-        {scenario === "A" &&
-          assets.map((a) => (
-            <div
-              key={a.asset_tag}
-              className={`sd-row ${s.inspectedTag === a.asset_tag ? "sel" : ""}`}
-              onClick={() => frameAsset(a.asset_tag)}
-            >
-              <span className="sd-dot" style={{ background: bandMeta(a.band).color }} />
-              <span className="nm">
-                <div className="t">{a.label}</div>
-                <div className="s">{a.asset_tag} · {a.asset_class.replace(/_/g, " ")}</div>
-              </span>
-              <span className="pct" style={{ color: bandMeta(a.band).color }}>
-                {Math.round(a.score * 100)}%
-              </span>
-            </div>
-          ))}
-        {scenario === "B" &&
-          segments.map((g) => (
-            <div
-              key={g.segment_id}
-              className={`sd-row ${s.inspectedSegmentId === g.segment_id ? "sel" : ""}`}
-              onClick={() => frameSegment(g.segment_id)}
-            >
-              <span className="sd-dot" style={{ background: segBandMeta(g.band).color }} />
-              <span className="nm">
-                <div className="t">{g.name}</div>
-                <div className="s">{g.segment_id} · {g.stats.count} incidents</div>
-              </span>
-              <span className="pct" style={{ color: segBandMeta(g.band).color }}>
-                {Math.round(g.score * 100)}%
-              </span>
-            </div>
-          ))}
+        {assets.map((a) => (
+          <div
+            key={a.asset_tag}
+            className={`sd-row ${s.inspectedTag === a.asset_tag ? "sel" : ""}`}
+            onClick={() => frameAsset(a.asset_tag)}
+          >
+            <span className="sd-dot" style={{ background: bandMeta(a.band).color }} />
+            <span className="nm">
+              <div className="t">{a.label}</div>
+              <div className="s">{a.asset_tag} · {a.asset_class.replace(/_/g, " ")}</div>
+            </span>
+            <span className="pct" style={{ color: bandMeta(a.band).color }}>
+              {Math.round(a.score * 100)}%
+            </span>
+          </div>
+        ))}
       </div>
+    </>
+  );
+}
+
+/* ---- Scenario B left list ---- */
+function SegmentLeftList({
+  q,
+  band,
+  setBand,
+}: {
+  q: string;
+  band: RiskBand | "all";
+  setBand: (b: RiskBand | "all") => void;
+}) {
+  const s = useScenarioState();
+  const ql = q.trim().toLowerCase();
+  const segments = useMemo(
+    () =>
+      s.segments.filter(
+        (g) =>
+          (band === "all" || g.band === band) &&
+          (ql === "" ||
+            g.name.toLowerCase().includes(ql) ||
+            g.segment_id.toLowerCase().includes(ql))
+      ),
+    [s.segments, band, ql]
+  );
+  return (
+    <>
+      <div className="sd-chips">
+        {(["all", ...BANDS] as const).map((b) => (
+          <span
+            key={b}
+            className={`sd-chip ${band === b ? "on" : ""}`}
+            onClick={() => setBand(b)}
+          >
+            {b === "all" ? "All" : segBandMeta(b).label}
+          </span>
+        ))}
+      </div>
+      <div className="sd-list">
+        {segments.map((g) => (
+          <div
+            key={g.segment_id}
+            className={`sd-row ${s.inspectedSegmentId === g.segment_id ? "sel" : ""}`}
+            onClick={() => frameSegment(g.segment_id)}
+          >
+            <span className="sd-dot" style={{ background: segBandMeta(g.band).color }} />
+            <span className="nm">
+              <div className="t">{g.name}</div>
+              <div className="s">{g.segment_id} · {g.stats.count} incidents</div>
+            </span>
+            <span className="pct" style={{ color: segBandMeta(g.band).color }}>
+              {Math.round(g.score * 100)}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+/* ---- Scenario C left list (M0 placeholder) ---- */
+function TollingLeftList() {
+  return (
+    <div className="sd-list">
+      <div className="empty" style={{ padding: "16px", color: "var(--sd-dim)", fontSize: 13 }}>
+        Dynamic Tolling data loads in Milestone 1.
+      </div>
+    </div>
+  );
+}
+
+function LeftPanel({ scenario, onCollapse }: { scenario: ScenarioKey; onCollapse: () => void }) {
+  const [q, setQ] = useState("");
+  const [band, setBand] = useState<RiskBand | "all">("all");
+  const reg = SCENARIO_REGISTRY[scenario];
+
+  return (
+    <div className="sd-left">
+      <div className="sd-panel-h">
+        <button className="sd-collapse" title="Collapse" onClick={onCollapse}>‹</button>
+        <h3>
+          {scenario === "A" ? "ITS Assets" : scenario === "B" ? "Corridor Segments" : "Express Sections"}
+        </h3>
+        <Legend scenario={scenario} />
+      </div>
+      {scenario !== "C" && (
+        <div className="sd-filter">
+          <input
+            placeholder={reg.leftEmptyText}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </div>
+      )}
+      {scenario === "A" && <AssetLeftList q={q} band={band} setBand={setBand} />}
+      {scenario === "B" && <SegmentLeftList q={q} band={band} setBand={setBand} />}
+      {scenario === "C" && <TollingLeftList />}
     </div>
   );
 }
@@ -349,7 +419,19 @@ function SegmentInspector({ segment }: { segment: ScoredSegment }) {
   );
 }
 
-function RightPanel({ scenario, onCollapse }: { scenario: "A" | "B"; onCollapse: () => void }) {
+/* ---- Scenario C inspector placeholder (M0) ---- */
+function TollingInspector() {
+  return (
+    <div className="sd-insp">
+      <div className="empty" style={{ padding: "16px", color: "var(--sd-dim)", fontSize: 13 }}>
+        Dynamic Tolling inspector loads in Milestone 1. Select an express section to see its LOS,
+        posted rate, density, and override controls.
+      </div>
+    </div>
+  );
+}
+
+function RightPanel({ scenario, onCollapse }: { scenario: ScenarioKey; onCollapse: () => void }) {
   const s = useScenarioState();
   const asset = s.inspectedTag ? s.assets.find((a) => a.asset_tag === s.inspectedTag) : undefined;
   const seg = s.inspectedSegmentId ? s.segments.find((g) => g.segment_id === s.inspectedSegmentId) : undefined;
@@ -367,39 +449,50 @@ function RightPanel({ scenario, onCollapse }: { scenario: "A" | "B"; onCollapse:
       <div className="sd-right">
         {head}
         {asset ? <AssetInspector asset={asset} /> : (
-          <div className="sd-insp"><div className="empty">Select an ITS asset — on the model or in the list — to see its failure risk, drivers, and recommended action.</div></div>
+          <div className="sd-insp"><div className="empty">{SCENARIO_REGISTRY["A"].inspectorEmptyText}</div></div>
         )}
         {pkg.length > 0 && <WorkPackagePanel assets={pkg} />}
       </div>
     );
   }
+  if (scenario === "B") {
+    return (
+      <div className="sd-right">
+        {head}
+        {seg ? <SegmentInspector segment={seg} /> : (
+          <div className="sd-insp"><div className="empty">{SCENARIO_REGISTRY["B"].inspectorEmptyText}</div></div>
+        )}
+      </div>
+    );
+  }
+  // Scenario C — M0 placeholder
   return (
     <div className="sd-right">
       {head}
-      {seg ? <SegmentInspector segment={seg} /> : (
-        <div className="sd-insp"><div className="empty">Select a corridor segment to see its incident profile and test a countermeasure.</div></div>
-      )}
+      <TollingInspector />
     </div>
   );
 }
 
 /* ----------------------------------- KPI bar ----------------------------------- */
-function KpiBar({ scenario }: { scenario: "A" | "B" }) {
+function KpiBarA() {
   const s = useScenarioState();
-  if (scenario === "A") {
-    const reds = s.assets.filter((a) => a.band === "red");
-    const watch = s.assets.filter((a) => a.band === "amber").length;
-    const wp = computeWorkPackage(reds);
-    return (
-      <div className="sd-kpi">
-        <div className="item"><div className="v" style={{ color: "var(--red)" }}>{reds.length}</div><div className="l">Act now</div></div>
-        <div className="item"><div className="v" style={{ color: "var(--amber)" }}>{watch}</div><div className="l">Watch</div></div>
-        <div className="item"><div className="v green">{wp.closuresAvoided}</div><div className="l">Closures avoidable (proactive)</div></div>
-        <div className="item"><div className="v green">{fmt$(wp.revenueProtected)}</div><div className="l">Toll revenue protected</div></div>
-        <div className="note">Synthetic data · scores from config · placement: {s.placementMode}</div>
-      </div>
-    );
-  }
+  const reds = s.assets.filter((a) => a.band === "red");
+  const watch = s.assets.filter((a) => a.band === "amber").length;
+  const wp = computeWorkPackage(reds);
+  return (
+    <div className="sd-kpi">
+      <div className="item"><div className="v" style={{ color: "var(--red)" }}>{reds.length}</div><div className="l">Act now</div></div>
+      <div className="item"><div className="v" style={{ color: "var(--amber)" }}>{watch}</div><div className="l">Watch</div></div>
+      <div className="item"><div className="v green">{wp.closuresAvoided}</div><div className="l">Closures avoidable (proactive)</div></div>
+      <div className="item"><div className="v green">{fmt$(wp.revenueProtected)}</div><div className="l">Toll revenue protected</div></div>
+      <div className="note">Synthetic data · scores from config · placement: {s.placementMode}</div>
+    </div>
+  );
+}
+
+function KpiBarB() {
+  const s = useScenarioState();
   const reds = s.segments.filter((g) => g.band === "red").length;
   const incidents = s.segments.reduce((n, g) => n + g.stats.count, 0);
   const injuries = s.segments.reduce((n, g) => n + g.stats.injuries, 0);
@@ -413,6 +506,25 @@ function KpiBar({ scenario }: { scenario: "A" | "B" }) {
       <div className="note">Synthetic data · before/after from countermeasure catalog</div>
     </div>
   );
+}
+
+/* ---- Scenario C KPI bar placeholder (M0) ---- */
+function KpiBarC() {
+  return (
+    <div className="sd-kpi">
+      <div className="item"><div className="v">—</div><div className="l">Speed held (≥45 mph)</div></div>
+      <div className="item"><div className="v">—</div><div className="l">Projected revenue / hr</div></div>
+      <div className="item"><div className="v">—</div><div className="l">Corridor utilization</div></div>
+      <div className="item"><div className="v">—</div><div className="l">Safety flags</div></div>
+      <div className="note">Dynamic Tolling · data loads in Milestone 1</div>
+    </div>
+  );
+}
+
+function KpiBar({ scenario }: { scenario: ScenarioKey }) {
+  if (scenario === "A") return <KpiBarA />;
+  if (scenario === "B") return <KpiBarB />;
+  return <KpiBarC />;
 }
 
 /* ----------------------------------- shell ----------------------------------- */
@@ -433,6 +545,8 @@ export function Shell({ viewer }: { viewer: ReactNode }) {
   const [dataOpen, setDataOpen] = useState(false);
   const gridTemplateColumns = `${leftOpen ? 312 : 34}px 1fr ${rightOpen ? 360 : 34}px`;
 
+  const reg = SCENARIO_REGISTRY[scenario];
+
   return (
     <div className="shell" style={{ gridTemplateColumns }}>
       <TopBar
@@ -445,12 +559,14 @@ export function Shell({ viewer }: { viewer: ReactNode }) {
         <LeftPanel scenario={scenario} onCollapse={() => setLeftOpen(false)} />
       ) : (
         <div className="sd-left" style={{ gridArea: "left" }}>
-          <Rail side="left" label={scenario === "A" ? "ASSETS" : "SEGMENTS"} onExpand={() => setLeftOpen(true)} />
+          <Rail side="left" label={reg.leftRailLabel} onExpand={() => setLeftOpen(true)} />
         </div>
       )}
       <div className="sd-viewer">
         {viewer}
-        {dataOpen && <DataTablePanel scenario={scenario} onClose={() => setDataOpen(false)} />}
+        {dataOpen && (scenario === "A" || scenario === "B") && (
+          <DataTablePanel scenario={scenario} onClose={() => setDataOpen(false)} />
+        )}
       </div>
       {rightOpen ? (
         <RightPanel scenario={scenario} onCollapse={() => setRightOpen(false)} />
