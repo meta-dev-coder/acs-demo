@@ -22,6 +22,7 @@ import type {
   SectionPricingResult,
   CorridorPricingResult,
   DemandCurvePoint,
+  TrafficState,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -203,18 +204,24 @@ export function computeConnectedMainlineUtilization(
 // ---------------------------------------------------------------------------
 
 /** Compute all pricing outputs for one express sub-section + time block + strategy.
- *  Implements the full FDOT pipeline: traffic state → density → LOS → toll → demand → revenue → safety. */
+ *  Implements the full FDOT pipeline: traffic state → density → LOS → toll → demand → revenue → safety.
+ *
+ *  @param trafficTable  Optional external traffic table (CSV upload) that overrides the V2X stub.
+ *                       When provided, lookups use this table first; falls back to the stub if the
+ *                       section/block combo is not found (tolerant partial CSV support). */
 export function computeSectionPricing(
   section: ExpressSection,
   timeBlock: TimeBlock,
   strategy: PricingStrategy,
-  overrideRate?: number // optional operator override ($0.50–$10.00)
+  overrideRate?: number, // optional operator override ($0.50–$10.00)
+  trafficTable?: Record<string, Record<string, TrafficState>> | null
 ): SectionPricingResult {
   const sectionId = section.sectionId as "EXP-W" | "EXP-C" | "EXP-E";
   const timeBlockId = timeBlock as "morning_peak_eb" | "evening_peak_wb" | "off_peak" | "weekend";
 
-  // 1. V2X stub → per-lane flow + speed
-  const traffic = getTrafficState(sectionId, timeBlockId);
+  // 1. Traffic state: CSV table takes priority over the V2X stub (M5 feed override)
+  const csvEntry = trafficTable?.[sectionId]?.[timeBlockId];
+  const traffic = csvEntry ?? getTrafficState(sectionId, timeBlockId);
   const { flowPerLane, speed } = traffic;
 
   // 2. Density (per-lane only — NEVER feed 3-lane total)
@@ -283,14 +290,18 @@ export function computeSectionPricing(
 // Corridor-level pricing (all 3 sub-sections)
 // ---------------------------------------------------------------------------
 
-/** Compute pricing for all three express sub-sections and aggregate KPIs. */
+/** Compute pricing for all three express sub-sections and aggregate KPIs.
+ *
+ *  @param trafficTable  Optional external traffic table (CSV upload) passed through to
+ *                       computeSectionPricing. null/undefined → use the V2X stub. */
 export function computeCorridorPricing(
   timeBlock: TimeBlock,
   strategy: PricingStrategy,
-  overrides?: Partial<Record<string, number>> // sectionId → operator override rate
+  overrides?: Partial<Record<string, number>>, // sectionId → operator override rate
+  trafficTable?: Record<string, Record<string, TrafficState>> | null
 ): CorridorPricingResult {
   const sections = EXPRESS_SECTIONS.map((sec) =>
-    computeSectionPricing(sec, timeBlock, strategy, overrides?.[sec.sectionId])
+    computeSectionPricing(sec, timeBlock, strategy, overrides?.[sec.sectionId], trafficTable)
   );
 
   const corridorTotalRate = sections.reduce((s, sec) => s + sec.postedRate, 0);

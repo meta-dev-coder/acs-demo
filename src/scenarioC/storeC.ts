@@ -6,10 +6,14 @@
  * All mutations recompute corridor pricing via computeCorridorPricing() so derived state
  * (pricedSections, kpi, safety flags) is always in sync with the latest inputs.
  *
+ * M5 additions: traffic-feed CSV data source (sourceC, sourceErrorC, tableC, trafficTable).
+ * The trafficTable overrides the V2X stub when set; loadDefaultTraffic() restores the stub.
+ *
  * Imported in tests (node env) so this file MUST NOT import any React or DOM APIs.
  *--------------------------------------------------------------------------------------------*/
 import { computeCorridorPricing } from "./pricing";
-import type { TimeBlock, PricingStrategy, SectionPricingResult, CorridorPricingResult } from "./types";
+import type { TimeBlock, PricingStrategy, SectionPricingResult, CorridorPricingResult, TrafficState } from "./types";
+import type { TableData } from "../scenarioA/store";
 
 // ---------------------------------------------------------------------------
 // State shape
@@ -45,6 +49,19 @@ export interface StateC {
   kpi: StateCKpi;
   /** Currently inspected express section id, or null. */
   inspectedSectionId: string | null;
+  // ---- M5: Bring-your-own traffic data ----
+  /** Active traffic-feed data source id ("default" = built-in V2X stub). */
+  sourceC: string;
+  /** Inline error from the last CSV parse/upload, or null when healthy. */
+  sourceErrorC: string | null;
+  /** Table rows/columns for the currently active traffic dataset. */
+  tableC: TableData;
+  /**
+   * Custom traffic table from a CSV upload / sample source.
+   * When set, computeCorridorPricing uses these values instead of the V2X stub.
+   * null means: use the built-in V2X stub (default).
+   */
+  trafficTable: Record<string, Record<string, TrafficState>> | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -54,12 +71,14 @@ export interface StateC {
 function recompute(
   timeBlock: TimeBlock,
   strategy: PricingStrategy,
-  overrides: Partial<Record<string, number>>
+  overrides: Partial<Record<string, number>>,
+  trafficTable?: Record<string, Record<string, TrafficState>> | null
 ): Pick<StateC, "pricedSections" | "kpi"> {
   const result: CorridorPricingResult = computeCorridorPricing(
     timeBlock,
     strategy,
-    overrides as Partial<Record<string, number>>
+    overrides as Partial<Record<string, number>>,
+    trafficTable
   );
 
   const kpi: StateCKpi = {
@@ -81,8 +100,10 @@ const DEFAULT_TIME_BLOCK: TimeBlock = "morning_peak_eb";
 const DEFAULT_STRATEGY: PricingStrategy = "moderate_variable";
 const DEFAULT_OVERRIDES: Partial<Record<string, number>> = {};
 
+const EMPTY_TABLE_C: TableData = { columns: [], rows: [] };
+
 function buildInitial(): StateC {
-  const { pricedSections, kpi } = recompute(DEFAULT_TIME_BLOCK, DEFAULT_STRATEGY, DEFAULT_OVERRIDES);
+  const { pricedSections, kpi } = recompute(DEFAULT_TIME_BLOCK, DEFAULT_STRATEGY, DEFAULT_OVERRIDES, null);
   return {
     timeBlock: DEFAULT_TIME_BLOCK,
     strategy: DEFAULT_STRATEGY,
@@ -91,6 +112,10 @@ function buildInitial(): StateC {
     pricedSections,
     kpi,
     inspectedSectionId: null,
+    sourceC: "default",
+    sourceErrorC: null,
+    tableC: EMPTY_TABLE_C,
+    trafficTable: null,
   };
 }
 
@@ -107,7 +132,7 @@ function set(patch: Partial<StateC>): void {
 
 function setAndRecompute(patch: Partial<Pick<StateC, "timeBlock" | "strategy" | "overrides">>): void {
   const next = { ...state, ...patch };
-  const computed = recompute(next.timeBlock, next.strategy, next.overrides);
+  const computed = recompute(next.timeBlock, next.strategy, next.overrides, state.trafficTable);
   set({ ...patch, ...computed });
 }
 
@@ -162,6 +187,41 @@ export const storeC = {
   /** Set the inspected express section id (or null to deselect). */
   inspectSection(sectionId: string | null): void {
     set({ inspectedSectionId: sectionId });
+  },
+
+  // ---- M5: Traffic-feed CSV data source ----
+
+  /**
+   * Load a custom traffic table (from a CSV upload or sample source) into the store.
+   * Immediately recomputes the corridor pricing with the new traffic state.
+   *
+   * @param trafficTable  sectionId → timeBlock → TrafficState lookup (from parseTrafficCsv)
+   * @param sourceId      Source id to track in state.sourceC
+   * @param table         Table rows/columns to populate the Data panel
+   */
+  loadTrafficTable(
+    trafficTable: Record<string, Record<string, TrafficState>>,
+    sourceId: string,
+    table: TableData
+  ): void {
+    const computed = recompute(state.timeBlock, state.strategy, state.overrides, trafficTable);
+    set({ trafficTable, sourceC: sourceId, tableC: table, sourceErrorC: null, ...computed });
+  },
+
+  /**
+   * Reset to the built-in V2X synthetic feed (sourceC = "default").
+   * Immediately recomputes with the stub values.
+   *
+   * @param table  Table rows for the default dataset (generated from the V2X stub values)
+   */
+  loadDefaultTrafficTable(table: TableData): void {
+    const computed = recompute(state.timeBlock, state.strategy, state.overrides, null);
+    set({ trafficTable: null, sourceC: "default", tableC: table, sourceErrorC: null, ...computed });
+  },
+
+  /** Record a data-source error (shown as an inline banner; previous state is unchanged). */
+  setSourceErrorC(message: string | null): void {
+    set({ sourceErrorC: message });
   },
 };
 

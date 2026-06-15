@@ -3,6 +3,10 @@
  * -> run the EXISTING scoring (scoreAssets / scoreSegments) -> push into the store (which
  * re-decorates the viewer + updates the list + KPI bar). The default (built-in) source path is
  * untouched logically — it just also publishes a table view of the same rows.
+ *
+ * M5 addition: Scenario C traffic-feed CSV ingestion functions (applyTrafficSource,
+ * applyTrafficUpload, loadDefaultTraffic) that push into storeC via the same keep-previous-on-
+ * failure robustness pattern used by Scenarios A and B.
  *--------------------------------------------------------------------------------------------*/
 import { store, type TableData } from "../scenarioA/store";
 import { scoreAssets } from "../scenarioA/scoring";
@@ -11,13 +15,18 @@ import assetsData from "../scenarioA/data/assets.json";
 import historyData from "../scenarioA/data/history.json";
 import segmentsData from "../scenarioB/data/segments.json";
 import incidentsData from "../scenarioB/data/segmentIncidents.json";
+import { storeC } from "../scenarioC/storeC";
+import { getTrafficState } from "../stubs/v2xStub";
 import {
   ASSET_CSV_COLUMNS,
   ASSET_SOURCES,
   parseAssetCsv,
   parseSegmentCsv,
+  parseTrafficCsv,
   SEGMENT_CSV_COLUMNS,
   SEGMENT_SOURCES,
+  TRAFFIC_CSV_COLUMNS,
+  TRAFFIC_SOURCES,
 } from "./sources";
 import type { HistoryRecord, RawAsset, ScoredAsset } from "../scenarioA/types";
 import type { RawSegment, ScoredSegment, SegIncident } from "../scenarioB/types";
@@ -129,5 +138,79 @@ export function applySegmentUpload(text: string): void {
     scoreAndLoadSegments(bundle.segments, bundle.incidents, "upload", { columns, rows });
   } catch (e) {
     store.setSourceError("B", e instanceof Error ? e.message : "Could not parse the uploaded CSV.");
+  }
+}
+
+/* ----------------------------- Scenario C — Traffic feed ----------------------------- */
+
+/** V2X stub section / block order for the default table view. */
+const STUB_SECTION_IDS = ["EXP-W", "EXP-C", "EXP-E"] as const;
+const STUB_TIME_BLOCKS = ["morning_peak_eb", "evening_peak_wb", "off_peak", "weekend"] as const;
+
+/** Build a TableData from the built-in V2X stub values (for the default Data panel view). */
+function defaultTrafficTable(): TableData {
+  const rows: Record<string, string>[] = [];
+  for (const sectionId of STUB_SECTION_IDS) {
+    for (const timeBlock of STUB_TIME_BLOCKS) {
+      const state = getTrafficState(sectionId, timeBlock);
+      rows.push({
+        section_id: sectionId,
+        time_block: timeBlock,
+        volume_vphpl: String(state.flowPerLane),
+        speed_mph: String(state.speed),
+      });
+    }
+  }
+  return { columns: [...TRAFFIC_CSV_COLUMNS], rows };
+}
+
+/**
+ * Load the built-in default Scenario C traffic dataset (the V2X stub values).
+ * Resets any custom traffic table and recomputes pricing from the stub.
+ */
+export function loadDefaultTraffic(): void {
+  storeC.loadDefaultTrafficTable(defaultTrafficTable());
+}
+
+/**
+ * Apply a Scenario C traffic-feed source by id.
+ * - "default": loads the built-in V2X stub and resets any custom table.
+ * - sample ids: parses the shipped CSV and pushes it into storeC.
+ * Keeps the previous state on parse failure (same robustness as Scenarios A/B).
+ */
+export function applyTrafficSource(sourceId: string): void {
+  if (sourceId === "default") return loadDefaultTraffic();
+
+  const def = TRAFFIC_SOURCES.find((s) => s.id === sourceId);
+  if (!def?.csv) {
+    storeC.setSourceErrorC(`Unknown data source "${sourceId}".`);
+    return;
+  }
+  try {
+    const { rows, table } = parseTrafficCsv(def.csv);
+    const tableData: TableData = {
+      columns: [...TRAFFIC_CSV_COLUMNS],
+      rows,
+    };
+    storeC.loadTrafficTable(table, sourceId, tableData);
+  } catch (e) {
+    storeC.setSourceErrorC(e instanceof Error ? e.message : "Could not parse the dataset.");
+  }
+}
+
+/**
+ * Apply an uploaded Scenario C traffic-feed CSV (raw text).
+ * Keeps the previous traffic state on parse failure (keep-previous-on-failure pattern).
+ */
+export function applyTrafficUpload(text: string): void {
+  try {
+    const { rows, table } = parseTrafficCsv(text);
+    const tableData: TableData = {
+      columns: [...TRAFFIC_CSV_COLUMNS],
+      rows,
+    };
+    storeC.loadTrafficTable(table, "upload", tableData);
+  } catch (e) {
+    storeC.setSourceErrorC(e instanceof Error ? e.message : "Could not parse the uploaded CSV.");
   }
 }

@@ -27,6 +27,9 @@ import assetsSample2 from "../scenarioA/data/assets-sample-2.csv?raw";
 import assetsSample3 from "../scenarioA/data/assets-sample-3.csv?raw";
 import segmentsSample2 from "../scenarioB/data/segments-sample-2.csv?raw";
 import segmentsSample3 from "../scenarioB/data/segments-sample-3.csv?raw";
+import trafficSample2 from "../scenarioC/data/traffic-sample-2.csv?raw";
+import trafficSample3 from "../scenarioC/data/traffic-sample-3.csv?raw";
+import type { TrafficState } from "../scenarioC/types";
 
 /* Corridor UTM frame (mirrors src/scene/place.ts CORRIDOR) — used to synthesize coordinates from
  * a row index when an uploaded CSV omits easting/northing, so items still land on the road. */
@@ -292,3 +295,127 @@ export function parseSegmentCsv(
   if (rows.length === 0) throw new Error("No data rows found below the header.");
   return { columns, rows, bundle: rowsToSegments(rows, refDate) };
 }
+
+/* =============================== Scenario C — Traffic feed CSV =============================== */
+
+/**
+ * CSV schema for Scenario C traffic feed (per-section, per-time-block detector data).
+ *  - section_id:    express section identifier (EXP-W / EXP-C / EXP-E)
+ *  - time_block:    time-of-day block (morning_peak_eb / evening_peak_wb / off_peak / weekend)
+ *  - volume_vphpl:  per-lane flow in vehicles per hour per lane — the ONLY value fed to the
+ *                   density formula (density = flowPerLane / speed_mph)
+ *  - speed_mph:     section speed in mph; must be > 0 to prevent division-by-zero in the formula
+ *
+ * STUB source: replace with live V2X / MVDS detector feed (volume, speed, occupancy per 0.5-mi station)
+ */
+export const TRAFFIC_CSV_COLUMNS = [
+  "section_id",
+  "time_block",
+  "volume_vphpl",
+  "speed_mph",
+] as const;
+
+/** Nested lookup table: sectionId → timeBlock → TrafficState */
+export type TrafficTable = Record<string, Record<string, TrafficState>>;
+
+/** Column aliases for tolerant header matching in customer uploads. */
+const TRAFFIC_COLUMN_ALIASES: Record<string, string[]> = {
+  section_id:   ["section_id", "section id", "sectionid", "section"],
+  time_block:   ["time_block", "time block", "timeblock", "block", "period"],
+  volume_vphpl: ["volume_vphpl", "volume vphpl", "volumevphpl", "volume", "flow", "vphpl"],
+  speed_mph:    ["speed_mph", "speed mph", "speedmph", "speed", "mph"],
+};
+
+/** Resolve a raw CSV column name to a canonical TRAFFIC_CSV_COLUMNS key, or undefined. */
+function resolveTrafficCol(raw: string): keyof typeof TRAFFIC_COLUMN_ALIASES | undefined {
+  const normRaw = raw.toLowerCase().replace(/[\s_-]/g, "");
+  for (const [canonical, aliases] of Object.entries(TRAFFIC_COLUMN_ALIASES)) {
+    for (const alias of aliases) {
+      if (alias.toLowerCase().replace(/[\s_-]/g, "") === normRaw) {
+        return canonical as keyof typeof TRAFFIC_COLUMN_ALIASES;
+      }
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Map parsed CSV rows (after alias resolution) to a TrafficTable.
+ * Tolerant: speed 0 → replaced by fallback 1 to prevent division-by-zero;
+ * negative volume → clamped to 0.
+ */
+export function rowsToTrafficState(rows: Record<string, string>[]): TrafficTable {
+  const table: TrafficTable = {};
+
+  for (const row of rows) {
+    // Resolve columns via alias matching across the row's actual keys
+    let sectionId: string | undefined;
+    let timeBlock: string | undefined;
+    let rawVolume: string | undefined;
+    let rawSpeed: string | undefined;
+
+    for (const rawCol of Object.keys(row)) {
+      const canon = resolveTrafficCol(rawCol);
+      if (canon === "section_id") sectionId = row[rawCol];
+      else if (canon === "time_block") timeBlock = row[rawCol];
+      else if (canon === "volume_vphpl") rawVolume = row[rawCol];
+      else if (canon === "speed_mph") rawSpeed = row[rawCol];
+    }
+
+    if (!sectionId || !timeBlock) continue; // skip rows without identity columns
+
+    const flowPerLane = Math.max(0, num(rawVolume, 0));
+    // Speed must be > 0 to prevent division-by-zero in density = flowPerLane / speed
+    const speed = Math.max(1, num(rawSpeed, 1));
+
+    if (!table[sectionId]) table[sectionId] = {};
+    table[sectionId][timeBlock] = { flowPerLane, speed };
+  }
+
+  return table;
+}
+
+/** Parse a traffic-feed CSV text into rows + a TrafficTable; throws a friendly Error on bad input.
+ *
+ * Validation:
+ *  - File must not be empty (parseCsv already checks this).
+ *  - At least one data row must exist below the header.
+ *  - At least one row must have a recognized section_id and time_block so the pricing engine
+ *    gets usable data; if none do, the CSV almost certainly has wrong column names.
+ */
+export function parseTrafficCsv(text: string): {
+  rows: Record<string, string>[];
+  columns: string[];
+  table: TrafficTable;
+} {
+  const { columns, rows } = parseCsv(text);
+  if (rows.length === 0) throw new Error("No data rows found below the header.");
+  const table = rowsToTrafficState(rows);
+  // Validate that at least one section/block combo was successfully mapped.
+  if (Object.keys(table).length === 0) {
+    throw new Error(
+      "Could not find the required columns (section_id, time_block, volume_vphpl, speed_mph). " +
+        "Please use the template to see the expected format."
+    );
+  }
+  return { columns, rows, table };
+}
+
+/** Download template: an empty CSV with just the TRAFFIC_CSV_COLUMNS header. */
+export function trafficTemplateCsv(): string {
+  return toCsv([...TRAFFIC_CSV_COLUMNS], []);
+}
+
+/** Source registry for Scenario C traffic feed.
+ *  Default (#1) = built-in synthetic V2X stub values.
+ *  Sample #2/#3 = slightly varied synthetic datasets for the "bring your own data" demo.
+ *  Upload = customer-supplied detector export.
+ *
+ * STUB - replace with live V2X / MVDS detector feed (volume, speed, occupancy per 0.5-mi station)
+ */
+export const TRAFFIC_SOURCES: DataSourceDef[] = [
+  { id: "default", label: "Default (synthetic)", kind: "builtin" },
+  { id: "peakVariant", label: "Higher-peak scenario", kind: "csv", csv: trafficSample2 },
+  { id: "lightDemand", label: "Light-demand scenario", kind: "csv", csv: trafficSample3 },
+  { id: "upload", label: "Upload CSV…", kind: "upload" },
+];

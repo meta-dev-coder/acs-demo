@@ -7,13 +7,15 @@
  * table header, keyboard-accessible controls, and clear empty/error states. Additive only: the
  * default source renders the built-in data exactly as today.
  *--------------------------------------------------------------------------------------------*/
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { store, useScenarioState } from "../scenarioA/store";
 import {
   ASSET_SOURCES,
   assetTemplateCsv,
   SEGMENT_SOURCES,
   segmentTemplateCsv,
+  TRAFFIC_SOURCES,
+  trafficTemplateCsv,
 } from "../data/sources";
 import { toCsv } from "../data/csv";
 import {
@@ -21,7 +23,10 @@ import {
   applyAssetUpload,
   applySegmentSource,
   applySegmentUpload,
+  applyTrafficSource,
+  applyTrafficUpload,
 } from "../data/loader";
+import { storeC } from "../scenarioC/storeC";
 
 /** Trigger a client-side download of `text` as a .csv file. */
 function downloadCsv(filename: string, text: string): void {
@@ -42,15 +47,19 @@ export function DataSourceSwitcher({
   dataOpen,
   onToggleData,
 }: {
-  scenario: "A" | "B";
+  scenario: "A" | "B" | "C";
   dataOpen: boolean;
   onToggleData: () => void;
 }) {
   const s = useScenarioState();
+  const sc = useSyncExternalStore(storeC.subscribe, storeC.getSnapshot, storeC.getSnapshot);
   const fileRef = useRef<HTMLInputElement>(null);
-  const sources = scenario === "A" ? ASSET_SOURCES : SEGMENT_SOURCES;
-  const activeId = scenario === "A" ? s.sourceA : s.sourceB;
-  const error = scenario === "A" ? s.sourceErrorA : s.sourceErrorB;
+  const sources =
+    scenario === "A" ? ASSET_SOURCES : scenario === "B" ? SEGMENT_SOURCES : TRAFFIC_SOURCES;
+  const activeId =
+    scenario === "A" ? s.sourceA : scenario === "B" ? s.sourceB : sc.sourceC;
+  const error =
+    scenario === "A" ? s.sourceErrorA : scenario === "B" ? s.sourceErrorB : sc.sourceErrorC;
 
   const selectSource = (id: string) => {
     if (id === "upload") {
@@ -58,7 +67,8 @@ export function DataSourceSwitcher({
       return;
     }
     if (scenario === "A") applyAssetSource(id);
-    else applySegmentSource(id);
+    else if (scenario === "B") applySegmentSource(id);
+    else applyTrafficSource(id);
   };
 
   const onFile = (file: File | undefined) => {
@@ -67,25 +77,39 @@ export function DataSourceSwitcher({
     reader.onload = () => {
       const text = typeof reader.result === "string" ? reader.result : "";
       if (scenario === "A") applyAssetUpload(text);
-      else applySegmentUpload(text);
+      else if (scenario === "B") applySegmentUpload(text);
+      else applyTrafficUpload(text);
     };
-    reader.onerror = () =>
-      store.setSourceError(scenario, "Could not read the file. Please try another CSV.");
+    reader.onerror = () => {
+      if (scenario === "C") storeC.setSourceErrorC("Could not read the file. Please try another CSV.");
+      else store.setSourceError(scenario, "Could not read the file. Please try another CSV.");
+    };
     reader.readAsText(file);
   };
 
   const downloadTemplate = () => {
     if (scenario === "A") downloadCsv("its-assets-template.csv", assetTemplateCsv());
-    else downloadCsv("corridor-segments-template.csv", segmentTemplateCsv());
+    else if (scenario === "B") downloadCsv("corridor-segments-template.csv", segmentTemplateCsv());
+    else downloadCsv("traffic-feed-template.csv", trafficTemplateCsv());
   };
 
   const downloadCurrent = () => {
-    const table = scenario === "A" ? s.tableA : s.tableB;
+    const table =
+      scenario === "A" ? s.tableA : scenario === "B" ? s.tableB : sc.tableC;
     if (table.rows.length === 0) return downloadTemplate();
     downloadCsv(
-      scenario === "A" ? "its-assets-current.csv" : "corridor-segments-current.csv",
+      scenario === "A"
+        ? "its-assets-current.csv"
+        : scenario === "B"
+        ? "corridor-segments-current.csv"
+        : "traffic-feed-current.csv",
       toCsv(table.columns, table.rows)
     );
+  };
+
+  const dismissError = () => {
+    if (scenario === "C") storeC.setSourceErrorC(null);
+    else store.setSourceError(scenario, null);
   };
 
   const uploadActive = activeId === "upload";
@@ -161,14 +185,15 @@ export function DataSourceSwitcher({
       {error && (
         <div className="sd-ds-error" role="alert">
           <span aria-hidden>⚠</span> {error}{" "}
-          <button type="button" className="sd-ds-dismiss" onClick={() => store.setSourceError(scenario, null)}>
+          <button type="button" className="sd-ds-dismiss" onClick={dismissError}>
             Dismiss
           </button>
         </div>
       )}
       {uploadActive && !error && (
         <div className="sd-ds-note">
-          Showing your uploaded CSV · {(scenario === "A" ? s.tableA : s.tableB).rows.length} rows ·{" "}
+          Showing your uploaded CSV ·{" "}
+          {(scenario === "A" ? s.tableA : scenario === "B" ? s.tableB : sc.tableC).rows.length} rows ·{" "}
           <button type="button" className="sd-ds-link" onClick={downloadCurrent}>
             download as CSV
           </button>
@@ -183,13 +208,17 @@ export function DataTablePanel({
   scenario,
   onClose,
 }: {
-  scenario: "A" | "B";
+  scenario: "A" | "B" | "C";
   onClose: () => void;
 }) {
   const s = useScenarioState();
-  const table = scenario === "A" ? s.tableA : s.tableB;
-  const activeId = scenario === "A" ? s.sourceA : s.sourceB;
-  const sources = scenario === "A" ? ASSET_SOURCES : SEGMENT_SOURCES;
+  const sc = useSyncExternalStore(storeC.subscribe, storeC.getSnapshot, storeC.getSnapshot);
+  const table =
+    scenario === "A" ? s.tableA : scenario === "B" ? s.tableB : sc.tableC;
+  const activeId =
+    scenario === "A" ? s.sourceA : scenario === "B" ? s.sourceB : sc.sourceC;
+  const sources =
+    scenario === "A" ? ASSET_SOURCES : scenario === "B" ? SEGMENT_SOURCES : TRAFFIC_SOURCES;
   const activeLabel = sources.find((src) => src.id === activeId)?.label ?? activeId;
   const [q, setQ] = useState("");
 
@@ -213,16 +242,23 @@ export function DataTablePanel({
   const downloadCurrent = () => {
     if (table.rows.length === 0) return;
     downloadCsv(
-      scenario === "A" ? "its-assets-current.csv" : "corridor-segments-current.csv",
+      scenario === "A"
+        ? "its-assets-current.csv"
+        : scenario === "B"
+        ? "corridor-segments-current.csv"
+        : "traffic-feed-current.csv",
       toCsv(table.columns, table.rows)
     );
   };
+
+  const kicker =
+    scenario === "A" ? "ITS assets" : scenario === "B" ? "Corridor segments" : "Traffic feed";
 
   return (
     <div className="sd-table-overlay" role="dialog" aria-modal="false" aria-label="Dataset table">
       <div className="sd-table-head">
         <div className="sd-table-title">
-          <span className="sd-table-kicker">{scenario === "A" ? "ITS assets" : "Corridor segments"}</span>
+          <span className="sd-table-kicker">{kicker}</span>
           <span className="sd-table-name">{activeLabel}</span>
           <span className="sd-table-count">{table.rows.length} rows · {table.columns.length} columns</span>
         </div>

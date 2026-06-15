@@ -1,0 +1,13 @@
+section_id,time_block,volume_vphpl,speed_mph
+EXP-W,morning_peak_eb,800,63
+EXP-W,evening_peak_wb,1800,53
+EXP-W,off_peak,500,68
+EXP-W,weekend,650,67
+EXP-C,morning_peak_eb,1200,58
+EXP-C,evening_peak_wb,1500,56
+EXP-C,off_peak,600,68
+EXP-C,weekend,750,66
+EXP-E,morning_peak_eb,1900,51
+EXP-E,evening_peak_wb,1000,63
+EXP-E,off_peak,580,68
+EXP-E,weekend,720,67
