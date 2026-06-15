@@ -284,10 +284,10 @@ describe("computeSectionPricing — end-to-end per section", () => {
     sectionId: "EXP-E",
     name: "Express East",
     connectedMainlineSegmentId: "SEG-MN-E",
-    uFrom: 0.56,
+    uFrom: 0.62,  // canonical value from EXPRESS_SECTIONS in src/scenarioC/pricing.ts
     uTo: 0.78,
-    fromE: 584700,
-    fromN: 2883017,
+    fromE: 585400,
+    fromN: 2883018,
     toE: 588000,
     toN: 2883020,
   };

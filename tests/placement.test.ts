@@ -7,6 +7,7 @@ import { Point3d, Range3d } from "@itwin/core-geometry";
 import { buildCenterline, corridorPoint, orderAlongChord, snapToRoad } from "../src/scene/place";
 import assetsData from "../src/scenarioA/data/assets.json";
 import segData from "../src/scenarioB/data/segments.json";
+import { EXPRESS_SECTIONS } from "../src/scenarioC/pricing";
 
 function rng(seed: number) {
   let s = seed;
@@ -77,6 +78,54 @@ describe("markers + ribbons map onto the corridor", () => {
       expect(len / chord).toBeLessThan(1.8);
       for (const p of poly) expect(box.containsPoint(p)).toBe(true);
     }
+  });
+});
+
+describe("Scenario C — EXPRESS_SECTIONS endpoints land inside the SEG-EXP-RVS corridor", () => {
+  // corridorPoint() maps easting/northing through the CORRIDOR transform (eMin/eMax/nRef) onto
+  // the synthetic centerline built above, yielding coordinates in the same model-space as `box`.
+  // The existing `box` (Range3d of centerline pts + 150 m expansion) is the canonical on-corridor
+  // bounding box used by all Scenario B ribbon tests — we reuse it here so Scenario C uses the
+  // exact same acceptance criterion.
+  //
+  // We also assert that the EXP-W/C/E u-extents are sub-intervals of SEG-EXP-RVS (u 0.30–0.78)
+  // and that they are contiguous — matching the spec's "split into thirds" requirement.
+
+  it("every EXPRESS_SECTION endpoint (fromE/fromN and toE/toN) maps onto the corridor centerline (same box as Scenario B ribbon test)", () => {
+    for (const section of EXPRESS_SECTIONS) {
+      // lateralFactor=0 keeps the point on the centerline spine (same call pattern as the
+      // Scenario B ribbon test) so the comparison to `box` is apples-to-apples.
+      const fromPt = corridorPoint(cl, section.fromE, section.fromN, 3, 0);
+      const toPt   = corridorPoint(cl, section.toE,   section.toN,   3, 0);
+      expect(box.containsPoint(fromPt), `${section.sectionId} fromPt outside model box`).toBe(true);
+      expect(box.containsPoint(toPt),   `${section.sectionId} toPt outside model box`).toBe(true);
+    }
+  });
+
+  it("EXP-W/EXP-C/EXP-E u-extents are strictly within SEG-EXP-RVS parent ribbon (u 0.30–0.78)", () => {
+    const parentUFrom = 0.30;
+    const parentUTo   = 0.78;
+    for (const section of EXPRESS_SECTIONS) {
+      expect(section.uFrom, `${section.sectionId} uFrom below parent ribbon`)
+        .toBeGreaterThanOrEqual(parentUFrom);
+      expect(section.uTo, `${section.sectionId} uTo above parent ribbon`)
+        .toBeLessThanOrEqual(parentUTo);
+      expect(section.uFrom, `${section.sectionId} uFrom >= uTo`)
+        .toBeLessThan(section.uTo);
+    }
+  });
+
+  it("EXP-W/EXP-C/EXP-E sub-sections are contiguous and together span the full SEG-EXP-RVS ribbon (no gaps, no overlaps)", () => {
+    const sorted = [...EXPRESS_SECTIONS].sort((a, b) => a.uFrom - b.uFrom);
+    expect(sorted[0].sectionId).toBe("EXP-W");
+    expect(sorted[1].sectionId).toBe("EXP-C");
+    expect(sorted[2].sectionId).toBe("EXP-E");
+    // Each section's uTo should equal the next section's uFrom (contiguous partitioning)
+    expect(sorted[0].uTo).toBeCloseTo(sorted[1].uFrom, 5);
+    expect(sorted[1].uTo).toBeCloseTo(sorted[2].uFrom, 5);
+    // Together they cover the full parent ribbon extent
+    expect(sorted[0].uFrom).toBeCloseTo(0.30, 5);
+    expect(sorted[2].uTo).toBeCloseTo(0.78, 5);
   });
 });
 
