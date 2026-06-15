@@ -21,6 +21,8 @@ interface SafetyConfig {
   severityWeight: Record<Severity, number>;
   weights: { frequency: number; severity: number; closure: number };
   normalizers: { incidentsFull: number; severityScoreFull: number; closureMinFull: number };
+  recency: { halfLifeMonths: number; floor: number };
+  lengthNormalizationRefM: number;
   bands: { redAtOrAbove: number; amberAtOrAbove: number };
   bandMeta: Record<RiskBand, BandMeta>;
   economics: { tolledLaneRevenuePerHour: number; incidentResponseCostAvg: number };
@@ -30,6 +32,21 @@ export const config = safetyCfg as unknown as SafetyConfig;
 export const countermeasures = (cmData.countermeasures as unknown) as Countermeasure[];
 
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
+
+const REF = new Date(config.referenceDate);
+/** Months from an incident date to the reference date (0 if in the future). */
+function monthsSince(date: string): number {
+  const d = new Date(date);
+  return Math.max(0, (REF.getFullYear() - d.getFullYear()) * 12 + (REF.getMonth() - d.getMonth()));
+}
+/** Recency weight: exponential decay (config half-life), floored — recent crashes count more. */
+function recencyWeight(date: string): number {
+  return Math.max(config.recency.floor, Math.pow(0.5, monthsSince(date) / config.recency.halfLifeMonths));
+}
+/** Per-length factor: short segments with the same incident load read as higher-rate (per km). */
+function lengthFactor(lengthM: number): number {
+  return Math.max(0.5, Math.min(2.5, config.lengthNormalizationRefM / Math.max(lengthM, 1)));
+}
 
 export function bandFor(score: number): RiskBand {
   if (score >= config.bands.redAtOrAbove) return "red";
@@ -62,13 +79,19 @@ function statsFor(incidents: SegIncident[]): SegmentStats {
 }
 
 /** Effective-weight scoring: each incident contributes `weight` (1, or 1-reduction if a
- * countermeasure addresses it). Lets the before/after toggle produce a smooth new score. */
-function scoreFromWeighted(incidents: SegIncident[], weightOf: (i: SegIncident) => number): number {
+ * countermeasure addresses it) × a recency decay. Frequency + severity are normalized per segment
+ * length (incidents/km); closure burden stays absolute. Lets the before/after toggle stay smooth. */
+function scoreFromWeighted(
+  incidents: SegIncident[],
+  lengthM: number,
+  weightOf: (i: SegIncident) => number
+): number {
+  const lf = lengthFactor(lengthM);
   let count = 0;
   let severity = 0;
   let closure = 0;
   for (const i of incidents) {
-    const w = weightOf(i);
+    const w = weightOf(i) * recencyWeight(i.date);
     count += w;
     severity += w * (config.severityWeight[i.severity] ?? 1);
     closure += w * i.lane_closure_min;
@@ -76,8 +99,8 @@ function scoreFromWeighted(incidents: SegIncident[], weightOf: (i: SegIncident) 
   const n = config.normalizers;
   const wt = config.weights;
   return clamp01(
-    wt.frequency * clamp01(count / n.incidentsFull) +
-      wt.severity * clamp01(severity / n.severityScoreFull) +
+    wt.frequency * clamp01((count * lf) / n.incidentsFull) +
+      wt.severity * clamp01((severity * lf) / n.severityScoreFull) +
       wt.closure * clamp01(closure / n.closureMinFull)
   );
 }
@@ -109,7 +132,7 @@ export function computeDelta(seg: ScoredSegment, cm: Countermeasure): Countermea
   const revenueProtected = Math.round(
     closureHoursAvoided * config.economics.tolledLaneRevenuePerHour
   );
-  const afterScore = scoreFromWeighted(seg.incidents, (i) =>
+  const afterScore = scoreFromWeighted(seg.incidents, seg.length_m, (i) =>
     addresses(cm, i) ? 1 - cm.reduction : 1
   );
   return {
@@ -133,7 +156,7 @@ export function scoreSegments(
       const segIncidents = incidents
         .filter((i) => i.segment_id === seg.segment_id)
         .sort((a, b) => (a.date < b.date ? 1 : -1));
-      const score = scoreFromWeighted(segIncidents, () => 1);
+      const score = scoreFromWeighted(segIncidents, seg.length_m, () => 1);
       const band = bandFor(score);
       const stats = statsFor(segIncidents);
       const recommended = recommendedFor(seg.segment_id);
