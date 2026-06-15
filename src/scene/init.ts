@@ -20,7 +20,7 @@ import {
   placeAndDecorateB,
   getBDecorator,
 } from "../scenarioB/manager";
-import { store } from "../scenarioA/store";
+import { registerReDecorate, store, type Scenario } from "../scenarioA/store";
 
 export function onIModelConnected(iModel: IModelConnection): void {
   scoreAssetsIntoStore(iModel);
@@ -28,9 +28,60 @@ export function onIModelConnected(iModel: IModelConnection): void {
 }
 
 let liveWired = false;
+/** The viewport last configured — used to re-place overlays when the active dataset changes. */
+let activeVp: ScreenViewport | undefined;
+
+/** Re-run the existing placement pipeline for one scenario against the store's current data,
+ *  then re-frame on the new overlays. Called by the store when a CSV source is swapped in. */
+async function reDecorate(scenario: Scenario): Promise<void> {
+  const vp = activeVp ?? IModelApp.viewManager.selectedView ?? undefined;
+  if (!vp) return;
+  try {
+    if (scenario === "A") await placeAndDecorateA(vp);
+    else await placeAndDecorateB(vp);
+    reframeOnActiveData(vp, scenario);
+  } catch (e) {
+    console.warn("[scene] re-decorate after data change failed:", e);
+  }
+}
+
+/** Frame the corridor on the active scenario's freshly-placed overlays (top-down), clamped to the
+ *  model extents so a stray placement can never throw the camera off-corridor. */
+function reframeOnActiveData(vp: ScreenViewport, scenario: Scenario): void {
+  const snap = store.getSnapshot();
+  const focus =
+    scenario === "A"
+      ? [...snap.worldByTag.values()]
+      : [...snap.segmentMidById.values()];
+  const pe = vp.iModel.projectExtents;
+  let frame: Range3d | undefined;
+  if (focus.length > 0) {
+    frame = Range3d.createArray(focus);
+    if (!pe.isNull) {
+      frame.low.x = Math.max(frame.low.x, pe.low.x);
+      frame.low.y = Math.max(frame.low.y, pe.low.y);
+      frame.low.z = Math.max(frame.low.z, pe.low.z);
+      frame.high.x = Math.min(frame.high.x, pe.high.x);
+      frame.high.y = Math.min(frame.high.y, pe.high.y);
+      frame.high.z = Math.min(frame.high.z, pe.high.z);
+      if (frame.isNull || frame.low.x > frame.high.x || frame.low.y > frame.high.y)
+        frame = pe.clone();
+    }
+  } else if (!pe.isNull) {
+    frame = pe.clone();
+  }
+  vp.view.setStandardRotation(StandardViewId.Top);
+  if (frame && !frame.isNull) {
+    frame.expandInPlace(140);
+    vp.zoomToVolume(frame, { animateFrustumChange: true });
+  }
+}
 
 export function configureViewport(vp: ScreenViewport): void {
   applyCleanDisplay(vp);
+  activeVp = vp;
+  // Let the store trigger a re-place + re-frame when the active dataset (CSV source) changes.
+  registerReDecorate((scenario) => void reDecorate(scenario));
 
   if (store.getSnapshot().assets.length === 0) scoreAssetsIntoStore(vp.iModel);
   if (store.getSnapshot().segments.length === 0) scoreSegmentsIntoStore();

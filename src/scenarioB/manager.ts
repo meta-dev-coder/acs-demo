@@ -12,6 +12,8 @@ import { scoreSegments } from "./safetyScoring";
 import { SegmentRiskDecorator, type SegmentGraphic } from "./decorator";
 import { store } from "../scenarioA/store";
 import { getCenterline, corridorPoint, smoothPolyline } from "../scene/place";
+import { SEGMENT_CSV_COLUMNS } from "../data/sources";
+import { tableFrom } from "../data/loader";
 import { Point3d } from "@itwin/core-geometry";
 import type { RawSegment, SegIncident } from "./types";
 
@@ -23,6 +25,8 @@ export function scoreSegmentsIntoStore(): void {
   const incs = (incidentsData.incidents as unknown) as SegIncident[];
   const scored = scoreSegments(segs, incs);
   store.setSegments(scored);
+  // Publish a "Data" table of the built-in default segments (CSV column order).
+  store.setTable("B", tableFrom(SEGMENT_CSV_COLUMNS, segs as unknown as Record<string, unknown>[]));
   const reds = scored.filter((s) => s.band === "red").length;
   console.log(`[Scenario B] ${scored.length} segments scored — ${reds} high-risk.`);
 }

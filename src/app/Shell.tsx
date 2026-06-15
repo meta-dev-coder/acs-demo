@@ -14,6 +14,7 @@ import type { RiskBand, ScoredAsset } from "../scenarioA/types";
 import { bandMeta as segBandMeta } from "../scenarioB/safetyScoring";
 import type { ScoredSegment } from "../scenarioB/types";
 import { GuidedTour, shouldAutoStartTour } from "./GuidedTour";
+import { DataSourceSwitcher, DataTablePanel } from "./DataSource";
 
 const BANDS: RiskBand[] = ["red", "amber", "green"];
 const fmt$ = (n: number) => `$${n.toLocaleString("en-US")}`;
@@ -30,7 +31,17 @@ function frameSegment(id: string) {
 }
 
 /* ----------------------------------- top bar ----------------------------------- */
-function TopBar({ scenario, onStartTour }: { scenario: "A" | "B"; onStartTour: () => void }) {
+function TopBar({
+  scenario,
+  onStartTour,
+  dataOpen,
+  onToggleData,
+}: {
+  scenario: "A" | "B";
+  onStartTour: () => void;
+  dataOpen: boolean;
+  onToggleData: () => void;
+}) {
   return (
     <div className="sd-top">
       <div className="sd-brand">
@@ -51,8 +62,8 @@ function TopBar({ scenario, onStartTour }: { scenario: "A" | "B"; onStartTour: (
         </button>
       </div>
       <div className="spacer" />
+      <DataSourceSwitcher scenario={scenario} dataOpen={dataOpen} onToggleData={onToggleData} />
       <button className="tour-fab" onClick={onStartTour}>● Take a tour</button>
-      <span style={{ color: "var(--sd-dim)", fontSize: 12, marginLeft: 14 }}>ACS · I-595 Express LLC</span>
     </div>
   );
 }
@@ -246,7 +257,7 @@ function WorkPackagePanel({ assets }: { assets: ScoredAsset[] }) {
           <div className="sd-kpibox"><div className="v">{wp.crewHoursSaved}h</div><div className="l">crew saved</div></div>
           <div className="sd-kpibox"><div className="v green">{fmt$(wp.revenueProtected)}</div><div className="l">revenue protected</div></div>
         </div>
-        <div style={{ fontSize: 11.5, color: "var(--sd-dim)", margin: "8px 0" }}>
+        <div style={{ fontSize: 12, color: "var(--sd-dim)", margin: "8px 0", lineHeight: 1.45 }}>
           {wp.closuresSeparate} emergency closures → 1 planned window.
         </div>
         <button className="sd-btn primary" onClick={() => store.clearPackage()}>Clear selection</button>
@@ -419,11 +430,17 @@ export function Shell({ viewer }: { viewer: ReactNode }) {
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [tourOpen, setTourOpen] = useState(() => shouldAutoStartTour());
+  const [dataOpen, setDataOpen] = useState(false);
   const gridTemplateColumns = `${leftOpen ? 312 : 34}px 1fr ${rightOpen ? 360 : 34}px`;
 
   return (
     <div className="shell" style={{ gridTemplateColumns }}>
-      <TopBar scenario={scenario} onStartTour={() => setTourOpen(true)} />
+      <TopBar
+        scenario={scenario}
+        onStartTour={() => setTourOpen(true)}
+        dataOpen={dataOpen}
+        onToggleData={() => setDataOpen((v) => !v)}
+      />
       {leftOpen ? (
         <LeftPanel scenario={scenario} onCollapse={() => setLeftOpen(false)} />
       ) : (
@@ -431,7 +448,10 @@ export function Shell({ viewer }: { viewer: ReactNode }) {
           <Rail side="left" label={scenario === "A" ? "ASSETS" : "SEGMENTS"} onExpand={() => setLeftOpen(true)} />
         </div>
       )}
-      <div className="sd-viewer">{viewer}</div>
+      <div className="sd-viewer">
+        {viewer}
+        {dataOpen && <DataTablePanel scenario={scenario} onClose={() => setDataOpen(false)} />}
+      </div>
       {rightOpen ? (
         <RightPanel scenario={scenario} onCollapse={() => setRightOpen(false)} />
       ) : (

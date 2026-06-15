@@ -1,0 +1,11 @@
+asset_tag,asset_class,label,location_desc,coord_e,coord_n,u,v,install_date,expected_life_years,last_inspection_date,last_workorder_date,open_tickets,recent_workorders,manufacturer_eol,exposure_factor
+ITS-DN-CCTV-01,cctv,CCTV PTZ — N district MM 7.2,"I-595 EB shoulder, District N",579100,2882990,0.07,1,2014-03-10,10,2023-02-01,2025-11-04,2,3,true,0.6
+ITS-DN-DET-02,detector,Loop detector station — MM 8.1,"I-595 mainline, District N",580200,2883010,0.15,0,2011-06-22,10,2022-08-15,2024-12-01,4,6,true,0.7
+ITS-DN-DMS-03,dms,Dynamic message sign — westbound approach,"I-595 WB, District N",581400,2882960,0.23,-1,2016-09-01,15,2024-05-10,2025-09-20,1,2,false,0.5
+ITS-DN-LANE-04,lane_control,Lane-control signal gantry,"I-595 reversible, District N",583000,2883005,0.35,0,2010-01-15,12,2023-11-30,2026-01-10,5,7,true,0.85
+ITS-DN-CAB-05,controller_cabinet,Field controller cabinet C-12,"I-595 EB, District N",584600,2882985,0.46,0,2013-04-04,18,2024-09-01,2025-06-12,2,1,false,0.4
+ITS-DN-RAMP-06,ramp_signal,Ramp meter — Davie Rd EB on-ramp,"Davie Rd / I-595, District N",585800,2882940,0.55,-2,2018-07-19,12,2025-01-22,2025-10-05,0,1,false,0.45
+ITS-DN-CCTV-07,cctv,CCTV fixed — MM 11.4,"I-595 EB, District N",587100,2883000,0.64,1,2012-11-11,10,2021-12-12,2024-07-18,6,8,true,0.75
+ITS-DN-GAN-08,toll_gantry,Toll gantry — District N express entry,"I-595 Express, District N",588900,2883030,0.77,0,2008-02-28,12,2023-06-06,2026-02-14,3,5,true,0.9
+ITS-DN-LIGHT-09,lighting,High-mast lighting tower 9,"I-595 interchange, District N",590200,2882975,0.87,2,2017-10-30,25,2024-10-10,2025-03-03,1,0,false,0.3
+ITS-DN-GATE-10,access_gate,Maintenance access gate — east end,"I-595 Express east, District N",591500,2883020,0.96,-1,2019-05-05,15,2025-02-02,2025-08-22,0,1,false,0.35

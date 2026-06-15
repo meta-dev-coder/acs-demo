@@ -1,0 +1,7 @@
+segment_id,name,roadway,direction,from_e,from_n,to_e,to_n,u_from,u_to,length_m,incidents_24mo,injuries,serious,total_closure_min,dominant_type,dominant_factor
+SEG-MN-W,I-595 Mainline — West (prior year),i595_mainline,EB,578200,2882980,581200,2883000,0.04,0.22,3000,5,1,0,140,breakdown,speed
+SEG-MN-C,I-595 Mainline — Central (prior year),i595_mainline,EB,581200,2883000,584800,2883010,0.22,0.45,3600,8,2,0,260,rear_end,queue_spillback
+SEG-MN-E,I-595 Mainline — East (prior year),i595_mainline,WB,584800,2883010,588200,2883020,0.45,0.66,3400,12,4,1,540,rear_end,queue_spillback
+SEG-EXP-RVS,Express Lanes — reversible (prior year),express_lane,reversible,583000,2883060,587600,2883070,0.4,0.7,4600,7,2,0,210,sideswipe,lighting
+SEG-CONN,Turnpike connector ramp (prior year),turnpike_ramp,EB,588200,2883020,591200,2883040,0.66,0.86,3000,15,6,3,820,rear_end,merge_geometry
+SEG-TPK-N,Turnpike ramp North (prior year),turnpike_ramp,EB,591200,2883040,592000,2883050,0.86,0.97,900,3,0,0,60,sideswipe,merge_geometry

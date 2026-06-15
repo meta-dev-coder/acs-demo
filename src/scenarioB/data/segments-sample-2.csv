@@ -1,0 +1,7 @@
+segment_id,name,roadway,direction,from_e,from_n,to_e,to_n,u_from,u_to,length_m,incidents_24mo,injuries,serious,total_closure_min,dominant_type,dominant_factor
+S84-01,SR-84 — West of University Dr,sr84,EB,578300,2882900,580400,2882910,0.05,0.18,2100,9,3,1,420,rear_end,queue_spillback
+S84-02,SR-84 — University to Pine Island,sr84,EB,580400,2882910,582900,2882920,0.18,0.34,2500,14,5,2,640,sideswipe,merge_geometry
+S84-03,SR-84 — Pine Island to Nob Hill,sr84,WB,582900,2882905,585300,2882915,0.34,0.49,2400,6,1,0,180,breakdown,speed
+S84-04,SR-84 — Nob Hill curve,sr84,EB,585300,2882915,587000,2882925,0.49,0.61,1700,18,7,3,930,rear_end,wet_pavement
+S84-05,SR-84 — Hiatus to Flamingo,sr84,WB,587000,2882910,589400,2882920,0.61,0.77,2400,11,4,1,510,sideswipe,lighting
+S84-06,SR-84 — Flamingo to east terminus,sr84,EB,589400,2882920,591800,2882930,0.77,0.94,2400,5,1,0,150,debris,speed

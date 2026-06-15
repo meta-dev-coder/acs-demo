@@ -1,0 +1,10 @@
+asset_tag,asset_class,label,location_desc,coord_e,coord_n,u,v,install_date,expected_life_years,last_inspection_date,last_workorder_date,open_tickets,recent_workorders,manufacturer_eol,exposure_factor
+ITS-PU-GAN-01,toll_gantry,SunPass gantry — refreshed EB,I-595 Express EB,578900,2883025,0.05,0,2024-01-15,15,2026-04-01,2026-05-12,0,0,false,0.4
+ITS-PU-GAN-02,toll_gantry,SunPass gantry — refreshed WB,I-595 Express WB,581000,2882970,0.2,0,2024-02-20,15,2026-03-20,2026-04-30,0,1,false,0.4
+ITS-PU-CCTV-03,cctv,CCTV PTZ — new MM 9.0,I-595 EB,582600,2883000,0.32,1,2023-11-01,12,2026-02-10,2026-05-01,1,0,false,0.45
+ITS-PU-DMS-04,dms,"DMS — solar-backed, new",I-595 WB,584200,2882990,0.43,-1,2024-03-05,15,2026-01-15,2026-04-22,0,0,false,0.35
+ITS-PU-DET-05,detector,Radar detector — replaced loops,I-595 mainline,585700,2883010,0.54,0,2023-09-12,12,2025-12-01,2026-03-18,1,1,false,0.5
+ITS-PU-LANE-06,lane_control,Lane-control gantry — upgraded,I-595 reversible,587200,2882995,0.65,0,2024-04-18,15,2026-04-10,2026-05-20,0,0,false,0.5
+ITS-PU-CAB-07,controller_cabinet,"Edge cabinet — legacy, pending swap",I-595 EB,588600,2882980,0.75,0,2009-08-08,18,2024-06-01,2025-02-02,4,5,true,0.7
+ITS-PU-RAMP-08,ramp_signal,Ramp meter — new firmware,Turnpike ramp,589900,2882960,0.85,-2,2023-12-20,12,2026-02-28,2026-05-05,0,1,false,0.4
+ITS-PU-LIGHT-09,lighting,LED high-mast — retrofit,I-595 interchange,591100,2883000,0.94,2,2024-05-01,25,2026-05-01,2026-05-15,0,0,false,0.3

@@ -15,6 +15,8 @@ import { AssetDecorator } from "./decorator";
 import { store } from "./store";
 import { runDiscovery } from "./discovery";
 import { getCenterline, corridorPoint, snapToRoad } from "../scene/place";
+import { ASSET_CSV_COLUMNS } from "../data/sources";
+import { tableFrom } from "../data/loader";
 import type { Point3d } from "@itwin/core-geometry";
 import type { HistoryRecord, RawAsset } from "./types";
 
@@ -25,6 +27,8 @@ export function scoreAssetsIntoStore(iModel: IModelConnection): void {
   const history = (historyData.records as unknown) as HistoryRecord[];
   const scored = scoreAssets(assets, history);
   store.setAssets(scored);
+  // Publish a "Data" table of the built-in default assets (CSV column order).
+  store.setTable("A", tableFrom(ASSET_CSV_COLUMNS, assets as unknown as Record<string, unknown>[]));
 
   (window as unknown as { __acsDiscovery: () => Promise<void> }).__acsDiscovery = () =>
     runDiscovery(iModel);
