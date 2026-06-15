@@ -20,6 +20,10 @@ import { GuidedTour, shouldAutoStartTour } from "./GuidedTour";
 import { DataSourceSwitcher, DataTablePanel } from "./DataSource";
 import { SCENARIO_REGISTRY, ALL_SCENARIOS } from "./scenarioRegistry";
 import type { ScenarioKey } from "./scenarioRegistry";
+import { storeC } from "../scenarioC/storeC";
+import { useScenarioCState } from "../scenarioC/useScenarioCState";
+import { LOS_COLORS } from "../scenarioC/decorator";
+import type { TimeBlock, PricingStrategy } from "../scenarioC/types";
 
 const BANDS: RiskBand[] = ["red", "amber", "green"];
 const fmt$ = (n: number) => `$${n.toLocaleString("en-US")}`;
@@ -205,14 +209,125 @@ function SegmentLeftList({
   );
 }
 
-/* ---- Scenario C left list (M0 placeholder) ---- */
+const TIME_BLOCK_LABELS: Record<TimeBlock, string> = {
+  morning_peak_eb: "Morning Peak EB",
+  evening_peak_wb: "Evening Peak WB",
+  off_peak: "Off-Peak",
+  weekend: "Weekend",
+};
+
+const STRATEGY_LABELS: Record<PricingStrategy, string> = {
+  current_static: "Current Static",
+  moderate_variable: "Moderate Variable",
+  aggressive: "Aggressive",
+};
+
+/* ---- Scenario C left list ---- */
 function TollingLeftList() {
+  const s = useScenarioCState();
+
+  // Sort sections by utilization (highest first) — mirrors Scenario B's risk-sorted list
+  const sorted = [...s.pricedSections].sort((a, b) => b.utilization - a.utilization);
+
   return (
-    <div className="sd-list">
-      <div className="empty" style={{ padding: "16px", color: "var(--sd-dim)", fontSize: 13 }}>
-        Dynamic Tolling data loads in Milestone 1.
+    <>
+      {/* Controls: time-block selector + strategy presets */}
+      <div style={{ padding: "10px 14px 4px", borderBottom: "1px solid var(--sd-line)" }}>
+        <div style={{ fontSize: 11, color: "var(--sd-dim)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+          Time Block
+        </div>
+        <div className="sd-chips" style={{ padding: 0, marginBottom: 8 }}>
+          {(["morning_peak_eb", "evening_peak_wb", "off_peak", "weekend"] as TimeBlock[]).map((b) => (
+            <span
+              key={b}
+              className={`sd-chip${s.timeBlock === b ? " on" : ""}`}
+              onClick={() => storeC.setTimeBlock(b)}
+              style={{ fontSize: 10 }}
+            >
+              {TIME_BLOCK_LABELS[b]}
+            </span>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: "var(--sd-dim)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+          Strategy
+        </div>
+        <div className="sd-chips" style={{ padding: 0, marginBottom: 6 }}>
+          {(["current_static", "moderate_variable", "aggressive"] as PricingStrategy[]).map((strat) => (
+            <span
+              key={strat}
+              className={`sd-chip${s.strategy === strat ? " on" : ""}`}
+              onClick={() => storeC.setStrategy(strat)}
+              style={{ fontSize: 10 }}
+            >
+              {STRATEGY_LABELS[strat]}
+            </span>
+          ))}
+        </div>
+        {/* Color-by toggle */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+          <span style={{ fontSize: 11, color: "var(--sd-dim)" }}>Color by:</span>
+          <button
+            style={{
+              fontSize: 11, padding: "2px 8px", borderRadius: 4, border: "1px solid var(--sd-line)",
+              background: s.colorMode === "los" ? "var(--sd-accent)" : "var(--sd-panel2)",
+              color: s.colorMode === "los" ? "#fff" : "var(--sd-dim)", cursor: "pointer"
+            }}
+            onClick={() => storeC.setColorMode("los")}
+          >
+            LOS
+          </button>
+          <button
+            style={{
+              fontSize: 11, padding: "2px 8px", borderRadius: 4, border: "1px solid var(--sd-line)",
+              background: s.colorMode === "rate" ? "var(--sd-accent)" : "var(--sd-panel2)",
+              color: s.colorMode === "rate" ? "#fff" : "var(--sd-dim)", cursor: "pointer"
+            }}
+            onClick={() => storeC.setColorMode("rate")}
+          >
+            Rate
+          </button>
+        </div>
+        {/* Next recompute chip (static, 15-min cadence) */}
+        <div style={{ fontSize: 11, color: "var(--sd-dim)", marginTop: 8, padding: "4px 0" }}>
+          Next recompute · 15-min beat
+        </div>
       </div>
-    </div>
+
+      {/* Express sections sorted by utilization */}
+      <div className="sd-list">
+        {sorted.map((sec) => {
+          const color = LOS_COLORS[sec.los] ?? "#888";
+          const isInspected = s.inspectedSectionId === sec.sectionId;
+          const hasOverride = (s.overrides[sec.sectionId] !== undefined);
+          return (
+            <div
+              key={sec.sectionId}
+              className={`sd-row${isInspected ? " sel" : ""}`}
+              onClick={() => storeC.inspectSection(isInspected ? null : sec.sectionId)}
+            >
+              <span className="sd-dot" style={{ background: color, border: sec.safetyFlag ? "2px solid #cc0000" : undefined }} />
+              <span className="nm">
+                <div className="t">
+                  {sec.sectionId}
+                  {hasOverride && (
+                    <span style={{ fontSize: 10, color: "#ff9800", marginLeft: 6 }}>override</span>
+                  )}
+                  {sec.safetyFlag && (
+                    <span style={{ fontSize: 10, color: "#cc0000", marginLeft: 6 }}>safety flag</span>
+                  )}
+                </div>
+                <div className="s">
+                  LOS {sec.los} · ${sec.postedRate.toFixed(2)} · {sec.density.toFixed(1)} veh/mi/ln
+                </div>
+              </span>
+              <span className="pct" style={{ color }}>
+                {Math.round(sec.utilization * 100)}%
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
@@ -419,13 +534,183 @@ function SegmentInspector({ segment }: { segment: ScoredSegment }) {
   );
 }
 
-/* ---- Scenario C inspector placeholder (M0) ---- */
+/* ---- Scenario C inspector (full) ---- */
 function TollingInspector() {
+  const s = useScenarioCState();
+  const section = s.inspectedSectionId
+    ? s.pricedSections.find((p) => p.sectionId === s.inspectedSectionId)
+    : null;
+
+  if (!section) {
+    return (
+      <div className="sd-insp">
+        <div className="empty">{SCENARIO_REGISTRY["C"].inspectorEmptyText}</div>
+        {/* Corridor-total readout always visible */}
+        <div style={{ borderTop: "1px solid var(--sd-line)", padding: "14px" }}>
+          <div style={{ fontSize: 11, color: "var(--sd-dim)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+            Corridor Trip Total
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: "var(--sd-text)" }}>
+            ${s.kpi.corridorTotalRate.toFixed(2)}
+          </div>
+          <div style={{ fontSize: 11, color: "var(--sd-dim)" }}>Sum of 3 section posted rates</div>
+        </div>
+      </div>
+    );
+  }
+
+  const hasOverride = s.overrides[section.sectionId] !== undefined;
+  const overrideValue = s.overrides[section.sectionId] ?? section.postedRate;
+  const algorithmCap = 3.00;
+  const isOverOverride = hasOverride && overrideValue > algorithmCap;
+  const color = LOS_COLORS[section.los] ?? "#888";
+
   return (
     <div className="sd-insp">
-      <div className="empty" style={{ padding: "16px", color: "var(--sd-dim)", fontSize: 13 }}>
-        Dynamic Tolling inspector loads in Milestone 1. Select an express section to see its LOS,
-        posted rate, density, and override controls.
+      <h2 style={{ marginBottom: 2 }}>{section.sectionId}</h2>
+      <div className="sub" style={{ color: "var(--sd-dim)", fontSize: 12, marginBottom: 12 }}>
+        Express lane · {s.timeBlock.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())} ·
+        {" "}{STRATEGY_LABELS[s.strategy]}
+      </div>
+
+      {/* LOS band + density */}
+      <div className="sd-sec">
+        <h4>LOS / Density</h4>
+        <div style={{ display: "flex", gap: 16, alignItems: "baseline" }}>
+          <span
+            className="sd-big"
+            style={{ color, fontSize: 28, fontWeight: 800, minWidth: 40 }}
+          >
+            {section.los}
+          </span>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>{section.density.toFixed(1)} veh/mi/ln</div>
+            <div style={{ fontSize: 12, color: "var(--sd-dim)" }}>{section.speed} mph</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Rate display: posted vs proposed */}
+      <div className="sd-sec">
+        <h4>Toll Rate</h4>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: 12, color: "var(--sd-dim)" }}>Posted (locked)</div>
+            <div style={{ fontSize: 20, fontWeight: 800 }}>${section.postedRate.toFixed(2)}</div>
+          </div>
+          {hasOverride && (
+            <>
+              <div style={{ color: "var(--sd-dim)", fontSize: 18 }}>→</div>
+              <div>
+                <div style={{ fontSize: 12, color: "#ff9800" }}>
+                  Proposed {isOverOverride ? "(override)" : ""}
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: "#ff9800" }}>
+                  ${overrideValue.toFixed(2)}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Traffic metrics */}
+      <div className="sd-sec">
+        <h4>Traffic</h4>
+        <dl className="sd-meta">
+          <dt>Section volume</dt>
+          <dd>{Math.round(section.volume).toLocaleString()} veh/hr</dd>
+          <dt>Density</dt>
+          <dd>{section.density.toFixed(1)} veh/mi/ln</dd>
+          <dt>Speed</dt>
+          <dd>{section.speed} mph</dd>
+          <dt>Utilization</dt>
+          <dd>{(section.utilization * 100).toFixed(1)}%</dd>
+        </dl>
+      </div>
+
+      {/* Demand shift */}
+      <div className="sd-sec">
+        <h4>Demand Response</h4>
+        <dl className="sd-meta">
+          <dt>Demand retained</dt>
+          <dd>{(section.demandRetained * 100).toFixed(0)}%</dd>
+          <dt>Predicted shed</dt>
+          <dd>{Math.round(section.shedVehicles).toLocaleString()} veh/hr</dd>
+          <dt>Revenue / hr</dt>
+          <dd>${Math.round(section.revenuePerHour).toLocaleString()}</dd>
+        </dl>
+      </div>
+
+      {/* Safety flag */}
+      {section.safetyFlag && (
+        <div className="sd-sec" style={{ background: "#2a1010", borderRadius: 6, padding: "8px 10px" }}>
+          <div style={{ color: "#cc0000", fontWeight: 700, marginBottom: 4 }}>Safety Flag</div>
+          <div style={{ fontSize: 12, color: "#ff9090", lineHeight: 1.5 }}>
+            Demand shift from this pricing scenario increases volume on the connected mainline
+            ({(section.connectedMainlineUtilization * 100).toFixed(0)}% util) which has elevated safety risk.
+            Review before applying.
+          </div>
+        </div>
+      )}
+
+      {/* Override slider ($0.50–$10.00) */}
+      <div className="sd-sec">
+        <h4>
+          Override Rate
+          {isOverOverride && (
+            <span style={{ fontSize: 11, color: "#ff9800", marginLeft: 8 }}>
+              above algorithm cap ($3.00)
+            </span>
+          )}
+        </h4>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <span style={{ fontSize: 11, color: "var(--sd-dim)" }}>$0.50</span>
+          <input
+            type="range"
+            min={0.50}
+            max={10.00}
+            step={0.25}
+            value={overrideValue}
+            onChange={(e) => storeC.setOverride(section.sectionId, parseFloat(e.target.value))}
+            style={{ flex: 1 }}
+          />
+          <span style={{ fontSize: 11, color: "var(--sd-dim)" }}>$10.00</span>
+        </div>
+        <div style={{ textAlign: "center", fontWeight: 700, marginTop: 4 }}>
+          ${overrideValue.toFixed(2)}
+        </div>
+        {hasOverride && (
+          <button
+            className="sd-btn"
+            style={{ marginTop: 6, fontSize: 11, padding: "4px 10px" }}
+            onClick={() => storeC.clearOverride(section.sectionId)}
+          >
+            Reset to algorithm rate
+          </button>
+        )}
+      </div>
+
+      {/* Corridor-total readout */}
+      <div style={{ borderTop: "1px solid var(--sd-line)", padding: "10px 0 0" }}>
+        <div style={{ fontSize: 11, color: "var(--sd-dim)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
+          Corridor Trip Total (3 sections)
+        </div>
+        <div style={{ fontSize: 20, fontWeight: 800 }}>${s.kpi.corridorTotalRate.toFixed(2)}</div>
+      </div>
+
+      {/* Closure teaser card (non-interactive) */}
+      <div style={{
+        marginTop: 14, borderRadius: 6, border: "1px solid var(--sd-line)",
+        padding: "10px 12px", background: "var(--sd-panel2)"
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--sd-dim)", marginBottom: 4 }}>
+          Combined value preview
+        </div>
+        <div style={{ fontSize: 12, color: "var(--sd-dim)", lineHeight: 1.5 }}>
+          Full closure + pricing sim ships with Scenario 4 (Lane Closure).
+          Same LOS table, demand-shift, and safety-flag math — pricing recovering revenue during a disruption.
+        </div>
       </div>
     </div>
   );
@@ -508,15 +793,42 @@ function KpiBarB() {
   );
 }
 
-/* ---- Scenario C KPI bar placeholder (M0) ---- */
+/* ---- Scenario C KPI bar (4 co-equal tiles: Speed | Revenue | Utilization | Safety) ---- */
 function KpiBarC() {
+  const s = useScenarioCState();
+  const { kpi } = s;
   return (
     <div className="sd-kpi">
-      <div className="item"><div className="v">—</div><div className="l">Speed held (≥45 mph)</div></div>
-      <div className="item"><div className="v">—</div><div className="l">Projected revenue / hr</div></div>
-      <div className="item"><div className="v">—</div><div className="l">Corridor utilization</div></div>
-      <div className="item"><div className="v">—</div><div className="l">Safety flags</div></div>
-      <div className="note">Dynamic Tolling · data loads in Milestone 1</div>
+      {/* Tile 1: Speed held (mandated metric leads) */}
+      <div className="item">
+        <div className="v" style={{ color: kpi.speedHeld ? "var(--green)" : "var(--red)" }}>
+          {kpi.speedHeld ? "✓" : "✗"} {kpi.speedHeld ? "≥45 mph" : "<45 mph"}
+        </div>
+        <div className="l">Speed held</div>
+      </div>
+      {/* Tile 2: Projected revenue / hr (co-equal) */}
+      <div className="item">
+        <div className="v green">${Math.round(kpi.projectedRevenuePerHour).toLocaleString()}/hr</div>
+        <div className="l">Projected revenue</div>
+      </div>
+      {/* Tile 3: Corridor utilization (co-equal) */}
+      <div className="item">
+        <div className="v" style={{ color: kpi.corridorUtilization > 0.90 ? "var(--amber)" : "var(--sd-text)" }}>
+          {(kpi.corridorUtilization * 100).toFixed(0)}%
+        </div>
+        <div className="l">Corridor utilization</div>
+      </div>
+      {/* Tile 4: Safety flags (co-equal) */}
+      <div className="item">
+        <div className="v" style={{ color: kpi.safetyFlagCount > 0 ? "var(--red)" : "var(--green)" }}>
+          {kpi.safetyFlagCount}
+        </div>
+        <div className="l">Safety flags</div>
+      </div>
+      <div className="note">
+        Dynamic Tolling · {TIME_BLOCK_LABELS[s.timeBlock]} · {STRATEGY_LABELS[s.strategy]} ·
+        {" "}Trip total ${kpi.corridorTotalRate.toFixed(2)} · Synthetic data
+      </div>
     </div>
   );
 }
