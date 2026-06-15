@@ -144,7 +144,6 @@ export class TollingDecorator implements Decorator {
     if (scenarioState.scenario !== "C") return;
     if (!context.viewport.view.isSpatialView()) return;
 
-    this.idToSeg.clear();
     this.idToSection.clear();
 
     const cState = storeC.getSnapshot();
@@ -198,9 +197,6 @@ export class TollingDecorator implements Decorator {
     // Gantry price tags
     this.gantryMarkers.addDecoration(context);
   }
-
-  // Needed by WorldOverlay hit testing
-  private idToSeg = new Map<Id64String, SectionGraphic>();
 
   public testDecorationHit(id: string): boolean {
     return this.idToSection.has(id);

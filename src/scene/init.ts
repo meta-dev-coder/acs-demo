@@ -20,6 +20,7 @@ import {
   placeAndDecorateB,
   getBDecorator,
 } from "../scenarioB/manager";
+import { placeAndDecorateC, teardownC } from "../scenarioC/managerC";
 import { registerReDecorate, store, type Scenario } from "../scenarioA/store";
 
 export function onIModelConnected(iModel: IModelConnection): void {
@@ -38,7 +39,8 @@ async function reDecorate(scenario: Scenario): Promise<void> {
   if (!vp) return;
   try {
     if (scenario === "A") await placeAndDecorateA(vp);
-    else await placeAndDecorateB(vp);
+    else if (scenario === "B") await placeAndDecorateB(vp);
+    else await placeAndDecorateC(vp);
     reframeOnActiveData(vp, scenario);
   } catch (e) {
     console.warn("[scene] re-decorate after data change failed:", e);
@@ -91,6 +93,7 @@ export function configureViewport(vp: ScreenViewport): void {
       // 1) Place overlays on the real road + frame on them FIRST (fast — no waiting on tiles).
       await placeAndDecorateA(vp);
       await placeAndDecorateB(vp);
+      await placeAndDecorateC(vp);
 
       const snap = store.getSnapshot();
       // Frame the whole corridor top-down as the start view: western assets spread out as distinct
