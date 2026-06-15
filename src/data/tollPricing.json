@@ -1,0 +1,109 @@
+{
+  "_comment": "Dynamic Toll Pricing config for I-595 Express reversible lanes — Scenario C. Illustrative I-595 range, scaled from the published 95 Express LOS table (PMC8468808). All params config-driven; nothing hardcoded. Algorithm caps run $0.50–$3.00 to hold free-flow speed ≥45 mph. Operator override slider: $0.50–$10.00 (scope's literal range).",
+
+  "losBands": {
+    "A": {
+      "_comment": "LOS A: 0–11 veh/mi/ln — uncongested",
+      "minDensity": 0,
+      "maxDensity": 11,
+      "minToll": 0.50,
+      "maxToll": 0.50
+    },
+    "B": {
+      "_comment": "LOS B: 12–18 veh/mi/ln — stable flow",
+      "minDensity": 12,
+      "maxDensity": 18,
+      "minToll": 0.50,
+      "maxToll": 0.75
+    },
+    "C": {
+      "_comment": "LOS C: 19–26 veh/mi/ln — stable, some restrictions. minToll matches B maxToll so the table is non-decreasing across bands.",
+      "minDensity": 19,
+      "maxDensity": 26,
+      "minToll": 0.75,
+      "maxToll": 1.00
+    },
+    "D": {
+      "_comment": "LOS D: 27–35 veh/mi/ln — approaching unstable. minToll matches C maxToll.",
+      "minDensity": 27,
+      "maxDensity": 35,
+      "minToll": 1.00,
+      "maxToll": 2.00
+    },
+    "E": {
+      "_comment": "LOS E: 36–45 veh/mi/ln — unstable flow, approaching capacity",
+      "minDensity": 36,
+      "maxDensity": 45,
+      "minToll": 2.00,
+      "maxToll": 3.00
+    },
+    "F": {
+      "_comment": "LOS F: ≥46 veh/mi/ln — breakdown/congestion; cap at $3.00",
+      "minDensity": 46,
+      "maxDensity": 60,
+      "minToll": 3.00,
+      "maxToll": 3.00
+    }
+  },
+
+  "strategies": {
+    "current_static": {
+      "_comment": "Flat base rate — LOS band ignored. Comparison reference for operators.",
+      "baseRate": 1.50,
+      "multiplier": 1.0,
+      "useLOSTable": false
+    },
+    "moderate_variable": {
+      "_comment": "Standard LOS band lookup. High-utilization sections rise; low-utilization get a small reduction.",
+      "baseRate": 1.00,
+      "multiplier": 1.0,
+      "useLOSTable": true,
+      "deltaPerDensityUnit": 0.04
+    },
+    "aggressive": {
+      "_comment": "Raises max caps on LOS E/F sections to shed more demand to GP mainline / SR-84. Maximizes revenue at cost of larger demand shift.",
+      "baseRate": 1.00,
+      "multiplier": 1.25,
+      "useLOSTable": true,
+      "deltaPerDensityUnit": 0.06
+    }
+  },
+
+  "operatorOverride": {
+    "_comment": "Per-section slider range — the scope's literal $0.50–$10.00 SunPass override band. Pushing above the LOS-table ~$3.00 cap shows an 'override' badge in the UI.",
+    "min": 0.50,
+    "max": 10.00,
+    "algorithmCap": 3.00
+  },
+
+  "capacityVphpl": 1800,
+  "_capacityComment": "Express lane capacity in vehicles per hour per lane. I-595 Express: 3 reversible lanes; per-lane capacity ~1,800 vphpl (FDOT HCM-based).",
+
+  "safetyThreshold": 0.95,
+  "_safetyComment": "Mainline utilization fraction above which the safety flag fires — the explicit Scenario B bridge. FDOT 'degraded' threshold from SAFETEA-LU.",
+
+  "demandShedSplit": {
+    "_comment": "How shed express demand redistributes: 70% to connected GP mainline, 30% to SR-84 frontage. Config-driven; named in the spec.",
+    "mainline": 0.70,
+    "sr84": 0.30
+  },
+
+  "mainlineBaseline": {
+    "_comment": "Typical-peak mainline volume and capacity per connected segment, anchored to ~1,500 vphpl peak and ~1,800 vphpl capacity so 95% is a realistic threshold crossing.",
+    "SEG-MN-E": {
+      "baselineVphpl": 1500,
+      "capacityVphpl": 1800
+    },
+    "SEG-MN-C": {
+      "baselineVphpl": 1400,
+      "capacityVphpl": 1800
+    },
+    "SEG-MN-W": {
+      "baselineVphpl": 1300,
+      "capacityVphpl": 1800
+    }
+  },
+
+  "cadenceMinutes": 15,
+  "_cadenceComment": "Florida recomputes tolls every 15 minutes (PMC8468808). The 'next recompute' chip is a static label; recompute fires on explicit operator action."
+}
