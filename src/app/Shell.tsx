@@ -28,6 +28,10 @@ import { compareStore } from "../scenarioC/compareStore";
 import { useCompareState } from "../scenarioC/useCompareState";
 import { presentationStore } from "../scenarioC/presentationStore";
 import { usePresentationState } from "../scenarioC/usePresentationState";
+import { storeD } from "../scenarioD/storeD";
+import { useScenarioDState } from "../scenarioD/useScenarioDState";
+import { getLaneMenu } from "../scenarioD/closurePhysics";
+import { SCHEMATIC_LABEL } from "../scenarioD/placeClosure";
 
 const BANDS: RiskBand[] = ["red", "amber", "green"];
 const fmt$ = (n: number) => `$${n.toLocaleString("en-US")}`;
@@ -608,51 +612,216 @@ function TollingLeftList() {
   );
 }
 
-/* ---- Scenario D stubs (M0 — placeholder text only; full implementation in M5) ---- */
+/* ---- Scenario D — Lane Closure UI (M5: Concept A before/after) ---- */
 
 function ClosureLeftList() {
+  const s = useScenarioDState();
+  const [segmentId, setSegmentId] = useState("SEG-CONN");
+  const [lanesClosed, setLanesClosed] = useState(1);
+  const [timeOfDay, setTimeOfDay] = useState<"pm_peak" | "off_peak">("pm_peak");
+  const [durationMin, setDurationMin] = useState(60);
+  const [rain, setRain] = useState(false);
+
+  const menu = getLaneMenu(segmentId);
+  const effLanes = menu.some((m) => m.lanesClosed === lanesClosed) ? lanesClosed : menu[0]?.lanesClosed ?? 1;
+
+  const simulate = () => {
+    storeD.setClosureEvent({
+      segment_id: segmentId,
+      lanesClosed: effLanes,
+      startMin: 0,
+      durationMin,
+      timeOfDay,
+      ...(rain ? { weather: "rain" as const } : {}),
+    });
+  };
+
+  const segStates = s.conceptASnapshot?.segmentStates ?? [];
+  const lbl = {
+    fontSize: 11, color: "var(--sd-dim)", textTransform: "uppercase" as const,
+    letterSpacing: "0.05em", margin: "8px 0 4px",
+  };
+
   return (
-    <div className="sd-list" style={{ padding: "14px", color: "var(--sd-dim)", fontSize: 13 }}>
-      {/* SCHEMATIC corridor context — NOT calibrated mainline geometry */}
-      <div style={{ marginBottom: 8, fontStyle: "italic" }}>
-        Lane Closure — Scenario D (coming soon)
+    <>
+      <div data-testid="closure-event-builder" style={{ padding: "10px 14px", borderBottom: "1px solid var(--sd-line)" }}>
+        <div style={lbl}>Segment</div>
+        <select
+          data-testid="closure-segment-select"
+          value={segmentId}
+          onChange={(e) => setSegmentId(e.target.value)}
+          style={{ width: "100%", padding: "4px 6px", fontSize: 12, background: "var(--sd-panel2)", color: "var(--sd-text)", border: "1px solid var(--sd-line)", borderRadius: 4 }}
+        >
+          <option value="SEG-CONN">SEG-CONN — Express↔Turnpike connector</option>
+        </select>
+
+        <div style={lbl}>Lanes closed</div>
+        <div className="sd-chips" style={{ padding: 0 }}>
+          {menu.map((m) => (
+            <button
+              key={m.lanesClosed}
+              className={`sd-chip${effLanes === m.lanesClosed ? " on" : ""}`}
+              title={`HCM lane-blockage CAF ${m.caf}`}
+              onClick={() => setLanesClosed(m.lanesClosed)}
+            >
+              {m.lanesClosed} of {m.totalLanes} lanes
+            </button>
+          ))}
+        </div>
+
+        <div style={lbl}>Time of day</div>
+        <div className="sd-chips" style={{ padding: 0 }}>
+          <button className={`sd-chip${timeOfDay === "pm_peak" ? " on" : ""}`} onClick={() => setTimeOfDay("pm_peak")}>PM Peak</button>
+          <button className={`sd-chip${timeOfDay === "off_peak" ? " on" : ""}`} onClick={() => setTimeOfDay("off_peak")}>Off Peak</button>
+        </div>
+
+        <div style={lbl}>Duration · {durationMin} min</div>
+        <input
+          type="range" min={15} max={180} step={15} value={durationMin}
+          onChange={(e) => setDurationMin(parseInt(e.target.value, 10))}
+          style={{ width: "100%" }}
+        />
+
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--sd-dim)", marginTop: 8 }}>
+          <input type="checkbox" checked={rain} onChange={(e) => setRain(e.target.checked)} /> Rain (capacity ×0.85)
+        </label>
+
+        <button
+          onClick={simulate}
+          style={{ width: "100%", marginTop: 10, padding: "7px 0", fontSize: 13, fontWeight: 600, color: "#fff", background: "var(--sd-accent)", border: "none", borderRadius: 5, cursor: "pointer" }}
+        >
+          Simulate
+        </button>
       </div>
-      <div>Configure a closure event using the form above to simulate queue buildup,
-        shockwave propagation, and toll response on the I-595 connector segment.</div>
-    </div>
+
+      <div className="sd-list">
+        {segStates.length === 0 ? (
+          <div style={{ padding: "12px 14px", fontSize: 12, color: "var(--sd-dim)", fontStyle: "italic" }}>
+            Configure a closure and press Simulate to model queue buildup, shockwave propagation, and
+            dynamic-toll response. {SCHEMATIC_LABEL}.
+          </div>
+        ) : (
+          segStates.map((seg) => (
+            <div key={seg.segmentId} className="sd-row">
+              <span className="sd-dot" style={{ background: LOS_COLORS[seg.losBand] ?? "#888" }} />
+              <span className="nm">
+                <div className="t">{seg.segmentId}</div>
+                <div className="s">LOS {seg.losBand} · {seg.speed.toFixed(0)} mph · {seg.queued ? "queued" : "free-flow"}</div>
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+    </>
   );
 }
 
 function ClosureInspector() {
+  const s = useScenarioDState();
+  const showAfter = s.displayMode === "after";
+  const snap = s.conceptASnapshot;
+  const segStates = snap?.segmentStates ?? [];
+  const boq = snap?.backOfQueue;
+  const k = s.kpi;
+  const todLabel = s.activeEvent?.timeOfDay === "off_peak" ? "Off Peak" : "PM Peak";
+
   return (
     <div className="sd-insp">
-      <div className="empty">{SCENARIO_REGISTRY["D"].inspectorEmptyText}</div>
+      <h2>Lane Closure</h2>
+      <div className="sub">
+        {s.activeEvent
+          ? `${s.activeEvent.segment_id} · ${s.activeEvent.lanesClosed} of 2 lanes · ${todLabel} · ${s.activeEvent.durationMin} min`
+          : "No closure configured"}
+      </div>
+
+      {/* Before/After toggle — mirrors Scenario B countermeasure switch */}
+      <div className="sd-chips" style={{ padding: "8px 0" }}>
+        <button className={`sd-chip${!showAfter ? " on" : ""}`} onClick={() => storeD.setConceptAMode(false)}>Before</button>
+        <button className={`sd-chip${showAfter ? " on" : ""}`} onClick={() => storeD.setConceptAMode(true)}>After</button>
+      </div>
+
+      {!s.activeEvent ? (
+        <div className="empty">{SCENARIO_REGISTRY["D"].inspectorEmptyText}</div>
+      ) : (
+        <>
+          <div data-testid="closure-inspector-los" style={{ marginTop: 4 }}>
+            {showAfter ? (
+              segStates.length === 0 ? (
+                <div style={{ fontSize: 12, color: "var(--sd-dim)" }}>No affected segments.</div>
+              ) : (
+                segStates.map((seg) => (
+                  <div key={seg.segmentId} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 12 }}>
+                    <span className="sd-dot" style={{ background: LOS_COLORS[seg.losBand] ?? "#888" }} />
+                    <span style={{ flex: 1 }}>{seg.segmentId}</span>
+                    <strong>LOS {seg.losBand}</strong>
+                    <span style={{ color: "var(--sd-dim)" }}>{seg.speed.toFixed(0)} mph</span>
+                  </div>
+                ))
+              )
+            ) : (
+              <div style={{ fontSize: 12, color: "var(--green)", padding: "4px 0" }}>
+                Open road — all segments free-flow (LOS A, ≥ 55 mph).
+              </div>
+            )}
+          </div>
+
+          {showAfter && boq && (
+            <div style={{ marginTop: 8, fontSize: 12 }}>
+              <strong style={{ color: LOS_COLORS["F"] }}>Back of queue: {boq.lengthMi.toFixed(1)} mi</strong>
+              <div style={{ color: "var(--sd-dim)", fontSize: 11, marginTop: 2 }}>{SCHEMATIC_LABEL}</div>
+            </div>
+          )}
+
+          {/* Two co-equal economics lines — distinct formulas (§8-fix-6) */}
+          <div style={{ marginTop: 12, borderTop: "1px solid var(--sd-line)", paddingTop: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+              <span>Delay cost</span>
+              <strong data-testid="kpi-delay-cost">${Math.round(k.delayCostUsd).toLocaleString()}</strong>
+            </div>
+            <div style={{ color: "var(--sd-dim)", fontSize: 10, marginBottom: 8 }}>vehicle-hours of delay × value-of-time</div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+              <span>Express revenue protected</span>
+              <strong data-testid="kpi-express-revenue" className="green">${Math.round(k.expressRevenueProtectedUsd).toLocaleString()}</strong>
+            </div>
+            <div style={{ color: "var(--sd-dim)", fontSize: 10 }}>dynamic-toll pricing-response upside</div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
 function KpiBarD() {
+  const s = useScenarioDState();
+  const k = s.kpi;
+  const has = s.activeEvent !== null;
   return (
     <div className="sd-kpi">
-      <div className="item">
-        <div className="v" style={{ color: "var(--sd-dim)" }}>—</div>
-        <div className="l">Max queue (mi)</div>
+      <div className="item" data-testid="kpi-max-queue">
+        <div className="v" style={{ color: k.maxQueueMi > 0 ? "var(--red)" : "var(--sd-dim)" }}>
+          {has ? `${k.maxQueueMi.toFixed(1)} mi` : "—"}
+        </div>
+        <div className="l">Max queue</div>
       </div>
       <div className="item">
-        <div className="v" style={{ color: "var(--sd-dim)" }}>—</div>
+        <div className="v">{has ? Math.round(k.vehHrsDelay).toLocaleString() : "—"}</div>
         <div className="l">Delay (veh-hrs)</div>
       </div>
       <div className="item">
-        <div className="v" style={{ color: "var(--sd-dim)" }}>—</div>
-        <div className="l">Clearance time</div>
+        <div className="v">{has ? `${Math.round(k.clearanceMin)} min` : "—"}</div>
+        <div className="l">Clearance</div>
       </div>
-      <div className="item">
-        <div className="v" style={{ color: "var(--sd-dim)" }}>—</div>
+      <div className="item" data-testid="kpi-current-toll">
+        <div className="v green">{has ? `$${k.currentTollUsd.toFixed(2)}` : "—"}</div>
         <div className="l">Express toll</div>
       </div>
-      <div className="note">
-        SCHEMATIC corridor context — NOT calibrated mainline geometry · Lane Closure sim — configure event to run
+      <div className="item">
+        <div className="v" style={{ color: k.pctDiverted > 0 ? "var(--amber)" : "var(--sd-dim)" }}>
+          {has ? `${Math.round(k.pctDiverted * 100)}%` : "—"}
+        </div>
+        <div className="l">Diverted → SR-84</div>
       </div>
+      <div className="note">Schematic · synthetic sim · illustrative VMS diversion · not calibrated</div>
     </div>
   );
 }

@@ -6,6 +6,7 @@
  *--------------------------------------------------------------------------------------------*/
 import { describe, it, expect } from "vitest";
 import { storeD, storeDSnapshot, INITIAL_STATE_D } from "../src/scenarioD/storeD";
+import { getLaneMenu } from "../src/scenarioD/closurePhysics";
 
 const PM_EVENT = {
   segment_id: "SEG-CONN",
@@ -158,5 +159,29 @@ describe("Scenario D store — Concept A toggle + inspection", () => {
     storeD.setClosureEvent({ ...PM_EVENT });
     storeD.reset();
     expect(storeD.getSnapshot()).toMatchObject(INITIAL_STATE_D);
+  });
+});
+
+describe("Scenario D store — M5 UI data layer", () => {
+  it("lanesClosed menu for SEG-CONN (2 lanes) has exactly one option (1-of-2)", () => {
+    const menu = getLaneMenu("SEG-CONN");
+    expect(menu).toHaveLength(1);
+    expect(menu[0].lanesClosed).toBe(1);
+    expect(menu[0].totalLanes).toBe(2);
+  });
+
+  it("displayMode toggle (before↔after) does NOT change kpi (display-only)", () => {
+    storeD.reset();
+    storeD.setClosureEvent({ ...PM_EVENT });
+    const kpiBefore = storeD.getSnapshot().kpi;
+    storeD.setConceptAMode(false);
+    storeD.setConceptAMode(true);
+    expect(storeD.getSnapshot().kpi).toEqual(kpiBefore);
+  });
+
+  it("kpi.currentTollUsd is tied to the Scenario C pricing module (> $0.50 floor)", () => {
+    storeD.reset();
+    storeD.setClosureEvent({ ...PM_EVENT });
+    expect(storeD.getSnapshot().kpi.currentTollUsd).toBeGreaterThan(0.50);
   });
 });
