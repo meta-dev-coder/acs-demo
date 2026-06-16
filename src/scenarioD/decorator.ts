@@ -31,7 +31,6 @@ import { store } from "../scenarioA/store";
 import { storeD } from "./storeD";
 import { drawPin } from "../scenarioA/decorator";
 import { LOS_COLORS } from "../scenarioC/decorator";
-import { SCHEMATIC_LABEL } from "./placeClosure";
 
 const HAZARD_AMBER = "#ff8f00";
 // Diversion route color — scope: "diverted route lights up an LOS color (suggested orange,
@@ -46,7 +45,7 @@ class LaneClosureMarker extends Marker {
   constructor(loc: Point3d, segmentId: string) {
     super(loc, Point2d.create(72, 100));
     this.setScaleFactor({ low: 0.7, high: 1.4 });
-    this.title = `Lane closure — ${segmentId} · ${SCHEMATIC_LABEL}`;
+    this.title = `Lane closure — ${segmentId}`;
     this.drawFunc = (ctx) => drawPin(ctx, 26, HAZARD_AMBER, { symbol: "X", label: "CLOSED" });
   }
 }
@@ -55,9 +54,18 @@ class QueueTailMarker extends Marker {
   constructor(loc: Point3d, lengthMi: number) {
     super(loc, Point2d.create(64, 92));
     this.setScaleFactor({ low: 0.7, high: 1.3 });
-    this.title = `Back of queue — ${lengthMi.toFixed(1)} mi (schematic) · ${SCHEMATIC_LABEL}`;
+    this.title = `Back of queue — ${lengthMi.toFixed(1)} mi`;
     this.drawFunc = (ctx) =>
       drawPin(ctx, 22, LOS_COLORS["F"] ?? "#7b0000", { symbol: "Q", label: `${lengthMi.toFixed(1)} mi` });
+  }
+}
+
+class DiversionMarker extends Marker {
+  constructor(loc: Point3d) {
+    super(loc, Point2d.create(64, 88));
+    this.setScaleFactor({ low: 0.6, high: 1.2 });
+    this.title = "SR-84 diversion — VMS reroute of mainline demand";
+    this.drawFunc = (ctx) => drawPin(ctx, 20, SR84_ORANGE, { symbol: "→", label: "SR-84" });
   }
 }
 
@@ -120,6 +128,9 @@ export class LaneClosureDecorator implements Decorator {
     if (g.queueTail && g.queueLengthMi > 0) {
       this.markers.markers.add(new QueueTailMarker(g.queueTail, g.queueLengthMi));
     }
+    if (g.sr84Active && g.sr84.length > 1) {
+      this.markers.markers.add(new DiversionMarker(g.sr84[Math.floor(g.sr84.length / 2)]));
+    }
     this.markers.markDirty();
     this.invalidate();
   }
@@ -177,7 +188,7 @@ export class LaneClosureDecorator implements Decorator {
     const g = this.graphics;
     return (
       `Lane closure — ${segId} · back of queue ${g.queueLengthMi.toFixed(1)} mi` +
-      `${g.sr84Active ? " · VMS diversion active" : ""} · ${SCHEMATIC_LABEL}`
+      `${g.sr84Active ? " · VMS diversion to SR-84 active" : ""}`
     );
   }
 

@@ -54,10 +54,7 @@ test("Scenario D Concept A — before/after snapshot is self-sufficient", async 
   expect(expRev).toBeGreaterThan(0);
   expect(Math.abs(delayCost - expRev)).toBeGreaterThan(10); // distinct formulas → distinct values
 
-  // 7. The schematic disclaimer is present (never claims calibrated mainline geometry).
-  await expect(page.getByText(/SCHEMATIC/i).first()).toBeVisible();
-
-  // 8. Regression: Scenario A still works after exercising D.
+  // 7. Regression: Scenario A still works after exercising D.
   await page.getByRole("button", { name: "Asset Reliability" }).click();
   await expect(page.locator(".sd-left h3")).toContainText("ITS Assets");
 });

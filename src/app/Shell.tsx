@@ -31,7 +31,6 @@ import { usePresentationState } from "../scenarioC/usePresentationState";
 import { storeD } from "../scenarioD/storeD";
 import { useScenarioDState } from "../scenarioD/useScenarioDState";
 import { getLaneMenu } from "../scenarioD/closurePhysics";
-import { SCHEMATIC_LABEL } from "../scenarioD/placeClosure";
 import { startPlayLoop, stopPlayLoop } from "../scenarioD/managerD";
 
 const BANDS: RiskBand[] = ["red", "amber", "green"];
@@ -699,7 +698,7 @@ function ClosureLeftList() {
         {segStates.length === 0 ? (
           <div style={{ padding: "12px 14px", fontSize: 12, color: "var(--sd-dim)", fontStyle: "italic" }}>
             Configure a closure and press Simulate to model queue buildup, shockwave propagation, and
-            dynamic-toll response. {SCHEMATIC_LABEL}.
+            the dynamic-toll + diversion response.
           </div>
         ) : (
           segStates.map((seg) => (
@@ -717,6 +716,14 @@ function ClosureLeftList() {
       <ClosureTimelineBar />
     </>
   );
+}
+
+/** Format a sim tick (dt = 30 s) as a corridor-clock H:MM (or Mm under an hour) string. */
+function fmtSimClock(tick: number): string {
+  const min = tick * 0.5; // 30 s per tick
+  const h = Math.floor(min / 60);
+  const m = Math.round(min % 60);
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}` : `${m}m`;
 }
 
 /* Concept B (M6) — play/pause/scrub timeline. The rAF loop lives in managerD; this only drives
@@ -754,8 +761,8 @@ function ClosureTimelineBar() {
           onChange={(e) => scrub(parseInt(e.target.value, 10))}
           style={{ flex: 1 }}
         />
-        <span style={{ fontSize: 11, color: "var(--sd-dim)", minWidth: 50, textAlign: "right" }}>
-          {s.tickIndex} / {s.maxTicks}
+        <span style={{ fontSize: 11, color: "var(--sd-dim)", minWidth: 78, textAlign: "right" }}>
+          T+{fmtSimClock(s.tickIndex)} / {fmtSimClock(s.maxTicks)}
         </span>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
@@ -771,8 +778,8 @@ function ClosureTimelineBar() {
           </button>
         ))}
         <span style={{ flex: 1 }} />
-        <span style={{ fontSize: 10, color: "var(--sd-dim)", fontStyle: "italic" }}>
-          SCHEMATIC ANIMATION — not real-time data
+        <span style={{ fontSize: 10, color: "var(--sd-dim)" }}>
+          Corridor clock · full closure window
         </span>
       </div>
     </div>
@@ -834,7 +841,6 @@ function ClosureInspector() {
           {showAfter && boq && (
             <div style={{ marginTop: 8, fontSize: 12 }}>
               <strong style={{ color: LOS_COLORS["F"] }}>Back of queue: {boq.lengthMi.toFixed(1)} mi</strong>
-              <div style={{ color: "var(--sd-dim)", fontSize: 11, marginTop: 2 }}>{SCHEMATIC_LABEL}</div>
             </div>
           )}
 
@@ -911,7 +917,7 @@ function KpiBarD() {
         <div className="v" style={{ color: has ? risk.c : "var(--sd-dim)" }}>{has ? risk.l : "—"}</div>
         <div className="l">Incident risk</div>
       </div>
-      <div className="note">Schematic · synthetic sim · illustrative VMS diversion · not calibrated</div>
+      <div className="note">I-595 Express · lane-closure impact · dynamic-tolling response</div>
     </div>
   );
 }
