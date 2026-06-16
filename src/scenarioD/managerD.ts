@@ -126,25 +126,37 @@ export async function placeAndDecorateD(vp: ScreenViewport): Promise<void> {
 
 // ---- Concept B rAF play loop (the ONLY rAF / invalidate site) ----
 
-function rafLoop(): void {
-  storeD.advanceTick(); // increments tick + sets decoratorNeedsUpdate; notifies React coarsely
+// Wall-clock pacing: advance ONE sim tick per PLAYBACK_TICK_MS of real time (not per frame), so
+// the ~240-tick run plays over ~35 s and the shockwave crawl/recovery are actually visible
+// (an un-throttled rAF would race the whole sim in ~4 s).
+const PLAYBACK_TICK_MS = 150;
+let lastTickTs = 0;
+
+function rafLoop(ts: number): void {
   const snap = storeD.getSnapshot();
-  if (snap.decoratorNeedsUpdate && decorator && centerline) {
-    decorator.setClosureGraphics(
-      buildGraphicsFromTick(snap.tickHistory[snap.tickIndex] ?? null, snap.activeEvent, centerline)
-    );
-    storeD.clearDecoratorFlag();
-  }
-  if (snap.playbackState === "playing" && snap.tickIndex < snap.maxTicks) {
-    rafHandle = requestAnimationFrame(rafLoop);
-  } else {
+  if (snap.playbackState !== "playing" || snap.tickIndex >= snap.maxTicks) {
     rafHandle = undefined;
+    return; // pause / end → stop the loop (leaves the model on the current tick, not blank)
   }
+  if (lastTickTs === 0) lastTickTs = ts;
+  if (ts - lastTickTs >= PLAYBACK_TICK_MS) {
+    lastTickTs = ts;
+    storeD.advanceTick(); // increments tick + sets decoratorNeedsUpdate; notifies React coarsely
+    const s = storeD.getSnapshot();
+    if (s.decoratorNeedsUpdate && decorator && centerline) {
+      decorator.setClosureGraphics(
+        buildGraphicsFromTick(s.tickHistory[s.tickIndex] ?? null, s.activeEvent, centerline)
+      );
+      storeD.clearDecoratorFlag();
+    }
+  }
+  rafHandle = requestAnimationFrame(rafLoop);
 }
 
 /** Start the Concept B animation loop (called alongside storeD.play()). */
 export function startPlayLoop(): void {
   if (rafHandle !== undefined) cancelAnimationFrame(rafHandle);
+  lastTickTs = 0;
   rafHandle = requestAnimationFrame(rafLoop);
 }
 

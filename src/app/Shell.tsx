@@ -763,11 +763,14 @@ function ClosureTimelineBar() {
 
 function ClosureInspector() {
   const s = useScenarioDState();
-  const showAfter = s.displayMode === "after";
-  const snap = s.conceptASnapshot;
+  const playing = s.playbackState !== "idle";
+  // During playback/scrub the inspector follows the current tick (live LOS, queue, economics);
+  // when idle it's the Concept A before/after snapshot.
+  const showAfter = playing || s.displayMode === "after";
+  const snap = playing ? s.tickHistory[s.tickIndex] ?? null : s.conceptASnapshot;
   const segStates = snap?.segmentStates ?? [];
   const boq = snap?.backOfQueue;
-  const k = s.kpi;
+  const k = playing ? s.tickHistory[s.tickIndex]?.kpis ?? s.kpi : s.kpi;
   const todLabel = s.activeEvent?.timeOfDay === "off_peak" ? "Off Peak" : "PM Peak";
 
   return (
@@ -838,8 +841,10 @@ function ClosureInspector() {
 
 function KpiBarD() {
   const s = useScenarioDState();
-  const k = s.kpi;
   const has = s.activeEvent !== null;
+  // During playback/scrub, show the CURRENT tick's KPIs so the counters climb with the queue;
+  // when idle, show the peak/final KPIs (the Concept A summary).
+  const k = s.playbackState !== "idle" ? s.tickHistory[s.tickIndex]?.kpis ?? s.kpi : s.kpi;
   return (
     <div className="sd-kpi">
       <div className="item" data-testid="kpi-max-queue">

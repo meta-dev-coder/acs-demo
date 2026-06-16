@@ -20,7 +20,7 @@ import {
   placeAndDecorateB,
   getBDecorator,
 } from "../scenarioB/manager";
-import { placeAndDecorateC, teardownC } from "../scenarioC/managerC";
+import { placeAndDecorateC, teardownC, getCDecorator } from "../scenarioC/managerC";
 import { placeAndDecorateD, getDDecorator } from "../scenarioD/managerD";
 import { registerReDecorate, store, type Scenario } from "../scenarioA/store";
 
@@ -157,6 +157,7 @@ export function configureViewport(vp: ScreenViewport): void {
         const v = IModelApp.viewManager.selectedView;
         v?.invalidateDecorations();
         getBDecorator()?.invalidate();
+        getCDecorator()?.invalidate();
         getDDecorator()?.invalidate();
       });
     }
