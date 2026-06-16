@@ -6,7 +6,8 @@
  *--------------------------------------------------------------------------------------------*/
 import { describe, it, expect } from "vitest";
 import { storeD, storeDSnapshot, INITIAL_STATE_D } from "../src/scenarioD/storeD";
-import { getLaneMenu } from "../src/scenarioD/closurePhysics";
+import { getLaneMenu, computeClosureSim } from "../src/scenarioD/closurePhysics";
+import { SCHEMATIC_LABEL } from "../src/scenarioD/placeClosure";
 
 const PM_EVENT = {
   segment_id: "SEG-CONN",
@@ -267,5 +268,31 @@ describe("Scenario D store — M6 Concept B playback", () => {
     const s = storeD.getSnapshot();
     expect(s.playbackState).toBe("idle");
     expect(s.tickIndex).toBe(0);
+  });
+});
+
+describe("Scenario D — M7 final regression + integration", () => {
+  it("full 240-tick integration: every KPI field is positive", () => {
+    const { finalKpi } = computeClosureSim({ ...PM_EVENT }, 240);
+    expect(finalKpi.clearanceMin).toBeGreaterThan(0);
+    expect(finalKpi.maxQueueMi).toBeGreaterThan(0.5);
+    expect(finalKpi.delayCostUsd).toBeGreaterThan(0);
+    expect(finalKpi.expressRevenueProtectedUsd).toBeGreaterThan(0);
+    expect(finalKpi.currentTollUsd).toBeGreaterThan(0);
+    expect(finalKpi.pctDiverted).toBeGreaterThan(0); // fraction (≈0.12); VMS diversion fired
+  });
+
+  it("play/scrub round-trip: tickHistory[20] is the tick-20 snapshot", () => {
+    storeD.reset();
+    storeD.setClosureEvent({ ...PM_EVENT });
+    storeD.scrubTo(20);
+    const snap20 = storeD.getSnapshot().tickHistory[20];
+    expect(snap20.tick).toBe(20);
+    expect(snap20.kpis.maxQueueMi).toBeGreaterThanOrEqual(0);
+  });
+
+  it("SCHEMATIC_LABEL is exported and prominent (≥ 20 chars, contains 'SCHEMATIC')", () => {
+    expect(SCHEMATIC_LABEL).toMatch(/SCHEMATIC/i);
+    expect(SCHEMATIC_LABEL.length).toBeGreaterThan(20);
   });
 });
