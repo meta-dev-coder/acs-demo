@@ -102,9 +102,9 @@ describe("Scenario D store — setClosureEvent", () => {
     expect(pmQueue).toBeGreaterThan(offQueue);
   });
 
-  it("setClosureEvent with invalid lanesClosed=2 on SEG-CONN throws", () => {
+  it("setClosureEvent with out-of-range lanesClosed (3 on a 2-lane segment) throws", () => {
     expect(() =>
-      storeD.setClosureEvent({ ...PM_EVENT, lanesClosed: 2 })
+      storeD.setClosureEvent({ ...PM_EVENT, lanesClosed: 3 })
     ).toThrow();
   });
 

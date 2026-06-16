@@ -24,8 +24,11 @@ import type { LOSBand } from "../scenarioC/types";
 export interface ClosureEvent {
   /** Segment on which the closure occurs (e.g. "SEG-CONN"). */
   segment_id: string;
-  /** Number of lanes closed. Must be < total lanes on the segment. */
+  /** Number of lanes closed (1..totalLanes; === totalLanes is a full closure). Derived from closureType. */
   lanesClosed: number;
+  /** Closure taxonomy (scope §step-2): partial = close 1 lane; controlflow = leave 1 lane open;
+   *  full = all lanes closed. Drives lanesClosed via lanesClosedForType(). Optional (defaults partial). */
+  closureType?: "partial" | "controlflow" | "full";
   /** Closure start time offset in minutes from simulation start. */
   startMin: number;
   /** Duration of the closure in minutes. */

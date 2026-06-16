@@ -30,7 +30,7 @@ test("Scenario D Concept A — before/after snapshot is self-sufficient", async 
 
   // 3. Build a closure: SEG-CONN, 1-of-2, PM peak, then Simulate.
   await page.selectOption("[data-testid='closure-segment-select']", "SEG-CONN");
-  await page.getByRole("button", { name: "1 of 2 lanes" }).click();
+  await page.getByRole("button", { name: "Partial" }).click();
   await page.getByRole("button", { name: "PM Peak" }).click();
   await page.getByRole("button", { name: "Simulate" }).click();
 

@@ -30,7 +30,7 @@ import { presentationStore } from "../scenarioC/presentationStore";
 import { usePresentationState } from "../scenarioC/usePresentationState";
 import { storeD } from "../scenarioD/storeD";
 import { useScenarioDState } from "../scenarioD/useScenarioDState";
-import { getLaneMenu } from "../scenarioD/closurePhysics";
+import { getLaneMenu, lanesClosedForType } from "../scenarioD/closurePhysics";
 import { startPlayLoop, stopPlayLoop } from "../scenarioD/managerD";
 
 const BANDS: RiskBand[] = ["red", "amber", "green"];
@@ -617,18 +617,20 @@ function TollingLeftList() {
 function ClosureLeftList() {
   const s = useScenarioDState();
   const [segmentId, setSegmentId] = useState("SEG-CONN");
-  const [lanesClosed, setLanesClosed] = useState(1);
+  const [closureType, setClosureType] = useState<"partial" | "controlflow" | "full">("partial");
   const [timeOfDay, setTimeOfDay] = useState<"pm_peak" | "off_peak">("pm_peak");
   const [durationMin, setDurationMin] = useState(60);
   const [rain, setRain] = useState(false);
 
   const menu = getLaneMenu(segmentId);
-  const effLanes = menu.some((m) => m.lanesClosed === lanesClosed) ? lanesClosed : menu[0]?.lanesClosed ?? 1;
+  const segLanes = menu[0]?.totalLanes ?? 2;
+  const lanesClosed = lanesClosedForType(segmentId, closureType);
 
   const simulate = () => {
     storeD.setClosureEvent({
       segment_id: segmentId,
-      lanesClosed: effLanes,
+      lanesClosed,
+      closureType,
       startMin: 0,
       durationMin,
       timeOfDay,
@@ -655,18 +657,20 @@ function ClosureLeftList() {
           <option value="SEG-CONN">SEG-CONN — Express↔Turnpike connector</option>
         </select>
 
-        <div style={lbl}>Lanes closed</div>
+        <div style={lbl}>Closure type</div>
         <div className="sd-chips" style={{ padding: 0 }}>
-          {menu.map((m) => (
+          {([["partial", "Partial"], ["controlflow", "Controlflow"], ["full", "Full"]] as const).map(([t, label]) => (
             <button
-              key={m.lanesClosed}
-              className={`sd-chip${effLanes === m.lanesClosed ? " on" : ""}`}
-              title={`HCM lane-blockage CAF ${m.caf}`}
-              onClick={() => setLanesClosed(m.lanesClosed)}
+              key={t}
+              className={`sd-chip${closureType === t ? " on" : ""}`}
+              onClick={() => setClosureType(t)}
             >
-              {m.lanesClosed} of {m.totalLanes} lanes
+              {label}
             </button>
           ))}
+        </div>
+        <div style={{ fontSize: 10, color: "var(--sd-dim)", marginTop: 2 }}>
+          {lanesClosed} of {segLanes} lane{segLanes > 1 ? "s" : ""} closed
         </div>
 
         <div style={lbl}>Time of day</div>

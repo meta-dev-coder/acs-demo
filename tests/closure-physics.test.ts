@@ -135,11 +135,26 @@ describe("M1 closure-physics engine — §8-fix-2: per-segment CAF menu", () => 
     expect(menu.map((e: { lanesClosed: number }) => e.lanesClosed)).toEqual([1, 2]);
   });
 
-  it("§8-fix-2: buildClosureSegment throws for lanesClosed=2 on SEG-CONN", async () => {
+  it("§8-fix-2: buildClosureSegment throws for out-of-range lanesClosed (3 on a 2-lane SEG-CONN)", async () => {
     const { buildClosureSegment } = await import("../src/scenarioD/closurePhysics");
     expect(() =>
-      buildClosureSegment({ segment_id: "SEG-CONN", lanesClosed: 2, startMin: 0, durationMin: 60, timeOfDay: "pm_peak" })
+      buildClosureSegment({ segment_id: "SEG-CONN", lanesClosed: 3, startMin: 0, durationMin: 60, timeOfDay: "pm_peak" })
     ).toThrow();
+  });
+
+  it("G3: full closure (lanesClosed === totalLanes) is valid and uses the residual capacity", async () => {
+    const { buildClosureSegment, lanesClosedForType, computeMuTotal } = await import("../src/scenarioD/closurePhysics");
+    // 2-of-2 on SEG-CONN is a FULL closure — valid, no CAF lookup.
+    expect(() =>
+      buildClosureSegment({ segment_id: "SEG-CONN", lanesClosed: 2, startMin: 0, durationMin: 60, timeOfDay: "pm_peak" })
+    ).not.toThrow();
+    expect(lanesClosedForType("SEG-CONN", "full")).toBe(2);
+    expect(lanesClosedForType("SEG-CONN", "partial")).toBe(1);
+    // Full closure capacity (residual) < partial closure capacity (CAF 0.35).
+    const muFull = computeMuTotal({ segment_id: "SEG-CONN", lanesClosed: 2, timeOfDay: "pm_peak" }, false, false);
+    const muPartial = computeMuTotal({ segment_id: "SEG-CONN", lanesClosed: 1, timeOfDay: "pm_peak" }, false, false);
+    expect(muFull).toBeLessThan(muPartial);
+    expect(muFull).toBeGreaterThan(0);
   });
 });
 

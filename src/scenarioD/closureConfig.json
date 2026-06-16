@@ -33,5 +33,6 @@
   "metersPerMile": 1609.34,
   "segConnFromEasting": 590000,
   "baseCorridorTraverseMin": 10,
-  "incidentRiskRefMi": 3
+  "incidentRiskRefMi": 3,
+  "fullClosureResidualFactor": 0.05
 }

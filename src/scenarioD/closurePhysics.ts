@@ -106,19 +106,33 @@ export function getLaneMenu(segmentId: string): ClosureLaneMenuEntry[] {
 }
 
 /**
+ * Derive lanesClosed from a closure type for a segment (scope §step-2 taxonomy):
+ *  partial → close 1 lane; controlflow → leave 1 lane open; full → all lanes closed.
+ */
+export function lanesClosedForType(
+  segmentId: string,
+  closureType: "partial" | "controlflow" | "full"
+): number {
+  const seg = getSegCfg(segmentId);
+  if (closureType === "full") return seg.lanes;
+  if (closureType === "controlflow") return Math.max(1, seg.lanes - 1);
+  return 1; // partial
+}
+
+/**
  * Validates and returns the closure event configuration.
- * Throws if lanesClosed is invalid for the segment (§8-fix-2 gate).
+ * lanesClosed must be 1..totalLanes (=== totalLanes is a full closure). partial/controlflow
+ * (lanesClosed < lanes) require a CAF entry; full uses fullClosureResidualFactor (§8-fix-2 gate).
  */
 export function buildClosureSegment(event: ClosureEvent): ClosureEvent {
   const seg = getSegCfg(event.segment_id);
-  if (event.lanesClosed >= seg.lanes) {
+  if (event.lanesClosed < 1 || event.lanesClosed > seg.lanes) {
     throw new Error(
-      `lanesClosed=${event.lanesClosed} must be < totalLanes=${seg.lanes} on segment ${event.segment_id}`
+      `lanesClosed=${event.lanesClosed} must be between 1 and ${seg.lanes} on segment ${event.segment_id}`
     );
   }
-  if (event.lanesClosed > 0) {
-    // Validate that a CAF entry exists (throws if not)
-    getCaf(event.lanesClosed, seg.lanes);
+  if (event.lanesClosed < seg.lanes) {
+    getCaf(event.lanesClosed, seg.lanes); // partial/controlflow must have a CAF entry
   }
   return event;
 }
@@ -163,8 +177,11 @@ export function computeMuTotal(
   const lanesClosed = event.lanesClosed;
   const totalLanes = seg.lanes;
 
-  // mu_open: post-closure capacity from CAF (embeds merge + rubberneck)
-  const caf = getCaf(lanesClosed, totalLanes);
+  // mu_open: post-closure capacity. Full closure (all lanes) uses a small residual capacity
+  // (shoulder/emergency flow); partial/controlflow use the HCM CAF (embeds merge + rubberneck).
+  const caf = lanesClosed >= totalLanes
+    ? (config.fullClosureResidualFactor as number)
+    : getCaf(lanesClosed, totalLanes);
   let muTotal = caf * baseC;
 
   // Apply weather factor (one independent multiplier)
