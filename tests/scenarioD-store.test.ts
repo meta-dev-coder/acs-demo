@@ -185,3 +185,87 @@ describe("Scenario D store — M5 UI data layer", () => {
     expect(storeD.getSnapshot().kpi.currentTollUsd).toBeGreaterThan(0.50);
   });
 });
+
+describe("Scenario D store — M6 Concept B playback", () => {
+  it("play() sets playbackState to 'playing'", () => {
+    storeD.reset();
+    storeD.setClosureEvent({ ...PM_EVENT });
+    storeD.play();
+    expect(storeD.getSnapshot().playbackState).toBe("playing");
+  });
+
+  it("pause() sets playbackState to 'paused'", () => {
+    storeD.play();
+    storeD.pause();
+    expect(storeD.getSnapshot().playbackState).toBe("paused");
+  });
+
+  it("scrubTo(20) sets tickIndex to 20 (O(1) lookup into the cached tickHistory)", () => {
+    storeD.reset();
+    storeD.setClosureEvent({ ...PM_EVENT });
+    storeD.scrubTo(20);
+    expect(storeD.getSnapshot().tickIndex).toBe(20);
+    expect(storeD.getSnapshot().tickHistory.length).toBeGreaterThan(20);
+  });
+
+  it("tickHistory is pre-computed by setClosureEvent (> 60 ticks)", () => {
+    storeD.reset();
+    storeD.setClosureEvent({ ...PM_EVENT });
+    expect(storeD.getSnapshot().tickHistory.length).toBeGreaterThan(60);
+  });
+
+  it("queue (kpis.maxQueueMi) at tick 40 > tick 0 (builds during closure)", () => {
+    storeD.reset();
+    storeD.setClosureEvent({ ...PM_EVENT });
+    const hist = storeD.getSnapshot().tickHistory;
+    expect(hist[40].kpis.maxQueueMi).toBeGreaterThan(hist[0].kpis.maxQueueMi);
+  });
+
+  it("shockwave tail u at tick 30 < u at tick 5 (tail crawls upstream)", () => {
+    storeD.reset();
+    storeD.setClosureEvent({ ...PM_EVENT });
+    const hist = storeD.getSnapshot().tickHistory;
+    expect(hist[30].backOfQueue!.u).toBeLessThan(hist[5].backOfQueue!.u);
+  });
+
+  it("§8 render-budget: React listener fires ≤ 3 times for 8 tick advances (coarse cadence)", () => {
+    storeD.reset();
+    storeD.setClosureEvent({ ...PM_EVENT });
+    let count = 0;
+    const unsub = storeD.subscribe(() => count++);
+    for (let i = 0; i < 8; i++) storeD.advanceTick();
+    expect(count).toBeLessThanOrEqual(3);
+    unsub();
+  });
+
+  it("§8 render-budget: first React notification fires at tick 4 (not 0/1/2/3)", () => {
+    storeD.reset();
+    storeD.setClosureEvent({ ...PM_EVENT });
+    const fireTicks: number[] = [];
+    const unsub = storeD.subscribe(() => fireTicks.push(storeD.getSnapshot().tickIndex));
+    for (let i = 1; i <= 4; i++) storeD.advanceTick();
+    expect(fireTicks[0]).toBe(4);
+    unsub();
+  });
+
+  it("final-tick unconditional emit: listener fires on the last tick regardless of cadence", () => {
+    storeD.reset();
+    storeD.setClosureEvent({ ...PM_EVENT });
+    const maxTicks = storeD.getSnapshot().maxTicks;
+    storeD.scrubTo(maxTicks - 1);
+    let count = 0;
+    const unsub = storeD.subscribe(() => count++);
+    storeD.advanceTick(); // reaches maxTicks → unconditional emit
+    expect(count).toBe(1);
+    unsub();
+  });
+
+  it("reset() from a playing state restores idle + tickIndex 0", () => {
+    storeD.setClosureEvent({ ...PM_EVENT });
+    storeD.play();
+    storeD.reset();
+    const s = storeD.getSnapshot();
+    expect(s.playbackState).toBe("idle");
+    expect(s.tickIndex).toBe(0);
+  });
+});

@@ -2,9 +2,11 @@
  * Scenario D — Lane Closure orchestration manager.
  *
  * Places the closure/queue/SR-84 ribbons on the connector spine (schematic) and registers the
- * LaneClosureDecorator. Subscribes to storeD so the decorator recolors/repositions whenever the
- * closure event or Concept A before/after toggle changes. Concept B's rAF play loop (M6) will
- * reuse this same manager + the cached tickHistory.
+ * LaneClosureDecorator. Subscribes to storeD so the decorator recolors/repositions on Concept A
+ * toggles + scrubs. For Concept B playback (M6) it runs the rAF play loop: advanceTick() each
+ * frame, redraw the decorator every tick via the decoratorNeedsUpdate flag, and notify React on
+ * the store's coarse cadence only. This is the ONLY file with requestAnimationFrame /
+ * invalidateCachedDecorations — storeD.ts has none.
  *
  * Reuses: buildClosureRibbon/buildQueueRibbon/buildSR84EbRibbon + queueTailEasting (placeClosure),
  *         getCenterline / corridorPoint (scene/place), storeD (storeD), store (scenarioA/store).
@@ -22,11 +24,13 @@ import { storeD, type StateD } from "./storeD";
 import { store } from "../scenarioA/store";
 import config from "./closureConfig.json";
 import segmentsData from "../scenarioB/data/segments.json";
+import type { ClosureEvent, ClosureSimState } from "./typesD";
 import type { RawSegment } from "../scenarioB/types";
 
 let decorator: LaneClosureDecorator | undefined;
 let unsubscribeD: (() => void) | undefined;
-let rafHandle: number | undefined; // reserved for the Concept B (M6) play loop
+let rafHandle: number | undefined;
+let centerline: Centerline | undefined;
 
 const METERS_PER_MILE = config.metersPerMile as number;
 const SEG_CONN_FROM_E = config.segConnFromEasting as number;
@@ -46,21 +50,29 @@ const EMPTY_GRAPHICS: ClosureGraphics = {
   queueLengthMi: 0,
 };
 
-/** Build the decorator graphics from the current storeD snapshot (empty in the 'before' view). */
-function buildClosureGraphics(snap: StateD, cl: Centerline): ClosureGraphics {
-  const event = snap.activeEvent;
-  if (!event || snap.displayMode === "before") return EMPTY_GRAPHICS;
+/** Pick the sim tick to display: the scrubbed/playing tick in Concept B, else the Concept A view. */
+function pickDisplayTick(snap: StateD): ClosureSimState | null {
+  if (snap.playbackState !== "idle") return snap.tickHistory[snap.tickIndex] ?? null;
+  if (snap.displayMode === "after") return snap.conceptASnapshot;
+  return null; // Concept A "before" → open road (no overlays)
+}
+
+/** Build the decorator graphics for one sim tick (empty in the 'before'/no-event case). */
+function buildGraphicsFromTick(
+  tickState: ClosureSimState | null,
+  event: ClosureEvent | null,
+  cl: Centerline
+): ClosureGraphics {
+  if (!tickState || !event) return EMPTY_GRAPHICS;
 
   const rawSeg = rawSegs.find((s) => s.segment_id === event.segment_id);
   const segCoords = rawSeg
     ? { fromE: rawSeg.from_e, toE: rawSeg.to_e, fromN: rawSeg.from_n, toN: rawSeg.to_n }
     : { fromE: SEG_CONN_FROM_E, toE: SEG_CONN_FROM_E + FALLBACK_SPAN_M, fromN: FALLBACK_N, toN: FALLBACK_N };
 
-  const queueLengthMi = snap.kpi.maxQueueMi;
+  const queueLengthMi = tickState.backOfQueue?.lengthMi ?? 0;
   const queueLengthMeters = queueLengthMi * METERS_PER_MILE;
-  const pctDiverted = snap.conceptASnapshot?.diversionActive ? 1 : snap.kpi.pctDiverted;
-  const sr84Active = (snap.conceptASnapshot?.diversionActive ?? false) || snap.kpi.pctDiverted > 0;
-  void pctDiverted;
+  const sr84Active = tickState.diversionActive;
 
   const closure = buildClosureRibbon(cl, segCoords);
   const queue = buildQueueRibbon(
@@ -88,22 +100,60 @@ function buildClosureGraphics(snap: StateD, cl: Centerline): ClosureGraphics {
   };
 }
 
+function refreshDecorator(): void {
+  if (!decorator || !centerline) return;
+  const snap = storeD.getSnapshot();
+  decorator.setClosureGraphics(buildGraphicsFromTick(pickDisplayTick(snap), snap.activeEvent, centerline));
+}
+
 export async function placeAndDecorateD(vp: ScreenViewport): Promise<void> {
-  const iModel = vp.iModel;
-  const cl = await getCenterline(iModel);
+  centerline = await getCenterline(vp.iModel);
 
   if (!decorator) {
     decorator = new LaneClosureDecorator();
     IModelApp.viewManager.addDecorator(decorator);
   }
-  decorator.setClosureGraphics(buildClosureGraphics(storeD.getSnapshot(), cl));
+  refreshDecorator();
 
-  // Recolor/reposition whenever the closure event or before/after toggle changes.
+  // Concept A toggles + scrubs update the decorator here; the rAF loop owns updates during play.
   unsubscribeD?.();
   unsubscribeD = storeD.subscribe(() => {
     if (store.getSnapshot().scenario !== "D") return;
-    decorator!.setClosureGraphics(buildClosureGraphics(storeD.getSnapshot(), cl));
+    if (storeD.getSnapshot().playbackState === "playing") return; // rAF owns play updates
+    refreshDecorator();
   });
+}
+
+// ---- Concept B rAF play loop (the ONLY rAF / invalidate site) ----
+
+function rafLoop(): void {
+  storeD.advanceTick(); // increments tick + sets decoratorNeedsUpdate; notifies React coarsely
+  const snap = storeD.getSnapshot();
+  if (snap.decoratorNeedsUpdate && decorator && centerline) {
+    decorator.setClosureGraphics(
+      buildGraphicsFromTick(snap.tickHistory[snap.tickIndex] ?? null, snap.activeEvent, centerline)
+    );
+    storeD.clearDecoratorFlag();
+  }
+  if (snap.playbackState === "playing" && snap.tickIndex < snap.maxTicks) {
+    rafHandle = requestAnimationFrame(rafLoop);
+  } else {
+    rafHandle = undefined;
+  }
+}
+
+/** Start the Concept B animation loop (called alongside storeD.play()). */
+export function startPlayLoop(): void {
+  if (rafHandle !== undefined) cancelAnimationFrame(rafHandle);
+  rafHandle = requestAnimationFrame(rafLoop);
+}
+
+/** Stop the Concept B animation loop (called alongside storeD.pause()). */
+export function stopPlayLoop(): void {
+  if (rafHandle !== undefined) {
+    cancelAnimationFrame(rafHandle);
+    rafHandle = undefined;
+  }
 }
 
 export function getDDecorator(): LaneClosureDecorator | undefined {
@@ -111,14 +161,12 @@ export function getDDecorator(): LaneClosureDecorator | undefined {
 }
 
 export function teardownD(): void {
+  stopPlayLoop();
   unsubscribeD?.();
   unsubscribeD = undefined;
-  if (rafHandle !== undefined) {
-    cancelAnimationFrame(rafHandle);
-    rafHandle = undefined;
-  }
   if (decorator) {
     IModelApp.viewManager.dropDecorator(decorator);
     decorator = undefined;
   }
+  centerline = undefined;
 }

@@ -32,6 +32,7 @@ import { storeD } from "../scenarioD/storeD";
 import { useScenarioDState } from "../scenarioD/useScenarioDState";
 import { getLaneMenu } from "../scenarioD/closurePhysics";
 import { SCHEMATIC_LABEL } from "../scenarioD/placeClosure";
+import { startPlayLoop, stopPlayLoop } from "../scenarioD/managerD";
 
 const BANDS: RiskBand[] = ["red", "amber", "green"];
 const fmt$ = (n: number) => `$${n.toLocaleString("en-US")}`;
@@ -712,7 +713,51 @@ function ClosureLeftList() {
           ))
         )}
       </div>
+
+      <ClosureTimelineBar />
     </>
+  );
+}
+
+/* Concept B (M6) — play/pause/scrub timeline. The rAF loop lives in managerD; this only drives
+   storeD actions + startPlayLoop/stopPlayLoop. Hidden until a closure event exists. */
+function ClosureTimelineBar() {
+  const s = useScenarioDState();
+  if (!s.activeEvent) return null;
+  const playing = s.playbackState === "playing";
+  const toggle = () => {
+    if (playing) { storeD.pause(); stopPlayLoop(); }
+    else { storeD.play(); startPlayLoop(); }
+  };
+  const scrub = (n: number) => {
+    if (playing) { storeD.pause(); stopPlayLoop(); }
+    storeD.scrubTo(n);
+  };
+  return (
+    <div style={{ padding: "8px 14px 10px", borderTop: "1px solid var(--sd-line)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button
+          onClick={toggle}
+          style={{ fontSize: 12, padding: "3px 10px", borderRadius: 4, border: "1px solid var(--sd-line)", background: playing ? "#1565c0" : "var(--sd-accent)", color: "#fff", cursor: "pointer", minWidth: 72 }}
+        >
+          {playing ? "❚❚ Pause" : "▶ Play"}
+        </button>
+        <input
+          type="range"
+          min={0}
+          max={s.maxTicks}
+          value={s.tickIndex}
+          onChange={(e) => scrub(parseInt(e.target.value, 10))}
+          style={{ flex: 1 }}
+        />
+        <span style={{ fontSize: 11, color: "var(--sd-dim)", minWidth: 58, textAlign: "right" }}>
+          {s.tickIndex} / {s.maxTicks}
+        </span>
+      </div>
+      <div style={{ fontSize: 10, color: "var(--sd-dim)", marginTop: 4, fontStyle: "italic" }}>
+        SCHEMATIC ANIMATION — not real-time traffic data
+      </div>
+    </div>
   );
 }
 

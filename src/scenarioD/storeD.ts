@@ -1,14 +1,21 @@
 /*---------------------------------------------------------------------------------------------
- * Scenario D — Lane Closure store slice (Concept A snapshot foundation).
+ * Scenario D — Lane Closure store slice (Concept A snapshot + Concept B playback).
  *
  * useSyncExternalStore-compatible singleton (same pattern as scenarioC/storeC.ts and
  * scenarioA/store.ts). Holds the active ClosureEvent, the pre-computed tickHistory from
- * computeClosureSim(), the Concept A before/after display toggle, and the aggregated KPIs.
+ * computeClosureSim(), the Concept A before/after toggle, the Concept B playback state, and
+ * the aggregated KPIs.
  *
  * setClosureEvent() runs the full deterministic sim ONCE and caches tickHistory; Concept A's
- * "after" snapshot is the tick at t = durationMin + evalTAfterOffsetMin; Concept B scrubbing
- * (M6) is an O(1) lookup into tickHistory. setConceptAMode() is a display-only state change
- * (set(), never a recompute).
+ * "after" snapshot is the tick at t = durationMin + evalTAfterOffsetMin; Concept B scrubbing is
+ * an O(1) lookup into tickHistory. setConceptAMode() is display-only.
+ *
+ * Concept B (M6): play()/pause()/scrubTo()/advanceTick() drive tickIndex. advanceTick notifies
+ * React listeners only on a COARSE cadence (every coarseKpiEveryNTicks, plus an unconditional
+ * final-tick emit) so a 60–120-tick animation never triggers 60–120 full Shell re-renders. The
+ * decorator is refreshed every tick by managerD's rAF loop via the decoratorNeedsUpdate flag —
+ * this file makes NO animation-frame calls and NO decorator-invalidation calls (the rAF loop and
+ * the cached-decoration invalidation both live in managerD.ts only).
  *
  * Imported in tests (node env) so this file MUST NOT import any React or DOM APIs.
  *--------------------------------------------------------------------------------------------*/
@@ -29,14 +36,16 @@ export interface StateD {
   kpi: StateDKpi;
   /** Currently inspected segment id, or null. */
   inspectedSegmentId: string | null;
-  /** Concept B playback state (M6). */
+  /** Concept B playback state. */
   playbackState: PlaybackState;
-  /** Current playback tick index into tickHistory (M6). */
+  /** Current playback tick index into tickHistory. */
   tickIndex: number;
-  /** Total ticks in the cached simulation. */
+  /** Last tick index of the cached simulation (tickHistory.length - 1). */
   maxTicks: number;
   /** Full pre-computed per-tick simulation history (empty when no event). */
   tickHistory: ClosureSimState[];
+  /** True when the decorator needs a redraw — set every advanceTick, cleared by managerD's rAF. */
+  decoratorNeedsUpdate: boolean;
 }
 
 const ZERO_KPI: StateDKpi = {
@@ -52,6 +61,7 @@ const ZERO_KPI: StateDKpi = {
 const CONCEPT_A_TICKS = config.maxTicks as number; // 240 ticks = 2h at dt=30s
 const DT_MIN = (config.simDtSec as number) / 60;
 const EVAL_T_AFTER_OFFSET_MIN = config.evalTAfterOffsetMin as number;
+const COARSE_N = config.coarseKpiEveryNTicks as number; // React-notify cadence during playback
 
 function buildInitial(): StateD {
   return {
@@ -64,6 +74,7 @@ function buildInitial(): StateD {
     tickIndex: 0,
     maxTicks: CONCEPT_A_TICKS,
     tickHistory: [],
+    decoratorNeedsUpdate: false,
   };
 }
 
@@ -101,10 +112,9 @@ export const storeD = {
 
   /**
    * Set (or clear) the active closure event. Validates the lane-closure configuration
-   * (throws for an invalid lanesClosed on the segment — §8-fix-2), runs the full
-   * deterministic simulation ONCE, caches tickHistory, and derives the Concept A "after"
-   * snapshot + aggregated KPIs. Passing null returns to the free-flow baseline.
-   * Notifies subscribers exactly once.
+   * (throws for an invalid lanesClosed — §8-fix-2), runs the full deterministic simulation
+   * ONCE, caches tickHistory, derives the Concept A "after" snapshot + aggregated KPIs, and
+   * resets playback to tick 0. Passing null returns to the free-flow baseline. Notifies once.
    */
   setClosureEvent(event: ClosureEvent | null): void {
     if (event === null) {
@@ -114,8 +124,10 @@ export const storeD = {
         kpi: { ...ZERO_KPI },
         tickHistory: [],
         tickIndex: 0,
+        maxTicks: CONCEPT_A_TICKS,
         displayMode: "before",
         playbackState: "idle",
+        decoratorNeedsUpdate: false,
       });
       return;
     }
@@ -133,8 +145,10 @@ export const storeD = {
       conceptASnapshot,
       kpi: finalKpi,
       displayMode: "after",
-      tickIndex: evalIdx,
+      tickIndex: 0, // Concept B animation starts at t=0 (Concept A view reads conceptASnapshot)
+      maxTicks: Math.max(0, tickHistory.length - 1),
       playbackState: "idle",
+      decoratorNeedsUpdate: false,
     });
   },
 
@@ -149,6 +163,51 @@ export const storeD = {
   /** Set the inspected segment id (or null to deselect). */
   inspectClosure(segmentId: string | null): void {
     set({ inspectedSegmentId: segmentId });
+  },
+
+  // ---- Concept B playback (M6) ----
+
+  /** Start playback. Restarts from t=0 if currently at the end. Notifies once. */
+  play(): void {
+    const idx = state.tickIndex >= state.maxTicks ? 0 : state.tickIndex;
+    set({ playbackState: "playing", tickIndex: idx, decoratorNeedsUpdate: true });
+  },
+
+  /** Pause playback. Notifies once. */
+  pause(): void {
+    set({ playbackState: "paused" });
+  },
+
+  /** Scrub to an absolute tick index (clamped). O(1) lookup into the cached tickHistory. Notifies. */
+  scrubTo(n: number): void {
+    const idx = Math.max(0, Math.min(state.maxTicks, Math.round(n)));
+    set({ tickIndex: idx, playbackState: "paused", decoratorNeedsUpdate: true });
+  },
+
+  /**
+   * Advance one tick. Always updates tickIndex + sets decoratorNeedsUpdate (so managerD's rAF
+   * redraws the decorator every tick), but notifies React listeners only on the COARSE cadence
+   * (every COARSE_N ticks) plus an UNCONDITIONAL final-tick emit. Stops playback at the end.
+   */
+  advanceTick(): void {
+    const next = Math.min(state.tickIndex + 1, state.maxTicks);
+    const atEnd = next >= state.maxTicks;
+    // Mutate state directly (no notify) so the rAF loop can read the latest tick each frame.
+    state = {
+      ...state,
+      tickIndex: next,
+      decoratorNeedsUpdate: true,
+      playbackState: atEnd && state.playbackState === "playing" ? "paused" : state.playbackState,
+    };
+    // Coarse React-notify cadence + unconditional final-tick emit.
+    if (next % COARSE_N === 0 || atEnd) {
+      listeners.forEach((l) => l());
+    }
+  },
+
+  /** Clear the decorator-redraw flag WITHOUT notifying React (managerD's rAF calls this). */
+  clearDecoratorFlag(): void {
+    state = { ...state, decoratorNeedsUpdate: false };
   },
 };
 

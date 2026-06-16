@@ -45,6 +45,11 @@ import type { ClosureEvent, ClosureLaneMenuEntry, ClosureSimState, StateDKpi } f
 
 export const SCHEMATIC_LABEL = "SCHEMATIC corridor context — NOT calibrated mainline geometry";
 
+// Synthetic CORRIDOR easting frame (EPSG:32617), matching src/scene/place CORRIDOR + queueTailEasting.
+// Used to map a queue-tail easting → an along-corridor fraction u ∈ [0,1] for the decorator/timeline.
+const CORRIDOR_E_MIN = 578200;
+const CORRIDOR_E_SPAN = 592000 - 578200; // 13,800 m
+
 // ---------------------------------------------------------------------------
 // Config helpers (typed access to closureConfig.json)
 // ---------------------------------------------------------------------------
@@ -579,6 +584,14 @@ export function computeClosureSim(
         pricingResult.projectedRevenuePerHour * ((currentTimeMin + dtMin) / 60),
     };
 
+    // Back-of-queue tail uses the CURRENT queue (grows during closure, recedes on recovery) so the
+    // Concept B animation shows the shockwave crawl upstream and the recovery wave clear it.
+    const curQueueMi = state.queue / (seg.kjVphpl * seg.lanes);
+    const tailEasting = queueTailEasting(
+      config.segConnFromEasting as number,
+      curQueueMi * (config.metersPerMile as number)
+    );
+
     tickHistory.push({
       tick,
       segmentStates: [
@@ -592,12 +605,9 @@ export function computeClosureSim(
       ],
       backOfQueue: state.queue > 0
         ? {
-            u: 0,
-            eastingMeters: queueTailEasting(
-              config.segConnFromEasting as number,  // from config (§639)
-              maxQueueMi * (config.metersPerMile as number)  // meters/mile from config (§639)
-            ),
-            lengthMi: maxQueueMi,
+            u: (tailEasting - CORRIDOR_E_MIN) / CORRIDOR_E_SPAN,
+            eastingMeters: tailEasting,
+            lengthMi: curQueueMi,
             segmentSpan: [event.segment_id],
           }
         : null,
