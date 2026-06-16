@@ -733,6 +733,10 @@ function ClosureTimelineBar() {
     if (playing) { storeD.pause(); stopPlayLoop(); }
     storeD.scrubTo(n);
   };
+  const setSpeed = (mult: number) => {
+    storeD.setPlaybackSpeed(mult);
+    if (playing) { stopPlayLoop(); startPlayLoop(); } // re-pace the running loop immediately
+  };
   return (
     <div style={{ padding: "8px 14px 10px", borderTop: "1px solid var(--sd-line)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -750,12 +754,26 @@ function ClosureTimelineBar() {
           onChange={(e) => scrub(parseInt(e.target.value, 10))}
           style={{ flex: 1 }}
         />
-        <span style={{ fontSize: 11, color: "var(--sd-dim)", minWidth: 58, textAlign: "right" }}>
+        <span style={{ fontSize: 11, color: "var(--sd-dim)", minWidth: 50, textAlign: "right" }}>
           {s.tickIndex} / {s.maxTicks}
         </span>
       </div>
-      <div style={{ fontSize: 10, color: "var(--sd-dim)", marginTop: 4, fontStyle: "italic" }}>
-        SCHEMATIC ANIMATION — not real-time traffic data
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
+        <span style={{ fontSize: 11, color: "var(--sd-dim)" }}>Speed</span>
+        {[1, 2, 4].map((m) => (
+          <button
+            key={m}
+            className={`sd-chip${s.playbackSpeed === m ? " on" : ""}`}
+            style={{ fontSize: 10, padding: "1px 7px" }}
+            onClick={() => setSpeed(m)}
+          >
+            {m}×
+          </button>
+        ))}
+        <span style={{ flex: 1 }} />
+        <span style={{ fontSize: 10, color: "var(--sd-dim)", fontStyle: "italic" }}>
+          SCHEMATIC ANIMATION — not real-time data
+        </span>
       </div>
     </div>
   );

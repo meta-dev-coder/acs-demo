@@ -158,9 +158,12 @@ function rafLoop(ts: number): void {
 /** Start the Concept B animation loop (called alongside storeD.play()). */
 export function startPlayLoop(): void {
   if (rafHandle !== undefined) cancelAnimationFrame(rafHandle);
-  // Pace so the whole window (maxTicks) plays in ~TARGET_PLAYBACK_MS regardless of closure length.
-  const ticks = Math.max(1, storeD.getSnapshot().maxTicks);
-  perTickMs = Math.max(16, Math.round(TARGET_PLAYBACK_MS / ticks));
+  // Pace so the whole window (maxTicks) plays in ~TARGET_PLAYBACK_MS, divided by the speed
+  // multiplier (1×/2×/4×), regardless of closure length.
+  const snap = storeD.getSnapshot();
+  const ticks = Math.max(1, snap.maxTicks);
+  const speed = snap.playbackSpeed || 1;
+  perTickMs = Math.max(16, Math.round(TARGET_PLAYBACK_MS / ticks / speed));
   lastTickTs = 0;
   rafHandle = requestAnimationFrame(rafLoop);
 }

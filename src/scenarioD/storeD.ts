@@ -42,6 +42,8 @@ export interface StateD {
   tickIndex: number;
   /** Last tick index of the cached simulation (tickHistory.length - 1). */
   maxTicks: number;
+  /** Playback speed multiplier (1 / 2 / 4) applied to the ~30s window pacing. */
+  playbackSpeed: number;
   /** Full pre-computed per-tick simulation history (empty when no event). */
   tickHistory: ClosureSimState[];
   /** True when the decorator needs a redraw — set every advanceTick, cleared by managerD's rAF. */
@@ -81,6 +83,7 @@ function buildInitial(): StateD {
     playbackState: "idle",
     tickIndex: 0,
     maxTicks: CONCEPT_A_TICKS,
+    playbackSpeed: 1,
     tickHistory: [],
     decoratorNeedsUpdate: false,
   };
@@ -184,6 +187,11 @@ export const storeD = {
   /** Pause playback. Notifies once. */
   pause(): void {
     set({ playbackState: "paused" });
+  },
+
+  /** Set the playback speed multiplier (1/2/4). The play loop re-reads this on (re)start. */
+  setPlaybackSpeed(mult: number): void {
+    set({ playbackSpeed: mult });
   },
 
   /** Scrub to an absolute tick index (clamped). O(1) lookup into the cached tickHistory. Notifies. */
