@@ -7,9 +7,9 @@
  * Imported in tests (node env) so this file MUST NOT import any React or DOM APIs.
  *--------------------------------------------------------------------------------------------*/
 
-export type ScenarioKey = "A" | "B" | "C";
+export type ScenarioKey = "A" | "B" | "C" | "D";
 
-export const ALL_SCENARIOS: ScenarioKey[] = ["A", "B", "C"];
+export const ALL_SCENARIOS: ScenarioKey[] = ["A", "B", "C", "D"];
 
 export interface ScenarioRegistryEntry {
   /** Label shown on the tab button in the top bar. */
@@ -44,5 +44,12 @@ export const SCENARIO_REGISTRY: Record<ScenarioKey, ScenarioRegistryEntry> = {
     leftEmptyText: "Search express sections…",
     inspectorEmptyText:
       "Select an express section to see its LOS, posted rate, density, and override controls.",
+  },
+  D: {
+    tabLabel: "Lane Closure",
+    leftRailLabel: "CLOSURE",
+    leftEmptyText: "Configure closure event…",
+    inspectorEmptyText:
+      "Build a closure event — select segment, lanes, time of day, and weather — then click Simulate to see queue buildup, shockwave, LOS impact, and toll response.",
   },
 };

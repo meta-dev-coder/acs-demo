@@ -6,7 +6,7 @@ import { Point3d } from "@itwin/core-geometry";
 import type { ScoredAsset } from "./types";
 import type { ScoredSegment } from "../scenarioB/types";
 
-export type Scenario = "A" | "B" | "C";
+export type Scenario = "A" | "B" | "C" | "D";
 
 /** Parsed CSV (or built-in) rows backing the active dataset, for the "Data" table view. */
 export interface TableData {

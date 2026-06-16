@@ -83,7 +83,7 @@ function TopBar({
 
 /* ----------------------------------- left list ----------------------------------- */
 function Legend({ scenario }: { scenario: ScenarioKey }) {
-  if (scenario === "C") return null; // C has no risk-band legend in M0
+  if (scenario === "C" || scenario === "D") return null; // C/D have no risk-band legend
   const meta = scenario === "A" ? bandMeta : segBandMeta;
   return (
     <div className="sd-legend-row">
@@ -608,6 +608,55 @@ function TollingLeftList() {
   );
 }
 
+/* ---- Scenario D stubs (M0 — placeholder text only; full implementation in M5) ---- */
+
+function ClosureLeftList() {
+  return (
+    <div className="sd-list" style={{ padding: "14px", color: "var(--sd-dim)", fontSize: 13 }}>
+      {/* SCHEMATIC corridor context — NOT calibrated mainline geometry */}
+      <div style={{ marginBottom: 8, fontStyle: "italic" }}>
+        Lane Closure — Scenario D (coming soon)
+      </div>
+      <div>Configure a closure event using the form above to simulate queue buildup,
+        shockwave propagation, and toll response on the I-595 connector segment.</div>
+    </div>
+  );
+}
+
+function ClosureInspector() {
+  return (
+    <div className="sd-insp">
+      <div className="empty">{SCENARIO_REGISTRY["D"].inspectorEmptyText}</div>
+    </div>
+  );
+}
+
+function KpiBarD() {
+  return (
+    <div className="sd-kpi">
+      <div className="item">
+        <div className="v" style={{ color: "var(--sd-dim)" }}>—</div>
+        <div className="l">Max queue (mi)</div>
+      </div>
+      <div className="item">
+        <div className="v" style={{ color: "var(--sd-dim)" }}>—</div>
+        <div className="l">Delay (veh-hrs)</div>
+      </div>
+      <div className="item">
+        <div className="v" style={{ color: "var(--sd-dim)" }}>—</div>
+        <div className="l">Clearance time</div>
+      </div>
+      <div className="item">
+        <div className="v" style={{ color: "var(--sd-dim)" }}>—</div>
+        <div className="l">Express toll</div>
+      </div>
+      <div className="note">
+        SCHEMATIC corridor context — NOT calibrated mainline geometry · Lane Closure sim — configure event to run
+      </div>
+    </div>
+  );
+}
+
 function LeftPanel({ scenario, onCollapse }: { scenario: ScenarioKey; onCollapse: () => void }) {
   const [q, setQ] = useState("");
   const [band, setBand] = useState<RiskBand | "all">("all");
@@ -618,11 +667,11 @@ function LeftPanel({ scenario, onCollapse }: { scenario: ScenarioKey; onCollapse
       <div className="sd-panel-h">
         <button className="sd-collapse" title="Collapse" onClick={onCollapse}>‹</button>
         <h3>
-          {scenario === "A" ? "ITS Assets" : scenario === "B" ? "Corridor Segments" : "Express Sections"}
+          {scenario === "A" ? "ITS Assets" : scenario === "B" ? "Corridor Segments" : scenario === "C" ? "Express Sections" : "Lane Closure"}
         </h3>
         <Legend scenario={scenario} />
       </div>
-      {scenario !== "C" && (
+      {scenario !== "C" && scenario !== "D" && (
         <div className="sd-filter">
           <input
             placeholder={reg.leftEmptyText}
@@ -634,6 +683,7 @@ function LeftPanel({ scenario, onCollapse }: { scenario: ScenarioKey; onCollapse
       {scenario === "A" && <AssetLeftList q={q} band={band} setBand={setBand} />}
       {scenario === "B" && <SegmentLeftList q={q} band={band} setBand={setBand} />}
       {scenario === "C" && <TollingLeftList />}
+      {scenario === "D" && <ClosureLeftList />}
     </div>
   );
 }
@@ -1027,11 +1077,20 @@ function RightPanel({ scenario, onCollapse }: { scenario: ScenarioKey; onCollaps
       </div>
     );
   }
-  // Scenario C — M0 placeholder
+  // Scenario C
+  if (scenario === "C") {
+    return (
+      <div className="sd-right">
+        {head}
+        <TollingInspector />
+      </div>
+    );
+  }
+  // Scenario D — M0 stub
   return (
     <div className="sd-right">
       {head}
-      <TollingInspector />
+      <ClosureInspector />
     </div>
   );
 }
@@ -1113,6 +1172,7 @@ function KpiBarC() {
 function KpiBar({ scenario }: { scenario: ScenarioKey }) {
   if (scenario === "A") return <KpiBarA />;
   if (scenario === "B") return <KpiBarB />;
+  if (scenario === "D") return <KpiBarD />;
   return <KpiBarC />;
 }
 

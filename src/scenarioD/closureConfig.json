@@ -1,0 +1,30 @@
+{
+  "segments": {
+    "SEG-CONN":    { "lanes": 2, "baseCapPerLane": 2000, "freeFlowMph": 55, "kjVphpl": 210 },
+    "SEG-MN-W":    { "lanes": 3, "baseCapPerLane": 2200, "freeFlowMph": 65, "kjVphpl": 210 },
+    "SEG-MN-C":    { "lanes": 3, "baseCapPerLane": 2200, "freeFlowMph": 65, "kjVphpl": 210 },
+    "SEG-MN-E":    { "lanes": 3, "baseCapPerLane": 2200, "freeFlowMph": 65, "kjVphpl": 210 },
+    "SEG-EXP-RVS": { "lanes": 2, "baseCapPerLane": 2200, "freeFlowMph": 65, "kjVphpl": 210 },
+    "SEG-SR84":    { "lanes": 2, "baseCapPerLane":  900, "freeFlowMph": 45, "kjVphpl": 180 }
+  },
+  "cafTable": [
+    { "lanesClosed": 1, "totalLanes": 2, "caf": 0.35 },
+    { "lanesClosed": 1, "totalLanes": 3, "caf": 0.49 },
+    { "lanesClosed": 2, "totalLanes": 3, "caf": 0.17 }
+  ],
+  "simDtSec": 30,
+  "weatherFactor": 0.85,
+  "queueDischargeFactor": 0.93,
+  "diversionThresholdMi": 0.75,
+  "diversionThresholdDelayMin": 10,
+  "diversionShedFraction": 0.12,
+  "valueOfTimeLow": 18,
+  "valueOfTimeHigh": 25,
+  "expressRevenueRatePerLaneHour": 7800,
+  "evalTAfterOffsetMin": 30,
+  "coarseKpiEveryNTicks": 4,
+  "maxTicks": 240,
+  "pmPeakVphplConn": 1800,
+  "offPeakVphplConn": 900,
+  "sr84EbSegmentId": "SEG-SR84-EB"
+}

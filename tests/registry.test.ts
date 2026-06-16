@@ -74,13 +74,13 @@ describe("M0 regression — Scenario B scoring unchanged", () => {
 });
 
 // ── Registry shape ─────────────────────────────────────────────────────────────────────────
-describe("M0 — scenario registry exposes A, B, and C", () => {
-  it("ALL_SCENARIOS contains exactly 'A', 'B', 'C' in order", () => {
-    expect(ALL_SCENARIOS).toEqual(["A", "B", "C"]);
+describe("M0 — scenario registry exposes A, B, C, and D", () => {
+  it("ALL_SCENARIOS contains exactly 'A', 'B', 'C', 'D' in order", () => {
+    expect(ALL_SCENARIOS).toEqual(["A", "B", "C", "D"]);
   });
 
   it("SCENARIO_REGISTRY has an entry for each key with required fields", () => {
-    const keys: ScenarioKey[] = ["A", "B", "C"];
+    const keys: ScenarioKey[] = ["A", "B", "C", "D"];
     for (const k of keys) {
       const entry = SCENARIO_REGISTRY[k];
       expect(entry).toBeTruthy();
