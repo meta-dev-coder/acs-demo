@@ -75,7 +75,7 @@ const SIM_TICKS_CAP = 1200; // ≤ 10h sim window guard (scope: closures span 1�
 
 /** Sim length for an event: the closure window + an equal recovery (off-peak taper drains the
  *  queue) + a 30-min margin, so the queue builds AND visibly clears for any 1–8h closure. */
-function simTicksForEvent(event: ClosureEvent): number {
+export function simTicksForEvent(event: ClosureEvent): number {
   const windowMin = event.durationMin * 2 + 30;
   return Math.min(SIM_TICKS_CAP, Math.max(120, Math.round(windowMin / DT_MIN)));
 }

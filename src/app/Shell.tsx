@@ -30,8 +30,10 @@ import { presentationStore } from "../scenarioC/presentationStore";
 import { usePresentationState } from "../scenarioC/usePresentationState";
 import { storeD } from "../scenarioD/storeD";
 import { useScenarioDState } from "../scenarioD/useScenarioDState";
-import { getLaneMenu, lanesClosedForType } from "../scenarioD/closurePhysics";
+import { getLaneMenu, lanesClosedForType, computeClosureSim } from "../scenarioD/closurePhysics";
 import { startPlayLoop, stopPlayLoop } from "../scenarioD/managerD";
+import { simTicksForEvent } from "../scenarioD/storeD";
+import type { ClosureEvent } from "../scenarioD/typesD";
 
 const BANDS: RiskBand[] = ["red", "amber", "green"];
 const fmt$ = (n: number) => `$${n.toLocaleString("en-US")}`;
@@ -621,6 +623,7 @@ function ClosureLeftList() {
   const [timeOfDay, setTimeOfDay] = useState<"pm_peak" | "off_peak">("pm_peak");
   const [durationMin, setDurationMin] = useState(60);
   const [rain, setRain] = useState(false);
+  const [compare, setCompare] = useState(false);
 
   const menu = getLaneMenu(segmentId);
   const segLanes = menu[0]?.totalLanes ?? 2;
@@ -718,7 +721,56 @@ function ClosureLeftList() {
       </div>
 
       <ClosureTimelineBar />
+
+      {s.activeEvent && (
+        <div style={{ padding: "6px 14px 0" }}>
+          <button
+            className={`sd-chip${compare ? " on" : ""}`}
+            style={{ fontSize: 11 }}
+            onClick={() => setCompare(!compare)}
+          >
+            {compare ? "Hide" : "Compare"} PM vs Off-peak
+          </button>
+        </div>
+      )}
+      {compare && s.activeEvent && <ClosureComparePanel event={s.activeEvent} />}
     </>
+  );
+}
+
+/* G6 — compare two time windows: the active closure run at PM-peak vs off-peak, side by side. */
+function ClosureComparePanel({ event }: { event: ClosureEvent }) {
+  const pm = useMemo(() => {
+    const e: ClosureEvent = { ...event, timeOfDay: "pm_peak" };
+    return computeClosureSim(e, simTicksForEvent(e)).finalKpi;
+  }, [event]);
+  const off = useMemo(() => {
+    const e: ClosureEvent = { ...event, timeOfDay: "off_peak" };
+    return computeClosureSim(e, simTicksForEvent(e)).finalKpi;
+  }, [event]);
+
+  const Row = ({ label, a, b }: { label: string; a: string; b: string }) => (
+    <div style={{ display: "flex", fontSize: 11, padding: "3px 0", borderBottom: "1px solid var(--sd-line)" }}>
+      <span style={{ flex: 1, color: "var(--sd-dim)" }}>{label}</span>
+      <span style={{ width: 66, textAlign: "right" }}>{a}</span>
+      <span style={{ width: 66, textAlign: "right" }}>{b}</span>
+    </div>
+  );
+  const usd = (n: number) => `$${Math.round(n).toLocaleString()}`;
+
+  return (
+    <div data-testid="closure-compare" style={{ padding: "8px 14px 12px" }}>
+      <div style={{ display: "flex", fontSize: 11, fontWeight: 600, marginBottom: 2 }}>
+        <span style={{ flex: 1, color: "var(--sd-dim)" }}>Time window →</span>
+        <span style={{ width: 66, textAlign: "right" }}>PM Peak</span>
+        <span style={{ width: 66, textAlign: "right" }}>Off-Peak</span>
+      </div>
+      <Row label="Max queue" a={`${pm.maxQueueMi.toFixed(1)} mi`} b={`${off.maxQueueMi.toFixed(1)} mi`} />
+      <Row label="Travel time" a={`${Math.round(pm.travelTimeMin)}m`} b={`${Math.round(off.travelTimeMin)}m`} />
+      <Row label="Delay cost" a={usd(pm.delayCostUsd)} b={usd(off.delayCostUsd)} />
+      <Row label="Clearance" a={`${Math.round(pm.clearanceMin)}m`} b={`${Math.round(off.clearanceMin)}m`} />
+      <Row label="Net revenue" a={usd(pm.netRevenueUsd)} b={usd(off.netRevenueUsd)} />
+    </div>
   );
 }
 
