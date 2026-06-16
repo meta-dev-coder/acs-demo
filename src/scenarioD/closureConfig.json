@@ -26,5 +26,10 @@
   "maxTicks": 240,
   "pmPeakVphplConn": 1800,
   "offPeakVphplConn": 900,
-  "sr84EbSegmentId": "SEG-SR84-EB"
+  "sr84EbSegmentId": "SEG-SR84-EB",
+  "losCongestedSpeedThresholdMph": 45,
+  "losEFloorDensity": 36,
+  "congestedSpeedFraction": 0.3,
+  "metersPerMile": 1609.34,
+  "segConnFromEasting": 590000
 }

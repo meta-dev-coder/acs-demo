@@ -210,28 +210,30 @@ export function computeDTotal(
  *
  * NEVER blindly invert density from served flow — this paints a jammed queue green.
  * Branch selection:
- *  - queued=true (or speed < 45 mph): CONGESTED branch → high density → LOS E or F
+ *  - queued=true (or speed < losCongestedSpeedThresholdMph): CONGESTED branch → high density → LOS E or F
  *  - queued=false (free-flow): FREE-FLOW branch → low density → LOS A or B
+ *
+ * @param totalFlow  Total corridor flow in vph (sum across all lanes)
+ * @param speed      Segment speed in mph
+ * @param queued     True if this segment is inside the shockwave queue
+ * @param lanes      Number of lanes on the segment (per-segment, NOT hardcoded)
  */
-export function losFromState(totalFlow: number, speed: number, queued: boolean): LOSBand {
-  const CONGESTED_SPEED_THRESHOLD = 45; // mph (HCM breakdown threshold)
-  const CONGESTED_DENSITY_MIN = 26; // veh/mi/ln — forces LOS E or F (above LOS D max of 35)
+export function losFromState(totalFlow: number, speed: number, queued: boolean, lanes: number): LOSBand {
+  const congestedSpeedThreshold = config.losCongestedSpeedThresholdMph as number; // from config (§639)
+  const losEFloor = config.losEFloorDensity as number;                             // from config (§639)
 
-  const lanes = 2; // default; density is per-lane
   const flowPerLane = totalFlow / lanes;
 
-  if (queued || speed < CONGESTED_SPEED_THRESHOLD) {
+  if (queued || speed < congestedSpeedThreshold) {
     // CONGESTED branch: segment is inside the queue (backward wave).
     // Density on the congested branch is high (approaching jam density).
-    // Use jam density reference: kj - margin puts us firmly in LOS E/F territory.
-    // We use speed to back-calculate density on the congested side:
+    // Use speed to back-calculate density on the congested side:
     //   On the congested branch: vehicles are nearly stopped, real density >> flow/speed.
     //   Use congested speed (actual) only if meaningful; else floor at LOS E threshold.
     const effectiveSpeed = Math.max(1, speed);
     const densityPerLane = flowPerLane / effectiveSpeed;
-    // Congested branch floor: 36 veh/mi/ln = bottom of LOS E (HCM table)
-    const LOS_E_FLOOR = 36; // HCM LOS E starts at 36 veh/mi/ln
-    const congestedDensity = Math.max(densityPerLane, LOS_E_FLOOR);
+    // Congested branch floor from config: bottom of LOS E (HCM table)
+    const congestedDensity = Math.max(densityPerLane, losEFloor);
     return densityToLOS(congestedDensity);
   } else {
     // FREE-FLOW branch: density from actual speed (free-flow, low density)
@@ -403,8 +405,8 @@ type AccumulatedSimState = Pick<StateDKpi, "vehHrsDelay" | "maxQueueMi" | "pctDi
  *
  * Two economics lines with INDEPENDENT formulas (§5.7, §8-fix-6):
  *  delayCostUsd              = vehHrsDelay × valueOfTime   (midpoint of [18, 25] range)
- *  expressRevenueProtectedUsd = projectedRevenuePerHour × closureDurationHr
- *                               (from computeCorridorPricing — NEVER closureHours × 7800)
+ *  expressRevenueProtectedUsd = (projectedRevenuePerHour − baselineRevenuePerHour) × closureDurationHr
+ *                               (delta formula per §5.7 — NEVER closureHours × 7800)
  *
  * These formulas are structurally distinct and will never be numerically equal
  * for any non-trivial scenario.
@@ -419,13 +421,16 @@ export function computeStateDKpi(
   const valueOfTime = (valueOfTimeLow + valueOfTimeHigh) / 2; // midpoint
   const delayCostUsd = state.vehHrsDelay * valueOfTime;
 
-  // --- Economics line 2: express revenue protected ---
-  // Call Scenario C pricing module for the pm_peak scenario (the closure's toll-response scenario)
-  // The express lanes hold free-flow during the GP closure, running with elevated demand
+  // --- Economics line 2: express revenue protected (delta formula per §5.7) ---
+  // Projected: closure scenario — express lanes run with elevated demand (pm_peak / evening_peak_wb)
+  // Baseline: off-peak scenario — normal revenue without closure diversion
+  // expressRevenueProtectedUsd = (projectedRevenuePerHour − baselineRevenuePerHour) × closureDurationHr
   const pricingResult = computeCorridorPricing("evening_peak_wb", "moderate_variable" as PricingStrategy);
   const projectedRevenuePerHour = pricingResult.projectedRevenuePerHour;
+  const baselinePricingResult = computeCorridorPricing("off_peak", "moderate_variable" as PricingStrategy);
+  const baselineRevenuePerHour = baselinePricingResult.projectedRevenuePerHour;
   const closureDurationHr = closureDurationMin / 60;
-  const expressRevenueProtectedUsd = projectedRevenuePerHour * closureDurationHr;
+  const expressRevenueProtectedUsd = (projectedRevenuePerHour - baselineRevenuePerHour) * closureDurationHr;
 
   // --- Toll response ---
   const currentTollUsd = pricingResult.corridorTotalRate / 3; // per-section average
@@ -557,10 +562,11 @@ export function computeClosureSim(
       (pctDiverted > 0 ? computeDTotal(event.segment_id, event.timeOfDay, pctDiverted) : computeDTotal(event.segment_id, event.timeOfDay, 0)),
       muTotal
     );
+    const congestedSpeedFraction = config.congestedSpeedFraction as number; // from config (§639)
     const speed = closureActive && state.isQueued
-      ? seg.freeFlowMph * 0.3  // congested speed (30% of free-flow)
+      ? seg.freeFlowMph * congestedSpeedFraction  // congested speed fraction from config
       : seg.freeFlowMph;
-    const losBand = losFromState(servedFlow, speed, state.isQueued && closureActive);
+    const losBand = losFromState(servedFlow, speed, state.isQueued && closureActive, seg.lanes);
 
     const kpiSnapshot: StateDKpi = {
       maxQueueMi,
@@ -587,7 +593,10 @@ export function computeClosureSim(
       backOfQueue: state.queue > 0
         ? {
             u: 0,
-            eastingMeters: queueTailEasting(590000, maxQueueMi * 1609.34),
+            eastingMeters: queueTailEasting(
+              config.segConnFromEasting as number,  // from config (§639)
+              maxQueueMi * (config.metersPerMile as number)  // meters/mile from config (§639)
+            ),
             lengthMi: maxQueueMi,
             segmentSpan: [event.segment_id],
           }
