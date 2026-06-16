@@ -74,6 +74,10 @@ describe("M0 Scenario D — type imports compile", () => {
       pctDiverted: 0,
       delayCostUsd: 0,
       expressRevenueProtectedUsd: 0,
+      travelTimeMin: 0,
+      divertedVph: 0,
+      secondaryIncidentRisk: 0,
+      netRevenueUsd: 0,
     };
     expect(kpi.delayCostUsd).toBe(0);
     expect(kpi.expressRevenueProtectedUsd).toBe(0);

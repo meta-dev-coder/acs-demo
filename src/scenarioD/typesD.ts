@@ -103,6 +103,14 @@ export interface StateDKpi {
   delayCostUsd: number;
   /** Express revenue protected in USD (independent formula — never closureHours × 7800). */
   expressRevenueProtectedUsd: number;
+  /** Representative corridor travel time (min): free-flow traverse + current queue delay. */
+  travelTimeMin: number;
+  /** Absolute diverted volume to the EB SR-84 representation in veh/hr (demand × pctDiverted). */
+  divertedVph: number;
+  /** Secondary (rear-end) incident-risk index 0–1, rising with queue length (illustrative). */
+  secondaryIncidentRisk: number;
+  /** Net revenue position in USD: expressRevenueProtectedUsd − delayCostUsd. */
+  netRevenueUsd: number;
 }
 
 /**

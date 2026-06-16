@@ -405,6 +405,19 @@ export function stepQueueModel(
 
 type AccumulatedSimState = Pick<StateDKpi, "vehHrsDelay" | "maxQueueMi" | "pctDiverted">;
 
+/** Representative travel time (min): config base corridor traverse + current queuing delay (Q/μ). */
+function travelTimeMinFor(queueVeh: number, muTotalVph: number): number {
+  const base = config.baseCorridorTraverseMin as number;
+  const queueDelayMin = muTotalVph > 0 ? (queueVeh / muTotalVph) * 60 : 0;
+  return base + queueDelayMin;
+}
+
+/** Secondary (rear-end) incident-risk index 0–1, scaling with queue length (illustrative). */
+function incidentRiskFor(queueMi: number): number {
+  const ref = config.incidentRiskRefMi as number;
+  return Math.max(0, Math.min(1, queueMi / ref));
+}
+
 /**
  * Compute the final KPI snapshot from accumulated simulation state.
  *
@@ -418,7 +431,8 @@ type AccumulatedSimState = Pick<StateDKpi, "vehHrsDelay" | "maxQueueMi" | "pctDi
  */
 export function computeStateDKpi(
   state: AccumulatedSimState & Partial<StateDKpi>,
-  closureDurationMin: number
+  closureDurationMin: number,
+  strategy: PricingStrategy = "moderate_variable"
 ): StateDKpi {
   // --- Economics line 1: delay cost ---
   const valueOfTimeLow = config.valueOfTimeLow as number;
@@ -427,12 +441,11 @@ export function computeStateDKpi(
   const delayCostUsd = state.vehHrsDelay * valueOfTime;
 
   // --- Economics line 2: express revenue protected (delta formula per §5.7) ---
-  // Projected: closure scenario — express lanes run with elevated demand (pm_peak / evening_peak_wb)
-  // Baseline: off-peak scenario — normal revenue without closure diversion
-  // expressRevenueProtectedUsd = (projectedRevenuePerHour − baselineRevenuePerHour) × closureDurationHr
-  const pricingResult = computeCorridorPricing("evening_peak_wb", "moderate_variable" as PricingStrategy);
+  // Projected uses the active pricing STRATEGY (dynamic 'moderate_variable' vs flat 'current_static'),
+  // so the dynamic-pricing toggle changes the upside. Baseline = off-peak static (the do-nothing case).
+  const pricingResult = computeCorridorPricing("evening_peak_wb", strategy);
   const projectedRevenuePerHour = pricingResult.projectedRevenuePerHour;
-  const baselinePricingResult = computeCorridorPricing("off_peak", "moderate_variable" as PricingStrategy);
+  const baselinePricingResult = computeCorridorPricing("off_peak", "current_static" as PricingStrategy);
   const baselineRevenuePerHour = baselinePricingResult.projectedRevenuePerHour;
   const closureDurationHr = closureDurationMin / 60;
   const expressRevenueProtectedUsd = (projectedRevenuePerHour - baselineRevenuePerHour) * closureDurationHr;
@@ -453,6 +466,12 @@ export function computeStateDKpi(
     pctDiverted,
     delayCostUsd,
     expressRevenueProtectedUsd,
+    // travelTimeMin + divertedVph are queue/demand-dependent — computeClosureSim overrides them
+    // with the peak-tick values; here they default sensibly for direct callers.
+    travelTimeMin: config.baseCorridorTraverseMin as number,
+    divertedVph: 0,
+    secondaryIncidentRisk: incidentRiskFor(maxQueueMi),
+    netRevenueUsd: expressRevenueProtectedUsd - delayCostUsd,
   };
 }
 
@@ -475,7 +494,8 @@ type ClosureSimResult = {
  */
 export function computeClosureSim(
   event: ClosureEvent,
-  maxTicks: number
+  maxTicks: number,
+  strategy: PricingStrategy = "moderate_variable"
 ): ClosureSimResult {
   const dtSec = config.simDtSec as number;
   const dtHr = dtSec / 3600;
@@ -507,6 +527,8 @@ export function computeClosureSim(
   let maxQueueMi = 0;
   let clearanceMin = -1;
   let pctDiverted = 0;
+  let peakTravelTimeMin = config.baseCorridorTraverseMin as number;
+  let peakDivertedVph = 0;
 
   const tickHistory: ClosureSimResult["tickHistory"] = [];
 
@@ -554,11 +576,8 @@ export function computeClosureSim(
       clearanceMin = currentTimeMin;
     }
 
-    // Toll response (call Scenario C pricing module)
-    const pricingResult = computeCorridorPricing(
-      mapTimeBlock(event.timeOfDay),
-      "moderate_variable" as PricingStrategy
-    );
+    // Toll response (call Scenario C pricing module with the active pricing STRATEGY)
+    const pricingResult = computeCorridorPricing(mapTimeBlock(event.timeOfDay), strategy);
     const currentTollUsd = pricingResult.corridorTotalRate / 3;
 
     // Per-lane density and LOS for the closure segment
@@ -576,17 +595,6 @@ export function computeClosureSim(
       : seg.freeFlowMph;
     const losBand = losFromState(servedFlow, speed, state.isQueued && closureActive, seg.lanes);
 
-    const kpiSnapshot: StateDKpi = {
-      maxQueueMi,
-      vehHrsDelay,
-      clearanceMin: clearanceMin >= 0 ? clearanceMin : 0,
-      currentTollUsd,
-      pctDiverted,
-      delayCostUsd: vehHrsDelay * ((config.valueOfTimeLow as number + config.valueOfTimeHigh as number) / 2),
-      expressRevenueProtectedUsd:
-        pricingResult.projectedRevenuePerHour * ((currentTimeMin + dtMin) / 60),
-    };
-
     // Back-of-queue tail uses the CURRENT queue (grows during closure, recedes on recovery) so the
     // Concept B animation shows the shockwave crawl upstream and the recovery wave clear it.
     const curQueueMi = state.queue / (seg.kjVphpl * seg.lanes);
@@ -594,6 +602,29 @@ export function computeClosureSim(
       config.segConnFromEasting as number,
       curQueueMi * (config.metersPerMile as number)
     );
+
+    // Extended KPIs (G4/G5/G7): travel time, absolute diverted volume, incident risk, net revenue.
+    const tickDelayCostUsd = vehHrsDelay * (((config.valueOfTimeLow as number) + (config.valueOfTimeHigh as number)) / 2);
+    const tickExpressRevUsd = pricingResult.projectedRevenuePerHour * ((currentTimeMin + dtMin) / 60);
+    const tickDivertedVph = computeDTotal(event.segment_id, event.timeOfDay, 0) * pctDiverted;
+    const tickTravelTimeMin = travelTimeMinFor(state.queue, muTotal);
+    const tickIncidentRisk = incidentRiskFor(curQueueMi);
+    if (tickTravelTimeMin > peakTravelTimeMin) peakTravelTimeMin = tickTravelTimeMin;
+    if (tickDivertedVph > peakDivertedVph) peakDivertedVph = tickDivertedVph;
+
+    const kpiSnapshot: StateDKpi = {
+      maxQueueMi,
+      vehHrsDelay,
+      clearanceMin: clearanceMin >= 0 ? clearanceMin : 0,
+      currentTollUsd,
+      pctDiverted,
+      delayCostUsd: tickDelayCostUsd,
+      expressRevenueProtectedUsd: tickExpressRevUsd,
+      travelTimeMin: tickTravelTimeMin,
+      divertedVph: tickDivertedVph,
+      secondaryIncidentRisk: tickIncidentRisk,
+      netRevenueUsd: tickExpressRevUsd - tickDelayCostUsd,
+    };
 
     tickHistory.push({
       tick,
@@ -639,12 +670,17 @@ export function computeClosureSim(
     }
   }
 
-  // Final KPI
+  // Final KPI (strategy-aware; override the queue/demand-dependent fields with the peak-tick values)
   const finalKpi = computeStateDKpi(
     { vehHrsDelay, maxQueueMi, pctDiverted },
-    event.durationMin
+    event.durationMin,
+    strategy
   );
   finalKpi.clearanceMin = clearanceMin;
+  finalKpi.travelTimeMin = peakTravelTimeMin;
+  finalKpi.divertedVph = peakDivertedVph;
+  finalKpi.secondaryIncidentRisk = incidentRiskFor(maxQueueMi);
+  finalKpi.netRevenueUsd = finalKpi.expressRevenueProtectedUsd - finalKpi.delayCostUsd;
 
   // Also update the last tick's KPI snapshot with the projected clearance
   if (tickHistory.length > 0) {

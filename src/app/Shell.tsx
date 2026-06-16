@@ -850,6 +850,23 @@ function ClosureInspector() {
               <strong data-testid="kpi-express-revenue" className="green">${Math.round(k.expressRevenueProtectedUsd).toLocaleString()}</strong>
             </div>
             <div style={{ color: "var(--sd-dim)", fontSize: 10 }}>dynamic-toll pricing-response upside</div>
+
+            {/* Dynamic-pricing toggle → net revenue position (links to Scenario 3 pricing logic) */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
+              <span style={{ fontSize: 12, flex: 1 }}>Dynamic pricing</span>
+              <button className={`sd-chip${s.dynamicPricing ? " on" : ""}`} onClick={() => storeD.setDynamicPricing(true)}>On</button>
+              <button className={`sd-chip${!s.dynamicPricing ? " on" : ""}`} onClick={() => storeD.setDynamicPricing(false)}>Off (static)</button>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginTop: 8, borderTop: "1px solid var(--sd-line)", paddingTop: 8 }}>
+              <strong>Net revenue position</strong>
+              <strong style={{ color: k.netRevenueUsd >= 0 ? "var(--green)" : "var(--red)" }}>
+                {k.netRevenueUsd >= 0 ? "+" : "−"}${Math.abs(Math.round(k.netRevenueUsd)).toLocaleString()}
+              </strong>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--sd-dim)", marginTop: 6 }}>
+              <span>Recovery / clearance</span>
+              <span>{Math.round(k.clearanceMin)} min</span>
+            </div>
           </div>
         </>
       )}
@@ -863,6 +880,11 @@ function KpiBarD() {
   // During playback/scrub, show the CURRENT tick's KPIs so the counters climb with the queue;
   // when idle, show the peak/final KPIs (the Concept A summary).
   const k = s.playbackState !== "idle" ? s.tickHistory[s.tickIndex]?.kpis ?? s.kpi : s.kpi;
+  const risk = k.secondaryIncidentRisk < 0.34
+    ? { l: "Low", c: "var(--green)" }
+    : k.secondaryIncidentRisk < 0.67
+    ? { l: "Elevated", c: "var(--amber)" }
+    : { l: "High", c: "var(--red)" };
   return (
     <div className="sd-kpi">
       <div className="item" data-testid="kpi-max-queue">
@@ -872,22 +894,22 @@ function KpiBarD() {
         <div className="l">Max queue</div>
       </div>
       <div className="item">
-        <div className="v">{has ? Math.round(k.vehHrsDelay).toLocaleString() : "—"}</div>
-        <div className="l">Delay (veh-hrs)</div>
+        <div className="v">{has ? `${Math.round(k.travelTimeMin)} min` : "—"}</div>
+        <div className="l">Travel time</div>
       </div>
       <div className="item">
-        <div className="v">{has ? `${Math.round(k.clearanceMin)} min` : "—"}</div>
-        <div className="l">Clearance</div>
-      </div>
-      <div className="item" data-testid="kpi-current-toll">
-        <div className="v green">{has ? `$${k.currentTollUsd.toFixed(2)}` : "—"}</div>
-        <div className="l">Express toll</div>
-      </div>
-      <div className="item">
-        <div className="v" style={{ color: k.pctDiverted > 0 ? "var(--amber)" : "var(--sd-dim)" }}>
-          {has ? `${Math.round(k.pctDiverted * 100)}%` : "—"}
+        <div className="v" style={{ color: k.divertedVph > 0 ? "var(--amber)" : "var(--sd-dim)" }}>
+          {has ? `${Math.round(k.divertedVph).toLocaleString()} vph` : "—"}
         </div>
         <div className="l">Diverted → SR-84</div>
+      </div>
+      <div className="item">
+        <div className="v">{has ? `$${Math.round(k.delayCostUsd).toLocaleString()}` : "—"}</div>
+        <div className="l">Revenue loss (delay)</div>
+      </div>
+      <div className="item">
+        <div className="v" style={{ color: has ? risk.c : "var(--sd-dim)" }}>{has ? risk.l : "—"}</div>
+        <div className="l">Incident risk</div>
       </div>
       <div className="note">Schematic · synthetic sim · illustrative VMS diversion · not calibrated</div>
     </div>

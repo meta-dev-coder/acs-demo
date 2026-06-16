@@ -296,3 +296,26 @@ describe("Scenario D — M7 final regression + integration", () => {
     expect(SCHEMATIC_LABEL.length).toBeGreaterThan(20);
   });
 });
+
+describe("Scenario D — extended KPIs + dynamic-pricing toggle (G4/G5/G7)", () => {
+  it("finalKpi exposes travel time, diverted volume, incident risk (0–1), and net revenue", () => {
+    const { finalKpi } = computeClosureSim({ ...PM_EVENT }, 300);
+    expect(finalKpi.travelTimeMin).toBeGreaterThan(10); // base traverse + queue delay
+    expect(finalKpi.divertedVph).toBeGreaterThan(0);
+    expect(finalKpi.secondaryIncidentRisk).toBeGreaterThan(0);
+    expect(finalKpi.secondaryIncidentRisk).toBeLessThanOrEqual(1);
+    expect(finalKpi.netRevenueUsd).toBeCloseTo(
+      finalKpi.expressRevenueProtectedUsd - finalKpi.delayCostUsd, 2
+    );
+  });
+
+  it("dynamic pricing OFF (static) yields lower expressRevenueProtected than ON (variable)", () => {
+    storeD.reset();
+    storeD.setClosureEvent({ ...PM_EVENT });
+    const onRev = storeD.getSnapshot().kpi.expressRevenueProtectedUsd;
+    storeD.setDynamicPricing(false);
+    const offRev = storeD.getSnapshot().kpi.expressRevenueProtectedUsd;
+    expect(storeD.getSnapshot().dynamicPricing).toBe(false);
+    expect(offRev).toBeLessThan(onRev);
+  });
+});

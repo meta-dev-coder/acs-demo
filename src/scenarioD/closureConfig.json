@@ -31,5 +31,7 @@
   "losEFloorDensity": 36,
   "congestedSpeedFraction": 0.3,
   "metersPerMile": 1609.34,
-  "segConnFromEasting": 590000
+  "segConnFromEasting": 590000,
+  "baseCorridorTraverseMin": 10,
+  "incidentRiskRefMi": 3
 }

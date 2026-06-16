@@ -44,6 +44,8 @@ export interface StateD {
   maxTicks: number;
   /** Playback speed multiplier (1 / 2 / 4) applied to the ~30s window pacing. */
   playbackSpeed: number;
+  /** Dynamic toll pricing ON (variable strategy) vs OFF (flat/static) — drives the net-revenue position. */
+  dynamicPricing: boolean;
   /** Full pre-computed per-tick simulation history (empty when no event). */
   tickHistory: ClosureSimState[];
   /** True when the decorator needs a redraw — set every advanceTick, cleared by managerD's rAF. */
@@ -58,6 +60,10 @@ const ZERO_KPI: StateDKpi = {
   pctDiverted: 0,
   delayCostUsd: 0,
   expressRevenueProtectedUsd: 0,
+  travelTimeMin: 0,
+  divertedVph: 0,
+  secondaryIncidentRisk: 0,
+  netRevenueUsd: 0,
 };
 
 const CONCEPT_A_TICKS = config.maxTicks as number; // 240 ticks = 2h at dt=30s (initial/default window)
@@ -84,9 +90,19 @@ function buildInitial(): StateD {
     tickIndex: 0,
     maxTicks: CONCEPT_A_TICKS,
     playbackSpeed: 1,
+    dynamicPricing: true,
     tickHistory: [],
     decoratorNeedsUpdate: false,
   };
+}
+
+/** Run the deterministic sim for an event under the chosen pricing mode, returning the derived
+ *  tickHistory + Concept A snapshot index + final KPIs. Shared by setClosureEvent + setDynamicPricing. */
+function runSim(event: ClosureEvent, dynamicPricing: boolean) {
+  const strategy = dynamicPricing ? "moderate_variable" : "current_static";
+  const { tickHistory, finalKpi } = computeClosureSim(event, simTicksForEvent(event), strategy);
+  const evalIdx = conceptAEvalIndex(event, tickHistory.length);
+  return { tickHistory, finalKpi, evalIdx, conceptASnapshot: tickHistory[evalIdx] ?? null };
 }
 
 export const INITIAL_STATE_D: StateD = buildInitial();
@@ -146,9 +162,7 @@ export const storeD = {
     // Validate lane-closure configuration (throws on invalid lanesClosed for the segment).
     buildClosureSegment(event);
 
-    const { tickHistory, finalKpi } = computeClosureSim(event, simTicksForEvent(event));
-    const evalIdx = conceptAEvalIndex(event, tickHistory.length);
-    const conceptASnapshot = tickHistory[evalIdx] ?? null;
+    const { tickHistory, finalKpi, conceptASnapshot } = runSim(event, state.dynamicPricing);
 
     set({
       activeEvent: event,
@@ -192,6 +206,23 @@ export const storeD = {
   /** Set the playback speed multiplier (1/2/4). The play loop re-reads this on (re)start. */
   setPlaybackSpeed(mult: number): void {
     set({ playbackSpeed: mult });
+  },
+
+  /** Toggle dynamic toll pricing (variable vs flat/static); re-runs the sim if a closure is active. */
+  setDynamicPricing(on: boolean): void {
+    if (!state.activeEvent) {
+      set({ dynamicPricing: on });
+      return;
+    }
+    const { tickHistory, finalKpi, conceptASnapshot } = runSim(state.activeEvent, on);
+    set({
+      dynamicPricing: on,
+      tickHistory,
+      conceptASnapshot,
+      kpi: finalKpi,
+      maxTicks: Math.max(0, tickHistory.length - 1),
+      decoratorNeedsUpdate: true,
+    });
   },
 
   /** Scrub to an absolute tick index (clamped). O(1) lookup into the cached tickHistory. Notifies. */
