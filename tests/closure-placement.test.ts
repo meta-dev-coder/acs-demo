@@ -218,3 +218,18 @@ describe("Regression — Scenario B segment ribbons", () => {
     for (const p of polyline) expect(box.containsPoint(p)).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// § M4 — closure / queue marker placement (node-safe geometry)
+// ---------------------------------------------------------------------------
+describe("M4 — closure & queue marker geometry", () => {
+  it("LaneClosureMarker position (corridorPoint at closureStartEasting=590000) is within corridor box", () => {
+    expect(box.containsPoint(corridorPoint(cl, 590000, 2883000, 6, 0))).toBe(true);
+  });
+
+  it("QueueTailMarker position is WEST of (or at) the LaneClosureMarker position", () => {
+    const head = corridorPoint(cl, 590000, 2883000, 6, 0);
+    const tail = corridorPoint(cl, queueTailEasting(590000, 800), 2883000, 6, 0);
+    expect(tail.x).toBeLessThan(head.x + 1);
+  });
+});

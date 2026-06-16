@@ -21,6 +21,7 @@ import {
   getBDecorator,
 } from "../scenarioB/manager";
 import { placeAndDecorateC, teardownC } from "../scenarioC/managerC";
+import { placeAndDecorateD, getDDecorator } from "../scenarioD/managerD";
 import { registerReDecorate, store, type Scenario } from "../scenarioA/store";
 
 export function onIModelConnected(iModel: IModelConnection): void {
@@ -40,6 +41,7 @@ async function reDecorate(scenario: Scenario): Promise<void> {
   try {
     if (scenario === "A") await placeAndDecorateA(vp);
     else if (scenario === "B") await placeAndDecorateB(vp);
+    else if (scenario === "D") await placeAndDecorateD(vp);
     else await placeAndDecorateC(vp);
     reframeOnActiveData(vp, scenario);
   } catch (e) {
@@ -94,6 +96,7 @@ export function configureViewport(vp: ScreenViewport): void {
       await placeAndDecorateA(vp);
       await placeAndDecorateB(vp);
       await placeAndDecorateC(vp);
+      await placeAndDecorateD(vp);
 
       const snap = store.getSnapshot();
       // Frame the whole corridor top-down as the start view: western assets spread out as distinct
@@ -154,6 +157,7 @@ export function configureViewport(vp: ScreenViewport): void {
         const v = IModelApp.viewManager.selectedView;
         v?.invalidateDecorations();
         getBDecorator()?.invalidate();
+        getDDecorator()?.invalidate();
       });
     }
   })();
