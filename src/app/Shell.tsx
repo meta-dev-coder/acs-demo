@@ -676,10 +676,10 @@ function ClosureLeftList() {
           <button className={`sd-chip${timeOfDay === "off_peak" ? " on" : ""}`} onClick={() => setTimeOfDay("off_peak")}>Off Peak</button>
         </div>
 
-        <div style={lbl}>Duration · {durationMin} min</div>
+        <div style={lbl}>Duration · {durationMin / 60} {durationMin === 60 ? "hour" : "hours"}</div>
         <input
-          type="range" min={15} max={180} step={15} value={durationMin}
-          onChange={(e) => setDurationMin(parseInt(e.target.value, 10))}
+          type="range" min={1} max={8} step={1} value={durationMin / 60}
+          onChange={(e) => setDurationMin(parseInt(e.target.value, 10) * 60)}
           style={{ width: "100%" }}
         />
 

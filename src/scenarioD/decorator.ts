@@ -34,7 +34,9 @@ import { LOS_COLORS } from "../scenarioC/decorator";
 import { SCHEMATIC_LABEL } from "./placeClosure";
 
 const HAZARD_AMBER = "#ff8f00";
-const SR84_BLUE = "#64b5f6";
+// Diversion route color — scope: "diverted route lights up an LOS color (suggested orange,
+// distinct from the queue red)". Orange, clearly distinct from the dark-red (#7b0000) queue.
+const SR84_ORANGE = "#ff6f00";
 const CASING = ColorDef.from(8, 11, 16); // near-black casing (shared with Scenario C)
 
 // ---------------------------------------------------------------------------
@@ -160,7 +162,7 @@ export class LaneClosureDecorator implements Decorator {
     // Queue (drawn first, underneath) → closure head ribbon on top → SR-84 diversion.
     ribbon(g.queue, LOS_COLORS["F"] ?? "#7b0000", 14, true);
     ribbon(g.closure, HAZARD_AMBER, 16, true);
-    if (g.sr84Active) ribbon(g.sr84, SR84_BLUE, 10, false);
+    if (g.sr84Active) ribbon(g.sr84, SR84_ORANGE, 10, false);
 
     this.markers.addDecoration(context);
   }

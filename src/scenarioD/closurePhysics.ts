@@ -519,9 +519,12 @@ export function computeClosureSim(
       currentTimeMin >= event.startMin &&
       currentTimeMin < event.startMin + event.durationMin;
 
+    // After the closure reopens, the PM peak is passing — demand relaxes toward off-peak, so the
+    // restored open-road capacity drains the queue (the recovery wave clears it within the window).
+    const pastClosure = currentTimeMin >= event.startMin + event.durationMin;
     const activeEvent: ClosureEvent = closureActive
       ? event
-      : { ...event, lanesClosed: 0 };
+      : { ...event, lanesClosed: 0, timeOfDay: pastClosure ? "off_peak" : event.timeOfDay };
 
     // Compute diversion (VMS threshold — §5.6)
     const vehHrsDelayMin = vehHrsDelay * 60; // convert to vehicle-minutes for threshold

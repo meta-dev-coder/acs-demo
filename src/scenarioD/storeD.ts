@@ -58,10 +58,18 @@ const ZERO_KPI: StateDKpi = {
   expressRevenueProtectedUsd: 0,
 };
 
-const CONCEPT_A_TICKS = config.maxTicks as number; // 240 ticks = 2h at dt=30s
+const CONCEPT_A_TICKS = config.maxTicks as number; // 240 ticks = 2h at dt=30s (initial/default window)
 const DT_MIN = (config.simDtSec as number) / 60;
 const EVAL_T_AFTER_OFFSET_MIN = config.evalTAfterOffsetMin as number;
 const COARSE_N = config.coarseKpiEveryNTicks as number; // React-notify cadence during playback
+const SIM_TICKS_CAP = 1200; // ≤ 10h sim window guard (scope: closures span 1–8 hours)
+
+/** Sim length for an event: the closure window + an equal recovery (off-peak taper drains the
+ *  queue) + a 30-min margin, so the queue builds AND visibly clears for any 1–8h closure. */
+function simTicksForEvent(event: ClosureEvent): number {
+  const windowMin = event.durationMin * 2 + 30;
+  return Math.min(SIM_TICKS_CAP, Math.max(120, Math.round(windowMin / DT_MIN)));
+}
 
 function buildInitial(): StateD {
   return {
@@ -135,7 +143,7 @@ export const storeD = {
     // Validate lane-closure configuration (throws on invalid lanesClosed for the segment).
     buildClosureSegment(event);
 
-    const { tickHistory, finalKpi } = computeClosureSim(event, CONCEPT_A_TICKS);
+    const { tickHistory, finalKpi } = computeClosureSim(event, simTicksForEvent(event));
     const evalIdx = conceptAEvalIndex(event, tickHistory.length);
     const conceptASnapshot = tickHistory[evalIdx] ?? null;
 

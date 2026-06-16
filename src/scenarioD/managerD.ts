@@ -126,10 +126,12 @@ export async function placeAndDecorateD(vp: ScreenViewport): Promise<void> {
 
 // ---- Concept B rAF play loop (the ONLY rAF / invalidate site) ----
 
-// Wall-clock pacing: advance ONE sim tick per PLAYBACK_TICK_MS of real time (not per frame), so
-// the ~240-tick run plays over ~35 s and the shockwave crawl/recovery are actually visible
-// (an un-throttled rAF would race the whole sim in ~4 s).
-const PLAYBACK_TICK_MS = 150;
+// Wall-clock pacing: advance ONE sim tick per perTickMs of real time (not per frame). perTickMs
+// is derived at play-start so the FULL closure window plays in ~TARGET_PLAYBACK_MS (~30 s per the
+// scope) regardless of how many ticks the closure spans — the shockwave crawl + recovery stay
+// legible (an un-throttled rAF would race the whole sim in ~4 s).
+const TARGET_PLAYBACK_MS = 30_000;
+let perTickMs = 125;
 let lastTickTs = 0;
 
 function rafLoop(ts: number): void {
@@ -139,7 +141,7 @@ function rafLoop(ts: number): void {
     return; // pause / end → stop the loop (leaves the model on the current tick, not blank)
   }
   if (lastTickTs === 0) lastTickTs = ts;
-  if (ts - lastTickTs >= PLAYBACK_TICK_MS) {
+  if (ts - lastTickTs >= perTickMs) {
     lastTickTs = ts;
     storeD.advanceTick(); // increments tick + sets decoratorNeedsUpdate; notifies React coarsely
     const s = storeD.getSnapshot();
@@ -156,6 +158,9 @@ function rafLoop(ts: number): void {
 /** Start the Concept B animation loop (called alongside storeD.play()). */
 export function startPlayLoop(): void {
   if (rafHandle !== undefined) cancelAnimationFrame(rafHandle);
+  // Pace so the whole window (maxTicks) plays in ~TARGET_PLAYBACK_MS regardless of closure length.
+  const ticks = Math.max(1, storeD.getSnapshot().maxTicks);
+  perTickMs = Math.max(16, Math.round(TARGET_PLAYBACK_MS / ticks));
   lastTickTs = 0;
   rafHandle = requestAnimationFrame(rafLoop);
 }
