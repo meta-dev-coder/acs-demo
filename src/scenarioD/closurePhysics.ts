@@ -472,6 +472,7 @@ export function computeStateDKpi(
     divertedVph: 0,
     secondaryIncidentRisk: incidentRiskFor(maxQueueMi),
     netRevenueUsd: expressRevenueProtectedUsd - delayCostUsd,
+    delayRateUsdPerHr: 0, // overridden by computeClosureSim with the peak instantaneous rate
   };
 }
 
@@ -529,6 +530,7 @@ export function computeClosureSim(
   let pctDiverted = 0;
   let peakTravelTimeMin = config.baseCorridorTraverseMin as number;
   let peakDivertedVph = 0;
+  let peakDelayRate = 0;
 
   const tickHistory: ClosureSimResult["tickHistory"] = [];
 
@@ -609,8 +611,12 @@ export function computeClosureSim(
     const tickDivertedVph = computeDTotal(event.segment_id, event.timeOfDay, 0) * pctDiverted;
     const tickTravelTimeMin = travelTimeMinFor(state.queue, muTotal);
     const tickIncidentRisk = incidentRiskFor(curQueueMi);
+    // Instantaneous delay-cost RATE: currently-queued vehicles × value-of-time ($/hr). Eases as
+    // the queue clears (unlike the cumulative delayCostUsd), so the KPI bar tracks the congestion.
+    const tickDelayRate = state.queue * (((config.valueOfTimeLow as number) + (config.valueOfTimeHigh as number)) / 2);
     if (tickTravelTimeMin > peakTravelTimeMin) peakTravelTimeMin = tickTravelTimeMin;
     if (tickDivertedVph > peakDivertedVph) peakDivertedVph = tickDivertedVph;
+    if (tickDelayRate > peakDelayRate) peakDelayRate = tickDelayRate;
 
     const kpiSnapshot: StateDKpi = {
       maxQueueMi,
@@ -624,6 +630,7 @@ export function computeClosureSim(
       divertedVph: tickDivertedVph,
       secondaryIncidentRisk: tickIncidentRisk,
       netRevenueUsd: tickExpressRevUsd - tickDelayCostUsd,
+      delayRateUsdPerHr: tickDelayRate,
     };
 
     tickHistory.push({
@@ -681,6 +688,7 @@ export function computeClosureSim(
   finalKpi.divertedVph = peakDivertedVph;
   finalKpi.secondaryIncidentRisk = incidentRiskFor(maxQueueMi);
   finalKpi.netRevenueUsd = finalKpi.expressRevenueProtectedUsd - finalKpi.delayCostUsd;
+  finalKpi.delayRateUsdPerHr = peakDelayRate;
 
   // Also update the last tick's KPI snapshot with the projected clearance
   if (tickHistory.length > 0) {

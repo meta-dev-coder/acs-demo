@@ -309,6 +309,18 @@ describe("Scenario D — extended KPIs + dynamic-pricing toggle (G4/G5/G7)", () 
     );
   });
 
+  it("delay-cost RATE eases during recovery while the cumulative delay cost stays monotonic", () => {
+    const { tickHistory } = computeClosureSim({ ...PM_EVENT }, 360);
+    const rates = tickHistory.map((t) => t.kpis.delayRateUsdPerHr);
+    const peakRate = Math.max(...rates);
+    const lastRate = tickHistory[tickHistory.length - 1].kpis.delayRateUsdPerHr;
+    expect(lastRate).toBeLessThan(peakRate); // rate falls as the queue clears (tracks congestion)
+    const costs = tickHistory.map((t) => t.kpis.delayCostUsd);
+    for (let i = 1; i < costs.length; i++) {
+      expect(costs[i]).toBeGreaterThanOrEqual(costs[i - 1] - 1e-6); // cumulative total only grows
+    }
+  });
+
   it("dynamic-pricing toggle shifts the revenue line (re-runs the sim under a different strategy)", () => {
     storeD.reset();
     storeD.setClosureEvent({ ...PM_EVENT });

@@ -111,6 +111,9 @@ export interface StateDKpi {
   secondaryIncidentRisk: number;
   /** Net revenue position in USD: expressRevenueProtectedUsd − delayCostUsd. */
   netRevenueUsd: number;
+  /** Instantaneous delay-cost RATE ($/hr) at this tick (currently-queued vehicles × value-of-time).
+   *  Rises with the queue and eases to ~0 as it clears — unlike the cumulative delayCostUsd total. */
+  delayRateUsdPerHr: number;
 }
 
 /**

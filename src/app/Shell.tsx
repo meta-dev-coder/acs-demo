@@ -847,10 +847,10 @@ function ClosureInspector() {
           {/* Two co-equal economics lines — distinct formulas (§8-fix-6) */}
           <div style={{ marginTop: 12, borderTop: "1px solid var(--sd-line)", paddingTop: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-              <span>Delay cost</span>
+              <span>Delay cost (cumulative)</span>
               <strong data-testid="kpi-delay-cost">${Math.round(k.delayCostUsd).toLocaleString()}</strong>
             </div>
-            <div style={{ color: "var(--sd-dim)", fontSize: 10, marginBottom: 8 }}>vehicle-hours of delay × value-of-time</div>
+            <div style={{ color: "var(--sd-dim)", fontSize: 10, marginBottom: 8 }}>running total: vehicle-hours of delay × value-of-time</div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
               <span>Express revenue protected</span>
               <strong data-testid="kpi-express-revenue" className="green">${Math.round(k.expressRevenueProtectedUsd).toLocaleString()}</strong>
@@ -910,8 +910,8 @@ function KpiBarD() {
         <div className="l">Diverted → SR-84</div>
       </div>
       <div className="item">
-        <div className="v">{has ? `$${Math.round(k.delayCostUsd).toLocaleString()}` : "—"}</div>
-        <div className="l">Revenue loss (delay)</div>
+        <div className="v">{has ? `$${Math.round(k.delayRateUsdPerHr).toLocaleString()}/hr` : "—"}</div>
+        <div className="l">Delay cost rate</div>
       </div>
       <div className="item">
         <div className="v" style={{ color: has ? risk.c : "var(--sd-dim)" }}>{has ? risk.l : "—"}</div>

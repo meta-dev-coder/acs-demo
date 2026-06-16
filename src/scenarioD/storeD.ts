@@ -64,6 +64,7 @@ const ZERO_KPI: StateDKpi = {
   divertedVph: 0,
   secondaryIncidentRisk: 0,
   netRevenueUsd: 0,
+  delayRateUsdPerHr: 0,
 };
 
 const CONCEPT_A_TICKS = config.maxTicks as number; // 240 ticks = 2h at dt=30s (initial/default window)
