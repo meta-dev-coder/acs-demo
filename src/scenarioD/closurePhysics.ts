@@ -550,11 +550,13 @@ export function computeClosureSim(
       ? event
       : { ...event, lanesClosed: 0, timeOfDay: pastClosure ? "off_peak" : event.timeOfDay };
 
-    // Compute diversion (VMS threshold — §5.6)
-    const vehHrsDelayMin = vehHrsDelay * 60; // convert to vehicle-minutes for threshold
-    const diversionActive =
-      maxQueueMi > diversionThresholdMi || vehHrsDelayMin > diversionThresholdDelayMin;
+    // Compute diversion (VMS threshold — §5.6) from the CURRENT queue, so the VMS reroute turns
+    // OFF when the queue clears during recovery (not latched on the running max). The orange SR-84
+    // ribbon + diverted-volume KPI therefore ease away as the corridor recovers.
+    const priorQueueMi = state.queue / (seg.kjVphpl * seg.lanes);
+    const diversionActive = priorQueueMi > diversionThresholdMi;
     pctDiverted = diversionActive ? diversionShedFraction : 0;
+    void diversionThresholdDelayMin; // (current-queue trigger supersedes the cumulative-delay clause)
 
     // Step the queue model
     state = stepQueueModel(activeEvent, state, dtSec, diversionActive);
@@ -689,6 +691,8 @@ export function computeClosureSim(
   finalKpi.secondaryIncidentRisk = incidentRiskFor(maxQueueMi);
   finalKpi.netRevenueUsd = finalKpi.expressRevenueProtectedUsd - finalKpi.delayCostUsd;
   finalKpi.delayRateUsdPerHr = peakDelayRate;
+  // Summary view reflects the PEAK diversion (it fired during the closure), not the cleared end.
+  finalKpi.pctDiverted = peakDivertedVph > 0 ? (config.diversionShedFraction as number) : 0;
 
   // Also update the last tick's KPI snapshot with the projected clearance
   if (tickHistory.length > 0) {
