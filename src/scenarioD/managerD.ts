@@ -12,13 +12,15 @@
  *         getCenterline / corridorPoint (scene/place), storeD (storeD), store (scenarioA/store).
  *--------------------------------------------------------------------------------------------*/
 import { IModelApp, type ScreenViewport } from "@itwin/core-frontend";
-import { getCenterline, corridorPoint, type Centerline } from "../scene/place";
+import { Point3d } from "@itwin/core-geometry";
+import { getCenterline, corridorPoint, smoothPolyline, type Centerline } from "../scene/place";
 import {
   buildClosureRibbon,
   buildQueueRibbon,
   buildSR84EbRibbon,
   queueTailEasting,
 } from "./placeClosure";
+import { selectableClosureSegments } from "./closurePhysics";
 import { LaneClosureDecorator, type ClosureGraphics } from "./decorator";
 import { storeD, type StateD } from "./storeD";
 import { store } from "../scenarioA/store";
@@ -31,6 +33,7 @@ let decorator: LaneClosureDecorator | undefined;
 let unsubscribeD: (() => void) | undefined;
 let rafHandle: number | undefined;
 let centerline: Centerline | undefined;
+let candidateRibbons: { segmentId: string; polyline: Point3d[] }[] = [];
 
 const METERS_PER_MILE = config.metersPerMile as number;
 const SEG_CONN_FROM_E = config.segConnFromEasting as number;
@@ -48,7 +51,23 @@ const EMPTY_GRAPHICS: ClosureGraphics = {
   queueTail: null,
   segmentId: null,
   queueLengthMi: 0,
+  candidates: [],
 };
+
+/** Build faint, clickable candidate ribbons for every closure-selectable corridor segment (G1). */
+function buildCandidates(cl: Centerline): { segmentId: string; polyline: Point3d[] }[] {
+  const ids = new Set(selectableClosureSegments());
+  return rawSegs
+    .filter((s) => ids.has(s.segment_id))
+    .map((s) => {
+      const poly: Point3d[] = [];
+      for (let i = 0; i < 10; i++) {
+        const t = 0.05 + (0.9 * i) / 9;
+        poly.push(corridorPoint(cl, s.from_e + (s.to_e - s.from_e) * t, s.from_n + (s.to_n - s.from_n) * t, 4, 0));
+      }
+      return { segmentId: s.segment_id, polyline: smoothPolyline(poly, 1) };
+    });
+}
 
 /** Pick the sim tick to display: the scrubbed/playing tick in Concept B, else the Concept A view. */
 function pickDisplayTick(snap: StateD): ClosureSimState | null {
@@ -63,7 +82,7 @@ function buildGraphicsFromTick(
   event: ClosureEvent | null,
   cl: Centerline
 ): ClosureGraphics {
-  if (!tickState || !event) return EMPTY_GRAPHICS;
+  if (!tickState || !event) return { ...EMPTY_GRAPHICS, candidates: candidateRibbons };
 
   const rawSeg = rawSegs.find((s) => s.segment_id === event.segment_id);
   const segCoords = rawSeg
@@ -97,6 +116,7 @@ function buildGraphicsFromTick(
     queueTail,
     segmentId: event.segment_id,
     queueLengthMi,
+    candidates: candidateRibbons,
   };
 }
 
@@ -108,6 +128,7 @@ function refreshDecorator(): void {
 
 export async function placeAndDecorateD(vp: ScreenViewport): Promise<void> {
   centerline = await getCenterline(vp.iModel);
+  candidateRibbons = buildCandidates(centerline);
 
   if (!decorator) {
     decorator = new LaneClosureDecorator();
@@ -189,4 +210,5 @@ export function teardownD(): void {
     decorator = undefined;
   }
   centerline = undefined;
+  candidateRibbons = [];
 }

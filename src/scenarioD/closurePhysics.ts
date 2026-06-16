@@ -105,6 +105,12 @@ export function getLaneMenu(segmentId: string): ClosureLaneMenuEntry[] {
     .map((e) => ({ lanesClosed: e.lanesClosed, totalLanes: e.totalLanes, caf: e.caf }));
 }
 
+/** Corridor segments that can host a closure (everything in config except the SR-84 diversion
+ *  target). Used to render clickable candidate ribbons (G1) + populate the segment selector. */
+export function selectableClosureSegments(): string[] {
+  return Object.keys(segmentConfig).filter((id) => !id.startsWith("SEG-SR84"));
+}
+
 /**
  * Derive lanesClosed from a closure type for a segment (scope §step-2 taxonomy):
  *  partial → close 1 lane; controlflow → leave 1 lane open; full → all lanes closed.

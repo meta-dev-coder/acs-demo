@@ -36,6 +36,8 @@ export interface StateD {
   kpi: StateDKpi;
   /** Currently inspected segment id, or null. */
   inspectedSegmentId: string | null;
+  /** Segment selected as the closure location (driven by the model click + the form selector). */
+  selectedSegmentId: string;
   /** Concept B playback state. */
   playbackState: PlaybackState;
   /** Current playback tick index into tickHistory. */
@@ -87,6 +89,7 @@ function buildInitial(): StateD {
     displayMode: "before",
     kpi: { ...ZERO_KPI },
     inspectedSegmentId: null,
+    selectedSegmentId: "SEG-CONN",
     playbackState: "idle",
     tickIndex: 0,
     maxTicks: CONCEPT_A_TICKS,
@@ -189,6 +192,11 @@ export const storeD = {
   /** Set the inspected segment id (or null to deselect). */
   inspectClosure(segmentId: string | null): void {
     set({ inspectedSegmentId: segmentId });
+  },
+
+  /** Set the segment selected as the closure location (model click → form). */
+  setSelectedSegment(segmentId: string): void {
+    set({ selectedSegmentId: segmentId });
   },
 
   // ---- Concept B playback (M6) ----

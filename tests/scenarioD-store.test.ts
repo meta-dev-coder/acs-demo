@@ -6,7 +6,7 @@
  *--------------------------------------------------------------------------------------------*/
 import { describe, it, expect } from "vitest";
 import { storeD, storeDSnapshot, INITIAL_STATE_D } from "../src/scenarioD/storeD";
-import { getLaneMenu, computeClosureSim } from "../src/scenarioD/closurePhysics";
+import { getLaneMenu, computeClosureSim, selectableClosureSegments } from "../src/scenarioD/closurePhysics";
 import { SCHEMATIC_LABEL } from "../src/scenarioD/placeClosure";
 
 const PM_EVENT = {
@@ -294,6 +294,22 @@ describe("Scenario D — M7 final regression + integration", () => {
   it("SCHEMATIC_LABEL is exported and prominent (≥ 20 chars, contains 'SCHEMATIC')", () => {
     expect(SCHEMATIC_LABEL).toMatch(/SCHEMATIC/i);
     expect(SCHEMATIC_LABEL.length).toBeGreaterThan(20);
+  });
+});
+
+describe("Scenario D — G1 segment selection (click-to-place)", () => {
+  it("selectableClosureSegments includes SEG-CONN and excludes the SR-84 diversion target", () => {
+    const segs = selectableClosureSegments();
+    expect(segs).toContain("SEG-CONN");
+    expect(segs.every((id) => !id.startsWith("SEG-SR84"))).toBe(true);
+    expect(segs.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("setSelectedSegment updates the store's closure location (model click → form)", () => {
+    storeD.reset();
+    expect(storeD.getSnapshot().selectedSegmentId).toBe("SEG-CONN");
+    storeD.setSelectedSegment("SEG-MN-C");
+    expect(storeD.getSnapshot().selectedSegmentId).toBe("SEG-MN-C");
   });
 });
 

@@ -95,6 +95,8 @@ export interface ClosureGraphics {
   segmentId: string | null;
   /** Queue length in miles (for the queue marker label). */
   queueLengthMi: number;
+  /** Clickable candidate corridor segments (G1: click one to set the closure location). */
+  candidates: { segmentId: string; polyline: Point3d[] }[];
 }
 
 const EMPTY_GRAPHICS: ClosureGraphics = {
@@ -106,6 +108,7 @@ const EMPTY_GRAPHICS: ClosureGraphics = {
   queueTail: null,
   segmentId: null,
   queueLengthMi: 0,
+  candidates: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -170,6 +173,21 @@ export class LaneClosureDecorator implements Decorator {
       context.addDecorationFromBuilder(builder);
     };
 
+    // Candidate corridor segments (G1) — faint + pickable; click to set the closure location.
+    // The currently-selected segment is highlighted brighter.
+    const selId = storeD.getSnapshot().selectedSegmentId;
+    for (const c of g.candidates) {
+      if (c.polyline.length < 2) continue;
+      const id = iModel.transientIds.getNext();
+      this.idToSeg.set(id, c.segmentId);
+      const sel = c.segmentId === selId;
+      const color = ColorDef.fromString(sel ? "#80d8ff" : "#455a64");
+      const b = context.createGraphic({ type: GraphicType.WorldOverlay, pickable: { id } });
+      b.setSymbology(color, color, sel ? 9 : 5, LinePixels.Solid);
+      b.addLineString(c.polyline);
+      context.addDecorationFromBuilder(b);
+    }
+
     // Queue (drawn first, underneath) → closure head ribbon on top → SR-84 diversion.
     ribbon(g.queue, LOS_COLORS["F"] ?? "#7b0000", 14, true);
     ribbon(g.closure, HAZARD_AMBER, 16, true);
@@ -196,6 +214,7 @@ export class LaneClosureDecorator implements Decorator {
     if (ev.button !== BeButton.Data || !ev.isDown) return EventHandled.No;
     const segId = this.idToSeg.get(hit.sourceId);
     if (!segId) return EventHandled.No;
+    storeD.setSelectedSegment(segId); // click a segment → set it as the closure location (G1)
     storeD.inspectClosure(segId);
     this.invalidate();
     return EventHandled.Yes;

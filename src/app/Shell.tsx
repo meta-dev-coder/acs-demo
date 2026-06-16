@@ -30,13 +30,22 @@ import { presentationStore } from "../scenarioC/presentationStore";
 import { usePresentationState } from "../scenarioC/usePresentationState";
 import { storeD } from "../scenarioD/storeD";
 import { useScenarioDState } from "../scenarioD/useScenarioDState";
-import { getLaneMenu, lanesClosedForType, computeClosureSim } from "../scenarioD/closurePhysics";
+import { getLaneMenu, lanesClosedForType, computeClosureSim, selectableClosureSegments } from "../scenarioD/closurePhysics";
 import { startPlayLoop, stopPlayLoop } from "../scenarioD/managerD";
 import { simTicksForEvent } from "../scenarioD/storeD";
 import type { ClosureEvent } from "../scenarioD/typesD";
 
 const BANDS: RiskBand[] = ["red", "amber", "green"];
 const fmt$ = (n: number) => `$${n.toLocaleString("en-US")}`;
+
+/** Friendly labels for the closure-selectable corridor segments (Scenario D selector). */
+const SEG_LABELS: Record<string, string> = {
+  "SEG-CONN": "Connector (Express↔Turnpike)",
+  "SEG-MN-W": "Mainline — West",
+  "SEG-MN-C": "Mainline — Central",
+  "SEG-MN-E": "Mainline — East",
+  "SEG-EXP-RVS": "Reversible express",
+};
 
 function frameAsset(tag: string) {
   store.inspect(tag);
@@ -618,7 +627,7 @@ function TollingLeftList() {
 
 function ClosureLeftList() {
   const s = useScenarioDState();
-  const [segmentId, setSegmentId] = useState("SEG-CONN");
+  const segmentId = s.selectedSegmentId; // driven by the model click + this selector (G1)
   const [closureType, setClosureType] = useState<"partial" | "controlflow" | "full">("partial");
   const [timeOfDay, setTimeOfDay] = useState<"pm_peak" | "off_peak">("pm_peak");
   const [durationMin, setDurationMin] = useState(60);
@@ -654,11 +663,16 @@ function ClosureLeftList() {
         <select
           data-testid="closure-segment-select"
           value={segmentId}
-          onChange={(e) => setSegmentId(e.target.value)}
+          onChange={(e) => storeD.setSelectedSegment(e.target.value)}
           style={{ width: "100%", padding: "4px 6px", fontSize: 12, background: "var(--sd-panel2)", color: "var(--sd-text)", border: "1px solid var(--sd-line)", borderRadius: 4 }}
         >
-          <option value="SEG-CONN">SEG-CONN — Express↔Turnpike connector</option>
+          {selectableClosureSegments().map((id) => (
+            <option key={id} value={id}>{SEG_LABELS[id] ?? id}</option>
+          ))}
         </select>
+        <div style={{ fontSize: 10, color: "var(--sd-dim)", marginTop: 3 }}>
+          Tip: click a corridor segment on the map to set the closure location.
+        </div>
 
         <div style={lbl}>Closure type</div>
         <div className="sd-chips" style={{ padding: 0 }}>
