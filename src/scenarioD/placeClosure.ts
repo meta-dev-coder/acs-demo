@@ -22,7 +22,9 @@ import type { Centerline } from "../scene/place";
 import { corridorPoint, smoothPolyline } from "../scene/place";
 
 // Re-export queueTailEasting from closurePhysics — NOT reimplemented here.
+// Also import it directly so buildQueueRibbon can call it without duplicating logic.
 export { queueTailEasting } from "./closurePhysics";
+import { queueTailEasting } from "./closurePhysics";
 
 // ---------------------------------------------------------------------------
 // Exported SCHEMATIC_LABEL constant (§4: every ribbon/marker includes SCHEMATIC)
@@ -123,10 +125,9 @@ export function buildQueueRibbon(
     return [];
   }
 
-  // Import queueTailEasting at call time to use the re-export
-  // (already exported from this module; call the underlying function directly)
-  const CORRIDOR_EASTING_MIN = 578200;
-  const tailE = Math.max(CORRIDOR_EASTING_MIN, seg.fromE - queueLengthMeters);
+  // Plan §M2 line 782: "from queueTailEasting to seg.fromE" — call the shared helper
+  // so future constant changes in closurePhysics (CORRIDOR_EASTING_MIN etc.) propagate here.
+  const tailE = queueTailEasting(seg.fromE, queueLengthMeters);
   const headE = seg.fromE;
   const fromN = seg.fromN;
 

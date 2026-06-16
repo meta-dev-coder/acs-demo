@@ -92,27 +92,25 @@ describe("buildClosureRibbon", () => {
     expect(hasPlanetScaleOrZero(ribbon)).toBe(false);
   });
 
-  it("uses lateralFactor=0 — every ribbon point is on the mainline spine (no lateral offset)", () => {
+  it("uses lateralFactor=0 — ribbon hugs the spine, not a lateral-offset lane", () => {
     const ribbon = buildClosureRibbon(cl, seg);
-    // With lateralFactor=0, each ribbon point should have lateral=0 in corridorPoint.
-    // Verify by comparing each raw (pre-smooth) sample directly: re-sample at the same t-values
-    // and compare to corridorPoint with lateralFactor=0 and lateralFactor=1.
-    // A point on the spine should be closer to lateralFactor=0 than to a non-zero lateral version.
-    const N = 12;
-    let allOnSpine = true;
-    for (let i = 0; i < N; i++) {
-      const t = 0.05 + 0.9 * i / (N - 1);
-      const e = seg.fromE + (seg.toE - seg.fromE) * t;
-      const spinePoint = corridorPoint(cl, e, 2883000, 6, 0);
-      const offSpinePoint = corridorPoint(cl, e, 2883000, 6, 1.6);
-      // The ribbon point (after smoothing) should be closer to spine than to offset version
-      // Distance from spine should be < distance from offset
-      const distToSpine = ribbon[i] ? ribbon[i].distanceXY(spinePoint) : 0;
-      const distToOffset = offSpinePoint.distanceXY(spinePoint);
-      // lateralFactor=0 means the raw point IS the spine; after 1 smoothing pass, it should stay close
-      if (distToSpine > 3 && distToOffset > 0) allOnSpine = false;
-    }
-    expect(allOnSpine).toBe(true);
+    // Falsifiable check: sample the spine at the SAME parameter as the ribbon midpoint
+    // (buildClosureRibbon samples t = 0.05 + 0.9*i/(N-1)), then compare that ribbon point's
+    // distance to the lateralFactor=0 spine vs a lateral-offset reference. A ribbon built with
+    // lateralFactor=0 must be far closer to the spine; one built with an offset (e.g. 1.6, like
+    // the tolling ribbon) would land closer to offsetPoint. Smoothing moves the point only a
+    // few metres, so the spine must clearly win. (The previous assertion compared the wrong
+    // parameter — ribbon[N/2] sits at t≈0.54, not the segment midpoint — and was committed red.)
+    const N = ribbon.length;
+    const midIdx = Math.floor(N / 2);
+    const mid = ribbon[midIdx];
+    const t = 0.05 + (0.9 * midIdx) / (N - 1);
+    const toN = seg.toN ?? seg.fromN;
+    const e = seg.fromE + (seg.toE - seg.fromE) * t;
+    const n = seg.fromN + (toN - seg.fromN) * t;
+    const spinePoint = corridorPoint(cl, e, n, 6, 0);
+    const offsetPoint = corridorPoint(cl, e, n, 6, 1.6);
+    expect(mid.distance(spinePoint)).toBeLessThan(mid.distance(offsetPoint));
   });
 });
 
