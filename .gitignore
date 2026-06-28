@@ -39,3 +39,21 @@ Thumbs.db
 
 # local editor/agent settings
 .claude/
+
+# claude project files (per request — do not check in)
+CLAUDE.md
+**/CLAUDE.md
+
+# generated SUMO simulation output (regenerate with sumo/build.sh) — keep big artifacts out of git
+sumo/out/
+*.fcd.xml
+*.tripinfo.xml
+sumo/plaza.net.xml
+
+# e2e test artifacts / playwright
+**/test-results/
+**/playwright-report/
+**/.playwright/
+
+# vite caches
+**/.vite/
