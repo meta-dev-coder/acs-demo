@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <input>
+    <net-file value="plaza.net.xml"/>
+    <route-files value="out/plaza.intervention.sampled.rou.xml"/>
+    <additional-files value="plaza.vtypes.xml"/>
+  </input>
+  <time>
+    <begin value="0"/>
+    <end value="720"/>
+    <step-length value="1.0"/>
+  </time>
+  <output>
+    <fcd-output value="out/intervention.fcd.xml"/>
+    <tripinfo-output value="out/intervention.tripinfo.xml"/>
+  </output>
+  <processing>
+    <time-to-teleport value="120"/>
+  </processing>
+</configuration>

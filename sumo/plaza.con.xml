@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SINGLE-ROADWAY fan-out: 3 approach lanes widen to 10 adjacent booth lanes, then merge back to 3.
+     Split is 4 / 3 / 3 (right / centre / left) so every booth lane (pl_0..pl_9) is reachable and
+     addressable. SUMO lane 0 = rightmost. -->
+<connections>
+  <!-- ===== fan-out at B: ap(3) -> fo(10), 4/3/3 ===== -->
+  <connection from="ap" to="fo" fromLane="0" toLane="0"/>
+  <connection from="ap" to="fo" fromLane="0" toLane="1"/>
+  <connection from="ap" to="fo" fromLane="0" toLane="2"/>
+  <connection from="ap" to="fo" fromLane="0" toLane="3"/>
+  <connection from="ap" to="fo" fromLane="1" toLane="4"/>
+  <connection from="ap" to="fo" fromLane="1" toLane="5"/>
+  <connection from="ap" to="fo" fromLane="1" toLane="6"/>
+  <connection from="ap" to="fo" fromLane="2" toLane="7"/>
+  <connection from="ap" to="fo" fromLane="2" toLane="8"/>
+  <connection from="ap" to="fo" fromLane="2" toLane="9"/>
+
+  <!-- ===== straight-through the booths: fo(10) -> pl(10) -> fi(10) ===== -->
+  <connection from="fo" to="pl" fromLane="0" toLane="0"/>
+  <connection from="fo" to="pl" fromLane="1" toLane="1"/>
+  <connection from="fo" to="pl" fromLane="2" toLane="2"/>
+  <connection from="fo" to="pl" fromLane="3" toLane="3"/>
+  <connection from="fo" to="pl" fromLane="4" toLane="4"/>
+  <connection from="fo" to="pl" fromLane="5" toLane="5"/>
+  <connection from="fo" to="pl" fromLane="6" toLane="6"/>
+  <connection from="fo" to="pl" fromLane="7" toLane="7"/>
+  <connection from="fo" to="pl" fromLane="8" toLane="8"/>
+  <connection from="fo" to="pl" fromLane="9" toLane="9"/>
+  <connection from="pl" to="fi" fromLane="0" toLane="0"/>
+  <connection from="pl" to="fi" fromLane="1" toLane="1"/>
+  <connection from="pl" to="fi" fromLane="2" toLane="2"/>
+  <connection from="pl" to="fi" fromLane="3" toLane="3"/>
+  <connection from="pl" to="fi" fromLane="4" toLane="4"/>
+  <connection from="pl" to="fi" fromLane="5" toLane="5"/>
+  <connection from="pl" to="fi" fromLane="6" toLane="6"/>
+  <connection from="pl" to="fi" fromLane="7" toLane="7"/>
+  <connection from="pl" to="fi" fromLane="8" toLane="8"/>
+  <connection from="pl" to="fi" fromLane="9" toLane="9"/>
+
+  <!-- ===== fan-in at E: fi(10) -> dp(3), 4/3/3 ===== -->
+  <connection from="fi" to="dp" fromLane="0" toLane="0"/>
+  <connection from="fi" to="dp" fromLane="1" toLane="0"/>
+  <connection from="fi" to="dp" fromLane="2" toLane="0"/>
+  <connection from="fi" to="dp" fromLane="3" toLane="0"/>
+  <connection from="fi" to="dp" fromLane="4" toLane="1"/>
+  <connection from="fi" to="dp" fromLane="5" toLane="1"/>
+  <connection from="fi" to="dp" fromLane="6" toLane="1"/>
+  <connection from="fi" to="dp" fromLane="7" toLane="2"/>
+  <connection from="fi" to="dp" fromLane="8" toLane="2"/>
+  <connection from="fi" to="dp" fromLane="9" toLane="2"/>
+</connections>

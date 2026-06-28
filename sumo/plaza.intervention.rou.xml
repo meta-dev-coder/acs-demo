@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ============================================================================================
+     SINGLE-ROADWAY TOLL PLAZA — INTERVENTION (2 of 3 cash booths converted to AET).
+       Booth lanes: pl_0 .. pl_9
+     INTERVENTION booth mix = 1 CASH + 9 AET:
+       CASH (8 s dwell) : pl_0
+       AET  (2 s dwell) : pl_1 .. pl_9
+     TOTAL demand held identical to baseline for a fair before/after — the former cash riders now
+     carry transponders. Result: the cash queue all but disappears, throughput rises, wait drops. -->
+<routes>
+  <vType id="etc"   vClass="passenger" guiShape="passenger" color="0.10,0.80,0.25" length="4.8" accel="2.6" decel="4.5" sigma="0.5" minGap="2.5" maxSpeed="33"/>
+  <vType id="cash"  vClass="passenger" guiShape="passenger" color="1.00,0.60,0.10" length="4.8" accel="2.6" decel="4.5" sigma="0.5" minGap="2.5" maxSpeed="33"/>
+  <vType id="truck" vClass="truck"     guiShape="truck"     color="0.20,0.50,0.90" length="12"  accel="1.3" decel="4.0" sigma="0.5" minGap="3.0" maxSpeed="28"/>
+
+  <route id="main" edges="ap fo pl fi dp"/>
+
+  <!-- ===== 1 remaining CASH booth: 8 s transaction ===== -->
+  <flow id="cash0" type="cash" route="main" begin="0" end="600" vehsPerHour="540" departLane="free" departSpeed="max"><stop lane="pl_0" duration="8"/></flow>
+
+  <!-- ===== 9 AET booths: 2 s open-road-tolling pass (former-cash + AET demand spread ≈ 360/lane) ===== -->
+  <flow id="etc1" type="etc" route="main" begin="0" end="600" vehsPerHour="360" departLane="free" departSpeed="max"><stop lane="pl_1" duration="2"/></flow>
+  <flow id="etc2" type="etc" route="main" begin="0" end="600" vehsPerHour="360" departLane="free" departSpeed="max"><stop lane="pl_2" duration="2"/></flow>
+  <flow id="etc3" type="etc" route="main" begin="0" end="600" vehsPerHour="360" departLane="free" departSpeed="max"><stop lane="pl_3" duration="2"/></flow>
+  <flow id="etc4" type="etc" route="main" begin="0" end="600" vehsPerHour="360" departLane="free" departSpeed="max"><stop lane="pl_4" duration="2"/></flow>
+  <flow id="etc5" type="etc" route="main" begin="0" end="600" vehsPerHour="360" departLane="free" departSpeed="max"><stop lane="pl_5" duration="2"/></flow>
+  <flow id="etc6" type="etc" route="main" begin="0" end="600" vehsPerHour="360" departLane="free" departSpeed="max"><stop lane="pl_6" duration="2"/></flow>
+  <flow id="etc7" type="etc" route="main" begin="0" end="600" vehsPerHour="360" departLane="free" departSpeed="max"><stop lane="pl_7" duration="2"/></flow>
+  <flow id="etc8" type="etc" route="main" begin="0" end="600" vehsPerHour="360" departLane="free" departSpeed="max"><stop lane="pl_8" duration="2"/></flow>
+
+  <!-- Trucks (transponder-equipped) through the leftmost AET booth -->
+  <flow id="trk" type="truck" route="main" begin="0" end="600" vehsPerHour="120" departLane="free" departSpeed="max"><stop lane="pl_9" duration="2"/></flow>
+</routes>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Edges. Speeds in m/s (29.06 ≈ 65 mph). SINGLE-ROADWAY fan-out: a 3-lane mainline widens to 10
+     adjacent booth lanes (pl_0 .. pl_9) and narrows back to 3. All on one centre-line so cars fan
+     out / merge within one carriageway. A <stop> in the route pulls each vehicle onto a specific
+     booth lane (cash 8 s dwell vs AET 2 s). fan-out (fo) / fan-in (fi) carry the 3→10 / 10→3
+     connections (plaza.con.xml). -->
+<!-- spreadType="center" keeps every edge's lanes SYMMETRIC about the centre-line (y=0), so the 3-lane
+     mainline sits in the MIDDLE of the 10-lane plaza and traffic fans out / merges evenly both ways. -->
+<edges>
+  <edge id="ap" from="A" to="B" numLanes="3"  speed="29.06" priority="3" spreadType="center"/>  <!-- approach (3)  -->
+  <edge id="fo" from="B" to="C" numLanes="10" speed="13.40" priority="3" spreadType="center"/>  <!-- fan-out (10)  -->
+  <edge id="pl" from="C" to="D" numLanes="10" speed="8.00"  priority="3" spreadType="center"/>  <!-- booths (10)   -->
+  <edge id="fi" from="D" to="E" numLanes="10" speed="13.40" priority="3" spreadType="center"/>  <!-- fan-in (10)   -->
+  <edge id="dp" from="E" to="F" numLanes="3"  speed="29.06" priority="3" spreadType="center"/>  <!-- departure (3) -->
+</edges>

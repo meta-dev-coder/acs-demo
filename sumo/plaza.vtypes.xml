@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  plaza.vtypes.xml — Vehicle type definitions for the I-595 toll plaza PoC.
+  Used as an <additional-files> so it can be referenced by both the sampled
+  route files and the sumocfg without duplication.
+
+  Colors match COLORS in cesium-poc/src/main.js:
+    cash   → #ff9b1a (orange)
+    etc    → #1ccb40 (green)
+    truck  → #3a80e8 (blue)
+-->
+<additional>
+  <vType id="etc"   vClass="passenger" guiShape="passenger"
+         color="0.10,0.80,0.25" length="4.8"
+         accel="2.6" decel="4.5" sigma="0.5" minGap="2.5" maxSpeed="33"/>
+  <vType id="cash"  vClass="passenger" guiShape="passenger"
+         color="1.00,0.60,0.10" length="4.8"
+         accel="2.6" decel="4.5" sigma="0.5" minGap="2.5" maxSpeed="33"/>
+  <vType id="truck" vClass="truck"     guiShape="truck"
+         color="0.20,0.50,0.90" length="12"
+         accel="1.3" decel="4.0" sigma="0.5" minGap="3.0" maxSpeed="28"/>
+</additional>

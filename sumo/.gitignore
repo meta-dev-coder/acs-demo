@@ -1,0 +1,3 @@
+# Generated SUMO artifacts (rebuild with ./build.sh)
+out/
+plaza.net.xml
