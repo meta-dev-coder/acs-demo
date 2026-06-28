@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>I-595 Toll-Plaza Flow — SUMO × Cesium</title>
+  </head>
+  <body>
+    <div id="cesiumContainer"></div>
+
+    <!-- Title + scenario story -->
+    <div id="hud" class="panel">
+      <div class="hud-eyebrow">OPERATIONAL DIGITAL TWIN</div>
+      <div class="hud-title">Toll-Plaza Throughput</div>
+      <div class="hud-sub">SuperDNA Tech</div>
+
+      <select id="site-select" class="site-select" title="Same SUMO plaza, different real toll corridor"></select>
+
+      <div class="toggle">
+        <button id="btn-baseline" class="on">Today · 3 cash + 7 AET</button>
+        <button id="btn-intervention">Convert 2 cash → AET</button>
+        <button id="btn-live">● LIVE</button>
+      </div>
+
+      <div id="kpis" class="kpis"></div>
+
+      <div class="legend">
+        <span><i class="sw cash"></i> Cash booth</span>
+        <span><i class="sw etc"></i> AET booth</span>
+      </div>
+
+      <!-- Camera + live gate controls -->
+      <div class="ctl-row">
+        <button id="btn-view" class="mini">Oblique view</button>
+        <button id="btn-calib" class="mini">⊕ Mark gates</button>
+        <span id="conn" class="conn off">socket: offline</span>
+      </div>
+
+      <div id="gatePanel" class="gates hidden">
+        <div class="gates-h">Booth gates — click to close / open (B0–B2 cash, rest AET)</div>
+        <div id="gates-all" class="gate-grid"></div>
+      </div>
+
+      <div id="status" class="status">Loading…</div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
