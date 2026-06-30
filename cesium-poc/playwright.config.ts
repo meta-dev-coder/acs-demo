@@ -2,6 +2,8 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
+  workers: 3,        // cap workers: SwiftShader tests are GPU-intensive; 5 workers causes timeout flakiness
+  timeout: 40_000,   // per-test: live Booth residual needs > 30 s to warm up (35 s waitForFunction + overhead)
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: 'http://localhost:5180',

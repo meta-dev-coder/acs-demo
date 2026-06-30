@@ -35,21 +35,19 @@ python3 csv2counts.py transactions.baseline.csv     plaza.vtypes.xml baseline   
 python3 csv2counts.py transactions.intervention.csv plaza.vtypes.xml intervention  out/plaza.intervention.sampled.rou.xml
 
 echo "== baseline =="
-# Use --fcd-output to write geo FCD to a separate .geo.fcd.xml file.
-# This avoids SUMO 1.27's pre-allocation artifact where it appends a raw-coord FCD block
-# after the geo block in the same output file (resulting in a corrupt 40-60 MB file).
-# Writing to a dedicated geo file keeps it clean and parseable.
+# Emit raw UTM FCD (no --fcd-output.geo): x,y are raw UTM 17N metres.
+# fcd2json.py converts them back to local SUMO plaza metres via utm_to_local().
+# This keeps CoordinateTransform as the single placement authority: both vehicles
+# and gate markers go through T.sumoToWorld(x, y), so marking moves traffic too.
 sumo -c plaza.baseline.sumocfg --no-step-log true \
-     --fcd-output out/baseline.geo.fcd.xml \
-     --fcd-output.geo true
+     --fcd-output out/baseline.fcd.xml
 
 echo "== intervention =="
 sumo -c plaza.intervention.sumocfg --no-step-log true \
-     --fcd-output out/intervention.geo.fcd.xml \
-     --fcd-output.geo true
+     --fcd-output out/intervention.fcd.xml
 
 echo "== fcd -> json =="
-python3 fcd2json.py out/baseline.geo.fcd.xml     out/baseline.tripinfo.xml     "$DATA_DIR/baseline.json"
-python3 fcd2json.py out/intervention.geo.fcd.xml out/intervention.tripinfo.xml "$DATA_DIR/intervention.json"
+python3 fcd2json.py out/baseline.fcd.xml     out/baseline.tripinfo.xml     "$DATA_DIR/baseline.json"
+python3 fcd2json.py out/intervention.fcd.xml out/intervention.tripinfo.xml "$DATA_DIR/intervention.json"
 
 echo "Done. JSON written to $DATA_DIR"

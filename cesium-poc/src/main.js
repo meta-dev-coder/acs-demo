@@ -2,9 +2,11 @@
  * I-595 Toll-Plaza Flow — SUMO trajectories rendered in CesiumJS.
  *
  * Coordinate conversion (SUMO metres <-> Cesium globe) is owned ENTIRELY by transform.js
- * (CoordinateTransform). The data pipeline (fcd2json.py / live_server.py) emits RAW SUMO coordinates;
- * this client places them via the transform, which is produced by a 4-click calibration and persisted.
- * Nothing about placement is hardcoded here.
+ * (CoordinateTransform). The data pipeline (fcd2json.py / live_server.py) emits LOCAL SUMO
+ * plaza metres; this client places them via the active transform T.sumoToWorld(x, y).
+ *
+ * This means BOTH vehicles AND gate markers go through the same T, so marking at any location
+ * on the map moves traffic WITH the markers — the mark-coupling invariant is always maintained.
  */
 import {
   Ion, Viewer, Terrain, Cartesian3, Color, JulianDate, Math as CMath,
@@ -28,9 +30,24 @@ const COLORS = {
   etc: Color.fromCssColorString("#1ccb40"),
   truck: Color.fromCssColorString("#3a80e8"),
 };
+// Vehicle model sizing:
+//   car.glb — native body 4.8 m long (X=-2.4..+2.4), 2.0 m wide, 1.35 m tall.  scale=1.0 → real sedan.
+//   truck.glb — Cesium Milk Truck, native Z span ≈4.87 m.  scale=2.465 → ~12 m semi.
+const VEHICLE_SCALE   = { car: 1.0, truck: 1.25 };    // truck ~2.5× car length, not 5×
+const MIN_PIXEL_SIZE  = { car: 26,  truck: 30    };   // keep visible at max zoom-out
+// Per-model yaw correction (deg): each glTF has its own native forward axis, so align the mesh's
+// nose to the travel heading. Tuned by screenshot so cars/trucks point ALONG the corridor.
+const MODEL_YAW_OFFSET = { car: -110, truck: -30 };   // mesh nose alignment (tuned per request)
 const DIMS = { cash: [4.8, 2.0, 1.6], etc: [4.8, 2.0, 1.6], truck: [12, 2.6, 3.2] };
 const N_BOOTHS = 10;
-const CASH_LANES = new Set(["pl_0", "pl_1", "pl_2"]);   // matches plaza.baseline.rou.xml
+// Cash booths per scenario. Baseline: 3 cash (pl_0..2). Intervention ("Convert 2 cash → AET"):
+// pl_1 & pl_2 are converted to AET (turn GREEN), only pl_0 stays cash — so green cars flow through the
+// converted booths and the orange (cash) cars queue at the single remaining cash booth.
+const CASH_BY_SCENARIO = {
+  baseline: new Set(["pl_0", "pl_1", "pl_2"]),
+  intervention: new Set(["pl_0"]),
+};
+let activeCashLanes = CASH_BY_SCENARIO.baseline;
 const WS_URL = "ws://localhost:8765";
 
 // ---- SITES: the SAME SUMO plaza, placed on different real toll corridors purely by swapping the
@@ -58,53 +75,20 @@ const $ = (id) => document.getElementById(id);
 const setStatus = (m) => ($("status").textContent = m);
 
 // ============================================================================ transform + booths
-let T = null;            // the CoordinateTransform (model <-> SUMO). Null until calibrated.
-let META = null;         // data meta: { bounds, boothX, tEnd, [georef, anchor, boothGeo, ...] }
-let BOOTHS = [];         // [{ lane, y, cash }] or [{ lane, lonlat, cash }] for georef
-let markedGates = [];    // user-clicked gate positions [{lon,lat}] — the source of truth for markers
+let T = null;            // the CoordinateTransform (SUMO local metres <-> globe). Always set.
+let META = null;         // data meta: { bounds, boothX, tEnd, dt }
+let BOOTHS = [];         // [{ lane, y, cash }] — derived from meta.bounds
 
 function computeBooths(meta) {
-  // Georeferenced data: use boothGeo list from meta (exact lane lon/lat from pipeline)
-  if (meta.georef && meta.boothGeo && meta.boothGeo.length > 0) {
-    return meta.boothGeo.map((b) => ({
-      lane: b.lane,
-      lonlat: { lon: b.lon, lat: b.lat },
-      cash: b.cash,
-    }));
-  }
-  // Raw SUMO data: derive booth Y positions from bounds
+  // Derive booth Y positions from the SUMO bounds (minY..maxY spans all 10 lanes).
   const { minY, maxY } = meta.bounds;
   const out = [];
   for (let i = 0; i < N_BOOTHS; i++) {
     const lane = `pl_${i}`;
     const y = minY + (i * (maxY - minY)) / (N_BOOTHS - 1);   // lane centres span the plaza
-    out.push({ lane, y, cash: CASH_LANES.has(lane) });
+    out.push({ lane, y, cash: activeCashLanes.has(lane) });
   }
   return out;
-}
-
-/** Is the current data georeferenced? */
-function isGeoref() { return !!(META && META.georef); }
-
-/** Get the Cartesian3 position for a SUMO (x, y) or (lon, lat) depending on georef mode. */
-function samplePosition(x, y) {
-  if (isGeoref()) return Cartesian3.fromDegrees(x, y, META.anchor ? META.anchor.height : 3);
-  return T ? T.sumoToWorld(x, y) : null;
-}
-
-/** Get the Cartesian3 world-position anchor (for orientation frame). */
-function anchorWorld() {
-  if (isGeoref() && META.anchor) {
-    return Cartesian3.fromDegrees(META.anchor.lon, META.anchor.lat, META.anchor.height);
-  }
-  return T ? T.sumoToWorld(T.p.sumoRefX, 0) : Cartesian3.fromDegrees(-80.306, 26.1124, 3);
-}
-
-/** Get the bearing (radians) for a given SUMO compass angle. */
-function headingRadFor(angleDeg) {
-  const bearingDeg = (META && META.bearingDeg) ? META.bearingDeg
-    : (T ? T.p.bearingDeg : 104);
-  return ((angleDeg || 0) + bearingDeg - 180) * Math.PI / 180;
 }
 
 // ============================================================================ viewer
@@ -127,10 +111,12 @@ async function makeViewer() {
   return viewer;
 }
 
-// orientation quaternion for a SUMO/compass angle, at the plaza-centre frame (small plaza → constant up)
-function orientFor(angleDeg) {
-  const at = anchorWorld();
-  return Transforms.headingPitchRollQuaternion(at, new HeadingPitchRoll(headingRadFor(angleDeg), 0, 0));
+// orientation quaternion for a SUMO/compass angle, at the plaza-centre frame.
+// `type` selects the per-model yaw correction so the mesh nose points along travel.
+function orientFor(angleDeg, type) {
+  const at = T.sumoToWorld(T.p.sumoRefX, 0);
+  const yaw = T.headingRad(angleDeg) + CMath.toRadians(MODEL_YAW_OFFSET[type === "truck" ? "truck" : "car"]);
+  return Transforms.headingPitchRollQuaternion(at, new HeadingPitchRoll(yaw, 0, 0));
 }
 
 // ============================================================================ booth markers
@@ -142,24 +128,12 @@ const isClosed = (lane) => !!desired.get(lane) || closedSet.has(lane);
 function rebuildBoothMarkers(viewer) {
   boothEntities.forEach((e) => viewer.entities.remove(e.disc));
   boothEntities = [];
-  // Prefer the user-marked gates (rendered at the EXACT clicked lon/lat) over computed positions.
-  const useMarked = markedGates.length > 0;
-  const list = useMarked
-    ? markedGates.map((g, i) => ({ lane: `pl_${i}`, lonlat: g, cash: i < 3 }))
-    : BOOTHS.map((b) => ({ lane: b.lane, lonlat: b.lonlat, y: b.y, cash: b.cash }));
 
-  for (const b of list) {
-    // Position: marked gates and georef booths both carry lonlat; raw SUMO uses T.sumoToWorld.
-    let posCb;
-    if (b.lonlat) {
-      const ll = b.lonlat;
-      posCb = new CallbackProperty(() => Cartesian3.fromDegrees(ll.lon, ll.lat, 2), false);
-    } else if (T) {
-      const y = b.y;
-      posCb = new CallbackProperty(() => T.sumoToWorld(META.boothX, y), false);
-    } else {
-      continue;
-    }
+  for (const b of BOOTHS) {
+    // All booths are placed via T.sumoToWorld — marking rebuilds T, so booth markers follow.
+    const y = b.y;
+    const boothX = META ? META.boothX : T.p.sumoRefX;
+    const posCb = new CallbackProperty(() => T.sumoToWorld(boothX, y), false);
     const disc = viewer.entities.add({
       position: posCb,
       ellipse: {
@@ -177,22 +151,17 @@ function rebuildBoothMarkers(viewer) {
     });
     boothEntities.push({ lane: b.lane, disc });
   }
-  // one "Toll plaza" label on the centre-line just ahead of the booths
-  // For georef: place label at a fixed lon/lat slightly up-road of the anchor; for raw: use T.
-  const labelPos = isGeoref() && META.anchor
-    ? (() => {
-        // 26 m up-road of the anchor (booth stop line) along bearing 104°
-        const b = META.bearingDeg * Math.PI / 180;
-        const mPerDegLon = 111320 * Math.cos(META.anchor.lat * Math.PI / 180);
-        const mPerDegLat = 110540;
-        const lon = META.anchor.lon - 26 * Math.sin(b) / mPerDegLon;
-        const lat = META.anchor.lat - 26 * Math.cos(b) / mPerDegLat;
-        return Cartesian3.fromDegrees(lon, lat, 3);
-      })()
-    : (T ? T.sumoToWorld(META.boothX - 26, 0) : null);
-  if (labelPos) {
+
+  // ONE "Toll plaza" label on the centre-line. Use a stable id + a CallbackProperty position so a
+  // rebuild REPLACES it (entities.add with an existing id throws → remove-then-add) instead of stacking
+  // a new label every time (that stacking was the "TOLL PLAZA × 9" bug).
+  const boothX = META ? META.boothX : (T ? T.p.sumoRefX : 530);
+  const existing = viewer.entities.getById("toll-plaza-label");
+  if (existing) viewer.entities.remove(existing);
+  if (T) {
     viewer.entities.add({
-      position: labelPos,
+      id: "toll-plaza-label",
+      position: new CallbackProperty(() => T.sumoToWorld(boothX - 26, 0), false),
       label: {
         text: "TOLL PLAZA", font: "bold 13px sans-serif",
         fillColor: Color.fromCssColorString("#bfe0ff"), showBackground: true,
@@ -220,11 +189,10 @@ async function loadRun(viewer, url) {
   BOOTHS = computeBooths(META);
   removeVehicles(viewer);
   rebuildBoothMarkers(viewer);
-  // Georeferenced data can be placed without a calibrated T (uses fromDegrees directly).
-  if (!isGeoref() && !T) { setStatus("⊕ Calibrate the road to place + start the traffic."); return; }
 
-  const georef = isGeoref();
-  const height = (META.anchor && META.anchor.height) || 3;
+  if (!T) { setStatus("⊕ Calibrate the road to place + start the traffic."); return; }
+
+  const height = T.p.anchorHeight || 3;
 
   for (const v of data.vehicles) {
     const pos = new SampledPositionProperty();
@@ -233,8 +201,8 @@ async function loadRun(viewer, url) {
     const ang = new SampledProperty(Number);
     for (const [t, x, y, a] of v.samples) {
       const time = JulianDate.addSeconds(EPOCH, t, new JulianDate());
-      // Georef: samples carry [t, lon, lat, angle] → fromDegrees. Raw: T.sumoToWorld.
-      const world = georef ? Cartesian3.fromDegrees(x, y, height) : T.sumoToWorld(x, y);
+      // All vehicles placed via T.sumoToWorld — marking rebuilds T, so traffic follows.
+      const world = T.sumoToWorld(x, y);
       pos.addSample(time, world);
       ang.addSample(time, a);
     }
@@ -245,16 +213,16 @@ async function loadRun(viewer, url) {
         stop: JulianDate.addSeconds(EPOCH, v.samples[v.samples.length - 1][0], new JulianDate()),
       })]),
       position: pos,
-      orientation: new CallbackProperty((time) => orientFor(ang.getValue(time) ?? a0), false),
+      orientation: new CallbackProperty((time) => orientFor(ang.getValue(time) ?? a0, v.type), false),
       model: {
         uri: v.type === "truck" ? "/models/truck.glb" : "/models/car.glb",
-        minimumPixelSize: 8,
-        scale: v.type === "truck" ? 1.0 : 0.8,
+        minimumPixelSize: MIN_PIXEL_SIZE[v.type === "truck" ? "truck" : "car"],
+        scale: VEHICLE_SCALE[v.type === "truck" ? "truck" : "car"],
         color: COLORS[v.type] || Color.WHITE,
-        colorBlendMode: 1,  // REPLACE — fully tint the model with payment-type colour
-        colorBlendAmount: 1.0,
+        colorBlendMode: 2,  // MIX — tint while preserving model shape/shading
+        colorBlendAmount: 0.6,
         silhouetteColor: Color.WHITE,
-        silhouetteSize: 0,
+        silhouetteSize: 1.0,
       },
     }));
   }
@@ -289,19 +257,9 @@ function renderKpis(s) {
 // ============================================================================ camera
 let obliqueOn = false;
 function frameCamera(viewer) {
-  // Georef: target the anchor (booth stop line centre) directly; bearing from META.
-  // Raw SUMO: use T to map the reference point.
-  let tgt;
-  let headingRad;
-  if (isGeoref() && META.anchor) {
-    tgt = Cartesian3.fromDegrees(META.anchor.lon, META.anchor.lat, META.anchor.height);
-    headingRad = headingRadFor(90);   // look along the corridor (bearingDeg + 90 - 180 = bearing - 90)
-  } else if (T) {
-    tgt = T.sumoToWorld(T.p.sumoRefX, 0);
-    headingRad = T.headingRad(90);
-  } else {
-    return;
-  }
+  if (!T) return;
+  const tgt = T.sumoToWorld(T.p.sumoRefX, 0);
+  const headingRad = T.headingRad(90);
   const pitch = CMath.toRadians(obliqueOn ? -32 : -80);
   viewer.camera.lookAt(tgt, new HeadingPitchRange(headingRad, pitch, obliqueOn ? 360 : 300));
   viewer.camera.lookAtTransform(Matrix4.IDENTITY);
@@ -347,22 +305,12 @@ function stopLive(viewer) {
   setConn(false, "socket: offline");
 }
 function onMeta(viewer, m) {
-  // Build a META compatible with computeBooths — support both georef and raw SUMO meta.
-  if (m.georef) {
-    // Georef meta from live_server: has anchor, bearingDeg, boothGeo
-    META = {
-      georef: true,
-      anchor: m.anchor || { lon: -80.306, lat: 26.1124, height: 3 },
-      bearingDeg: m.bearingDeg || 104,
-      boothLon: m.boothLon,
-      boothLat: m.boothLat,
-      boothGeo: m.boothGeo || [],
-      bounds: m.bounds || { minX: -80.311, maxX: -80.302, minY: 26.111, maxY: 26.114 },
-      boothX: m.boothX || 530,
-      tEnd: m.tEnd || 0,
-    };
-  } else if (m.bounds && typeof m.boothX === "number") {
+  // Build a META compatible with computeBooths (raw SUMO bounds).
+  if (m.bounds && typeof m.boothX === "number") {
     META = { bounds: m.bounds, boothX: m.boothX, tEnd: m.tEnd || 0 };
+  } else {
+    // Fallback: use default bounds matching the 10-lane plaza
+    META = { bounds: { minX: 0, maxX: 930, minY: -14.4, maxY: 14.4 }, boothX: 530, tEnd: 0 };
   }
   BOOTHS = computeBooths(META);
   rebuildBoothMarkers(viewer);
@@ -373,33 +321,31 @@ function onMeta(viewer, m) {
 function onStep(viewer, m) {
   closedSet = new Set(m.closed || []);
   const seen = new Set();
-  const georef = isGeoref();
-  const height = (META && META.anchor && META.anchor.height) || 3;
   for (const v of m.vehicles) {
     seen.add(v.id);
-    // Georef live data: v.lon, v.lat. Raw: v.x, v.y.
-    const world = georef
-      ? Cartesian3.fromDegrees(v.lon, v.lat, height)
-      : T.sumoToWorld(v.x, v.y);
+    // Live data carries raw local SUMO x,y — place via T.sumoToWorld.
+    const world = T ? T.sumoToWorld(v.x, v.y) : null;
+    if (!world) continue;
     let e = liveEntities.get(v.id);
     if (!e) {
-      const dims = DIMS[v.type] || DIMS.cash;
       e = viewer.entities.add({
         position: new ConstantPositionProperty(world),
-        orientation: orientFor(v.angle),
+        orientation: orientFor(v.angle, v.type),
         model: {
           uri: v.type === "truck" ? "/models/truck.glb" : "/models/car.glb",
-          minimumPixelSize: 8,
-          scale: v.type === "truck" ? 1.0 : 0.8,
+          minimumPixelSize: MIN_PIXEL_SIZE[v.type === "truck" ? "truck" : "car"],
+          scale: VEHICLE_SCALE[v.type === "truck" ? "truck" : "car"],
           color: COLORS[v.type] || Color.WHITE,
-          colorBlendMode: 1,  // REPLACE
-          colorBlendAmount: 1.0,
+          colorBlendMode: 2,  // MIX — tint while preserving model shape/shading
+          colorBlendAmount: 0.6,
+          silhouetteColor: Color.WHITE,
+          silhouetteSize: 1.0,
         },
       });
       liveEntities.set(v.id, e);
     } else {
       e.position.setValue(world);
-      e.orientation = orientFor(v.angle);
+      e.orientation = orientFor(v.angle, v.type);
     }
   }
   for (const [id, e] of liveEntities) if (!seen.has(id)) { viewer.entities.remove(e); liveEntities.delete(id); }
@@ -434,9 +380,9 @@ function syncGateButtons() {
 }
 
 // ============================================================================ MARK GATES (user clicks each real toll gate)
-// The user marks the road direction (2 clicks) then clicks each real toll gate on the aerial. The
-// markers land EXACTLY where clicked (source of truth), and the transform is derived from them so the
-// cars flow along that line. No more guessed/random gate placement.
+// The user marks the road direction (2 clicks) then clicks each real toll gate on the aerial.
+// Marking rebuilds T from the clicks, then reloads vehicles (placed via T.sumoToWorld) AND
+// rebuilds booth markers (also via T.sumoToWorld) — so traffic and markers always coincide.
 const mark = { on: false, dir: [], gates: [], handler: null };
 function buildTransformFromMarks(dir, gates) {
   const [up, down] = dir;
@@ -454,17 +400,16 @@ function buildTransformFromMarks(dir, gates) {
 }
 function finishMarking(viewer, btn) {
   if (mark.dir.length < 2 || mark.gates.length < 2) { setStatus("Mark up-road, down-road, then at least 2 gates."); return; }
-  markedGates = mark.gates.slice();
-  T = buildTransformFromMarks(mark.dir, markedGates);
+  // Build a new T from the user's clicks; BOTH vehicles and booth markers use T.sumoToWorld.
+  T = buildTransformFromMarks(mark.dir, mark.gates);
   calibrated = true; mark.on = false;
   btn.textContent = "⊕ Mark gates"; btn.classList.remove("on", "pulse");
-  try { localStorage.setItem(siteKey(siteId), JSON.stringify({ t: T.toJSON(), g: markedGates })); } catch {}
-  console.log("MARKED", markedGates.length, "gates →", JSON.stringify(T.toJSON()));
-  rebuildBoothMarkers(viewer);
+  try { localStorage.setItem(siteKey(siteId), JSON.stringify({ t: T.toJSON(), g: mark.gates })); } catch {}
+  console.log("MARKED", mark.gates.length, "gates →", JSON.stringify(T.toJSON()));
   if (liveMode) { sendCmd({ cmd: "reset" }); trafficStarted = true; }
   else { reloadAndStart(viewer); }
   frameCamera(viewer);
-  setStatus(`✓ ${markedGates.length} gates marked — traffic flowing through them (saved).`);
+  setStatus(`✓ ${mark.gates.length} gates marked — traffic flowing through them (saved).`);
 }
 function installMarking(viewer) {
   const btn = $("btn-calib");
@@ -484,8 +429,11 @@ function installMarking(viewer) {
       if (mark.dir.length === 0) { mark.dir.push(ll); setStatus("Mark 2 — click a point DOWN-road (travel direction)"); return; }
       if (mark.dir.length === 1) { mark.dir.push(ll); setStatus("Now click EACH toll gate left→right. Click ✓ Finish when done."); return; }
       mark.gates.push(ll);
-      markedGates = mark.gates.slice();
-      rebuildBoothMarkers(viewer);   // show the marker immediately where clicked
+      // Preview the new transform after each gate click so markers track the clicks.
+      if (mark.gates.length >= 2) {
+        T = buildTransformFromMarks(mark.dir, mark.gates);
+      }
+      rebuildBoothMarkers(viewer);
       setStatus(`Gate ${mark.gates.length} marked — keep clicking gates, or ✓ Finish.`);
     }, ScreenSpaceEventType.LEFT_CLICK);
   };
@@ -499,7 +447,7 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
 
   // Every site ships a default transform, so the app is ALWAYS placed enough to render — it flies
   // straight to the plaza (never the bare globe) and starts traffic. ⊕ Mark gates refines placement.
-  { const s = loadSite(siteId); T = s.transform; markedGates = s.gates; }
+  { const s = loadSite(siteId); T = s.transform; }
   calibrated = true;
   trafficStarted = true;          // ship-with-default-transform → run immediately (no globe, no blank)
 
@@ -508,17 +456,19 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
   renderGatePanel();
   installMarking(viewer);
 
-  const selectOffline = async (url, onBtn) => {
+  const selectOffline = async (url, onBtn, scenario) => {
     stopLive(viewer);
     [bBase, bInt, bLive].forEach((b) => b.classList.remove("on"));
     onBtn.classList.add("on");
+    activeCashLanes = CASH_BY_SCENARIO[scenario];   // recolor gates: intervention turns pl_1/pl_2 green
     offlineUrl = url;
-    await loadRun(viewer, url);
+    await loadRun(viewer, url);                      // rebuilds booths/markers with the new cash set
+    renderGatePanel();                              // recolor the booth gate buttons too
     startTraffic(viewer);
     frameCamera(viewer);
   };
-  bBase.onclick = () => selectOffline("/data/baseline.json", bBase);
-  bInt.onclick = () => selectOffline("/data/intervention.json", bInt);
+  bBase.onclick = () => selectOffline("/data/baseline.json", bBase, "baseline");
+  bInt.onclick = () => selectOffline("/data/intervention.json", bInt, "intervention");
   bLive.onclick = () => {
     [bBase, bInt].forEach((b) => b.classList.remove("on"));
     bLive.classList.add("on");
@@ -539,7 +489,7 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
     sel.value = siteId;
     sel.onchange = async () => {
       siteId = sel.value;
-      { const s = loadSite(siteId); T = s.transform; markedGates = s.gates; }
+      { const s = loadSite(siteId); T = s.transform; }
       stopLive(viewer);
       [bInt, bLive].forEach((b) => b.classList.remove("on")); bBase.classList.add("on");
       offlineUrl = "/data/baseline.json";

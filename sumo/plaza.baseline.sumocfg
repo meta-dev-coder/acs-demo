@@ -11,7 +11,6 @@
     <step-length value="1.0"/>
   </time>
   <output>
-    <fcd-output value="out/baseline.fcd.xml"/>
     <tripinfo-output value="out/baseline.tripinfo.xml"/>
   </output>
   <processing>
