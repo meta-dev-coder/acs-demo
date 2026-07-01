@@ -24,9 +24,30 @@
 
       <div id="kpis" class="kpis"></div>
 
+      <!-- Animated cumulative revenue counter — the headline "wow" number -->
+      <div class="rev-counter-wrap">
+        <div id="revenue-counter" class="rev-counter">$0</div>
+        <div class="rev-counter-label">cumulative revenue (sim window)</div>
+      </div>
+
+      <!-- Cash vs AET comparison card -->
+      <div id="cash-aet-card" class="cash-aet-card"></div>
+
       <div class="legend">
         <span><i class="sw cash"></i> Cash booth</span>
         <span><i class="sw etc"></i> AET booth</span>
+      </div>
+
+      <!-- Weather preset selector -->
+      <div class="ctl-row">
+        <label class="weather-label" for="weather-select">Weather</label>
+        <select id="weather-select" class="weather-select" title="Apply weather conditions (live mode sends to SUMO server)">
+          <option value="clear">Clear</option>
+          <option value="lightrain">Light Rain</option>
+          <option value="heavyrain">Heavy Rain</option>
+          <option value="fog">Fog</option>
+          <option value="snowice">Snow-Ice</option>
+        </select>
       </div>
 
       <!-- Camera + live gate controls -->
@@ -43,6 +64,9 @@
 
       <div id="status" class="status">Loading…</div>
     </div>
+
+    <!-- Full-viewport weather tint overlay (toggled by main.js applyWeatherOverlay) -->
+    <div id="weather-overlay" style="display:none"></div>
 
     <script type="module" src="/src/main.js"></script>
   </body>

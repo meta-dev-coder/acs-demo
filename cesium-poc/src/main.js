@@ -234,24 +234,164 @@ async function loadRun(viewer, url) {
   if (trafficStarted) setStatus(`${data.vehicles.length} vehicles · ${Math.round(data.meta.tEnd)} s sim`);
 }
 
+// ============================================================================ weather overlay
+let _activeWeather = "clear";
+let _clearCapacity = null;   // capacityVph observed under clear weather (for delta chip)
+
+/**
+ * Apply (or remove) the full-viewport weather tint overlay and set window.__weather.
+ * Also sends the command to the live server if connected.
+ * @param {string} preset — one of "clear"|"lightrain"|"heavyrain"|"fog"|"snowice"
+ * @param {boolean} [sendToServer=true] — whether to forward the command over WS
+ */
+function applyWeatherOverlay(preset, sendToServer = true) {
+  _activeWeather = preset;
+  window.__weather = preset;
+
+  const overlay = $("weather-overlay");
+  if (overlay) {
+    const classes = ["weather-clear", "weather-lightrain", "weather-heavyrain", "weather-fog", "weather-snowice"];
+    overlay.className = "";
+    classes.forEach((c) => overlay.classList.remove(c));
+    if (preset === "clear") {
+      overlay.style.display = "none";
+    } else {
+      overlay.className = "weather-" + preset;
+      overlay.style.display = "";
+    }
+  }
+
+  // Fog: lower Cesium scene fog density so distant vehicles fade
+  if (window.__viewer) {
+    const fog = window.__viewer.scene.fog;
+    if (preset === "fog") {
+      fog.enabled = true;
+      fog.density = 0.002;
+    } else {
+      fog.enabled = false;
+    }
+  }
+
+  if (sendToServer) sendCmd({ cmd: "setWeather", preset });
+}
+
 // ============================================================================ KPIs
+// baselineStats is captured ONLY when the baseline scenario is loaded (not first-call).
+// This ensures that the delta chips compare intervention vs baseline correctly even
+// if the app boots straight into the intervention scenario.
 let baselineStats = null;
+let _currentScenario = "baseline";  // "baseline" | "intervention" | "live"
+
+// Animated cumulative-$ counter state
+let _revCounterTarget = 0;
+let _revCounterDisplayed = 0;
+let _revRafId = null;
+function _animateRevCounter() {
+  const el = $("revenue-counter");
+  if (!el) return;
+  const step = (_revCounterTarget - _revCounterDisplayed) * 0.12;
+  if (Math.abs(step) < 0.01) {
+    _revCounterDisplayed = _revCounterTarget;
+  } else {
+    _revCounterDisplayed += step;
+  }
+  el.textContent = "$" + Math.round(_revCounterDisplayed).toLocaleString();
+  if (Math.abs(_revCounterDisplayed - _revCounterTarget) > 0.01) {
+    _revRafId = requestAnimationFrame(_animateRevCounter);
+  } else {
+    _revRafId = null;
+  }
+}
+function _setRevCounter(target) {
+  _revCounterTarget = target;
+  if (_revRafId === null) {
+    _revRafId = requestAnimationFrame(_animateRevCounter);
+  }
+}
+
 function renderKpis(s) {
-  if (!baselineStats) baselineStats = s;
+  // Capture baseline stats only when on the baseline scenario.
+  if (_currentScenario === "baseline") baselineStats = s;
+  if (!baselineStats) baselineStats = s;  // fallback for live / first load
+
   const delta = (cur, base, lowerBetter) => {
-    if (cur === base) return "";
+    if (cur == null || base == null || cur === base) return "";
     const better = lowerBetter ? cur < base : cur > base;
     const pct = base ? Math.round(((cur - base) / base) * 100) : 0;
     return `<div class="d ${better ? "good" : "bad"}">${pct > 0 ? "+" : ""}${pct}%</div>`;
   };
+
+  // ---- Format helpers ----
+  const fmtRev = (r) => r != null ? "$" + Math.round(r).toLocaleString() : "—";
+  const fmtUtil = (u) => u != null ? Math.round(u * 100) + "%" : "—";
+  const fmtDelay = (d) => d != null ? Math.round(d) + "s" : "—";
+
+  // Track clearCapacity for weather delta: first non-zero capacityVph under clear weather
+  if (s.capacityVph > 0 && (_clearCapacity === null || _activeWeather === "clear")) {
+    if (_activeWeather === "clear") _clearCapacity = s.capacityVph;
+  }
+
+  // ---- KPI tiles (4 existing + Phase 0 + Phase 1 weather) ----
+  const b = baselineStats;
+  const capDelta = s.capacityVph != null && _clearCapacity != null && _activeWeather !== "clear"
+    ? delta(s.capacityVph, _clearCapacity, false)
+    : "";
+  const satPct = s.satRatio != null ? Math.round(s.satRatio * 100) : null;
+  const satStyle = satPct != null && satPct >= 100 ? ' style="color:#ff6b6b"' : '';
+
   const tiles = [
-    ["Avg wait", `${s.avgWaitSec}s`, delta(s.avgWaitSec, baselineStats.avgWaitSec, true)],
-    ["Throughput", `${s.throughputVph}`, delta(s.throughputVph, baselineStats.throughputVph, false)],
-    ["Avg speed", `${s.avgSpeedMph} mph`, delta(s.avgSpeedMph, baselineStats.avgSpeedMph, false)],
-    ["Mainline spillback", s.spillback ? "Yes" : "No", ""],
+    // Existing 4 (unchanged labels/logic)
+    ["Avg wait",           `${s.avgWaitSec}s`,            delta(s.avgWaitSec,   b.avgWaitSec,   true)],
+    ["Throughput",         `${s.throughputVph} vph`,       delta(s.throughputVph, b.throughputVph, false)],
+    ["Avg speed",          `${s.avgSpeedMph} mph`,         delta(s.avgSpeedMph,  b.avgSpeedMph,  false)],
+    ["Mainline spillback", s.spillback ? "Yes" : "No",     ""],
+    // Phase 0
+    ["Revenue/hr",         fmtRev(s.revenuePerHr),        delta(s.revenuePerHr,  b.revenuePerHr,  false)],
+    ["Avg delay",          fmtDelay(s.avgDelaySec),        delta(s.avgDelaySec,   b.avgDelaySec,   true)],
+    ["Booth util",         fmtUtil(s.boothUtilisation?.overall), ""],
+    // Phase 1 weather
+    ["Plaza capacity",     s.capacityVph != null ? `${s.capacityVph} vph` : "—", capDelta],
+    ["Saturation",         satPct != null ? `<span${satStyle}>${satPct}%</span>` : "—", ""],
   ];
-  $("kpis").innerHTML = tiles
+
+  const visibleTiles = [
+    tiles[0], tiles[1], tiles[2],
+    tiles[4],  // Revenue/hr
+    tiles[5],  // Avg delay
+    tiles[6],  // Booth util
+    tiles[7],  // Plaza capacity
+    tiles[8],  // Saturation
+  ];
+  $("kpis").innerHTML = visibleTiles
     .map(([l, v, d]) => `<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div>${d}</div>`).join("");
+
+  // ---- Animated cumulative-$ counter ----
+  if (s.cumulativeRevenue != null) {
+    _setRevCounter(s.cumulativeRevenue);
+  }
+
+  // ---- Cash-vs-AET card ----
+  const cvaEl = $("cash-aet-card");
+  if (cvaEl && s.cashVsAet) {
+    const { cash, aet } = s.cashVsAet;
+    const fmtCva = (bucket, label, color) => `
+      <div class="cva-col" style="border-left:3px solid ${color}">
+        <div class="cva-label">${label}</div>
+        <div class="cva-row"><span class="cva-k">Throughput</span><span class="cva-v">${bucket.throughputVph || 0} vph</span></div>
+        <div class="cva-row"><span class="cva-k">Avg wait</span><span class="cva-v">${bucket.avgWaitSec || 0}s</span></div>
+        <div class="cva-row"><span class="cva-k">Avg delay</span><span class="cva-v">${bucket.avgDelaySec || 0}s</span></div>
+        <div class="cva-row"><span class="cva-k">Rev/hr</span><span class="cva-v">${fmtRev(bucket.revenuePerHr)}</span></div>
+      </div>`;
+    cvaEl.innerHTML = `
+      <div class="cva-title">Cash vs AET</div>
+      <div class="cva-cols">
+        ${fmtCva(cash || {}, "Cash", "#ff9b1a")}
+        ${fmtCva(aet  || {}, "AET (ETC)", "#1ccb40")}
+      </div>`;
+  }
+
+  // ---- Debug hook ----
+  window.__kpi = s;
 }
 
 // ============================================================================ camera
@@ -351,6 +491,17 @@ function onStep(viewer, m) {
   for (const [id, e] of liveEntities) if (!seen.has(id)) { viewer.entities.remove(e); liveEntities.delete(id); }
   syncGateButtons();
   const s = m.stats || {};
+  // Render KPIs from live step when the stats carry the Phase 0 schema.
+  if (s.schemaVersion != null) {
+    _currentScenario = "live";
+    // Sync weather overlay from server-confirmed weather (without re-sending to server)
+    if (s.weather && s.weather !== _activeWeather) {
+      applyWeatherOverlay(s.weather, false);
+      const weatherSel = $("weather-select");
+      if (weatherSel) weatherSel.value = s.weather;
+    }
+    renderKpis(s);
+  }
   setStatus(`Live · t=${Math.round(m.t)}s · ${s.running || 0} cars · approach queue ${s.queueAp || 0}`);
 }
 
@@ -450,6 +601,7 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
   { const s = loadSite(siteId); T = s.transform; }
   calibrated = true;
   trafficStarted = true;          // ship-with-default-transform → run immediately (no globe, no blank)
+  _currentScenario = "baseline";  // boot always loads baseline; ensures baselineStats is captured
 
   await loadRun(viewer, offlineUrl);
   viewer.clock.currentTime = EPOCH.clone();  // ensure sim starts at t=0 on boot
@@ -460,6 +612,7 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
     stopLive(viewer);
     [bBase, bInt, bLive].forEach((b) => b.classList.remove("on"));
     onBtn.classList.add("on");
+    _currentScenario = scenario;                     // track before loadRun calls renderKpis
     activeCashLanes = CASH_BY_SCENARIO[scenario];   // recolor gates: intervention turns pl_1/pl_2 green
     offlineUrl = url;
     await loadRun(viewer, url);                      // rebuilds booths/markers with the new cash set
@@ -504,6 +657,16 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
   // Fly to the plaza (never the bare globe).
   frameCamera(viewer);
   setStatus(`${SITES.find((s) => s.id === siteId).name} — traffic running. ⊕ Calibrate to refine placement.`);
+
+  // ---- Weather dropdown: change overlay + send to server (if live) ----
+  const weatherSel = $("weather-select");
+  if (weatherSel) {
+    weatherSel.onchange = () => {
+      const preset = weatherSel.value;
+      // Apply overlay always; only send to server when in live mode with an open WS
+      applyWeatherOverlay(preset, liveMode && ws && ws.readyState === WebSocket.OPEN);
+    };
+  }
 
   // debug hooks for headless verification
   window.__viewer = viewer;

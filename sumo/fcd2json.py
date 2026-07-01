@@ -37,6 +37,14 @@ import statistics
 import sys
 import xml.etree.ElementTree as ET
 
+# Shared KPI module (computes Phase 0 revenue + delay + utilisation stats).
+# Must be importable from the same directory; fcd2json.py is run as __main__
+# so we add its own directory to sys.path if needed.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+import kpi as _kpi
+
 QUEUE_SPEED = 0.5       # m/s; below this a vehicle counts as "queued"
 
 # ---- Anchor constants (MUST match main.js SITES[0] and georef_nodes.py) ----
@@ -178,43 +186,21 @@ def parse_tripinfo(path):
 
     Returns (n_trips, avg_wait_s, avg_speed_mph).
     Only includes non-vaporized trips in the averages.
+
+    Extended version also returns a list of full trip records via _kpi.parse_tripinfo_extended.
+    This wrapper keeps backward compatibility with code that only uses the 3-tuple.
     """
-    import re
-    n = sum_wait = sum_speed = 0
-    try:
-        for _, elem in ET.iterparse(path, events=("end",)):
-            if elem.tag != "tripinfo":
-                continue
-            if elem.get("vaporized"):
-                elem.clear(); continue
-            n += 1
-            sum_wait += float(elem.get("waitingTime", 0))
-            dur = float(elem.get("duration") or 1.0)
-            route_len = float(elem.get("routeLength", 0))
-            sum_speed += route_len / dur
-            elem.clear()
-    except (FileNotFoundError, ET.ParseError):
-        import re
-        try:
-            with open(path, "r", errors="replace") as f:
-                raw = f.read()
-            vap_ids = set(re.findall(r'id="([^"]+)"[^>]*vaporized="[^"]+"', raw))
-            for m in re.finditer(
-                r'<tripinfo\s[^>]*?id="(?P<id>[^"]+)"[^>]*?'
-                r'duration="(?P<dur>[0-9.]+)"[^>]*?'
-                r'routeLength="(?P<rl>[0-9.]+)"[^>]*?'
-                r'waitingTime="(?P<wt>[0-9.]+)"',
-                raw,
-            ):
-                if m.group("id") in vap_ids:
-                    continue
-                n += 1
-                sum_wait += float(m.group("wt"))
-                dur = float(m.group("dur")) or 1.0
-                sum_speed += float(m.group("rl")) / dur
-        except FileNotFoundError:
-            pass
-    return (n, sum_wait / n if n else 0.0, (sum_speed / n) * 2.23694 if n else 0.0)
+    trips = _kpi.parse_tripinfo_extended(path)
+    if not trips:
+        return 0, 0.0, 0.0
+    n = len(trips)
+    avg_wait = sum(t["waitingTime"] for t in trips) / n if n else 0.0
+    speed_vals = []
+    for t in trips:
+        if t["duration"] > 0 and t["routeLength"] > 0:
+            speed_vals.append(t["routeLength"] / t["duration"])
+    avg_speed_mph = (sum(speed_vals) / len(speed_vals)) * 2.23694 if speed_vals else 0.0
+    return n, avg_wait, avg_speed_mph
 
 
 def booth_stop_x(vehicles):
@@ -265,16 +251,29 @@ def main():
                for vid, rec in vehicles.items()]
 
     window_h = (t_end / 3600.0) or 1.0
+
+    # ---- Phase 0: compute extended KPI stats via shared kpi module ----
+    trips = _kpi.parse_tripinfo_extended(tripinfo)
+    tolls = _kpi.load_tolls()
+    kpi_stats = _kpi.aggregate(trips, vehicles, meta["boothX"], bounds, tolls, window_h)
+
+    # Merge FCD-derived back-compat fields (queue/spillback aren't in kpi.aggregate).
+    kpi_stats.update({
+        "mainlineQueueMax": max(queue_per_step) if queue_per_step else 0,
+        "spillback": spillback,
+    })
+    # If tripinfo was empty (no trips), use the FCD-derived stats as back-compat fallback.
+    if not trips:
+        kpi_stats.update({
+            "processed":    processed,
+            "avgWaitSec":   round(avg_wait, 1),
+            "throughputVph": round(processed / window_h),
+            "avgSpeedMph":  round(avg_speed_mph, 1),
+        })
+
     data = {
         "meta": meta,
-        "stats": {
-            "processed": processed,
-            "avgWaitSec": round(avg_wait, 1),
-            "throughputVph": round(processed / window_h),
-            "avgSpeedMph": round(avg_speed_mph, 1),
-            "mainlineQueueMax": max(queue_per_step) if queue_per_step else 0,
-            "spillback": spillback,
-        },
+        "stats": kpi_stats,
         "vehicles": veh_out,
     }
     with open(out, "w") as fh:

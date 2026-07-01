@@ -108,3 +108,100 @@ html, body, #cesiumContainer {
   font-weight: 600;
 }
 .site-select option { color: #111; }
+
+/* ---- Cumulative revenue counter ---- */
+.rev-counter-wrap {
+  text-align: center;
+  margin: 4px 0 10px;
+  padding: 8px 10px;
+  background: rgba(46,204,113,0.08);
+  border: 1px solid rgba(46,204,113,0.22);
+  border-radius: 8px;
+}
+#revenue-counter {
+  font-size: 26px;
+  font-weight: 800;
+  color: #2ecc71;
+  letter-spacing: 0.5px;
+  font-variant-numeric: tabular-nums;
+}
+.rev-counter-label {
+  font-size: 9px;
+  color: #7fa87f;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+/* ---- Cash vs AET comparison card ---- */
+.cash-aet-card {
+  margin-bottom: 10px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.cva-title {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #9fb0c3;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 7px 10px 4px;
+}
+.cva-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.cva-col {
+  padding: 4px 8px 8px;
+}
+.cva-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #e0e8f2;
+  margin-bottom: 4px;
+}
+.cva-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9.5px;
+  padding: 1px 0;
+}
+.cva-k { color: #8fa3bb; }
+.cva-v { font-weight: 600; color: #d6e3f0; }
+
+/* ---- Weather selector ---- */
+.weather-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #9fb0c3;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+.weather-select {
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: rgba(255,255,255,0.06);
+  color: #e8eef6;
+  border: 1px solid rgba(255,255,255,0.16);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.weather-select option { color: #111; }
+
+/* ---- Full-viewport weather tint overlay ---- */
+#weather-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 5;           /* above Cesium globe, below HUD panel (z-index:10) */
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+#weather-overlay.weather-lightrain  { background: rgba(90, 120, 180, 0.14); }
+#weather-overlay.weather-heavyrain  { background: rgba(60,  90, 160, 0.22); }
+#weather-overlay.weather-fog        { background: rgba(200, 210, 220, 0.38); }
+#weather-overlay.weather-snowice    { background: rgba(220, 235, 255, 0.30); }

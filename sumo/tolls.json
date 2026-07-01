@@ -1,0 +1,10 @@
+{
+  "_comment": "Synthetic I-595-style flat per-trip tolls (not accurate; demo-credible). AET (ETC) carries a small premium over cash to reflect the SunPass Express lane value proposition. Trucks pay by axle-weight proxy.",
+  "currency": "USD",
+  "ratePerVehicle": {
+    "etc":   2.50,
+    "cash":  1.50,
+    "truck": 6.00
+  },
+  "aetViolationRate": 0.0
+}
