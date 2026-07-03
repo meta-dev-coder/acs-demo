@@ -14,12 +14,15 @@
  */
 import {
   Ion, Viewer, Terrain, Color, JulianDate, Math as CMath,
-  SampledPositionProperty, SampledProperty, Transforms,
+  SampledPositionProperty, SampledProperty, Transforms, Matrix4,
   TimeInterval, TimeIntervalCollection, ClockRange, ExtrapolationType,
   HermitePolynomialApproximation, EllipsoidTerrainProvider, UrlTemplateImageryProvider,
-  ImageryLayer, HeadingPitchRoll, ConstantPositionProperty, CallbackProperty,
+  ImageryLayer, HeadingPitchRange, HeadingPitchRoll, ConstantPositionProperty,
+  CallbackProperty, LabelStyle, VerticalOrigin, Cartesian2, NearFarScalar,
+  ScreenSpaceEventHandler, ScreenSpaceEventType,
 } from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
+import { CoordinateTransform } from "../transform.js";
 
 // Sim-time origin (Cesium JulianDate). Renderer-internal: main.js deals only in seconds.
 const EPOCH = JulianDate.fromIso8601("2025-01-01T00:00:00Z");
@@ -42,6 +45,8 @@ export class CesiumRenderer {
     this._T = null;
     this._sampled = [];            // offline sampled-track entities
     this._live = new Map();        // id -> live entity
+    this._markers = new Map();     // id -> marker entity (booths, plaza label)
+    this._pickHandler = null;
     // Clock facade (renderer-owned sim time, seconds since EPOCH).
     this.clock = {
       setRange: (t0, t1) => {
@@ -179,5 +184,82 @@ export class CesiumRenderer {
   clearLiveVehicles() {
     for (const e of this._live.values()) this._viewer.entities.remove(e);
     this._live.clear();
+  }
+
+  // ---- markers (booth discs + gate ✕ labels + the TOLL PLAZA label) ----
+  _labelOptions(label) {
+    const textVal = label.textFn
+      ? new CallbackProperty(() => label.textFn(), false)
+      : label.text;
+    if (label.kind === "plaza") {
+      return {
+        text: textVal, font: "bold 13px sans-serif",
+        fillColor: Color.fromCssColorString("#bfe0ff"), showBackground: true,
+        backgroundColor: Color.fromCssColorString("#0d1621").withAlpha(0.85),
+        scaleByDistance: new NearFarScalar(200, 1, 4000, 0.45),
+      };
+    }
+    // "gate" (default): red ✕ badge above the booth
+    return {
+      text: textVal, font: "bold 13px sans-serif", fillColor: Color.WHITE, showBackground: true,
+      backgroundColor: Color.fromCssColorString("#c01a0e").withAlpha(0.92),
+      style: LabelStyle.FILL, pixelOffset: new Cartesian2(0, -14),
+      verticalOrigin: VerticalOrigin.BOTTOM, scaleByDistance: new NearFarScalar(200, 1, 3000, 0.5),
+    };
+  }
+
+  /**
+   * Upsert a marker at SUMO (x,y). id-keyed (re-place replaces). `tracking` makes the position
+   * re-read the transform every frame (booths follow re-calibration). Optional disc + label.
+   * @param {object} m — { id, x, y, tracking, disc?:{radiusM,colorCss,alpha}, label?:{kind,text|textFn} }
+   */
+  placeMarker(m) {
+    const existing = this._markers.get(m.id);
+    if (existing) { this._viewer.entities.remove(existing); this._markers.delete(m.id); }
+    const position = m.tracking
+      ? new CallbackProperty(() => this._T.sumoToWorld(m.x, m.y), false)
+      : this._T.sumoToWorld(m.x, m.y);
+    const opts = { position };
+    if (m.disc) {
+      opts.ellipse = {
+        semiMajorAxis: m.disc.radiusM, semiMinorAxis: m.disc.radiusM,
+        material: Color.fromCssColorString(m.disc.colorCss).withAlpha(m.disc.alpha ?? 0.9),
+        outline: true, outlineColor: Color.WHITE.withAlpha(0.9), height: 1,
+      };
+    }
+    if (m.label) opts.label = this._labelOptions(m.label);
+    const e = this._viewer.entities.add(opts);
+    this._markers.set(m.id, e);
+    return e;
+  }
+
+  clearMarkers() {
+    for (const e of this._markers.values()) this._viewer.entities.remove(e);
+    this._markers.clear();
+  }
+
+  // ---- camera ----
+  frameCamera({ x, y, headingDeg, oblique }) {
+    const tgt = this._T.sumoToWorld(x, y);
+    const headingRad = this._T.headingRad(headingDeg);
+    const pitch = CMath.toRadians(oblique ? -32 : -80);
+    this._viewer.camera.lookAt(tgt, new HeadingPitchRange(headingRad, pitch, oblique ? 360 : 300));
+    this._viewer.camera.lookAtTransform(Matrix4.IDENTITY);
+  }
+
+  // ---- pick (mark-gates): deliver {lon,lat}|null to cb on every left-click ----
+  onPick(cb) {
+    if (this._pickHandler) return;
+    this._pickHandler = new ScreenSpaceEventHandler(this._viewer.scene.canvas);
+    this._pickHandler.setInputAction((click) => {
+      cb(CoordinateTransform.pickLonLat(this._viewer, click.position));
+    }, ScreenSpaceEventType.LEFT_CLICK);
+  }
+
+  // ---- weather fog ----
+  setFog(enabled, density) {
+    const fog = this._viewer.scene.fog;
+    fog.enabled = !!enabled;
+    if (enabled && density != null) fog.density = density;
   }
 }

@@ -26,13 +26,6 @@ import { CesiumRenderer } from "./renderers/cesium.js";
 const ION = import.meta.env.VITE_CESIUM_ION_TOKEN;
 if (ION) Ion.defaultAccessToken = ION;
 
-// Marker/vehicle colours. Vehicle appearance (model/scale/yaw) lives in the renderer adapter;
-// COLORS stays here because booth markers use it too (moves to the adapter with markers).
-const COLORS = {
-  cash: Color.fromCssColorString("#ff9b1a"),
-  etc: Color.fromCssColorString("#1ccb40"),
-  truck: Color.fromCssColorString("#3a80e8"),
-};
 const N_BOOTHS = 10;
 // Fixed plaza half-span: 10 lanes x 3.2 m / 2 = 14.4 m. The plaza core (fo/pl/fi) stays a straight,
 // symmetric-about-y=0 tangent by design (Feature A curved-road net — see sumo/georef_nodes.py), so
@@ -112,54 +105,28 @@ const R = new CesiumRenderer();
 function setTransform(t) { T = t; R.setTransform(t); }
 
 // ============================================================================ booth markers
-let boothEntities = [];
 let closedSet = new Set();
 const desired = new Map();
 const isClosed = (lane) => !!desired.get(lane) || closedSet.has(lane);
 
-function rebuildBoothMarkers(viewer) {
-  boothEntities.forEach((e) => viewer.entities.remove(e.disc));
-  boothEntities = [];
-
-  for (const b of BOOTHS) {
-    // All booths are placed via T.sumoToWorld — marking rebuilds T, so booth markers follow.
-    const y = b.y;
-    const boothX = META ? META.boothX : T.p.sumoRefX;
-    const posCb = new CallbackProperty(() => T.sumoToWorld(boothX, y), false);
-    const disc = viewer.entities.add({
-      position: posCb,
-      ellipse: {
-        semiMajorAxis: 1.8, semiMinorAxis: 1.8,
-        material: (b.cash ? COLORS.cash : COLORS.etc).withAlpha(0.9),
-        outline: true, outlineColor: Color.WHITE.withAlpha(0.9), height: 1,
-      },
-      label: {
-        text: new CallbackProperty(() => (isClosed(b.lane) ? "✕" : ""), false),
-        font: "bold 13px sans-serif", fillColor: Color.WHITE, showBackground: true,
-        backgroundColor: Color.fromCssColorString("#c01a0e").withAlpha(0.92),
-        style: LabelStyle.FILL, pixelOffset: new Cartesian2(0, -14),
-        verticalOrigin: VerticalOrigin.BOTTOM, scaleByDistance: new NearFarScalar(200, 1, 3000, 0.5),
-      },
-    });
-    boothEntities.push({ lane: b.lane, disc });
-  }
-
-  // ONE "Toll plaza" label on the centre-line. Use a stable id + a CallbackProperty position so a
-  // rebuild REPLACES it (entities.add with an existing id throws → remove-then-add) instead of stacking
-  // a new label every time (that stacking was the "TOLL PLAZA × 9" bug).
+function rebuildBoothMarkers() {
+  // All markers place via the renderer through T.sumoToWorld (tracking:true) — marking rebuilds T,
+  // so booth discs and the plaza label follow. The gate ✕ label is a per-frame callback on isClosed.
+  R.clearMarkers();
   const boothX = META ? META.boothX : (T ? T.p.sumoRefX : 530);
-  const existing = viewer.entities.getById("toll-plaza-label");
-  if (existing) viewer.entities.remove(existing);
+  for (const b of BOOTHS) {
+    R.placeMarker({
+      id: `booth:${b.lane}`, x: boothX, y: b.y, tracking: true,
+      disc: { radiusM: 1.8, colorCss: b.cash ? "#ff9b1a" : "#1ccb40", alpha: 0.9 },
+      label: { kind: "gate", textFn: () => (isClosed(b.lane) ? "✕" : "") },
+    });
+  }
+  // ONE "TOLL PLAZA" label on the centre-line (id-keyed, so a rebuild replaces it — the fix for the
+  // old "TOLL PLAZA × 9" stacking bug).
   if (T) {
-    viewer.entities.add({
-      id: "toll-plaza-label",
-      position: new CallbackProperty(() => T.sumoToWorld(boothX - 26, 0), false),
-      label: {
-        text: "TOLL PLAZA", font: "bold 13px sans-serif",
-        fillColor: Color.fromCssColorString("#bfe0ff"), showBackground: true,
-        backgroundColor: Color.fromCssColorString("#0d1621").withAlpha(0.85),
-        scaleByDistance: new NearFarScalar(200, 1, 4000, 0.45),
-      },
+    R.placeMarker({
+      id: "toll-plaza-label", x: boothX - 26, y: 0, tracking: true,
+      label: { kind: "plaza", text: "TOLL PLAZA" },
     });
   }
 }
@@ -174,7 +141,7 @@ async function loadRun(viewer, url) {
   META = data.meta;
   BOOTHS = computeBooths(META);
   R.clearSampled();
-  rebuildBoothMarkers(viewer);
+  rebuildBoothMarkers();
   // New scenario data invalidates any active work-zone overlay (stale geometry/KPIs).
   clearWorkZone(viewer);
   activeWorkzoneSpec = null;
@@ -219,16 +186,9 @@ function applyWeatherOverlay(preset, sendToServer = true) {
     }
   }
 
-  // Fog: lower Cesium scene fog density so distant vehicles fade
-  if (window.__viewer) {
-    const fog = window.__viewer.scene.fog;
-    if (preset === "fog") {
-      fog.enabled = true;
-      fog.density = 0.002;
-    } else {
-      fog.enabled = false;
-    }
-  }
+  // Fog: lower scene fog density so distant vehicles fade
+  if (preset === "fog") R.setFog(true, 0.002);
+  else R.setFog(false);
 
   if (sendToServer) sendCmd({ cmd: "setWeather", preset });
 }
@@ -359,11 +319,7 @@ function renderKpis(s) {
 let obliqueOn = false;
 function frameCamera(viewer) {
   if (!T) return;
-  const tgt = T.sumoToWorld(T.p.sumoRefX, 0);
-  const headingRad = T.headingRad(90);
-  const pitch = CMath.toRadians(obliqueOn ? -32 : -80);
-  viewer.camera.lookAt(tgt, new HeadingPitchRange(headingRad, pitch, obliqueOn ? 360 : 300));
-  viewer.camera.lookAtTransform(Matrix4.IDENTITY);
+  R.frameCamera({ x: T.p.sumoRefX, y: 0, headingDeg: 90, oblique: obliqueOn });
 }
 
 // ============================================================================ traffic gate
@@ -428,7 +384,7 @@ function onMeta(viewer, m) {
     };
   }
   BOOTHS = computeBooths(META);
-  rebuildBoothMarkers(viewer);
+  rebuildBoothMarkers();
   renderGatePanel();
   closedSet = new Set(m.closed || []);
   setStatus("Live · waiting for first step…");
@@ -609,7 +565,7 @@ function renderWorkzoneHud() {
 // The user marks the road direction (2 clicks) then clicks each real toll gate on the aerial.
 // Marking rebuilds T from the clicks, then reloads vehicles (placed via T.sumoToWorld) AND
 // rebuilds booth markers (also via T.sumoToWorld) — so traffic and markers always coincide.
-const mark = { on: false, dir: [], gates: [], handler: null };
+const mark = { on: false, dir: [], gates: [] };
 function buildTransformFromMarks(dir, gates) {
   const [up, down] = dir;
   const mLat = 110540, mLon0 = 111320 * Math.cos(CMath.toRadians(up.lat));
@@ -643,28 +599,26 @@ function finishMarking(viewer, btn) {
 function installMarking(viewer) {
   const btn = $("btn-calib");
   if (!btn) return;
+  // Register the pick handler once; it only acts while mark.on. The renderer delivers {lon,lat}.
+  R.onPick((ll) => {
+    if (!mark.on) return;
+    if (!ll) { setStatus("Couldn't read that point — click on the road."); return; }
+    if (mark.dir.length === 0) { mark.dir.push(ll); setStatus("Mark 2 — click a point DOWN-road (travel direction)"); return; }
+    if (mark.dir.length === 1) { mark.dir.push(ll); setStatus("Now click EACH toll gate left→right. Click ✓ Finish when done."); return; }
+    mark.gates.push(ll);
+    // Preview the new transform after each gate click so markers track the clicks.
+    if (mark.gates.length >= 2) {
+      setTransform(buildTransformFromMarks(mark.dir, mark.gates));
+    }
+    rebuildBoothMarkers();
+    setStatus(`Gate ${mark.gates.length} marked — keep clicking gates, or ✓ Finish.`);
+  });
   btn.onclick = () => {
     if (mark.on) { finishMarking(viewer, btn); return; }   // 2nd click = Finish
     mark.on = true; mark.dir = []; mark.gates = [];
     R.clock.pause();   // Bug 1 fix: pause traffic while user is picking points
     btn.textContent = "✓ Finish"; btn.classList.add("on");
     setStatus("Mark 1 — click a point UP-road (where traffic enters)");
-    if (mark.handler) return;
-    mark.handler = new ScreenSpaceEventHandler(viewer.scene.canvas);
-    mark.handler.setInputAction((click) => {
-      if (!mark.on) return;
-      const ll = CoordinateTransform.pickLonLat(viewer, click.position);
-      if (!ll) { setStatus("Couldn't read that point — click on the road."); return; }
-      if (mark.dir.length === 0) { mark.dir.push(ll); setStatus("Mark 2 — click a point DOWN-road (travel direction)"); return; }
-      if (mark.dir.length === 1) { mark.dir.push(ll); setStatus("Now click EACH toll gate left→right. Click ✓ Finish when done."); return; }
-      mark.gates.push(ll);
-      // Preview the new transform after each gate click so markers track the clicks.
-      if (mark.gates.length >= 2) {
-        setTransform(buildTransformFromMarks(mark.dir, mark.gates));
-      }
-      rebuildBoothMarkers(viewer);
-      setStatus(`Gate ${mark.gates.length} marked — keep clicking gates, or ✓ Finish.`);
-    }, ScreenSpaceEventType.LEFT_CLICK);
   };
 }
 async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); startTraffic(viewer); }
