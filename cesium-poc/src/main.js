@@ -8,23 +8,16 @@
  * This means BOTH vehicles AND gate markers go through the same T, so marking at any location
  * on the map moves traffic WITH the markers — the mark-coupling invariant is always maintained.
  */
-import {
-  Ion, Viewer, Terrain, Cartesian3, Color, JulianDate, Math as CMath,
-  SampledPositionProperty, SampledProperty, Transforms, Matrix4,
-  TimeInterval, TimeIntervalCollection, ClockRange, ExtrapolationType,
-  HermitePolynomialApproximation, EllipsoidTerrainProvider, UrlTemplateImageryProvider,
-  ImageryLayer, HeadingPitchRange, HeadingPitchRoll, ConstantPositionProperty,
-  CallbackProperty, LabelStyle, VerticalOrigin, Cartesian2, NearFarScalar,
-  ScreenSpaceEventHandler, ScreenSpaceEventType,
-} from "cesium";
-import "cesium/Build/Cesium/Widgets/widgets.css";
+// main.js is renderer-AGNOSTIC: it owns orchestration (scenario state, websocket, KPIs, gates,
+// marking) and drives a renderer adapter. It imports NO Cesium types directly — the CesiumRenderer
+// (and, behind ?renderer=arcgis, an ArcGIS adapter) own everything renderer-specific.
 import "./style.css";
 import { CoordinateTransform } from "./transform.js";
 import { buildWorkZone, clearWorkZone, rilcaWorkzone, CLOSURE_CONFIG } from "./workzone.js";
 import { CesiumRenderer } from "./renderers/cesium.js";
 
+const toRad = (deg) => (deg * Math.PI) / 180;
 const ION = import.meta.env.VITE_CESIUM_ION_TOKEN;
-if (ION) Ion.defaultAccessToken = ION;
 
 const N_BOOTHS = 10;
 // Fixed plaza half-span: 10 lanes x 3.2 m / 2 = 14.4 m. The plaza core (fo/pl/fi) stays a straight,
@@ -100,7 +93,7 @@ function computeBooths(meta) {
 // The Cesium renderer adapter owns viewer creation (see renderers/cesium.js). main() holds
 // the returned Viewer as `viewer` and drives it directly for concerns not yet moved behind
 // the adapter; window.__viewer stays the same object so the e2e contract is unchanged.
-const R = new CesiumRenderer();
+let R = null;  // the active renderer adapter (Cesium by default; ArcGIS via ?renderer=arcgis). Set in main().
 /** Set the active transform on BOTH the module (markers/camera still read it) and the renderer. */
 function setTransform(t) { T = t; R.setTransform(t); }
 
@@ -568,12 +561,12 @@ function renderWorkzoneHud() {
 const mark = { on: false, dir: [], gates: [] };
 function buildTransformFromMarks(dir, gates) {
   const [up, down] = dir;
-  const mLat = 110540, mLon0 = 111320 * Math.cos(CMath.toRadians(up.lat));
+  const mLat = 110540, mLon0 = 111320 * Math.cos(toRad(up.lat));
   const bearingDeg = ((Math.atan2((down.lon - up.lon) * mLon0, (down.lat - up.lat) * mLat) * 180) / Math.PI + 360) % 360;
   const anchorLon = gates.reduce((s, g) => s + g.lon, 0) / gates.length;
   const anchorLat = gates.reduce((s, g) => s + g.lat, 0) / gates.length;
-  const mLon = 111320 * Math.cos(CMath.toRadians(anchorLat));
-  const Br = CMath.toRadians(bearingDeg);
+  const mLon = 111320 * Math.cos(toRad(anchorLat));
+  const Br = toRad(bearingDeg);
   const perp = (g) => ((g.lon - anchorLon) * mLon) * -Math.cos(Br) + ((g.lat - anchorLat) * mLat) * Math.sin(Br);
   const ps = gates.map(perp);
   const span = (Math.max(...ps) - Math.min(...ps)) || 1;
@@ -625,6 +618,10 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
 
 // ============================================================================ boot
 (async function main() {
+  // Renderer switch: ?renderer=arcgis selects the ArcGIS adapter (wired in a later step); default Cesium.
+  const useArcgis = new URLSearchParams(location.search).get("renderer") === "arcgis";
+  if (useArcgis) console.warn("[renderer] ArcGIS path not yet available; falling back to Cesium.");
+  R = new CesiumRenderer();
   const viewer = await R.init("cesiumContainer", { ionToken: ION });
   const bBase = $("btn-baseline"), bInt = $("btn-intervention"), bLive = $("btn-live");
 
@@ -716,7 +713,8 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
   }
 
   // debug hooks for headless verification
-  window.__viewer = viewer;
+  window.__viewer = viewer;      // Cesium-specific (raw Viewer) — the existing e2e contract
+  window.__view = R.raw();       // renderer-neutral alias for future renderer-agnostic specs
   window.__startTraffic = () => startTraffic(viewer);
   window.__markGates = (dir, gates) => { mark.dir = dir; mark.gates = gates; finishMarking(viewer, $("btn-calib")); };
   // Feature B: MUTCD/RILCA work-zone lane closure hooks (TTC overlay + KPIs) — see closeLaneHook.

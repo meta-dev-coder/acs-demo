@@ -6,7 +6,10 @@
     <title>I-595 Toll-Plaza Flow — SUMO × Cesium</title>
   </head>
   <body>
+    <!-- Render surface. Exactly one is populated per load: Cesium by default, or the ArcGIS
+         SceneView when the app is opened with ?renderer=arcgis. Both fill the viewport (style.css). -->
     <div id="cesiumContainer"></div>
+    <div id="arcgisContainer" style="display:none"></div>
 
     <!-- Title + scenario story -->
     <div id="hud" class="panel">
