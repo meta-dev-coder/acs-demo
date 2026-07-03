@@ -5,7 +5,9 @@ road_centerline.py — Fetch (or fall back to hardcoded) I-595 centerline near t
 Sources tried in order:
   1. FDOT FeatureServer/15 (RCI Roads, outSR EPSG:26917) — authoritative FDOT data
   2. OSM Overpass (highway=motorway) — open-data fallback, ~1 m after pyproj projection
-  3. Hardcoded digitized I-595 polyline — network-free last resort (designed for > 8° curve)
+  3. road_detect.py — weakly-supervised ML segmentation on Esri imagery, only when
+     1+2 both fail and a cached mosaic or the network is available (see road_detect.py)
+  4. Hardcoded digitized I-595 polyline — network-free last resort (designed for > 8° curve)
 
 Caches result to sumo/centerline.json:
   { "utm": [[E, N], ...],   # UTM 17N (EPSG:26917)
@@ -75,6 +77,15 @@ def _lonlat_to_utm(lonlat_list):
     from pyproj import Transformer
     fwd = Transformer.from_crs("EPSG:4326", "EPSG:32617", always_xy=True)
     return [fwd.transform(lon, lat) for lon, lat in lonlat_list]
+
+
+def _utm_to_lonlat(utm_list):
+    """Inverse of _lonlat_to_utm: project a list of (E, N) UTM 17N to (lon, lat).
+    Raises on pyproj failure. Added for road_detect.py's tile <-> UTM geotransform
+    math (Esri tile pixel bounds are looked up in lon/lat, mosaic content is in UTM)."""
+    from pyproj import Transformer
+    inv = Transformer.from_crs("EPSG:32617", "EPSG:4326", always_xy=True)
+    return [inv.transform(E, N) for E, N in utm_list]
 
 
 def _resample(utm_pts, spacing=10.0):
@@ -246,6 +257,28 @@ def _fetch_overpass(E0, N0):
     return best_pts, best_lanes
 
 
+# ── Source 3: weakly-supervised ML road detector (imagery, last resort) ──────
+
+def _fetch_ml(E0, N0):
+    """
+    Source 3: road_detect.py's weakly-supervised (logistic-regression-on-Esri-
+    imagery) centerline extractor. Only reached when both FDOT and Overpass have
+    failed. Prefers the cached mosaic/affine written by a previous run (offline,
+    fast); otherwise attempts a bounded live Esri tile fetch. Raises — like the
+    other two sources — if neither a cache nor a network is usable, so the caller
+    falls through to the hardcoded polyline.
+
+    Note: road_detect.detect() reads sumo/centerline.json directly (the last
+    successfully-committed vector prior) as its weak-supervision signal — it does
+    NOT call load() again, so there is no re-entrancy here.
+    """
+    import road_detect
+    result = road_detect.detect(offline=False)
+    utm_pts = [tuple(p) for p in result["utm"]]
+    lane_count = int(result.get("laneCount", DEFAULT_LANE_COUNT))
+    return utm_pts, lane_count
+
+
 # ── Hardcoded fallback ────────────────────────────────────────────────────────
 
 def _hardcoded():
@@ -326,6 +359,7 @@ def load(force_refresh=False):
 
     for label, fn in [("FDOT",       lambda: _fetch_fdot(E0, N0)),
                       ("Overpass",   lambda: _fetch_overpass(E0, N0)),
+                      ("ML",         lambda: _fetch_ml(E0, N0)),
                       ("hardcoded",  _hardcoded)]:
         try:
             raw_pts, lc = fn()
