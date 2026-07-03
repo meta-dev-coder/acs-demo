@@ -26,21 +26,13 @@ import { CesiumRenderer } from "./renderers/cesium.js";
 const ION = import.meta.env.VITE_CESIUM_ION_TOKEN;
 if (ION) Ion.defaultAccessToken = ION;
 
-const EPOCH = JulianDate.fromIso8601("2025-01-01T00:00:00Z");
+// Marker/vehicle colours. Vehicle appearance (model/scale/yaw) lives in the renderer adapter;
+// COLORS stays here because booth markers use it too (moves to the adapter with markers).
 const COLORS = {
   cash: Color.fromCssColorString("#ff9b1a"),
   etc: Color.fromCssColorString("#1ccb40"),
   truck: Color.fromCssColorString("#3a80e8"),
 };
-// Vehicle model sizing:
-//   car.glb — native body 4.8 m long (X=-2.4..+2.4), 2.0 m wide, 1.35 m tall.  scale=1.0 → real sedan.
-//   truck.glb — Cesium Milk Truck, native Z span ≈4.87 m.  scale=2.465 → ~12 m semi.
-const VEHICLE_SCALE   = { car: 1.0, truck: 1.25 };    // truck ~2.5× car length, not 5×
-const MIN_PIXEL_SIZE  = { car: 26,  truck: 30    };   // keep visible at max zoom-out
-// Per-model yaw correction (deg): each glTF has its own native forward axis, so align the mesh's
-// nose to the travel heading. Tuned by screenshot so cars/trucks point ALONG the corridor.
-const MODEL_YAW_OFFSET = { car: -110, truck: -30 };   // mesh nose alignment (tuned per request)
-const DIMS = { cash: [4.8, 2.0, 1.6], etc: [4.8, 2.0, 1.6], truck: [12, 2.6, 3.2] };
 const N_BOOTHS = 10;
 // Fixed plaza half-span: 10 lanes x 3.2 m / 2 = 14.4 m. The plaza core (fo/pl/fi) stays a straight,
 // symmetric-about-y=0 tangent by design (Feature A curved-road net — see sumo/georef_nodes.py), so
@@ -116,14 +108,8 @@ function computeBooths(meta) {
 // the returned Viewer as `viewer` and drives it directly for concerns not yet moved behind
 // the adapter; window.__viewer stays the same object so the e2e contract is unchanged.
 const R = new CesiumRenderer();
-
-// orientation quaternion for a SUMO/compass angle, at the plaza-centre frame.
-// `type` selects the per-model yaw correction so the mesh nose points along travel.
-function orientFor(angleDeg, type) {
-  const at = T.sumoToWorld(T.p.sumoRefX, 0);
-  const yaw = T.headingRad(angleDeg) + CMath.toRadians(MODEL_YAW_OFFSET[type === "truck" ? "truck" : "car"]);
-  return Transforms.headingPitchRollQuaternion(at, new HeadingPitchRoll(yaw, 0, 0));
-}
+/** Set the active transform on BOTH the module (markers/camera still read it) and the renderer. */
+function setTransform(t) { T = t; R.setTransform(t); }
 
 // ============================================================================ booth markers
 let boothEntities = [];
@@ -179,21 +165,15 @@ function rebuildBoothMarkers(viewer) {
 }
 
 // ============================================================================ offline playback
-let vehicleEntities = [];
 let currentData = null;
 let offlineUrl = "/data/baseline.json";
-
-function removeVehicles(viewer) {
-  vehicleEntities.forEach((e) => viewer.entities.remove(e));
-  vehicleEntities = [];
-}
 
 async function loadRun(viewer, url) {
   const data = await (await fetch(url)).json();
   currentData = data;
   META = data.meta;
   BOOTHS = computeBooths(META);
-  removeVehicles(viewer);
+  R.clearSampled();
   rebuildBoothMarkers(viewer);
   // New scenario data invalidates any active work-zone overlay (stale geometry/KPIs).
   clearWorkZone(viewer);
@@ -201,44 +181,13 @@ async function loadRun(viewer, url) {
 
   if (!T) { setStatus("⊕ Calibrate the road to place + start the traffic."); return; }
 
-  const height = T.p.anchorHeight || 3;
-
+  // Vehicles are placed via the renderer through T.sumoToWorld — marking rebuilds T, so traffic follows.
   for (const v of data.vehicles) {
-    const pos = new SampledPositionProperty();
-    pos.setInterpolationOptions({ interpolationDegree: 2, interpolationAlgorithm: HermitePolynomialApproximation });
-    pos.forwardExtrapolationType = ExtrapolationType.HOLD;
-    const ang = new SampledProperty(Number);
-    for (const [t, x, y, a] of v.samples) {
-      const time = JulianDate.addSeconds(EPOCH, t, new JulianDate());
-      // All vehicles placed via T.sumoToWorld — marking rebuilds T, so traffic follows.
-      const world = T.sumoToWorld(x, y);
-      pos.addSample(time, world);
-      ang.addSample(time, a);
-    }
-    const a0 = v.samples[0][3];
-    vehicleEntities.push(viewer.entities.add({
-      availability: new TimeIntervalCollection([new TimeInterval({
-        start: JulianDate.addSeconds(EPOCH, v.samples[0][0], new JulianDate()),
-        stop: JulianDate.addSeconds(EPOCH, v.samples[v.samples.length - 1][0], new JulianDate()),
-      })]),
-      position: pos,
-      orientation: new CallbackProperty((time) => orientFor(ang.getValue(time) ?? a0, v.type), false),
-      model: {
-        uri: v.type === "truck" ? "/models/truck.glb" : "/models/car.glb",
-        minimumPixelSize: MIN_PIXEL_SIZE[v.type === "truck" ? "truck" : "car"],
-        scale: VEHICLE_SCALE[v.type === "truck" ? "truck" : "car"],
-        color: COLORS[v.type] || Color.WHITE,
-        colorBlendMode: 2,  // MIX — tint while preserving model shape/shading
-        colorBlendAmount: 0.6,
-        silhouetteColor: Color.WHITE,
-        silhouetteSize: 1.0,
-      },
-    }));
+    R.addSampledVehicle({ type: v.type, samples: v.samples });
   }
-  viewer.clock.startTime = EPOCH.clone();
-  viewer.clock.stopTime = JulianDate.addSeconds(EPOCH, data.meta.tEnd, new JulianDate());
-  if (!trafficStarted) viewer.clock.currentTime = EPOCH.clone();
-  viewer.clock.shouldAnimate = trafficStarted;
+  R.clock.setRange(0, data.meta.tEnd);
+  if (!trafficStarted) R.clock.seek(0);
+  R.clock.setPlaying(trafficStarted);
   renderKpis(data.stats);
   if (trafficStarted) setStatus(`${data.vehicles.length} vehicles · ${Math.round(data.meta.tEnd)} s sim`);
 }
@@ -422,20 +371,18 @@ let calibrated = false;
 let trafficStarted = false;
 function startTraffic(viewer) {
   trafficStarted = true;
-  viewer.clock.currentTime = EPOCH.clone();
-  viewer.clock.shouldAnimate = true;
+  R.clock.seek(0);
+  R.clock.play();
 }
 
 // ============================================================================ live mode
 let ws = null, liveMode = false;
-const liveEntities = new Map();
 function setConn(on, text) { const e = $("conn"); e.className = "conn " + (on ? "on" : "off"); e.textContent = text; }
-function clearLive(viewer) { for (const e of liveEntities.values()) viewer.entities.remove(e); liveEntities.clear(); }
 
 function startLive(viewer) {
   liveMode = true;
-  viewer.clock.shouldAnimate = false;
-  removeVehicles(viewer);
+  R.clock.pause();
+  R.clearSampled();
   setConn(false, "socket: connecting…");
   $("gatePanel").classList.remove("hidden");
   try { ws = new WebSocket(WS_URL); } catch { setConn(false, "socket: failed"); return; }
@@ -451,7 +398,7 @@ function startLive(viewer) {
 function stopLive(viewer) {
   liveMode = false;
   if (ws) { try { ws.close(); } catch {} ws = null; }
-  clearLive(viewer);
+  R.clearLiveVehicles();
   closedSet = new Set();
   $("gatePanel").classList.add("hidden");
   setConn(false, "socket: offline");
@@ -491,32 +438,13 @@ function onStep(viewer, m) {
   const seen = new Set();
   for (const v of m.vehicles) {
     seen.add(v.id);
-    // Live data carries raw local SUMO x,y — place via T.sumoToWorld.
-    const world = T ? T.sumoToWorld(v.x, v.y) : null;
-    if (!world) continue;
-    let e = liveEntities.get(v.id);
-    if (!e) {
-      e = viewer.entities.add({
-        position: new ConstantPositionProperty(world),
-        orientation: orientFor(v.angle, v.type),
-        model: {
-          uri: v.type === "truck" ? "/models/truck.glb" : "/models/car.glb",
-          minimumPixelSize: MIN_PIXEL_SIZE[v.type === "truck" ? "truck" : "car"],
-          scale: VEHICLE_SCALE[v.type === "truck" ? "truck" : "car"],
-          color: COLORS[v.type] || Color.WHITE,
-          colorBlendMode: 2,  // MIX — tint while preserving model shape/shading
-          colorBlendAmount: 0.6,
-          silhouetteColor: Color.WHITE,
-          silhouetteSize: 1.0,
-        },
-      });
-      liveEntities.set(v.id, e);
-    } else {
-      e.position.setValue(world);
-      e.orientation = orientFor(v.angle, v.type);
-    }
+    // Live data carries raw local SUMO x,y — the renderer places it via T.sumoToWorld.
+    if (!T) continue;
+    const p = { id: v.id, type: v.type, x: v.x, y: v.y, angleDeg: v.angle };
+    if (R.hasVehicle(v.id)) R.updateVehicle(p);
+    else R.addLiveVehicle(p);
   }
-  for (const [id, e] of liveEntities) if (!seen.has(id)) { viewer.entities.remove(e); liveEntities.delete(id); }
+  for (const id of R.liveIds()) if (!seen.has(id)) R.removeVehicle(id);
   syncGateButtons();
   const s = m.stats || {};
   // Render KPIs from live step when the stats carry the Phase 0 schema.
@@ -702,7 +630,7 @@ function buildTransformFromMarks(dir, gates) {
 function finishMarking(viewer, btn) {
   if (mark.dir.length < 2 || mark.gates.length < 2) { setStatus("Mark up-road, down-road, then at least 2 gates."); return; }
   // Build a new T from the user's clicks; BOTH vehicles and booth markers use T.sumoToWorld.
-  T = buildTransformFromMarks(mark.dir, mark.gates);
+  setTransform(buildTransformFromMarks(mark.dir, mark.gates));
   calibrated = true; mark.on = false;
   btn.textContent = "⊕ Mark gates"; btn.classList.remove("on", "pulse");
   try { localStorage.setItem(siteKey(siteId), JSON.stringify({ t: T.toJSON(), g: mark.gates })); } catch {}
@@ -718,7 +646,7 @@ function installMarking(viewer) {
   btn.onclick = () => {
     if (mark.on) { finishMarking(viewer, btn); return; }   // 2nd click = Finish
     mark.on = true; mark.dir = []; mark.gates = [];
-    viewer.clock.shouldAnimate = false;   // Bug 1 fix: pause traffic while user is picking points
+    R.clock.pause();   // Bug 1 fix: pause traffic while user is picking points
     btn.textContent = "✓ Finish"; btn.classList.add("on");
     setStatus("Mark 1 — click a point UP-road (where traffic enters)");
     if (mark.handler) return;
@@ -732,7 +660,7 @@ function installMarking(viewer) {
       mark.gates.push(ll);
       // Preview the new transform after each gate click so markers track the clicks.
       if (mark.gates.length >= 2) {
-        T = buildTransformFromMarks(mark.dir, mark.gates);
+        setTransform(buildTransformFromMarks(mark.dir, mark.gates));
       }
       rebuildBoothMarkers(viewer);
       setStatus(`Gate ${mark.gates.length} marked — keep clicking gates, or ✓ Finish.`);
@@ -748,13 +676,13 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
 
   // Every site ships a default transform, so the app is ALWAYS placed enough to render — it flies
   // straight to the plaza (never the bare globe) and starts traffic. ⊕ Mark gates refines placement.
-  { const s = loadSite(siteId); T = s.transform; }
+  { const s = loadSite(siteId); setTransform(s.transform); }
   calibrated = true;
   trafficStarted = true;          // ship-with-default-transform → run immediately (no globe, no blank)
   _currentScenario = "baseline";  // boot always loads baseline; ensures baselineStats is captured
 
   await loadRun(viewer, offlineUrl);
-  viewer.clock.currentTime = EPOCH.clone();  // ensure sim starts at t=0 on boot
+  R.clock.seek(0);  // ensure sim starts at t=0 on boot
   renderGatePanel();
   installMarking(viewer);
 
@@ -807,7 +735,7 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
     sel.value = siteId;
     sel.onchange = async () => {
       siteId = sel.value;
-      { const s = loadSite(siteId); T = s.transform; }
+      { const s = loadSite(siteId); setTransform(s.transform); }
       stopLive(viewer);
       [bInt, bLive].forEach((b) => b.classList.remove("on")); bBase.classList.add("on");
       offlineUrl = "/data/baseline.json";
