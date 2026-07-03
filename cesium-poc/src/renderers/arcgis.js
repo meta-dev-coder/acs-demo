@@ -19,6 +19,8 @@ import Graphic from "@arcgis/core/Graphic.js";
 import Point from "@arcgis/core/geometry/Point.js";
 import PointSymbol3D from "@arcgis/core/symbols/PointSymbol3D.js";
 import ObjectSymbol3DLayer from "@arcgis/core/symbols/ObjectSymbol3DLayer.js";
+import IconSymbol3DLayer from "@arcgis/core/symbols/IconSymbol3DLayer.js";
+import TextSymbol3DLayer from "@arcgis/core/symbols/TextSymbol3DLayer.js";
 
 // Per-type vehicle appearance (ArcGIS palette + glb). Sizes are exaggerated ~3x real so the vehicles
 // read clearly at the top-down demo zoom (ArcGIS has no Cesium-style minimumPixelSize floor).
@@ -45,6 +47,7 @@ export class ArcgisRenderer {
     this._live = new Map();  // id -> graphic
     this._markers = new Map();
     this._raf = null;
+    this._pickHandle = null;
     // Clock: seconds since a sim epoch, advanced by wall-clock * multiplier while playing.
     this._clock = { t0: 0, t1: 0, mult: 6, cur: 0, playing: false, lastWall: 0 };
     this.clock = {
@@ -90,13 +93,14 @@ export class ArcgisRenderer {
   setTransform(T) { this._T = T; }
   raw() { return this._view; }
   vehicleCount() { return this._gfx ? this._gfx.graphics.length : 0; }
+  markerCount() { return this._markerLayer ? this._markerLayer.graphics.length : 0; }
 
   // ---- internal rAF loop (advances sim clock + interpolates sampled vehicles) ----
   _ensureRaf() {
     if (this._raf != null) return;
     const loop = () => {
       this._tick();
-      this._raf = (this._clock.playing || this._sampled.length) ? requestAnimationFrame(loop) : null;
+      this._raf = (this._clock.playing || this._sampled.length || this._markers.size) ? requestAnimationFrame(loop) : null;
     };
     this._raf = requestAnimationFrame(loop);
   }
@@ -109,6 +113,7 @@ export class ArcgisRenderer {
       c.lastWall = now;
       if (c.t1 > c.t0 && c.cur > c.t1) c.cur = c.t0;   // loop-stop → restart (matches Cesium LOOP_STOP feel)
     }
+    this._refreshMarkerLabels();
     if (!this._T || !this._sampled.length) return;
     const t = c.cur;
     for (const rec of this._sampled) {
@@ -205,8 +210,67 @@ export class ArcgisRenderer {
   liveIds() { return Array.from(this._live.keys()); }
   removeVehicle(id) { const g = this._live.get(id); if (g) { this._gfx.remove(g); this._live.delete(id); } }
   clearLiveVehicles() { for (const g of this._live.values()) this._gfx.remove(g); this._live.clear(); }
-  placeMarker(_m) { /* chunk 9 */ }
+  // ---- markers (booth discs + gate ✕ / TOLL PLAZA labels) ----
+  _markerSymbol(m, text) {
+    const layers = [];
+    if (m.disc) {
+      layers.push(new IconSymbol3DLayer({
+        resource: { primitive: "circle" },
+        material: { color: m.disc.colorCss },
+        outline: { color: [255, 255, 255, 0.9], size: 1 },
+        size: 11,
+      }));
+    }
+    if (m.label && text) {
+      const plaza = m.label.kind === "plaza";
+      layers.push(new TextSymbol3DLayer({
+        text,
+        material: { color: plaza ? "#bfe0ff" : "#ffffff" },
+        halo: { color: plaza ? [13, 22, 33, 0.9] : [192, 26, 14, 0.95], size: 2 },
+        size: plaza ? 11 : 13,
+        font: { size: plaza ? 11 : 13, weight: "bold" },
+      }));
+    }
+    return new PointSymbol3D({ symbolLayers: layers, verticalOffset: m.label && !m.disc ? { screenLength: 0 } : undefined });
+  }
+
+  placeMarker(m) {
+    const existing = this._markers.get(m.id);
+    if (existing) this._markerLayer.remove(existing.graphic);
+    const { lon, lat } = this._T.sumoToLonLat(m.x, m.y);
+    const text = m.label ? (m.label.textFn ? m.label.textFn() : m.label.text) : null;
+    const g = new Graphic({
+      geometry: new Point({ longitude: lon, latitude: lat, z: 0 }),
+      symbol: this._markerSymbol(m, text),
+    });
+    this._markerLayer.add(g);
+    this._markers.set(m.id, { graphic: g, spec: m, lastText: text });
+    this._ensureRaf();  // so gate ✕ label refreshes appear even while paused
+  }
+
   clearMarkers() { this._markerLayer?.removeAll(); this._markers.clear(); }
-  onPick(_cb) { /* chunk 9 */ }
+
+  // Re-evaluate live label callbacks (gate ✕ toggles) and rebuild only changed marker symbols.
+  _refreshMarkerLabels() {
+    for (const rec of this._markers.values()) {
+      const fn = rec.spec.label?.textFn;
+      if (!fn) continue;
+      const text = fn();
+      if (text !== rec.lastText) {
+        rec.lastText = text;
+        rec.graphic.symbol = this._markerSymbol(rec.spec, text);
+      }
+    }
+  }
+
+  // ---- pick (mark-gates): SceneView click gives the ground map point directly ----
+  onPick(cb) {
+    if (this._pickHandle || !this._view) return;
+    this._pickHandle = this._view.on("click", (e) => {
+      const mp = e.mapPoint;
+      cb(mp ? { lon: mp.longitude, lat: mp.latitude } : null);
+    });
+  }
+
   setFog(_enabled, _density) { /* ArcGIS: no direct analog; no-op */ }
 }
