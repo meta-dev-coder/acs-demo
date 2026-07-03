@@ -694,6 +694,36 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
     frameCamera(viewer);
   };
 
+  // ---- Renderer badge: make it obvious which 3D engine is drawing ----
+  const badge = $("renderer-badge");
+  if (badge) {
+    badge.textContent = useArcgis ? "Esri · ArcGIS" : "CesiumJS";
+    badge.classList.add(useArcgis ? "arcgis" : "cesium");
+  }
+
+  // ---- Minimize / expand the control panel ----
+  const collapseBtn = $("btn-collapse");
+  if (collapseBtn) {
+    collapseBtn.onclick = () => {
+      const collapsed = $("hud").classList.toggle("collapsed");
+      collapseBtn.textContent = collapsed ? "▸" : "▾";
+      collapseBtn.setAttribute("aria-expanded", String(!collapsed));
+      collapseBtn.title = collapsed ? "Expand panel" : "Minimize panel";
+    };
+  }
+
+  // ---- Playback speed (both renderers, via the shared clock adapter) ----
+  const speedSeg = $("speed-seg");
+  if (speedSeg) {
+    const speedBtns = speedSeg.querySelectorAll("button");
+    speedBtns.forEach((b) => {
+      b.onclick = () => {
+        R.clock.setMultiplier(Number(b.dataset.mult));
+        speedBtns.forEach((x) => x.classList.toggle("on", x === b));
+      };
+    });
+  }
+
   // ---- SITE SELECTOR: switch the transform to a different real toll corridor (same SUMO plaza). ----
   const sel = $("site-select");
   if (sel) {
