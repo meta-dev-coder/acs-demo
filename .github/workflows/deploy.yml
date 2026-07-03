@@ -40,10 +40,13 @@ jobs:
           node-version: 24
       - run: npm install
         working-directory: cesium-poc
+      # relative base: vite-plugin-cesium nests its static copy under an absolute
+      # base (dist/<base>/cesium), which 404s when the app is served from a sub-path;
+      # './' keeps every asset URL relative to the page so it works under /acs-demo/twin/
       - run: npx vite build
         working-directory: cesium-poc
         env:
-          POC_BASE_PATH: /acs-demo/twin/
+          POC_BASE_PATH: ./
       - run: mkdir -p dist/twin && cp -R cesium-poc/dist/. dist/twin/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
