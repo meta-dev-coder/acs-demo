@@ -15,6 +15,21 @@ import Basemap from "@arcgis/core/Basemap.js";
 import SceneView from "@arcgis/core/views/SceneView.js";
 import WebTileLayer from "@arcgis/core/layers/WebTileLayer.js";
 import GraphicsLayer from "@arcgis/core/layers/GraphicsLayer.js";
+import Graphic from "@arcgis/core/Graphic.js";
+import Point from "@arcgis/core/geometry/Point.js";
+import PointSymbol3D from "@arcgis/core/symbols/PointSymbol3D.js";
+import ObjectSymbol3DLayer from "@arcgis/core/symbols/ObjectSymbol3DLayer.js";
+
+// Per-type vehicle appearance (ArcGIS palette + glb). Sizes are exaggerated ~3x real so the vehicles
+// read clearly at the top-down demo zoom (ArcGIS has no Cesium-style minimumPixelSize floor).
+const VEH = {
+  cash:  { href: "/models/car.glb",   color: [255, 155, 26],  w: 6,  d: 15, h: 5 },
+  etc:   { href: "/models/car.glb",   color: [28, 203, 64],   w: 6,  d: 15, h: 5 },
+  truck: { href: "/models/truck.glb", color: [58, 128, 232],  w: 7,  d: 22, h: 7 },
+};
+// glb nose vs ArcGIS heading (deg, CW from north): the world travel heading is the SUMO angle rotated
+// into the placed corridor; this per-model offset aligns the mesh nose to travel. Tuned by screenshot.
+const ARCGIS_YAW_OFFSET = { car: 90, truck: 90 };
 
 // @arcgis/core loads its workers/assets from a matching CDN by default; pin it explicitly so the
 // Vite dev/prod bundle never needs to copy them. (Keyless — same public Esri imagery Cesium uses.)
@@ -74,6 +89,7 @@ export class ArcgisRenderer {
 
   setTransform(T) { this._T = T; }
   raw() { return this._view; }
+  vehicleCount() { return this._gfx ? this._gfx.graphics.length : 0; }
 
   // ---- internal rAF loop (advances sim clock + interpolates sampled vehicles) ----
   _ensureRaf() {
@@ -93,7 +109,38 @@ export class ArcgisRenderer {
       c.lastWall = now;
       if (c.t1 > c.t0 && c.cur > c.t1) c.cur = c.t0;   // loop-stop → restart (matches Cesium LOOP_STOP feel)
     }
-    // Vehicle interpolation is wired in chunk 8.
+    if (!this._T || !this._sampled.length) return;
+    const t = c.cur;
+    for (const rec of this._sampled) {
+      if (t < rec.t0 || t > rec.t1) {
+        if (rec.graphic) { this._gfx.remove(rec.graphic); rec.graphic = null; }
+        continue;
+      }
+      const [x, y, a] = this._sampleAt(rec, t);
+      const { lon, lat } = this._T.sumoToLonLat(x, y);
+      const h = this._headingFor(a, rec.type);
+      if (!rec.graphic) {
+        rec.graphic = this._graphic(rec.type, lon, lat, h);
+        rec.lastH = h;
+        this._gfx.add(rec.graphic);
+      } else {
+        rec.graphic.geometry = new Point({ longitude: lon, latitude: lat, z: 0 });
+        // Only rebuild the symbol (glb re-instantiation) when the heading actually turns — cheap moves.
+        if (Math.abs(h - (rec.lastH ?? h)) > 2) { rec.graphic.symbol = this._symbol(rec.type, h); rec.lastH = h; }
+      }
+    }
+  }
+
+  // Linear-interpolate [x,y,angle] at sim time t, with a cached bracket index per vehicle.
+  _sampleAt(rec, t) {
+    const s = rec.samples;
+    let i = rec.idx || 0;
+    if (t < s[i][0]) i = 0;
+    while (i < s.length - 2 && s[i + 1][0] < t) i++;
+    rec.idx = i;
+    const a0 = s[i], a1 = s[Math.min(i + 1, s.length - 1)];
+    const f = a1[0] > a0[0] ? (t - a0[0]) / (a1[0] - a0[0]) : 0;
+    return [a0[1] + (a1[1] - a0[1]) * f, a0[2] + (a1[2] - a0[2]) * f, a0[3] + (a1[3] - a0[3]) * f];
   }
 
   // ---- camera ----
@@ -106,15 +153,58 @@ export class ArcgisRenderer {
     ).catch(() => {});
   }
 
-  // ---- stubs implemented in later chunks (present so ?renderer=arcgis boots cleanly) ----
-  addSampledVehicle(_v) { /* chunk 8 */ }
-  clearSampled() { this._gfx?.removeAll(); this._sampled = []; }
-  addLiveVehicle(_v) { /* chunk 8 */ }
-  updateVehicle(_v) { /* chunk 8 */ }
+  // ---- vehicle helpers ----
+  _carKey(type) { return type === "truck" ? "truck" : "car"; }
+  _headingFor(angleDeg, type) {
+    const off = ARCGIS_YAW_OFFSET[this._carKey(type)];
+    return (((angleDeg + (this._T?.p.bearingDeg || 0) + off) % 360) + 360) % 360;
+  }
+  _symbol(type, headingDeg) {
+    const s = VEH[type] || VEH.etc;
+    return new PointSymbol3D({
+      symbolLayers: [new ObjectSymbol3DLayer({
+        resource: { href: s.href },
+        width: s.w, depth: s.d, height: s.h, heading: headingDeg,
+        material: { color: s.color }, anchor: "bottom",
+      })],
+    });
+  }
+  _graphic(type, lon, lat, headingDeg) {
+    return new Graphic({
+      geometry: new Point({ longitude: lon, latitude: lat, z: 0 }),
+      symbol: this._symbol(type, headingDeg),
+    });
+  }
+
+  // ---- offline sampled track (driven by _tick) ----
+  addSampledVehicle(v) {
+    const s = v.samples;
+    this._sampled.push({ type: v.type, samples: s, t0: s[0][0], t1: s[s.length - 1][0], idx: 0, graphic: null });
+    this._ensureRaf();
+  }
+  clearSampled() {
+    for (const r of this._sampled) if (r.graphic) this._gfx.remove(r.graphic);
+    this._sampled = [];
+  }
+
+  // ---- live imperative vehicles ----
+  addLiveVehicle(v) {
+    const { lon, lat } = this._T.sumoToLonLat(v.x, v.y);
+    const g = this._graphic(v.type, lon, lat, this._headingFor(v.angleDeg, v.type));
+    this._gfx.add(g);
+    this._live.set(v.id, g);
+  }
+  updateVehicle(v) {
+    const g = this._live.get(v.id);
+    if (!g) return;
+    const { lon, lat } = this._T.sumoToLonLat(v.x, v.y);
+    g.geometry = new Point({ longitude: lon, latitude: lat, z: 0 });
+    g.symbol = this._symbol(v.type, this._headingFor(v.angleDeg, v.type));
+  }
   hasVehicle(id) { return this._live.has(id); }
   liveIds() { return Array.from(this._live.keys()); }
-  removeVehicle(id) { this._live.delete(id); }
-  clearLiveVehicles() { this._live.clear(); }
+  removeVehicle(id) { const g = this._live.get(id); if (g) { this._gfx.remove(g); this._live.delete(id); } }
+  clearLiveVehicles() { for (const g of this._live.values()) this._gfx.remove(g); this._live.clear(); }
   placeMarker(_m) { /* chunk 9 */ }
   clearMarkers() { this._markerLayer?.removeAll(); this._markers.clear(); }
   onPick(_cb) { /* chunk 9 */ }

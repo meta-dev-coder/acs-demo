@@ -729,6 +729,7 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
   // debug hooks for headless verification
   window.__viewer = useArcgis ? null : viewer;  // Cesium-specific (raw Viewer) — the existing e2e contract
   window.__view = R.raw();                        // renderer-neutral (Viewer or SceneView)
+  window.__R = R;                                 // the active renderer adapter (for renderer-specific specs)
   window.__arcgisReady = useArcgis;               // ArcGIS smoke specs wait on this
   window.__startTraffic = () => startTraffic(viewer);
   window.__markGates = (dir, gates) => { mark.dir = dir; mark.gates = gates; finishMarking(viewer, $("btn-calib")); };
