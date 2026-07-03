@@ -25,6 +25,11 @@ import { buildWorkZone, clearWorkZone, rilcaWorkzone, CLOSURE_CONFIG } from "./w
 const ION = import.meta.env.VITE_CESIUM_ION_TOKEN;
 if (ION) Ion.defaultAccessToken = ION;
 
+// Runtime fetch/model URIs are plain strings — Vite does NOT rewrite them at build time (unlike
+// index.html src/href attributes), so under a sub-path deploy (POC_BASE_PATH) they must be joined
+// against BASE_URL explicitly. dataUrl("data/baseline.json") -> "/acs-demo/twin/data/baseline.json".
+const dataUrl = (path) => import.meta.env.BASE_URL + path.replace(/^\//, "");
+
 const EPOCH = JulianDate.fromIso8601("2025-01-01T00:00:00Z");
 const COLORS = {
   cash: Color.fromCssColorString("#ff9b1a"),
@@ -56,7 +61,8 @@ const CASH_BY_SCENARIO = {
   intervention: new Set(["pl_0"]),
 };
 let activeCashLanes = CASH_BY_SCENARIO.baseline;
-const WS_URL = "ws://localhost:8765";
+// Default is localhost for local dev; a hosted page can point at any live server via ?ws=wss://host:port.
+const WS_URL = new URLSearchParams(location.search).get("ws") || "ws://localhost:8765";
 
 // ---- Feature B: MUTCD/RILCA work-zone lane closure (approach lanes only) ----
 const AP_LANES = ["ap_0", "ap_1", "ap_2"];
@@ -194,7 +200,7 @@ function rebuildBoothMarkers(viewer) {
 // ============================================================================ offline playback
 let vehicleEntities = [];
 let currentData = null;
-let offlineUrl = "/data/baseline.json";
+let offlineUrl = dataUrl("data/baseline.json");
 
 function removeVehicles(viewer) {
   vehicleEntities.forEach((e) => viewer.entities.remove(e));
@@ -237,7 +243,7 @@ async function loadRun(viewer, url) {
       position: pos,
       orientation: new CallbackProperty((time) => orientFor(ang.getValue(time) ?? a0, v.type), false),
       model: {
-        uri: v.type === "truck" ? "/models/truck.glb" : "/models/car.glb",
+        uri: v.type === "truck" ? dataUrl("models/truck.glb") : dataUrl("models/car.glb"),
         minimumPixelSize: MIN_PIXEL_SIZE[v.type === "truck" ? "truck" : "car"],
         scale: VEHICLE_SCALE[v.type === "truck" ? "truck" : "car"],
         color: COLORS[v.type] || Color.WHITE,
@@ -513,7 +519,7 @@ function onStep(viewer, m) {
         position: new ConstantPositionProperty(world),
         orientation: orientFor(v.angle, v.type),
         model: {
-          uri: v.type === "truck" ? "/models/truck.glb" : "/models/car.glb",
+          uri: v.type === "truck" ? dataUrl("models/truck.glb") : dataUrl("models/car.glb"),
           minimumPixelSize: MIN_PIXEL_SIZE[v.type === "truck" ? "truck" : "car"],
           scale: VEHICLE_SCALE[v.type === "truck" ? "truck" : "car"],
           color: COLORS[v.type] || Color.WHITE,
@@ -798,8 +804,8 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
     startTraffic(viewer);
     frameCamera(viewer);
   };
-  bBase.onclick = () => selectOffline("/data/baseline.json", bBase, "baseline");
-  bInt.onclick = () => selectOffline("/data/intervention.json", bInt, "intervention");
+  bBase.onclick = () => selectOffline(dataUrl("data/baseline.json"), bBase, "baseline");
+  bInt.onclick = () => selectOffline(dataUrl("data/intervention.json"), bInt, "intervention");
   bLive.onclick = () => {
     [bBase, bInt].forEach((b) => b.classList.remove("on"));
     bLive.classList.add("on");
@@ -823,7 +829,7 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
       { const s = loadSite(siteId); T = s.transform; }
       stopLive(viewer);
       [bInt, bLive].forEach((b) => b.classList.remove("on")); bBase.classList.add("on");
-      offlineUrl = "/data/baseline.json";
+      offlineUrl = dataUrl("data/baseline.json");
       trafficStarted = false;
       await loadRun(viewer, offlineUrl);
       startTraffic(viewer);

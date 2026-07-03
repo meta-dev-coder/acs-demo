@@ -18,6 +18,7 @@ import { RootLayout } from "./RootLayout";
 import { ProgressLinear } from "@itwin/itwinui-react";
 import { App } from "./App";
 import { TokenView } from "./TokenView";
+import { Landing } from "../app/Landing";
 
 const rootRoute = createRootRoute({
   component: RootLayout,
@@ -51,7 +52,12 @@ const indexRoute = createRoute({
   path: "/",
   component: function Index() {
     const { iTwinId, iModelId, changesetId } = indexRoute.useSearch();
-    const { state } = useAuthorizationContext();
+    const { state, signIn } = useAuthorizationContext();
+
+    if (state === AuthorizationState.Unauthenticated) {
+      // No cached IMS session — show the public landing instead of auto-redirecting to sign-in.
+      return <Landing onSignIn={() => void signIn()} />;
+    }
 
     return (
       <div className="viewer-container">

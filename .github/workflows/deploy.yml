@@ -34,6 +34,17 @@ jobs:
       # (e.g. /signin-callback) 404. Serving index.html as the 404 page boots the SPA,
       # which then handles the route — same role S3's "error document" played for water-poc.
       - run: cp dist/index.html dist/404.html
+      # SUMO×Cesium physics twin (needs Node 24; the iTwin toolchain above needs 22)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install
+        working-directory: cesium-poc
+      - run: npx vite build
+        working-directory: cesium-poc
+        env:
+          POC_BASE_PATH: /acs-demo/twin/
+      - run: mkdir -p dist/twin && cp -R cesium-poc/dist/. dist/twin/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

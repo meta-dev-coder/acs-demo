@@ -6,6 +6,7 @@
 import {
   createContext,
   type PropsWithChildren,
+  useCallback,
   useContext,
   useEffect,
   useState,
@@ -15,6 +16,9 @@ import { useNavigate } from "@tanstack/react-router";
 
 export enum AuthorizationState {
   Pending,
+  /** No cached session found — silent sign-in failed. Show the landing page; wait for the
+   *  user to opt in via `signIn()` rather than auto-redirecting to Bentley IMS. */
+  Unauthenticated,
   Authorized,
 }
 
@@ -30,6 +34,10 @@ function callbackPathname(): string {
 export interface AuthorizationContext {
   client: BrowserAuthorizationClient;
   state: AuthorizationState;
+  /** Explicit, user-initiated sign-in (landing page "Operational Twin" card). Tries a silent
+   *  refresh first, falling back to the interactive IMS redirect — the same sequence the app
+   *  used to fire automatically on mount. */
+  signIn: () => Promise<void>;
 }
 
 const authorizationContext = createContext<AuthorizationContext>({
@@ -39,13 +47,16 @@ const authorizationContext = createContext<AuthorizationContext>({
     scope: "",
   }),
   state: AuthorizationState.Pending,
+  signIn: async () => {},
 });
 
 export function useAuthorizationContext() {
   return useContext(authorizationContext);
 }
 
-const createAuthClient = (): AuthorizationContext => {
+type ClientState = Omit<AuthorizationContext, "signIn">;
+
+const createAuthClient = (): ClientState => {
   const client = new BrowserAuthorizationClient({
     scope: import.meta.env.IMJS_AUTH_CLIENT_SCOPES ?? "",
     clientId: import.meta.env.IMJS_AUTH_CLIENT_CLIENT_ID ?? "",
@@ -61,7 +72,7 @@ const createAuthClient = (): AuthorizationContext => {
 };
 
 export function AuthorizationProvider(props: PropsWithChildren<unknown>) {
-  const [contextValue, setContextValue] = useState<AuthorizationContext>(() =>
+  const [contextValue, setContextValue] = useState<ClientState>(() =>
     createAuthClient()
   );
 
@@ -77,21 +88,44 @@ export function AuthorizationProvider(props: PropsWithChildren<unknown>) {
 
   useEffect(() => {
     // On the OIDC callback route, the SignInRedirect component completes auth — don't also
-    // kick off silent/redirect here (it races the callback and can loop).
+    // kick off silent sign-in here (it races the callback and can loop).
     if (window.location.pathname === callbackPathname()) return;
-    const signIn = async () => {
+    let cancelled = false;
+    const trySilent = async () => {
       try {
+        // Quiet check for a cached/refreshable session — never prompts or redirects the
+        // browser. On success, onAccessTokenChanged (above) flips state to Authorized and the
+        // app boots straight into the viewer, same as before this change.
         await authClient.signInSilent();
       } catch {
-        await authClient.signInRedirect();
+        // No cached session: land on the pre-auth landing page instead of auto-firing the
+        // interactive IMS redirect. The user opts in via the "Operational Twin" card, which
+        // calls the `signIn` context method below.
+        if (!cancelled) {
+          setContextValue((prev) => ({
+            ...prev,
+            state: AuthorizationState.Unauthenticated,
+          }));
+        }
       }
     };
 
-    void signIn();
+    void trySilent();
+    return () => {
+      cancelled = true;
+    };
+  }, [authClient]);
+
+  const signIn = useCallback(async () => {
+    try {
+      await authClient.signInSilent();
+    } catch {
+      await authClient.signInRedirect();
+    }
   }, [authClient]);
 
   return (
-    <authorizationContext.Provider value={contextValue}>
+    <authorizationContext.Provider value={{ ...contextValue, signIn }}>
       {props.children}
     </authorizationContext.Provider>
   );
