@@ -15,6 +15,7 @@ import "./style.css";
 import { CoordinateTransform } from "./transform.js";
 import { buildWorkZone, clearWorkZone, rilcaWorkzone, CLOSURE_CONFIG } from "./workzone.js";
 import { CesiumRenderer } from "./renderers/cesium.js";
+import { assetKpis } from "./assetOps.js";
 
 const toRad = (deg) => (deg * Math.PI) / 180;
 const ION = import.meta.env.VITE_CESIUM_ION_TOKEN;
@@ -128,6 +129,84 @@ function rebuildBoothMarkers() {
       label: { kind: "plaza", text: "TOLL PLAZA" },
     });
   }
+  renderGantries();   // re-add gantry assets after any booth-marker rebuild (clearMarkers wiped them)
+}
+
+// ============================================================================ gantry assets (GIS layer)
+// The DNT toll gantries are geospatial ASSETS (Legacy / Headquarters / Gaylord), loaded from a GIS
+// export (public/data/dnt-gantries.json — stands in for a TxDOT/NTTA ArcGIS FeatureLayer). They place
+// onto the same corridor centerline as the traffic via T, and carry health status for the asset-ops
+// scenario. Rendered as cyan discs (red when a camera degrades) with name labels.
+let GANTRIES = [];
+let AVG_TOLL = 1.45;
+let assetIncidentOn = false;
+
+async function loadGantries() {
+  try {
+    const d = await (await fetch("/data/dnt-gantries.json")).json();
+    GANTRIES = (d.gantries || []).map((g) => ({ ...g }));
+    AVG_TOLL = d.avgTollUsd ?? 1.45;
+  } catch { GANTRIES = []; }
+}
+
+function renderGantries() {
+  if (!T) return;
+  for (const g of GANTRIES) {
+    const degraded = g.status === "degraded";
+    R.placeMarker({
+      id: `gantry:${g.id}`, x: g.station, y: 0, tracking: true,
+      disc: { radiusM: 3.4, colorCss: degraded ? "#ff4d4d" : "#39c0d6", alpha: 0.85 },
+      label: { kind: "gantry", text: g.name.replace(" Gantry", "") + (degraded ? " ⚠" : "") },
+    });
+  }
+}
+
+/** Fill the Asset Operations panel from the pure assetKpis engine + current throughput/weather. */
+function renderAssetOps() {
+  if (!$("assetops-hud")) return;
+  const throughput = window.__kpi?.throughputVph ?? currentData?.stats?.throughputVph ?? 0;
+  const state = { gantries: GANTRIES, weather: _activeWeather, throughputVph: throughput, avgTollUsd: AVG_TOLL, peak: assetIncidentOn };
+  const k = assetKpis(state);
+  const nominal = assetKpis({ ...state, gantries: GANTRIES.map((g) => ({ ...g, status: "healthy" })), weather: "clear", peak: false });
+  const riskDelta = k.revenueRiskPerHr - nominal.revenueRiskPerHr;
+
+  const glist = $("ao-gantries");
+  if (glist) glist.innerHTML = GANTRIES.map((g) => {
+    const deg = g.status === "degraded";
+    return `<div class="ao-g ${deg ? "deg" : ""}"><span class="ao-dot"></span><span class="ao-name">${g.name.replace(" Gantry", "")}</span><span class="ao-badge">${deg ? "DEGRADED" : "OK"}</span></div>`;
+  }).join("");
+
+  const kv = $("ao-kpis");
+  if (kv) {
+    const riskChip = assetIncidentOn && riskDelta > 0 ? ` <span class="ao-delta">▲ $${riskDelta.toLocaleString()}/hr vs nominal</span>` : "";
+    kv.innerHTML =
+      `<div class="ao-row"><span class="ao-k">Plate/tag read rate</span><span class="ao-v ${k.readRatePct < 97 ? "warn" : "good"}">${k.readRatePct}%</span></div>` +
+      `<div class="ao-row"><span class="ao-k">Missed reads</span><span class="ao-v">${k.missedPerHr.toLocaleString()}/hr</span></div>` +
+      `<div class="ao-row"><span class="ao-k">Revenue at risk</span><span class="ao-v ${assetIncidentOn && k.revenueRiskPerHr > 0 ? "warn" : ""}">$${k.revenueRiskPerHr.toLocaleString()}/hr${riskChip}</span></div>` +
+      `<div class="ao-row"><span class="ao-k">Congestion risk</span><span class="ao-v risk-${k.congestionRisk}">${k.congestionRisk}</span></div>` +
+      `<div class="ao-row"><span class="ao-k">Maintenance</span><span class="ao-v">${k.maintenance.priority === "HIGH" ? `<b class="warn">HIGH</b> · ${k.maintenance.target}` : "nominal"}</span></div>` +
+      (k.dispatch ? `<div class="ao-dispatch">🛠 ${k.dispatch}</div>` : "");
+  }
+  const btn = $("ao-run");
+  if (btn) {
+    btn.textContent = assetIncidentOn ? "Reset — restore healthy + clear" : "Run incident: camera degradation + rain";
+    btn.classList.toggle("on", assetIncidentOn);
+  }
+}
+
+/** The headline scenario: degrade a gantry camera + heavy rain + peak-hour, or clear it. */
+function toggleIncident() {
+  assetIncidentOn = !assetIncidentOn;
+  const target = GANTRIES.find((g) => g.id === "DNT-HQ") || GANTRIES[0];
+  if (target) target.status = assetIncidentOn ? "degraded" : "healthy";
+  const wsOpen = liveMode && ws && ws.readyState === WebSocket.OPEN;
+  applyWeatherOverlay(assetIncidentOn ? "heavyrain" : "clear", wsOpen);
+  const wsel = $("weather-select"); if (wsel) wsel.value = assetIncidentOn ? "heavyrain" : "clear";
+  rebuildBoothMarkers();   // re-renders gantries (status colour) + booths
+  renderAssetOps();
+  setStatus(assetIncidentOn
+    ? `⚠ Incident: ${target ? target.name : "gantry"} camera degraded + heavy rain + peak — revenue at risk, crew dispatched.`
+    : "Incident cleared — all gantries healthy, weather clear.");
 }
 
 // ============================================================================ offline playback
@@ -312,6 +391,8 @@ function renderKpis(s) {
 
   // ---- Feature B: work-zone HUD readouts (geometry from activeWorkzoneSpec, live numbers from s.workzone) ----
   renderWorkzoneHud();
+  // ---- Asset-operations KPIs (missed reads / revenue-risk react to live throughput + weather) ----
+  renderAssetOps();
 }
 
 // ============================================================================ camera
@@ -647,6 +728,7 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
   trafficStarted = true;          // ship-with-default-transform → run immediately (no globe, no blank)
   _currentScenario = "baseline";  // boot always loads baseline; ensures baselineStats is captured
 
+  await loadGantries();           // GIS asset inventory (gantries) — placed by rebuildBoothMarkers
   await loadRun(viewer, offlineUrl);
   R.clock.seek(0);  // ensure sim starts at t=0 on boot
   renderGatePanel();
@@ -723,6 +805,11 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
       };
     });
   }
+
+  // ---- Asset-ops incident scenario (camera degradation + rain + peak) ----
+  const aoRun = $("ao-run");
+  if (aoRun) aoRun.onclick = () => toggleIncident();
+  renderAssetOps();
 
   // ---- SITE SELECTOR: switch the transform to a different real toll corridor (same SUMO plaza). ----
   const sel = $("site-select");

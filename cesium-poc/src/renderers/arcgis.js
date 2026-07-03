@@ -222,13 +222,18 @@ export class ArcgisRenderer {
       }));
     }
     if (m.label && text) {
-      const plaza = m.label.kind === "plaza";
+      const kind = m.label.kind;
+      const style = kind === "plaza"
+        ? { color: "#bfe0ff", halo: [13, 22, 33, 0.9], size: 11 }
+        : kind === "gantry"
+        ? { color: "#8fe8f5", halo: [7, 35, 43, 0.92], size: 12 }
+        : { color: "#ffffff", halo: [192, 26, 14, 0.95], size: 13 };
       layers.push(new TextSymbol3DLayer({
         text,
-        material: { color: plaza ? "#bfe0ff" : "#ffffff" },
-        halo: { color: plaza ? [13, 22, 33, 0.9] : [192, 26, 14, 0.95], size: 2 },
-        size: plaza ? 11 : 13,
-        font: { size: plaza ? 11 : 13, weight: "bold" },
+        material: { color: style.color },
+        halo: { color: style.halo, size: 2 },
+        size: style.size,
+        font: { size: style.size, weight: "bold" },
       }));
     }
     return new PointSymbol3D({ symbolLayers: layers, verticalOffset: m.label && !m.disc ? { screenLength: 0 } : undefined });

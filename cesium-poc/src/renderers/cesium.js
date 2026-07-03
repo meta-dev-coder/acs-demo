@@ -199,6 +199,15 @@ export class CesiumRenderer {
         scaleByDistance: new NearFarScalar(200, 1, 4000, 0.45),
       };
     }
+    if (label.kind === "gantry") {
+      return {
+        text: textVal, font: "bold 12px sans-serif",
+        fillColor: Color.fromCssColorString("#8fe8f5"), showBackground: true,
+        backgroundColor: Color.fromCssColorString("#07232b").withAlpha(0.9),
+        style: LabelStyle.FILL, pixelOffset: new Cartesian2(0, -16),
+        verticalOrigin: VerticalOrigin.BOTTOM, scaleByDistance: new NearFarScalar(200, 1, 4500, 0.4),
+      };
+    }
     // "gate" (default): red ✕ badge above the booth
     return {
       text: textVal, font: "bold 13px sans-serif", fillColor: Color.WHITE, showBackground: true,

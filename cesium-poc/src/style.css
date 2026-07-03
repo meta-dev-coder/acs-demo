@@ -288,6 +288,59 @@ html, body, #cesiumContainer {
 .wz-badge-green { background: rgba(46, 204, 113, 0.18); color: #2ecc71; border: 1px solid rgba(46, 204, 113, 0.4); }
 .wz-badge-red   { background: rgba(255, 107, 107, 0.18); color: #ff6b6b; border: 1px solid rgba(255, 107, 107, 0.4); }
 
+/* ---- Asset operations (gantry health + incident scenario) ---- */
+.assetops-hud {
+  margin-bottom: 10px;
+  padding: 10px 10px 12px;
+  background: rgba(57, 192, 214, 0.06);
+  border: 1px solid rgba(57, 192, 214, 0.24);
+  border-radius: 8px;
+}
+.ao-h {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 9.5px; font-weight: 700; color: #7fdcec;
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+}
+.ao-src {
+  margin-left: auto; font-size: 8.5px; letter-spacing: 0.5px;
+  color: #8fd66a; background: rgba(108, 194, 74, 0.14);
+  border: 1px solid rgba(108, 194, 74, 0.4); border-radius: 999px; padding: 1px 6px;
+}
+.ao-gantries { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+.ao-g {
+  display: flex; align-items: center; gap: 7px; font-size: 11px;
+  padding: 4px 7px; border-radius: 6px; background: rgba(255, 255, 255, 0.04);
+}
+.ao-g .ao-dot { width: 8px; height: 8px; border-radius: 50%; background: #39c0d6; flex: none; }
+.ao-g.deg { background: rgba(255, 77, 77, 0.12); }
+.ao-g.deg .ao-dot { background: #ff4d4d; box-shadow: 0 0 6px rgba(255, 77, 77, 0.8); }
+.ao-g .ao-name { flex: 1; color: #dce7f0; font-weight: 600; }
+.ao-g .ao-badge { font-size: 8.5px; font-weight: 700; letter-spacing: 0.4px; color: #7d8da3; }
+.ao-g.deg .ao-badge { color: #ff8f8f; }
+
+.ao-run {
+  width: 100%; margin-bottom: 8px; padding: 8px 10px; border-radius: 7px; cursor: pointer;
+  font-size: 11px; font-weight: 700;
+  border: 1px solid rgba(57, 192, 214, 0.5); background: rgba(57, 192, 214, 0.16); color: #cfeff6;
+  transition: background 0.15s;
+}
+.ao-run:hover { background: rgba(57, 192, 214, 0.26); }
+.ao-run.on { background: #e8412f; border-color: #e8412f; color: #fff; }
+
+.ao-kpis { display: flex; flex-direction: column; gap: 1px; }
+.ao-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 10.5px; padding: 2px 0; }
+.ao-k { color: #a7c3cc; }
+.ao-v { font-weight: 700; color: #eef6f8; font-variant-numeric: tabular-nums; text-align: right; }
+.ao-v.warn, .ao-v .warn, .warn { color: #ff6b6b; }
+.ao-v.good { color: #2ecc71; }
+.ao-delta { font-size: 9px; font-weight: 700; color: #ff8f6b; white-space: nowrap; }
+.risk-nominal { color: #2ecc71; } .risk-moderate { color: #ffc857; } .risk-elevated { color: #ff6b6b; }
+.ao-dispatch {
+  margin-top: 6px; font-size: 10px; font-weight: 600; color: #ffd9a8;
+  background: rgba(255, 140, 40, 0.12); border: 1px solid rgba(255, 140, 40, 0.3);
+  border-radius: 6px; padding: 5px 8px;
+}
+
 /* ---- Full-viewport weather tint overlay ---- */
 #weather-overlay {
   position: fixed;

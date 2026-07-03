@@ -1,0 +1,9 @@
+{
+  "_comment": "DNT toll-gantry asset inventory — stands in for a TxDOT/NTTA ArcGIS FeatureLayer (the GIS system-of-record). `station` is the corridor-x (SUMO metres) so gantries place onto the same centerline as the traffic via the active transform.",
+  "avgTollUsd": 1.45,
+  "gantries": [
+    { "id": "DNT-LGC", "name": "Legacy Dr Gantry",        "station": 120, "cameras": 6,  "readers": 8,  "status": "healthy" },
+    { "id": "DNT-HQ",  "name": "Headquarters Dr Gantry",  "station": 530, "cameras": 8,  "readers": 10, "status": "healthy" },
+    { "id": "DNT-GAY", "name": "Gaylord Pkwy Gantry",     "station": 860, "cameras": 6,  "readers": 8,  "status": "healthy" }
+  ]
+}
