@@ -59,6 +59,24 @@ export class CoordinateTransform {
     return Matrix4.multiplyByPoint(this.enu, new Cartesian3(east, north, 0), out || new Cartesian3());
   }
 
+  /**
+   * SUMO (x,y) metres -> WGS84 {lon,lat} degrees, WITHOUT any Cesium types.
+   * Renderer-agnostic (used by the ArcGIS adapter, which needs lon/lat not ECEF).
+   * Same east/north as sumoToWorld, then a local-tangent-plane (equirectangular)
+   * metres->degrees at the anchor latitude — sub-cm accurate over the corridor's
+   * few-hundred-metre span, where sumoToWorld's ellipsoidal ENU and this agree.
+   */
+  sumoToLonLat(x, y) {
+    const { scale, sumoRefX, sumoRefY, anchorLon, anchorLat } = this.p;
+    const dx = (x - sumoRefX) * scale, dy = (y - sumoRefY) * scale;
+    const east = dx * this._s - dy * this._c;
+    const north = dx * this._c + dy * this._s;
+    return {
+      lon: anchorLon + east / mPerDegLon(anchorLat),
+      lat: anchorLat + north / M_PER_DEG_LAT,
+    };
+  }
+
   /** Cesium lon/lat (deg) -> SUMO (x,y) metres. Inverse of sumoToWorld. */
   worldToSumo(lon, lat) {
     const { scale, sumoRefX, sumoRefY, anchorHeight } = this.p;
