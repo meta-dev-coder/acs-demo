@@ -65,6 +65,15 @@ const createAuthClient = (): ClientState => {
     responseType: "code",
     authority: import.meta.env.IMJS_AUTH_AUTHORITY,
   });
+  // The library's default non-interactive (silent) check waits up to 10s for a hidden-iframe
+  // round trip to the authority before giving up — both signIn()'s call into signInRedirect()
+  // and the mount-time silent probe pay that cost. Trim it so a "no session" click reaches the
+  // visible interactive redirect quickly rather than stalling near a full 10s. setAdvancedSettings
+  // merges (spreads) onto the settings already derived from the config above, so a partial object
+  // is all that's applied at runtime even though its declared type asks for the full settings shape.
+  client.setAdvancedSettings({
+    silentRequestTimeoutInSeconds: 6,
+  } as Parameters<typeof client.setAdvancedSettings>[0]);
   return {
     client,
     state: AuthorizationState.Pending,
@@ -117,10 +126,19 @@ export function AuthorizationProvider(props: PropsWithChildren<unknown>) {
   }, [authClient]);
 
   const signIn = useCallback(async () => {
+    // Show the Pending spinner immediately so the click has visible feedback (signInRedirect's
+    // own non-interactive check below can take several seconds against the IMS authority).
+    setContextValue((prev) => ({ ...prev, state: AuthorizationState.Pending }));
     try {
-      await authClient.signInSilent();
-    } catch {
+      // signInRedirect() already attempts a non-interactive (silent) sign-in first and only
+      // falls back to the interactive top-window redirect if that fails — see its docstring.
+      // Calling signInSilent() here first (as this used to) duplicates that same silent
+      // attempt, doubling the wait before the visible redirect ever fires. Call it directly.
       await authClient.signInRedirect();
+    } catch {
+      // Redirect couldn't be initiated (e.g. config/network error) — fall back to the landing
+      // page instead of leaving the user stuck on the Pending spinner with no way to retry.
+      setContextValue((prev) => ({ ...prev, state: AuthorizationState.Unauthenticated }));
     }
   }, [authClient]);
 
