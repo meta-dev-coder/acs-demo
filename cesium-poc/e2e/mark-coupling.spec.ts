@@ -133,14 +133,15 @@ test(
 
     expect(vehiclePositions.length, 'No vehicle positions found').toBeGreaterThan(0);
 
-    // 5. Collect booth marker positions from Cesium ellipse entities.
+    // 5. Collect booth marker positions from Cesium ellipse entities (booth discs only — gantry
+    //    assets are also ellipses, so filter by the stable "booth:" id).
     const markerPositions: LonLat[] = await page.evaluate(() => {
       const viewer = (window as any).__viewer;
       const time = viewer.clock.currentTime;
       const ell = viewer.scene.globe.ellipsoid;
       const results: { lon: number; lat: number }[] = [];
       for (const e of viewer.entities.values) {
-        if (!e.ellipse) continue;
+        if (!e.ellipse || !String(e.id).startsWith("booth:")) continue;
         const cart = e.position?.getValue(time);
         if (!cart) continue;
         const carto = ell.cartesianToCartographic(cart);

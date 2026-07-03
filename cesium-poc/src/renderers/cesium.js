@@ -228,7 +228,9 @@ export class CesiumRenderer {
     const position = m.tracking
       ? new CallbackProperty(() => this._T.sumoToWorld(m.x, m.y), false)
       : this._T.sumoToWorld(m.x, m.y);
-    const opts = { position };
+    // Carry the stable marker id onto the entity so tooling/tests can tell booth discs (booth:*)
+    // from gantry assets (gantry:*) and the plaza label — they are otherwise all ellipse/label entities.
+    const opts = { id: m.id, position };
     if (m.disc) {
       opts.ellipse = {
         semiMajorAxis: m.disc.radiusM, semiMinorAxis: m.disc.radiusM,

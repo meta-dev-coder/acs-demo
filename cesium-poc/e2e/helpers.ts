@@ -126,7 +126,8 @@ export async function counts(page: Page): Promise<EntityCounts> {
       const entities: any[] = viewer.entities.values;
 
       const vehicles = entities.filter((e: any) => e.model != null);
-      const gates    = entities.filter((e: any) => e.ellipse != null);
+      // Booth gate discs only — gantry assets are also ellipses, so filter by the stable "booth:" id.
+      const gates    = entities.filter((e: any) => e.ellipse != null && String(e.id).startsWith("booth:"));
 
       function hexToF(h: string): [number, number, number] {
         const s = h.replace('#', '');
