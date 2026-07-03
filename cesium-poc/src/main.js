@@ -51,6 +51,11 @@ const NODE_B_UPSTREAM_OF_BOOTH_M = 130;
 // transform — proving the transform module is map-agnostic. Each ships a default transform (so it
 // works out of the box) and persists its own manual calibration under a per-site key. ----
 const SITES = [
+  // DNT mainline, Plano–Frisco TX (business-district stretch near The Star / Legacy) — the NTTA demo
+  // corridor (default). Anchor + bearing are ON the real carriageway from OSM: the DNT runs nearly due
+  // north here (bearing ≈ 1°) at lon ≈ -96.8229 (verified against OpenStreetMap way geometry).
+  { id: "dnt", name: "Dallas North Tollway · Plano–Frisco TX",
+    transform: { anchorLon: -96.8229, anchorLat: 33.0920, anchorHeight: 3, bearingDeg: 1, scale: 0.5, sumoRefX: 530, sumoRefY: 0 } },
   { id: "i595", name: "I-595 Express · Ft Lauderdale FL",
     transform: { anchorLon: -80.306, anchorLat: 26.1124, anchorHeight: 3, bearingDeg: 104, scale: 0.5, sumoRefX: 530, sumoRefY: 0 } },
   { id: "i95de", name: "I-95 Toll Plaza · Newark DE",
