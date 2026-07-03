@@ -356,9 +356,16 @@ class LiveSim:
 
     def _apply_lane_closure(self, lane):
         """traci side-effects for an active closure: near-stop the lane, push an early/assertive
-        merge lane-change mode on vehicles already queued in it (MUTCD-style early merge)."""
+        merge lane-change mode on vehicles already queued in it (MUTCD-style early merge).
+        S2 fix: only capture _wz_orig_speed the FIRST time this lane is closed. Re-closing the
+        SAME lane (e.g. new offset/speed/divert params while already closed) must not overwrite
+        it with the already-dropped _WZ_CLOSED_SPEED, or openLane would "restore" 0.5 m/s forever."""
+        if self._wz_orig_speed is None:
+            try:
+                self._wz_orig_speed = traci.lane.getMaxSpeed(lane)
+            except traci.TraCIException as e:
+                print(f"[live_server] closeLane getMaxSpeed({lane}) failed: {e}", file=sys.stderr)
         try:
-            self._wz_orig_speed = traci.lane.getMaxSpeed(lane)
             traci.lane.setMaxSpeed(lane, self._WZ_CLOSED_SPEED)
         except traci.TraCIException as e:
             print(f"[live_server] closeLane setMaxSpeed({lane}) failed: {e}", file=sys.stderr)
@@ -373,6 +380,9 @@ class LiveSim:
             traci.lane.setMaxSpeed(lane, self._wz_orig_speed or 29.06)
         except traci.TraCIException as e:
             print(f"[live_server] openLane setMaxSpeed({lane}) failed: {e}", file=sys.stderr)
+        # S2 fix: clear the captured speed so the NEXT close (same or different lane) re-captures
+        # its own true original speed instead of reusing/leaking this lane's value.
+        self._wz_orig_speed = None
 
     def close_lane(self, lane, offset_ft=12.0, speed_mph=60.0, divert_pct=0.0):
         """Start a MUTCD/RILCA work-zone closure on an approach lane (ap_0/ap_1/ap_2)."""
@@ -381,6 +391,11 @@ class LiveSim:
         offset_ft = float(offset_ft or 12.0)
         speed_mph = float(speed_mph or 60.0)
         divert_pct = max(0.0, min(100.0, float(divert_pct or 0.0)))
+
+        # S1 fix: a DIFFERENT lane's closure is already active — clear it first so its max speed
+        # is restored (otherwise the old lane leaks and stays at _WZ_CLOSED_SPEED forever).
+        if self.workzone and self.workzone["lane"] != lane and self._started:
+            self._clear_lane_closure(self.workzone["lane"])
 
         taper_ft = kpi.taper_length(offset_ft, speed_mph, _CLOSURE_CFG)
         taper_m = round(taper_ft * 0.3048, 1)

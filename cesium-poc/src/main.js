@@ -85,12 +85,31 @@ const SITES = [
 ];
 let siteId = SITES[0].id;
 const siteKey = (id) => "plazaTransform:" + id;
-/** Returns { transform, gates } for a site — restoring a saved {t,g} or falling back to the default. */
-function loadSite(id) {
+/** raw {t,g} -> {transform, gates}, or null if the record doesn't parse into a usable transform. */
+function siteRecordFromRaw(raw) {
+  if (!raw || !raw.t) return null;
+  const t = CoordinateTransform.fromJSON(raw.t);
+  return t ? { transform: t, gates: raw.g || [] } : null;
+}
+/**
+ * Returns { transform, gates } for a site. Load order: per-browser localStorage calibration ->
+ * a committed calibration file (public/data/site-<id>.json, same {t,g} shape — lets a team share
+ * one calibration by committing it) -> the built-in SITES default (always renders something).
+ */
+async function loadSite(id) {
   try {
-    const raw = JSON.parse(localStorage.getItem(siteKey(id)));
-    if (raw && raw.t) { const t = CoordinateTransform.fromJSON(raw.t); if (t) return { transform: t, gates: raw.g || [] }; }
+    const local = siteRecordFromRaw(JSON.parse(localStorage.getItem(siteKey(id))));
+    if (local) return local;
   } catch {}
+  try {
+    const res = await fetch(dataUrl(`data/site-${id}.json`));
+    // vite's dev server returns index.html (200, text/html) for unknown /data paths instead of a
+    // real 404, so a missing calibration file must be detected via content-type, not just res.ok.
+    if (res.ok && (res.headers.get("content-type") || "").includes("json")) {
+      const fetched = siteRecordFromRaw(await res.json());
+      if (fetched) return fetched;
+    }
+  } catch {}   // missing/invalid file falls through silently to the built-in default
   const site = SITES.find((x) => x.id === id);
   return { transform: site ? new CoordinateTransform(site.transform) : null, gates: [] };
 }
@@ -459,8 +478,11 @@ function startLive(viewer) {
   $("gatePanel").classList.remove("hidden");
   try { ws = new WebSocket(WS_URL); } catch { setConn(false, "socket: failed"); return; }
   ws.onopen = () => setConn(true, "socket: live");
-  ws.onclose = () => setConn(false, "socket: offline");
-  ws.onerror = () => setConn(false, "socket: error");
+  // C3: an unexpected drop (server killed, network blip) must also flip liveMode back to false —
+  // otherwise closeLaneHook keeps taking the `liveMode` branch (a no-op sendCmd on a dead socket)
+  // instead of falling into applyOfflineWorkzoneStats, and the KPI/queue readouts go stale.
+  ws.onclose = () => { liveMode = false; setConn(false, "socket: offline"); };
+  ws.onerror = () => { liveMode = false; setConn(false, "socket: error"); };
   ws.onmessage = (ev) => {
     let m; try { m = JSON.parse(ev.data); } catch { return; }
     if (m.type === "meta") onMeta(viewer, m);
@@ -655,6 +677,10 @@ function openLaneHook(viewer, lane) {
   clearWorkZone(viewer);
   activeWorkzoneSpec = null;
 
+  // C2 fix: drop the stale workzone KPI block now, in both modes — otherwise the HUD badge/queue
+  // numbers linger (showing the old closure's queue) until the next stats tick refreshes window.__kpi.
+  if (window.__kpi && "workzone" in window.__kpi) delete window.__kpi.workzone;
+
   if (liveMode) {
     sendCmd({ cmd: "openLane", lane: closingLane });
   } else if (currentData) {
@@ -758,6 +784,24 @@ function installMarking(viewer) {
     }, ScreenSpaceEventType.LEFT_CLICK);
   };
 }
+/** Wires #btn-export-calib: download the current site's localStorage calibration record as
+ * site-<id>.json, in the exact {t,g} shape loadSite() reads back — so a user can commit the
+ * file under public/data/ to share the calibration (localStorage -> file -> built-in default). */
+function installExportCalibration() {
+  const btn = $("btn-export-calib");
+  if (!btn) return;
+  btn.onclick = () => {
+    const raw = localStorage.getItem(siteKey(siteId));
+    if (!raw) { setStatus("Nothing to export yet — ⊕ Mark gates first."); return; }
+    const blob = new Blob([raw], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `site-${siteId}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    setStatus(`Exported site-${siteId}.json — commit it under cesium-poc/public/data/ to share.`);
+  };
+}
 async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); startTraffic(viewer); }
 
 // ============================================================================ boot
@@ -767,7 +811,7 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
 
   // Every site ships a default transform, so the app is ALWAYS placed enough to render — it flies
   // straight to the plaza (never the bare globe) and starts traffic. ⊕ Mark gates refines placement.
-  { const s = loadSite(siteId); T = s.transform; }
+  { const s = await loadSite(siteId); T = s.transform; }
   calibrated = true;
   trafficStarted = true;          // ship-with-default-transform → run immediately (no globe, no blank)
   _currentScenario = "baseline";  // boot always loads baseline; ensures baselineStats is captured
@@ -776,6 +820,7 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
   viewer.clock.currentTime = EPOCH.clone();  // ensure sim starts at t=0 on boot
   renderGatePanel();
   installMarking(viewer);
+  installExportCalibration();
 
   // ---- Feature B: work-zone HUD wiring (lane selector + close/reopen button) ----
   const wzLaneSel = $("wz-lane-select");
@@ -786,8 +831,21 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
   if (wzCloseBtn) {
     wzCloseBtn.onclick = () => {
       const lane = wzLaneSel ? wzLaneSel.value : AP_LANES[0];
-      if (activeWorkzoneSpec) openLaneHook(viewer, lane);
-      else closeLaneHook(viewer, lane, { offsetFt: 12, speedMph: 60 });
+      if (activeWorkzoneSpec) {
+        // C1 fix: a closure is active. If the dropdown still points at the closed lane, this
+        // click means "reopen". If the user picked a DIFFERENT lane, the intent is "switch the
+        // closure to that lane" — reopen the old one, then close the newly-selected one with the
+        // same params, instead of silently reopening whatever lane happens to be closed.
+        if (lane === activeWorkzoneSpec.lane) {
+          openLaneHook(viewer, lane);
+        } else {
+          const { offsetFt, speedMph, divertPct } = activeWorkzoneSpec;
+          openLaneHook(viewer, activeWorkzoneSpec.lane);
+          closeLaneHook(viewer, lane, { offsetFt, speedMph, divertPct });
+        }
+      } else {
+        closeLaneHook(viewer, lane, { offsetFt: 12, speedMph: 60 });
+      }
     };
   }
   renderWorkzoneHud();
@@ -826,7 +884,7 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
     sel.value = siteId;
     sel.onchange = async () => {
       siteId = sel.value;
-      { const s = loadSite(siteId); T = s.transform; }
+      { const s = await loadSite(siteId); T = s.transform; }
       stopLive(viewer);
       [bInt, bLive].forEach((b) => b.classList.remove("on")); bBase.classList.add("on");
       offlineUrl = dataUrl("data/baseline.json");
