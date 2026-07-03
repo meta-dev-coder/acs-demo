@@ -623,11 +623,20 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
 
 // ============================================================================ boot
 (async function main() {
-  // Renderer switch: ?renderer=arcgis selects the ArcGIS adapter (wired in a later step); default Cesium.
+  // Renderer switch: ?renderer=arcgis selects the ArcGIS adapter (lazy-loaded so the Cesium bundle is
+  // untouched) — this is the "jump straight to ESRI-ARCGIS NTTA" route. Default = Cesium.
   const useArcgis = new URLSearchParams(location.search).get("renderer") === "arcgis";
-  if (useArcgis) console.warn("[renderer] ArcGIS path not yet available; falling back to Cesium.");
-  R = new CesiumRenderer();
-  const viewer = await R.init("cesiumContainer", { ionToken: ION });
+  let viewer;
+  if (useArcgis) {
+    $("cesiumContainer").style.display = "none";
+    $("arcgisContainer").style.display = "";
+    const { ArcgisRenderer } = await import("./renderers/arcgis.js");
+    R = new ArcgisRenderer();
+    viewer = await R.init("arcgisContainer", {});
+  } else {
+    R = new CesiumRenderer();
+    viewer = await R.init("cesiumContainer", { ionToken: ION });
+  }
   const bBase = $("btn-baseline"), bInt = $("btn-intervention"), bLive = $("btn-live");
 
   // Every site ships a default transform, so the app is ALWAYS placed enough to render — it flies
@@ -718,8 +727,9 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
   }
 
   // debug hooks for headless verification
-  window.__viewer = viewer;      // Cesium-specific (raw Viewer) — the existing e2e contract
-  window.__view = R.raw();       // renderer-neutral alias for future renderer-agnostic specs
+  window.__viewer = useArcgis ? null : viewer;  // Cesium-specific (raw Viewer) — the existing e2e contract
+  window.__view = R.raw();                        // renderer-neutral (Viewer or SceneView)
+  window.__arcgisReady = useArcgis;               // ArcGIS smoke specs wait on this
   window.__startTraffic = () => startTraffic(viewer);
   window.__markGates = (dir, gates) => { mark.dir = dir; mark.gates = gates; finishMarking(viewer, $("btn-calib")); };
   // Feature B: MUTCD/RILCA work-zone lane closure hooks (TTC overlay + KPIs) — see closeLaneHook.
