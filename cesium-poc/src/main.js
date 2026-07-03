@@ -21,6 +21,7 @@ import "cesium/Build/Cesium/Widgets/widgets.css";
 import "./style.css";
 import { CoordinateTransform } from "./transform.js";
 import { buildWorkZone, clearWorkZone, rilcaWorkzone, CLOSURE_CONFIG } from "./workzone.js";
+import { CesiumRenderer } from "./renderers/cesium.js";
 
 const ION = import.meta.env.VITE_CESIUM_ION_TOKEN;
 if (ION) Ion.defaultAccessToken = ION;
@@ -111,24 +112,10 @@ function computeBooths(meta) {
 }
 
 // ============================================================================ viewer
-async function makeViewer() {
-  const opts = {
-    animation: true, timeline: true, baseLayerPicker: false, geocoder: false,
-    homeButton: false, navigationHelpButton: false, sceneModePicker: false,
-    fullscreenButton: false, infoBox: false, selectionIndicator: false,
-  };
-  opts.baseLayer = new ImageryLayer(new UrlTemplateImageryProvider({
-    url: "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    maximumLevel: 19, credit: "Imagery © Esri, Maxar, Earthstar Geographics",
-  }));
-  if (ION) opts.terrain = Terrain.fromWorldTerrain();
-  else opts.terrainProvider = new EllipsoidTerrainProvider();
-  const viewer = new Viewer("cesiumContainer", opts);
-  viewer.scene.globe.enableLighting = false;
-  viewer.clock.clockRange = ClockRange.LOOP_STOP;
-  viewer.clock.multiplier = 6;
-  return viewer;
-}
+// The Cesium renderer adapter owns viewer creation (see renderers/cesium.js). main() holds
+// the returned Viewer as `viewer` and drives it directly for concerns not yet moved behind
+// the adapter; window.__viewer stays the same object so the e2e contract is unchanged.
+const R = new CesiumRenderer();
 
 // orientation quaternion for a SUMO/compass angle, at the plaza-centre frame.
 // `type` selects the per-model yaw correction so the mesh nose points along travel.
@@ -756,7 +743,7 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
 
 // ============================================================================ boot
 (async function main() {
-  const viewer = await makeViewer();
+  const viewer = await R.init("cesiumContainer", { ionToken: ION });
   const bBase = $("btn-baseline"), bInt = $("btn-intervention"), bLive = $("btn-live");
 
   // Every site ships a default transform, so the app is ALWAYS placed enough to render — it flies
