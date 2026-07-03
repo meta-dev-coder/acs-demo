@@ -27,12 +27,13 @@ const N_BOOTHS = 10;
 // booth markers and the mark-gates transform scale wildly wrong (this WAS a real regression — see
 // e2e/bugs.spec.ts Bug 2). Mirrors fcd2json.py's ROAD_HALF_WIDTH_M, which documents the same rule.
 const PLAZA_HALF_SPAN_M = 14.4;
-// Cash booths per scenario. Baseline: 3 cash (pl_0..2). Intervention ("Convert 2 cash → AET"):
-// pl_1 & pl_2 are converted to AET (turn GREEN), only pl_0 stays cash — so green cars flow through the
-// converted booths and the orange (cash) cars queue at the single remaining cash booth.
+// NTTA all-electronic reframing (NTTA has NO cash booths). The A/B contrasts what a LEGACY CASH PLAZA
+// would cost the operator (baseline: 3 cash lanes → queues/delay) vs the ALL-ELECTRONIC REALITY
+// (intervention: every lane AET → free-flow). Mechanics unchanged; the cash set drives booth colour +
+// the cash-queue behaviour. All-electronic = empty cash set (every booth green).
 const CASH_BY_SCENARIO = {
-  baseline: new Set(["pl_0", "pl_1", "pl_2"]),
-  intervention: new Set(["pl_0"]),
+  baseline: new Set(["pl_0", "pl_1", "pl_2"]),  // "if NTTA still ran a legacy cash plaza"
+  intervention: new Set([]),                     // "your all-electronic reality" — every lane AET
 };
 let activeCashLanes = CASH_BY_SCENARIO.baseline;
 const WS_URL = "ws://localhost:8765";

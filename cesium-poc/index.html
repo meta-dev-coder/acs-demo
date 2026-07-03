@@ -14,14 +14,14 @@
     <!-- Title + scenario story -->
     <div id="hud" class="panel">
       <div class="hud-eyebrow">OPERATIONAL DIGITAL TWIN</div>
-      <div class="hud-title">Toll-Plaza Throughput</div>
-      <div class="hud-sub">SuperDNA Tech</div>
+      <div class="hud-title">All-Electronic Tolling</div>
+      <div class="hud-sub">SuperDNA · NTTA Operations Twin</div>
 
       <select id="site-select" class="site-select" title="Same SUMO plaza, different real toll corridor"></select>
 
       <div class="toggle">
-        <button id="btn-baseline" class="on">Today · 3 cash + 7 AET</button>
-        <button id="btn-intervention">Convert 2 cash → AET</button>
+        <button id="btn-baseline" class="on">Legacy cash plaza</button>
+        <button id="btn-intervention">All-electronic (AET)</button>
         <button id="btn-live">● LIVE</button>
       </div>
 
@@ -61,7 +61,7 @@
       </div>
 
       <div id="gatePanel" class="gates hidden">
-        <div class="gates-h">Booth gates — click to close / open (B0–B2 cash, rest AET)</div>
+        <div class="gates-h">Gantry lanes — click to close / open (all-electronic; legacy-cash view shows B0–B2 as cash)</div>
         <div id="gates-all" class="gate-grid"></div>
       </div>
 
