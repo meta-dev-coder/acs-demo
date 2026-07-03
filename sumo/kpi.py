@@ -49,6 +49,40 @@ def load_tolls(path=None):
     return _TOLL_CACHE
 
 
+# --------------------------------------------------------------------------- closure config loading
+_CLOSURE_CFG_CACHE = None
+
+def _closure_config_path():
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "closure_config.json")
+
+def load_closure_config(path=None):
+    """
+    Return the MUTCD/RILCA lane-closure config dict.  Cached per process.
+    Falls back to the verified research defaults (see HANDOFF doc) if the
+    JSON file is missing or malformed — never hardcode these inline elsewhere.
+    """
+    global _CLOSURE_CFG_CACHE
+    if _CLOSURE_CFG_CACHE is None:
+        p = path or _closure_config_path()
+        try:
+            with open(p) as fh:
+                _CLOSURE_CFG_CACHE = json.load(fh)
+        except Exception:
+            _CLOSURE_CFG_CACHE = {
+                "taperHighSpeedThresholdMph": 45,
+                "taperLowSpeedThresholdMph": 40,
+                "advanceWarningSpacingFt": {
+                    "freeway":      [1000, 1500, 2640],
+                    "conventional": [500, 500, 500],
+                },
+                "coneSpacingMaxFactor": 1.0,
+                "workZoneCapacityVphpl": 1600,
+                "avgVehicleSpacingFt": 25,
+                "permissible": {"maxQueueMi": 4.0, "maxDelayMin": 30.0},
+            }
+    return _CLOSURE_CFG_CACHE
+
+
 # --------------------------------------------------------------------------- payment classification
 def classify_payment(vtype):
     """Return 'cash' if vtype=='cash', else 'aet'."""
@@ -468,3 +502,145 @@ def window(step_records, elapsed_h, open_lanes=None, tolls=None):
         "satRatio":     round(total_throughput / capacity_vph, 3) if capacity_vph > 0 else 0.0,
         "visibilityM":  None,
     }
+
+
+# --------------------------------------------------------------------------- MUTCD/RILCA lane closure
+# Pure functions, config-driven via closure_config.json (load_closure_config()).
+# Used by BOTH live_server.py (closeLane command) and any offline schematic.
+# Research source: MUTCD Part 6 Table 6B-4 (taper), Table 6B-1 (advance-warning
+# spacing), §6K.01 (cone spacing); RILCA-style deterministic queueing for
+# work-zone delay/permissibility. See HANDOFF-curved-laneclosure.md.
+
+def taper_length(lane_width_ft, speed_mph, config=None):
+    """
+    MUTCD taper length (ft).
+      speed >= taperHighSpeedThresholdMph (default 45): L = W * S   (Table 6B-4, >=45 mph)
+      speed <= taperLowSpeedThresholdMph  (default 40): L = W * S^2 / 60
+      in-between: linear interpolation between the two boundary formulas.
+    """
+    cfg = config or load_closure_config()
+    hi = cfg.get("taperHighSpeedThresholdMph", 45)
+    lo = cfg.get("taperLowSpeedThresholdMph", 40)
+
+    if speed_mph >= hi:
+        L = lane_width_ft * speed_mph
+    elif speed_mph <= lo:
+        L = lane_width_ft * speed_mph ** 2 / 60.0
+    else:
+        L_lo = lane_width_ft * lo ** 2 / 60.0
+        L_hi = lane_width_ft * hi
+        t = (speed_mph - lo) / float(hi - lo)
+        L = L_lo + t * (L_hi - L_lo)
+    return round(L, 1)
+
+
+def advance_warning_spacing(freeway=True, config=None):
+    """
+    MUTCD advance-warning sign spacing (ft), 3 signs upstream of the taper.
+    Table 6B-1: freeway/expressway default [1000, 1500, 2640] ft.
+    """
+    cfg = config or load_closure_config()
+    table = cfg.get("advanceWarningSpacingFt", {})
+    key = "freeway" if freeway else "conventional"
+    return list(table.get(key, [1000, 1500, 2640] if freeway else [500, 500, 500]))
+
+
+def channelizing_spacing(speed_mph, config=None):
+    """
+    MUTCD §6K.01 channelizing device (cone) spacing in the taper: <= 1 x speed(mph) ft.
+    """
+    cfg = config or load_closure_config()
+    factor = cfg.get("coneSpacingMaxFactor", 1.0)
+    return round(speed_mph * factor)
+
+
+def n_cones(taper_length_ft, spacing_ft):
+    """Number of channelizing devices needed to cover the taper at the given spacing."""
+    if not spacing_ft or spacing_ft <= 0:
+        return 0
+    return int(round(taper_length_ft / float(spacing_ft)))
+
+
+def workzone_queue(arrivals_vph, capacity_vph, t1_h, q2_vph, config=None):
+    """
+    Deterministic (RILCA-style) oversaturation queueing.
+
+    arrivals_vph — demand rate q1 during the oversaturated period.
+    capacity_vph — reduced work-zone throughput capacity C.
+    t1_h         — duration (h) that arrivals exceed capacity.
+    q2_vph       — post-peak arrival rate q2 (< capacity), used for recovery.
+
+    Returns { maxQueueVeh, maxQueueMi, recoveryTimeH, maxDelayMin }.
+      maxQueueVeh   = N(t1) - C*t1 = (q1 - C) * t1          (0 if q1 <= C)
+      recoveryTimeH = (q1 - q2) * t1 / (C - q2)             (0 if no queue or C <= q2)
+      maxDelayMin   = half the total oversaturation+recovery duration, in minutes
+                      (mean of the triangular arrival/departure delay area).
+      maxQueueMi    = maxQueueVeh * avgVehicleSpacingFt / 5280
+    """
+    cfg = config or load_closure_config()
+    avg_spacing_ft = cfg.get("avgVehicleSpacingFt", 25)
+
+    excess_vph = max(0.0, arrivals_vph - capacity_vph)
+    max_queue_veh = excess_vph * t1_h
+
+    if max_queue_veh > 0 and capacity_vph > q2_vph:
+        recovery_time_h = (arrivals_vph - q2_vph) * t1_h / float(capacity_vph - q2_vph)
+    else:
+        recovery_time_h = 0.0
+
+    max_delay_min = 0.5 * (t1_h + recovery_time_h) * 60.0 if max_queue_veh > 0 else 0.0
+    max_queue_mi = max_queue_veh * avg_spacing_ft / 5280.0
+
+    return {
+        "maxQueueVeh":   round(max_queue_veh, 1),
+        "maxQueueMi":    round(max_queue_mi, 3),
+        "recoveryTimeH": round(recovery_time_h, 3),
+        "maxDelayMin":   round(max_delay_min, 1),
+    }
+
+
+def permissible(max_queue_mi, max_delay_min, config=None):
+    """RILCA permissible-closure-window check: green iff both thresholds are met."""
+    cfg = config or load_closure_config()
+    thresholds = cfg.get("permissible", {})
+    max_queue_thresh = thresholds.get("maxQueueMi", 4.0)
+    max_delay_thresh = thresholds.get("maxDelayMin", 30.0)
+    return "green" if (max_queue_mi < max_queue_thresh and max_delay_min < max_delay_thresh) else "red"
+
+
+def workzone(lane_width_ft, speed_mph, arrivals_vph, t1_h, q2_vph,
+             capacity_vph=None, freeway=True, config=None):
+    """
+    Assemble the full `workzone` KPI dict for a single lane closure.
+    Merged into `stats["workzone"]` by callers (fcd2json.py / live_server.py).
+    """
+    cfg = config or load_closure_config()
+    if capacity_vph is None:
+        capacity_vph = cfg.get("workZoneCapacityVphpl", 1600)
+
+    taper_ft = taper_length(lane_width_ft, speed_mph, cfg)
+    taper_m = round(taper_ft * 0.3048, 1)
+
+    cone_spacing_ft = channelizing_spacing(speed_mph, cfg)
+    cones = n_cones(taper_ft, cone_spacing_ft)
+
+    sign_spacing_ft = advance_warning_spacing(freeway, cfg)
+    sign_stations_m = [round(ft * 0.3048) for ft in sign_spacing_ft]
+
+    queue = workzone_queue(arrivals_vph, capacity_vph, t1_h, q2_vph, cfg)
+    perm = permissible(queue["maxQueueMi"], queue["maxDelayMin"], cfg)
+
+    result = {
+        "laneWidthFt":    lane_width_ft,
+        "speedMph":       speed_mph,
+        "taperLengthFt":  taper_ft,
+        "taperLengthM":   taper_m,
+        "coneSpacingFt":  cone_spacing_ft,
+        "nCones":         cones,
+        "signSpacingFt":  sign_spacing_ft,
+        "signStationsM":  sign_stations_m,
+        "capacityVph":    capacity_vph,
+        "permissible":    perm,
+    }
+    result.update(queue)
+    return result

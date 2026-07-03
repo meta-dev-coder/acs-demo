@@ -33,6 +33,16 @@ Client -> server commands:
   {"cmd":"closeGate","lane":"pl_2"}      # drain + redirect cars off this lane
   {"cmd":"openGate","lane":"pl_2"}       # restore
   {"cmd":"reset"}                        # restart scenario from t=0
+  {"cmd":"closeLane","lane":"ap_0","offsetFt":12,"speedMph":60,"divertPct":20}
+                                          # MUTCD/RILCA work-zone lane closure on an approach lane
+  {"cmd":"openLane","lane":"ap_0"}       # restore the closed approach lane
+
+Work-zone (Feature B) fields:
+  meta().workzone / step().stats.workzone -> None when no closure is active, else
+  {"lane","offsetFt","speedMph","divertPct","closureStartX","taperLengthM","nCones",
+   "signStationsM", ...} — the step-stats version additionally carries the live RILCA
+  queue numbers (maxQueueVeh, maxQueueMi, recoveryTimeH, maxDelayMin, permissible,
+  capacityVph) computed from sumo/kpi.py's pure workzone() assembler.
 
 Start:
   export SUMO_HOME="$(python3 -c 'import sumo;print(sumo.SUMO_HOME)')"
@@ -42,6 +52,7 @@ import asyncio
 import json
 import math
 import os
+import random
 import sys
 from collections import deque
 
@@ -130,6 +141,30 @@ except Exception as _e:
     _HALF_WIDTH = 25.0
     print(f"[live_server] WARNING: could not load centerline ({_e}); no lateral clamp", file=sys.stderr)
 
+# --- Feature B: MUTCD/RILCA work-zone lane closure -----------------------------------------------
+N_AP_LANES = 3
+AP_LANES = [f"ap_{i}" for i in range(N_AP_LANES)]
+_CLOSURE_CFG = kpi.load_closure_config()
+
+
+def _node_local_x(node_id, fallback):
+    """Local-frame x of a plaza.nod.xml node (e.g. 'B', the fan-out start), via roadgeom.utm_to_local.
+    Used as the downstream station the work-zone taper closes into."""
+    import xml.etree.ElementTree as ET
+    try:
+        tree = ET.parse(os.path.join(HERE, "plaza.nod.xml"))
+        for node in tree.getroot().findall("node"):
+            if node.get("id") == node_id:
+                ux, uy = float(node.get("x")), float(node.get("y"))
+                return roadgeom.utm_to_local(ux, uy)[0]
+    except Exception as _e:
+        print(f"[live_server] WARNING: could not resolve node {node_id} ({_e}); using fallback", file=sys.stderr)
+    return fallback
+
+
+# Node 'B' = end of the 'ap' approach edge / start of the fan-out — the taper closes into it.
+_NODE_B_LOCAL_X = _node_local_x("B", 400.0)
+
 # --- SUMO-internal → local plaza metres ----------------------------------------------------------
 # SUMO applies a netOffset when building the network (SUMO_internal = UTM + netOffset).
 # We read the netOffset from plaza.net.xml once so we can convert raw traci positions to
@@ -199,6 +234,14 @@ class LiveSim:
         # Booth occupancy accumulators (for kpi.window step_records)
         self._booth_occ = {g: 0 for g in GATES}
         self._booth_tot = {g: 0 for g in GATES}
+        # --- Feature B: work-zone lane closure state ---
+        self.workzone = None          # active closure spec {"lane","offsetFt","speedMph","divertPct"} or None
+        self._wz_geometry = None      # static geometry {"closureStartX","taperLengthM","nCones","signStationsM"}
+        self._wz_start_t = None       # sim time (s) the closure went active — t1 origin for workzone_queue
+        self._wz_diverted = 0         # cumulative count of percent-diversion vaporizations
+        self._wz_orig_speed = None    # lane's pre-closure max speed, for openLane restore
+        self._arrival_deque = deque() # (sim_t, n) rolling window of insertions, for arrivals_vph
+        self._last_queue_ap = 0       # previous step's approach queue length (diversion trigger)
 
     def _reset_kpi_state(self):
         """Reset all KPI tracking state (called on start/reset)."""
@@ -208,8 +251,11 @@ class LiveSim:
         self._step_count = 0
         self._window_records.clear()
         self._departure_deque.clear()
+        self._arrival_deque.clear()
         self._booth_occ = {g: 0 for g in GATES}
         self._booth_tot = {g: 0 for g in GATES}
+        if self.workzone:
+            self._wz_start_t = None   # scenario looped/reset: restart t1 accounting for the still-active closure
 
     def start(self):
         traci.start([
@@ -223,6 +269,8 @@ class LiveSim:
         self._redirected.clear()
         self._bounds = self._net_local_bounds()
         self._reset_kpi_state()
+        if self.workzone:
+            self._apply_lane_closure(self.workzone["lane"])
 
     def close(self):
         if self._started:
@@ -293,6 +341,85 @@ class LiveSim:
         if self._started:
             self._apply_open(lane)
         return True
+
+    # --- Feature B: work-zone lane closure --------------------------------------------------------
+    # Enforcement note: closure is applied via a near-zero lane speed limit, NOT
+    # traci.lane.setDisallowed(vClass). The generated route file (out/plaza.*.sampled.rou.xml)
+    # gives each vType group a FIXED departLane (0/1/2 by cash/etc/truck), so disallowing a
+    # vClass on its home lane makes SUMO fatally quit ("Invalid departlane definition") the next
+    # time that flow tries to insert — verified reproducible, and it re-triggers on every
+    # crash-recovery reset() since the closure is re-applied in start(), causing an infinite
+    # crash loop. A speed-limit closure produces the same MUTCD/RILCA closure physics (the lane
+    # becomes effectively impassable -> upstream queue -> reduced approach capacity) without
+    # touching insertion permissions, so it can't hit this failure mode.
+    _WZ_CLOSED_SPEED = 0.5  # m/s
+
+    def _apply_lane_closure(self, lane):
+        """traci side-effects for an active closure: near-stop the lane, push an early/assertive
+        merge lane-change mode on vehicles already queued in it (MUTCD-style early merge)."""
+        try:
+            self._wz_orig_speed = traci.lane.getMaxSpeed(lane)
+            traci.lane.setMaxSpeed(lane, self._WZ_CLOSED_SPEED)
+        except traci.TraCIException as e:
+            print(f"[live_server] closeLane setMaxSpeed({lane}) failed: {e}", file=sys.stderr)
+        try:
+            for vid in traci.lane.getLastStepVehicleIDs(lane):
+                traci.vehicle.setLaneChangeMode(vid, 1621)  # assertive: all changes incl. strategic
+        except traci.TraCIException:
+            pass
+
+    def _clear_lane_closure(self, lane):
+        try:
+            traci.lane.setMaxSpeed(lane, self._wz_orig_speed or 29.06)
+        except traci.TraCIException as e:
+            print(f"[live_server] openLane setMaxSpeed({lane}) failed: {e}", file=sys.stderr)
+
+    def close_lane(self, lane, offset_ft=12.0, speed_mph=60.0, divert_pct=0.0):
+        """Start a MUTCD/RILCA work-zone closure on an approach lane (ap_0/ap_1/ap_2)."""
+        if not lane or lane not in AP_LANES:
+            return False
+        offset_ft = float(offset_ft or 12.0)
+        speed_mph = float(speed_mph or 60.0)
+        divert_pct = max(0.0, min(100.0, float(divert_pct or 0.0)))
+
+        taper_ft = kpi.taper_length(offset_ft, speed_mph, _CLOSURE_CFG)
+        taper_m = round(taper_ft * 0.3048, 1)
+        cone_spacing_ft = kpi.channelizing_spacing(speed_mph, _CLOSURE_CFG)
+        sign_ft = kpi.advance_warning_spacing(True, _CLOSURE_CFG)
+
+        self.workzone = {
+            "lane": lane, "offsetFt": offset_ft, "speedMph": speed_mph, "divertPct": divert_pct,
+        }
+        self._wz_geometry = {
+            "closureStartX":  round(_NODE_B_LOCAL_X - taper_m, 1),
+            "taperLengthM":   taper_m,
+            "nCones":         kpi.n_cones(taper_ft, cone_spacing_ft),
+            "signStationsM":  [round(ft * 0.3048) for ft in sign_ft],
+        }
+        self._wz_start_t = None
+        self._wz_diverted = 0
+        self._arrival_deque.clear()
+        if self._started:
+            self._apply_lane_closure(lane)
+        return True
+
+    def open_lane(self, lane=None):
+        """End the active work-zone closure and restore the lane."""
+        if not self.workzone:
+            return False
+        closed_lane = self.workzone["lane"]
+        if self._started:
+            self._clear_lane_closure(closed_lane)
+        self.workzone = None
+        self._wz_geometry = None
+        self._wz_start_t = None
+        return True
+
+    def _workzone_meta(self):
+        """Static closure geometry for meta()/step() — None when no closure is active."""
+        if not self.workzone or not self._wz_geometry:
+            return None
+        return {**self.workzone, **self._wz_geometry}
 
     def set_weather(self, preset):
         """Apply weather preset to all vTypes and currently live vehicles (no booth dwell change)."""
@@ -369,6 +496,36 @@ class LiveSim:
         if self._elapsed_t0 is None:
             self._elapsed_t0 = t
 
+        # --- Feature B: work-zone — arrivals tracking, percent-diversion, early merge ---
+        if self.workzone:
+            if self._wz_start_t is None:
+                self._wz_start_t = t
+            departed_now = traci.simulation.getDepartedIDList()
+            if departed_now:
+                self._arrival_deque.append((t, len(departed_now)))
+            while self._arrival_deque and t - self._arrival_deque[0][0] > 60.0:
+                self._arrival_deque.popleft()
+            # Percent-diversion rerouter: once the (previous step's) approach queue exceeds the
+            # configured threshold, vaporize divertPct% of newly-inserted vehicles — they take the
+            # alternate route rather than joining the work-zone queue.
+            divert_pct = self.workzone.get("divertPct", 0.0)
+            if divert_pct > 0 and departed_now and self._last_queue_ap > _CLOSURE_CFG.get("diversionQueueThresholdVeh", 8):
+                p = divert_pct / 100.0
+                for vid in departed_now:
+                    if random.random() < p:
+                        try:
+                            traci.vehicle.remove(vid)
+                            self._wz_diverted += 1
+                        except traci.TraCIException:
+                            pass
+            # Early merge: keep vehicles currently in the closed lane in an assertive lane-change
+            # mode so they merge ahead of the taper rather than at the last moment.
+            try:
+                for vid in traci.lane.getLastStepVehicleIDs(self.workzone["lane"]):
+                    traci.vehicle.setLaneChangeMode(vid, 1621)
+            except traci.TraCIException:
+                pass
+
         # --- Collect vehicle data + update type registry ---
         current_ids = set(traci.vehicle.getIDList())
         if self._redirected:
@@ -431,6 +588,13 @@ class LiveSim:
         cap_factor = CAPACITY_FACTORS.get(self._active_weather, 1.0)
         capacity_vph = round(BASE_CAP_CLEAR_VPH * (n_open_lanes / N_BOOTHS) * cap_factor)
 
+        # --- Feature B: work-zone reduced approach capacity (1600 vphpl x open ap lanes) ---
+        wz_capacity_vph = None
+        if self.workzone:
+            n_open_ap_lanes = N_AP_LANES - 1  # single-lane closure
+            wz_capacity_vph = round(_CLOSURE_CFG.get("workZoneCapacityVphpl", 1600) * n_open_ap_lanes)
+            capacity_vph = min(capacity_vph, wz_capacity_vph)
+
         # --- Rolling 60-second departure window (used for throughput, not capacity) ---
         n_dep = sum(departed_by_type.values())
         if n_dep > 0:
@@ -472,7 +636,24 @@ class LiveSim:
             # Feature A: on-road fraction (fraction of live vehicles within road half-width)
             n_total = len(vehicles)
             kpi_data["onRoadPct"] = round(_on_road_count / n_total, 4) if n_total > 0 else 1.0
+            # Feature B: RILCA work-zone queue/permissibility, from the live arrival/capacity counters.
+            if self.workzone:
+                arrivals_vph = sum(c for _, c in self._arrival_deque) * 60
+                t1_h = max((t - (self._wz_start_t or t)) / 3600.0, 1e-9)
+                q2_vph = wz_capacity_vph * _CLOSURE_CFG.get("workzonePostPeakFactor", 0.5)
+                wz = kpi.workzone(
+                    lane_width_ft=self.workzone["offsetFt"], speed_mph=self.workzone["speedMph"],
+                    arrivals_vph=arrivals_vph, t1_h=t1_h, q2_vph=q2_vph,
+                    capacity_vph=wz_capacity_vph, freeway=True, config=_CLOSURE_CFG,
+                )
+                wz.update(self._wz_geometry)
+                wz["lane"] = self.workzone["lane"]
+                wz["divertPct"] = self.workzone["divertPct"]
+                wz["divertedTotal"] = self._wz_diverted
+                kpi_data["workzone"] = wz
             live_stats = kpi_data
+
+        self._last_queue_ap = queue_ap
 
         # Base stats frame (always emitted; replaced by live_stats when available)
         base_stats = {"running": len(vehicles), "queueAp": queue_ap, "booth": booth}
@@ -526,6 +707,8 @@ class LiveSim:
             # Feature A: expose centerline geometry for CR-spec and LIVE Bug 3 validation.
             "centerline":    [list(pt) for pt in _CL_LOCAL],
             "roadHalfWidthM": round(_HALF_WIDTH, 2),
+            # Feature B: work-zone closure geometry (None when no closure is active).
+            "workzone": self._workzone_meta(),
         }
 
 
@@ -578,6 +761,10 @@ def _apply_command(cmd):
         SIM.reset()
     elif c == "setWeather":
         SIM.set_weather(cmd.get("preset", "clear"))
+    elif c == "closeLane":
+        SIM.close_lane(cmd.get("lane"), cmd.get("offsetFt", 12), cmd.get("speedMph", 60), cmd.get("divertPct", 0))
+    elif c == "openLane":
+        SIM.open_lane(cmd.get("lane"))
 
 
 async def _safe_send(ws, payload):

@@ -62,6 +62,24 @@
         <div id="gates-all" class="gate-grid"></div>
       </div>
 
+      <!-- MUTCD/RILCA work-zone lane closure: TTC overlay (cones/signs) + queue/permissibility KPIs -->
+      <div id="workzone-hud" class="workzone-hud">
+        <div class="wz-h">Work-zone lane closure &middot; MUTCD/RILCA</div>
+        <div class="ctl-row">
+          <select id="wz-lane-select" class="wz-lane-select" title="Approach lane to close"></select>
+          <button id="wz-close" class="mini">Close lane</button>
+        </div>
+        <div class="wz-readouts">
+          <div class="wz-row"><span class="wz-k">Taper length (L=W&middot;S)</span><span class="wz-v" id="wz-taper-m">—</span></div>
+          <div class="wz-row"><span class="wz-k">Cones</span><span class="wz-v" id="wz-cone-count">—</span></div>
+          <div class="wz-row"><span class="wz-k">Advance signs</span><span class="wz-v" id="wz-sign-distances">—</span></div>
+          <div class="wz-row"><span class="wz-k">Max queue</span><span class="wz-v" id="wz-max-queue">—</span></div>
+          <div class="wz-row"><span class="wz-k">Max delay</span><span class="wz-v" id="wz-max-delay">—</span></div>
+          <div class="wz-row"><span class="wz-k">Recovery time</span><span class="wz-v" id="wz-recovery">—</span></div>
+        </div>
+        <div id="wz-permissible-badge" class="wz-badge wz-badge-none">—</div>
+      </div>
+
       <div id="status" class="status">Loading…</div>
     </div>
 

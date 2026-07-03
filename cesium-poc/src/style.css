@@ -193,6 +193,58 @@ html, body, #cesiumContainer {
 }
 .weather-select option { color: #111; }
 
+/* ---- Work-zone lane closure (MUTCD/RILCA) HUD ---- */
+.workzone-hud {
+  margin-bottom: 10px;
+  padding: 10px 10px 12px;
+  background: rgba(255, 106, 0, 0.06);
+  border: 1px solid rgba(255, 106, 0, 0.22);
+  border-radius: 8px;
+}
+.wz-h {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #ffb066;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.wz-lane-select {
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e8eef6;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.wz-lane-select option { color: #111; }
+#wz-close.on { background: #e8412f; border-color: #e8412f; color: #fff; }
+.wz-readouts { margin-top: 8px; }
+.wz-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 10.5px;
+  padding: 2px 0;
+}
+.wz-k { color: #b7c2ce; }
+.wz-v { font-weight: 700; color: #f2f5f8; font-variant-numeric: tabular-nums; }
+.wz-badge {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+.wz-badge-none { background: rgba(255, 255, 255, 0.05); color: #7d8da3; }
+.wz-badge-green { background: rgba(46, 204, 113, 0.18); color: #2ecc71; border: 1px solid rgba(46, 204, 113, 0.4); }
+.wz-badge-red   { background: rgba(255, 107, 107, 0.18); color: #ff6b6b; border: 1px solid rgba(255, 107, 107, 0.4); }
+
 /* ---- Full-viewport weather tint overlay ---- */
 #weather-overlay {
   position: fixed;

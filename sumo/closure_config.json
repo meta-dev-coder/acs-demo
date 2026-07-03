@@ -1,0 +1,18 @@
+{
+  "_comment": "MUTCD Part 6 (2023 Table 6B-4 / 2009 Table 6C-4) + RILCA work-zone-capacity constants for the lane-closure KPI engine (sumo/kpi.py). Not scenario-tuned — these are the published standard/typical values; kept in JSON so kpi.py stays config-driven per project convention (mirrors tolls.json).",
+  "taperHighSpeedThresholdMph": 45,
+  "taperLowSpeedThresholdMph": 40,
+  "advanceWarningSpacingFt": {
+    "freeway":      [1000, 1500, 2640],
+    "conventional": [500, 500, 500]
+  },
+  "coneSpacingMaxFactor": 1.0,
+  "workZoneCapacityVphpl": 1600,
+  "avgVehicleSpacingFt": 25,
+  "permissible": {
+    "maxQueueMi": 4.0,
+    "maxDelayMin": 30.0
+  },
+  "diversionQueueThresholdVeh": 8,
+  "workzonePostPeakFactor": 0.5
+}

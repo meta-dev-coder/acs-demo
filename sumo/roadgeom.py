@@ -55,6 +55,11 @@ def _build_local_transform():
 _E0, _N0, _SIN, _COS = _build_local_transform()
 
 
+def utm_to_local(E: float, N: float) -> tuple[float, float]:
+    """Public wrapper for _utm_to_local — convert UTM 17N (E, N) -> local SUMO plaza metres."""
+    return _utm_to_local(E, N)
+
+
 def _utm_to_local(E: float, N: float) -> tuple[float, float]:
     """Convert UTM 17N (E, N) → local SUMO plaza metres (x, y)."""
     dE = E - _E0

@@ -20,6 +20,7 @@ import {
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import "./style.css";
 import { CoordinateTransform } from "./transform.js";
+import { buildWorkZone, clearWorkZone, rilcaWorkzone, CLOSURE_CONFIG } from "./workzone.js";
 
 const ION = import.meta.env.VITE_CESIUM_ION_TOKEN;
 if (ION) Ion.defaultAccessToken = ION;
@@ -56,6 +57,16 @@ const CASH_BY_SCENARIO = {
 };
 let activeCashLanes = CASH_BY_SCENARIO.baseline;
 const WS_URL = "ws://localhost:8765";
+
+// ---- Feature B: MUTCD/RILCA work-zone lane closure (approach lanes only) ----
+const AP_LANES = ["ap_0", "ap_1", "ap_2"];
+const N_AP_LANES = AP_LANES.length;
+// Canonical corridor-x stations from sumo/georef_nodes.py: A=0, B=400, C=500, D=530(=boothX), E=630,
+// F=930. Node B — where the approach taper must fully merge — sits this many metres upstream of the
+// booth line. Used to place the OFFLINE schematic closure (no live SUMO net to report the exact
+// station); the LIVE server reports its own closureStartX from the real net, but we compute
+// geometry client-side either way so the overlay appears immediately (see closeLaneHook).
+const NODE_B_UPSTREAM_OF_BOOTH_M = 130;
 
 // ---- SITES: the SAME SUMO plaza, placed on different real toll corridors purely by swapping the
 // transform — proving the transform module is map-agnostic. Each ships a default transform (so it
@@ -197,6 +208,9 @@ async function loadRun(viewer, url) {
   BOOTHS = computeBooths(META);
   removeVehicles(viewer);
   rebuildBoothMarkers(viewer);
+  // New scenario data invalidates any active work-zone overlay (stale geometry/KPIs).
+  clearWorkZone(viewer);
+  activeWorkzoneSpec = null;
 
   if (!T) { setStatus("⊕ Calibrate the road to place + start the traffic."); return; }
 
@@ -400,6 +414,9 @@ function renderKpis(s) {
 
   // ---- Debug hook ----
   window.__kpi = s;
+
+  // ---- Feature B: work-zone HUD readouts (geometry from activeWorkzoneSpec, live numbers from s.workzone) ----
+  renderWorkzoneHud();
 }
 
 // ============================================================================ camera
@@ -451,6 +468,9 @@ function stopLive(viewer) {
   closedSet = new Set();
   $("gatePanel").classList.add("hidden");
   setConn(false, "socket: offline");
+  clearWorkZone(viewer);
+  activeWorkzoneSpec = null;
+  renderWorkzoneHud();
 }
 function onMeta(viewer, m) {
   // Preserve centerline + roadHalfWidthM from either the live server's meta message or
@@ -551,6 +571,125 @@ function syncGateButtons() {
   document.querySelectorAll(".gate-btn").forEach((b) => b.classList.toggle("closed", isClosed(b.dataset.lane)));
 }
 
+// ============================================================================ Feature B: work-zone lane closure
+// window.__closeLane(lane, opts) / window.__openLane(lane) — TTC overlay (workzone.js) + RILCA KPIs.
+// Geometry (taper length, cone count, sign stations) is computed CLIENT-SIDE via the workzone.js
+// mirror of sumo/kpi.py so the overlay appears immediately in both LIVE and OFFLINE modes, without
+// waiting on a websocket round-trip. LIVE mode additionally forwards the command to live_server.py,
+// which reacts with real traci physics (lane speed drop + strategic lane-change) and streams back
+// the real arrival-driven RILCA queue numbers in stats.workzone (picked up by renderKpis -> here).
+let activeWorkzoneSpec = null; // { lane, offsetFt, speedMph, divertPct, closureStartX, closureEndX, taperLengthM, nCones, signStationsM, laneSign }
+
+function workzoneGeometryOnly(offsetFt, speedMph) {
+  // arrivals/t1/q2 = 0 so only the geometry fields (taper/cones/signs) are meaningful here; the
+  // queue/permissible fields get recomputed with real numbers by applyOfflineWorkzoneStats / the
+  // live server's stats.workzone.
+  const capacityVph = CLOSURE_CONFIG.workZoneCapacityVphpl * (N_AP_LANES - 1);
+  return rilcaWorkzone(offsetFt, speedMph, 0, 0, 0, capacityVph);
+}
+
+function applyOfflineWorkzoneStats(offsetFt, speedMph, divertPct, lane) {
+  const capacityVph = CLOSURE_CONFIG.workZoneCapacityVphpl * (N_AP_LANES - 1);
+  // SCHEMATIC: offline playback has no live SUMO physics to measure real demand under closure, so
+  // assume a brief oversaturated window 15% above the reduced capacity, recovering per the RILCA
+  // formula — enough to demonstrate the queue/permissibility math without a live server (mirrors the
+  // live server's own q2 = capacity * workzonePostPeakFactor recovery assumption).
+  const arrivalsVph = capacityVph * 1.15;
+  const q2Vph = capacityVph * (CLOSURE_CONFIG.workzonePostPeakFactor ?? 0.5);
+  const wz = rilcaWorkzone(offsetFt, speedMph, arrivalsVph, 0.5, q2Vph, capacityVph);
+  wz.lane = lane;
+  wz.divertPct = divertPct;
+
+  const base = currentData?.stats || window.__kpi || {};
+  // SCHEMATIC: taking min(base.capacityVph, workZoneCapacityVphpl*(N-1)) is not always a real drop —
+  // if the pre-closure bottleneck (booths) already measured below the reduced-lane approach capacity,
+  // the raw min would leave capacityVph unchanged even though a lane just closed. Instead scale the
+  // *observed* baseline capacity down by the fraction of approach lanes lost (closing 1 of N lanes
+  // removes ~1/N of throughput), then still cap it at the absolute per-lane work-zone capacity —
+  // this always reflects the closure while never reporting more capacity than physically available.
+  const laneLossFactor = (N_AP_LANES - 1) / N_AP_LANES;
+  const reducedBaseCapacity = Math.round((base.capacityVph ?? capacityVph) * laneLossFactor);
+  const s = { ...base, workzone: wz, capacityVph: Math.min(reducedBaseCapacity, capacityVph) };
+  renderKpis(s);
+}
+
+function closeLaneHook(viewer, lane, opts = {}) {
+  if (!AP_LANES.includes(lane)) lane = AP_LANES[0];
+  const offsetFt = opts.offsetFt ?? 12;
+  const speedMph = opts.speedMph ?? 60;
+  const divertPct = opts.divertPct ?? 0;
+
+  const geom = workzoneGeometryOnly(offsetFt, speedMph);
+  const closureEndX = (META?.boothX ?? (T ? T.p.sumoRefX : 530)) - NODE_B_UPSTREAM_OF_BOOTH_M;
+  const closureStartX = closureEndX - geom.taperLengthM;
+
+  activeWorkzoneSpec = {
+    lane, offsetFt, speedMph, divertPct,
+    closureStartX, closureEndX,
+    taperLengthM: geom.taperLengthM, nCones: geom.nCones, signStationsM: geom.signStationsM,
+    laneSign: AP_LANES.indexOf(lane) === 0 ? -1 : 1,
+  };
+
+  if (T) {
+    buildWorkZone(viewer, T, {
+      ...activeWorkzoneSpec,
+      centerline: META?.centerline || [],
+      roadHalfWidthM: META?.roadHalfWidthM ?? 20,
+    });
+  }
+
+  if (liveMode) sendCmd({ cmd: "closeLane", lane, offsetFt, speedMph, divertPct });
+  else applyOfflineWorkzoneStats(offsetFt, speedMph, divertPct, lane);
+
+  renderWorkzoneHud();
+}
+
+function openLaneHook(viewer, lane) {
+  const closingLane = lane || activeWorkzoneSpec?.lane;
+  clearWorkZone(viewer);
+  activeWorkzoneSpec = null;
+
+  if (liveMode) {
+    sendCmd({ cmd: "openLane", lane: closingLane });
+  } else if (currentData) {
+    const s = { ...(window.__kpi || currentData.stats) };
+    delete s.workzone;
+    if (currentData.stats?.capacityVph != null) s.capacityVph = currentData.stats.capacityVph;
+    renderKpis(s);
+  }
+  renderWorkzoneHud();
+}
+
+/** Sync the #workzone-hud readouts from activeWorkzoneSpec (geometry) + window.__kpi.workzone (queue KPIs). */
+function renderWorkzoneHud() {
+  const spec = activeWorkzoneSpec;
+  const wz = window.__kpi?.workzone;
+  const fmt = (v, unit = "", digits = 1) => (v == null ? "—" : `${Number(v).toFixed(digits)}${unit}`);
+
+  const set = (id, text) => { const el = $(id); if (el) el.textContent = text; };
+  set("wz-taper-m", spec ? fmt(spec.taperLengthM, " m", 0) : "—");
+  set("wz-cone-count", spec ? String(spec.nCones ?? "—") : "—");
+  set("wz-sign-distances", spec && spec.signStationsM?.length
+    ? spec.signStationsM.map((m) => Math.round(m)).join(" / ") + " m" : "—");
+  set("wz-max-queue", wz ? `${fmt(wz.maxQueueVeh, " veh", 0)} (${fmt(wz.maxQueueMi, " mi", 2)})` : "—");
+  set("wz-max-delay", wz ? fmt(wz.maxDelayMin, " min", 1) : "—");
+  set("wz-recovery", wz ? fmt(wz.recoveryTimeH, " h", 2) : "—");
+
+  const badge = $("wz-permissible-badge");
+  if (badge) {
+    if (wz?.permissible) {
+      badge.textContent = wz.permissible.toUpperCase() + (wz.permissible === "green" ? " — PERMISSIBLE" : " — NOT PERMISSIBLE");
+      badge.className = "wz-badge wz-badge-" + wz.permissible;
+    } else {
+      badge.textContent = "—";
+      badge.className = "wz-badge wz-badge-none";
+    }
+  }
+
+  const btn = $("wz-close");
+  if (btn) { btn.textContent = spec ? "Reopen lane" : "Close lane"; btn.classList.toggle("on", !!spec); }
+}
+
 // ============================================================================ MARK GATES (user clicks each real toll gate)
 // The user marks the road direction (2 clicks) then clicks each real toll gate on the aerial.
 // Marking rebuilds T from the clicks, then reloads vehicles (placed via T.sumoToWorld) AND
@@ -632,6 +771,21 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
   renderGatePanel();
   installMarking(viewer);
 
+  // ---- Feature B: work-zone HUD wiring (lane selector + close/reopen button) ----
+  const wzLaneSel = $("wz-lane-select");
+  if (wzLaneSel) {
+    wzLaneSel.innerHTML = AP_LANES.map((l, i) => `<option value="${l}">Lane ${i} (${l})</option>`).join("");
+  }
+  const wzCloseBtn = $("wz-close");
+  if (wzCloseBtn) {
+    wzCloseBtn.onclick = () => {
+      const lane = wzLaneSel ? wzLaneSel.value : AP_LANES[0];
+      if (activeWorkzoneSpec) openLaneHook(viewer, lane);
+      else closeLaneHook(viewer, lane, { offsetFt: 12, speedMph: 60 });
+    };
+  }
+  renderWorkzoneHud();
+
   const selectOffline = async (url, onBtn, scenario) => {
     stopLive(viewer);
     [bBase, bInt, bLive].forEach((b) => b.classList.remove("on"));
@@ -696,6 +850,9 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
   window.__viewer = viewer;
   window.__startTraffic = () => startTraffic(viewer);
   window.__markGates = (dir, gates) => { mark.dir = dir; mark.gates = gates; finishMarking(viewer, $("btn-calib")); };
+  // Feature B: MUTCD/RILCA work-zone lane closure hooks (TTC overlay + KPIs) — see closeLaneHook.
+  window.__closeLane = (lane, opts) => closeLaneHook(viewer, lane, opts);
+  window.__openLane = (lane) => openLaneHook(viewer, lane);
   // Feature-A: expose live transform + meta so e2e specs can validate curved-road geometry.
   // Use property getters so the values stay current even if T / META are reassigned later
   // (e.g. after user switches sites or re-calibrates).
