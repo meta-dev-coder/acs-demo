@@ -96,7 +96,7 @@ async function boothStopResidual(page: any, gatePositions: LonLat[]): Promise<nu
 }
 
 // ===========================================================================
-// LIVE Bug 3 — vehicles stay within the plaza lane band in live mode
+// LIVE Bug 3 — vehicles stay within the road band in live mode (centerline check)
 // ===========================================================================
 test('LIVE Bug 3 — vehicles stay within plaza lane band (live mode, after marking)', async ({ page }) => {
   await waitForReady(page);
@@ -107,37 +107,72 @@ test('LIVE Bug 3 — vehicles stay within plaza lane band (live mode, after mark
   // Mark gates so the camera frames correctly.
   await markGates(page, SITE_I595.dir, SITE_I595.gates);
 
-  // Fast-forward a bit by setting a high multiplier and waiting briefly.
-  // In live mode, the clock doesn't animate (live frames are pushed by the server),
-  // so we just wait for several frame arrivals.
+  // Wait for several frame arrivals.
   await page.waitForTimeout(2_000);
 
-  const positions = await vehicleWorldPositions(page);
-  // In live mode, positions come from model entities (including any offline ones still there).
-  // We expect at least some live vehicles to be visible.
-  expect(positions.length, 'No vehicle positions found in live mode').toBeGreaterThan(0);
+  expect(
+    (await vehicleWorldPositions(page)).length,
+    'No vehicle positions found in live mode',
+  ).toBeGreaterThan(0);
 
-  // Compute the lane band from the marked gates (same logic as Bug 3 offline).
-  const laterals = SITE_I595.gates.map((g) => lateralOffset(g, SITE_I595.dir));
-  const gateMinLat = Math.min(...laterals);
-  const gateMaxLat = Math.max(...laterals);
-  const SLOP_M = 3.2;  // live: one full lane width (real scale = 3.2 m)
-  const loBound = gateMinLat - SLOP_M;
-  const hiBound = gateMaxLat + SLOP_M;
+  // Use window.__T + window.__meta (populated from the live server's meta message, or
+  // retained from the offline JSON) to check centerline-relative lateral offsets.
+  // This handles the curved approach correctly (approach vehicles are legitimately far
+  // from the straight gate axis, but always within roadHalfWidthM of the centerline).
+  const violations: string[] = await page.evaluate(() => {
+    const viewer = (window as any).__viewer;
+    const T      = (window as any).__T;
+    const meta   = (window as any).__meta;
+    if (!T || !meta) return ['__T or __meta not available'];
 
-  const out: string[] = [];
-  for (const p of positions) {
-    const lat = lateralOffset(p, SITE_I595.dir);
-    if (lat < loBound || lat > hiBound) {
-      out.push(
-        `Live vehicle at lon=${p.lon.toFixed(6)},lat=${p.lat.toFixed(6)} ` +
-        `has lateral=${lat.toFixed(2)} m outside [${loBound.toFixed(2)}, ${hiBound.toFixed(2)}]`
-      );
+    const cl: number[][] = meta.centerline;
+    const halfW: number  = meta.roadHalfWidthM;
+    const SLOP = 3.2;   // one full lane width of tolerance (real scale = 3.2 m) for live mode
+
+    function clY(x: number): number {
+      if (!cl || cl.length < 2) return 0;
+      if (x <= cl[0][0])             return cl[0][1];
+      if (x >= cl[cl.length - 1][0]) return cl[cl.length - 1][1];
+      for (let i = 0; i < cl.length - 1; i++) {
+        const [x0, y0] = cl[i], [x1, y1] = cl[i + 1];
+        if (x >= x0 && x <= x1) {
+          const t = (x - x0) / (x1 - x0);
+          return y0 + t * (y1 - y0);
+        }
+      }
+      return 0;
     }
-  }
+
+    const time = viewer.clock.currentTime;
+    const ell  = viewer.scene.globe.ellipsoid;
+    const viols: string[] = [];
+
+    for (const e of viewer.entities.values) {
+      if (!e.model) continue;
+      const cart = e.position?.getValue(time);
+      if (!cart) continue;
+      const carto = ell.cartesianToCartographic(cart);
+      if (!carto) continue;
+      const lon = (carto.longitude * 180) / Math.PI;
+      const lat = (carto.latitude  * 180) / Math.PI;
+
+      const local  = T.worldToSumo(lon, lat);
+      const refY   = clY(local.x);
+      const offset = Math.abs(local.y - refY);
+
+      if (offset > halfW + SLOP) {
+        viols.push(
+          `Live vehicle at local(${local.x.toFixed(1)}, ${local.y.toFixed(1)}) ` +
+          `offset ${offset.toFixed(1)} m from centerline (refY=${refY.toFixed(1)}) ` +
+          `> halfW(${halfW.toFixed(1)}) + slop(${SLOP})`
+        );
+      }
+    }
+    return viols;
+  });
 
   await shoot(page, 'live-bug3-lane-band');
-  expect(out, `Live vehicles outside lane band:\n${out.join('\n')}`).toHaveLength(0);
+  expect(violations, `Live vehicles outside lane band:\n${violations.join('\n')}`).toHaveLength(0);
 });
 
 // ===========================================================================

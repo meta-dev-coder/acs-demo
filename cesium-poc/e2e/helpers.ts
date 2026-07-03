@@ -206,6 +206,41 @@ export async function vehicleWorldPositions(
 }
 
 // ---------------------------------------------------------------------------
+// centerlineOffset / centerlineY
+// Feature A (curved road): shared lateral-offset math against the real curved
+// road centerline, so specs stop re-implementing the same interpolation.
+// `cl` is `window.__meta.centerline` — [[x, y], ...] in local SUMO metres,
+// x = along-corridor (monotonic), y = lateral offset from the straight
+// bearing-104° reference axis. Pure functions (no closures) so they can be
+// called directly in Node OR passed into page.evaluate() to run in-page.
+// ---------------------------------------------------------------------------
+export interface CenterlineOffset {
+  refY: number;    // interpolated centerline y at the given x
+  offset: number;  // |y - refY|, i.e. lateral distance from the centerline
+}
+
+/** Linearly interpolate the centerline's lateral y at a given along-corridor x (clamped to endpoints). */
+export function centerlineY(cl: number[][], x: number): number {
+  if (!cl || cl.length < 2) return 0;
+  if (x <= cl[0][0])             return cl[0][1];
+  if (x >= cl[cl.length - 1][0]) return cl[cl.length - 1][1];
+  for (let i = 0; i < cl.length - 1; i++) {
+    const [x0, y0] = cl[i], [x1, y1] = cl[i + 1];
+    if (x >= x0 && x <= x1) {
+      const t = (x - x0) / (x1 - x0);
+      return y0 + t * (y1 - y0);
+    }
+  }
+  return 0;
+}
+
+/** Lateral offset of local point (x, y) from the curved centerline `cl` (see centerlineY). */
+export function centerlineOffset(cl: number[][], x: number, y: number): CenterlineOffset {
+  const refY = centerlineY(cl, x);
+  return { refY, offset: Math.abs(y - refY) };
+}
+
+// ---------------------------------------------------------------------------
 // shoot
 // Save a screenshot to test-results/<name>.png (directory is git-ignored).
 // ---------------------------------------------------------------------------

@@ -20,7 +20,10 @@ echo "Using SUMO_HOME=$SUMO_HOME"
 DATA_DIR="../cesium-poc/public/data"
 mkdir -p out "$DATA_DIR"
 
-echo "== georef_nodes.py — write UTM node coords =="
+echo "== road_centerline.py — fetch/cache real I-595 centerline =="
+python3 road_centerline.py
+
+echo "== georef_nodes.py — write UTM node coords + curved edge shapes =="
 python3 georef_nodes.py
 
 echo "== netconvert =="

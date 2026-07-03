@@ -40,6 +40,13 @@ const MIN_PIXEL_SIZE  = { car: 26,  truck: 30    };   // keep visible at max zoo
 const MODEL_YAW_OFFSET = { car: -110, truck: -30 };   // mesh nose alignment (tuned per request)
 const DIMS = { cash: [4.8, 2.0, 1.6], etc: [4.8, 2.0, 1.6], truck: [12, 2.6, 3.2] };
 const N_BOOTHS = 10;
+// Fixed plaza half-span: 10 lanes x 3.2 m / 2 = 14.4 m. The plaza core (fo/pl/fi) stays a straight,
+// symmetric-about-y=0 tangent by design (Feature A curved-road net — see sumo/georef_nodes.py), so
+// this is a FIXED constant, not derived from meta.bounds.minY/maxY: those now span the whole curved
+// approach/departure trajectory (up to ~55 m), not just the booth line. Using bounds here would make
+// booth markers and the mark-gates transform scale wildly wrong (this WAS a real regression — see
+// e2e/bugs.spec.ts Bug 2). Mirrors fcd2json.py's ROAD_HALF_WIDTH_M, which documents the same rule.
+const PLAZA_HALF_SPAN_M = 14.4;
 // Cash booths per scenario. Baseline: 3 cash (pl_0..2). Intervention ("Convert 2 cash → AET"):
 // pl_1 & pl_2 are converted to AET (turn GREEN), only pl_0 stays cash — so green cars flow through the
 // converted booths and the orange (cash) cars queue at the single remaining cash booth.
@@ -80,8 +87,9 @@ let META = null;         // data meta: { bounds, boothX, tEnd, dt }
 let BOOTHS = [];         // [{ lane, y, cash }] — derived from meta.bounds
 
 function computeBooths(meta) {
-  // Derive booth Y positions from the SUMO bounds (minY..maxY spans all 10 lanes).
-  const { minY, maxY } = meta.bounds;
+  // Derive booth Y positions from the fixed plaza half-span (NOT meta.bounds — see
+  // PLAZA_HALF_SPAN_M comment above for why).
+  const minY = -PLAZA_HALF_SPAN_M, maxY = PLAZA_HALF_SPAN_M;
   const out = [];
   for (let i = 0; i < N_BOOTHS; i++) {
     const lane = `pl_${i}`;
@@ -445,12 +453,25 @@ function stopLive(viewer) {
   setConn(false, "socket: offline");
 }
 function onMeta(viewer, m) {
+  // Preserve centerline + roadHalfWidthM from either the live server's meta message or
+  // the previously loaded offline JSON (baseline.json), so window.__meta always carries
+  // these fields for the CR-spec / LIVE Bug 3 invariants.
+  const prevCl  = META?.centerline;
+  const prevHW  = META?.roadHalfWidthM;
   // Build a META compatible with computeBooths (raw SUMO bounds).
   if (m.bounds && typeof m.boothX === "number") {
-    META = { bounds: m.bounds, boothX: m.boothX, tEnd: m.tEnd || 0 };
+    META = {
+      bounds: m.bounds, boothX: m.boothX, tEnd: m.tEnd || 0,
+      centerline:    m.centerline    || prevCl,
+      roadHalfWidthM: m.roadHalfWidthM ?? prevHW,
+    };
   } else {
     // Fallback: use default bounds matching the 10-lane plaza
-    META = { bounds: { minX: 0, maxX: 930, minY: -14.4, maxY: 14.4 }, boothX: 530, tEnd: 0 };
+    META = {
+      bounds: { minX: 0, maxX: 930, minY: -14.4, maxY: 14.4 }, boothX: 530, tEnd: 0,
+      centerline:    prevCl,
+      roadHalfWidthM: prevHW,
+    };
   }
   BOOTHS = computeBooths(META);
   rebuildBoothMarkers(viewer);
@@ -546,7 +567,10 @@ function buildTransformFromMarks(dir, gates) {
   const perp = (g) => ((g.lon - anchorLon) * mLon) * -Math.cos(Br) + ((g.lat - anchorLat) * mLat) * Math.sin(Br);
   const ps = gates.map(perp);
   const span = (Math.max(...ps) - Math.min(...ps)) || 1;
-  const sumoSpan = (META.bounds.maxY - META.bounds.minY) || 1;
+  // Fixed plaza span (NOT meta.bounds — see PLAZA_HALF_SPAN_M comment): the marked gates span the
+  // real booth line, which is only ever the straight plaza core, regardless of how far the curved
+  // approach/departure trajectory bounds extend.
+  const sumoSpan = PLAZA_HALF_SPAN_M * 2;
   return new CoordinateTransform({ anchorLon, anchorLat, bearingDeg, scale: span / sumoSpan, sumoRefX: META.boothX, sumoRefY: 0 });
 }
 function finishMarking(viewer, btn) {
@@ -672,4 +696,9 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
   window.__viewer = viewer;
   window.__startTraffic = () => startTraffic(viewer);
   window.__markGates = (dir, gates) => { mark.dir = dir; mark.gates = gates; finishMarking(viewer, $("btn-calib")); };
+  // Feature-A: expose live transform + meta so e2e specs can validate curved-road geometry.
+  // Use property getters so the values stay current even if T / META are reassigned later
+  // (e.g. after user switches sites or re-calibrates).
+  Object.defineProperty(window, "__T",    { get: () => T,    configurable: true, enumerable: false });
+  Object.defineProperty(window, "__meta", { get: () => META, configurable: true, enumerable: false });
 })();

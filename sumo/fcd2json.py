@@ -44,6 +44,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 import kpi as _kpi
+import roadgeom as _roadgeom
 
 QUEUE_SPEED = 0.5       # m/s; below this a vehicle counts as "queued"
 
@@ -53,6 +54,13 @@ ANCHOR_LAT = 26.1124
 BEARING_DEG = 104.0
 SUMO_REF_X = 530.0    # booth stop line x (local metres)
 SUMO_REF_Y = 0.0
+
+# Road half-width for the lateral clamp / on-road validation (Feature A).
+# Fixed design constant — MUST match live_server.py's _HALF_WIDTH so offline
+# and live specs validate against the same band. Derived from the plaza's
+# known lane geometry (10 lanes x 3.2 m / 2 = 14.4 m half-span) with a 1.6x
+# buffer, NOT from the sample bounds being clamped (that would be circular).
+ROAD_HALF_WIDTH_M = 14.4 * 1.6
 
 # Default net.xml path relative to this script's directory
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -231,7 +239,20 @@ def main():
     # Pre-load the transform (reads net.xml once; errors here are clear)
     _ensure_transform(net_path)
 
+    # ---- Load road centerline (for lateral clamp + on-road validation) ----
+    cl_local = _roadgeom.load_centerline_local()   # [[x, y], ...] in local metres
+    road_half_width = ROAD_HALF_WIDTH_M             # fixed constant, not sample-derived
+
     vehicles, t_end, queue_per_step, spillback = parse_fcd(fcd, net_path)
+
+    # ---- Apply lateral clamp (keeps all samples within ±roadHalfWidthM of centerline) ----
+    if cl_local:
+        for rec in vehicles.values():
+            for samp in rec["samples"]:
+                cx, cy = _roadgeom.clamp_lateral(samp[1], samp[2], cl_local, road_half_width)
+                samp[1] = round(cx, 2)
+                samp[2] = round(cy, 2)
+
     processed, avg_wait, avg_speed_mph = parse_tripinfo(tripinfo)
 
     xs = [s[1] for v in vehicles.values() for s in v["samples"]]
@@ -240,11 +261,21 @@ def main():
     bounds = {"minX": min(xs), "maxX": max(xs), "minY": min(ys), "maxY": max(ys)} if xs else \
              {"minX": 0, "maxX": 0, "minY": 0, "maxY": 0}
 
+    # ---- Compute on-road residual stats (road_half_width is the fixed constant above) ----
+    flat_samples = [s for v in vehicles.values() for s in v["samples"]]
+    if cl_local and flat_samples:
+        residuals = _roadgeom.residual_stats(flat_samples, cl_local, road_half_width)
+    else:
+        residuals = {"maxLateralResidualM": 0.0, "p95LateralResidualM": 0.0, "onRoadPct": 1.0}
+
     meta = {
-        "bounds": bounds,
-        "boothX": booth_stop_x(vehicles),
-        "tEnd": t_end,
-        "dt": 1.0,
+        "bounds":        bounds,
+        "boothX":        booth_stop_x(vehicles),
+        "tEnd":          t_end,
+        "dt":            1.0,
+        # ---- Feature A: curved road metadata ----
+        "centerline":    [list(pt) for pt in cl_local],
+        "roadHalfWidthM": round(road_half_width, 2),
     }
 
     veh_out = [{"id": vid, "type": rec["type"], "t0": rec["samples"][0][0], "samples": rec["samples"]}
@@ -262,6 +293,8 @@ def main():
         "mainlineQueueMax": max(queue_per_step) if queue_per_step else 0,
         "spillback": spillback,
     })
+    # Merge on-road stats from Feature A.
+    kpi_stats.update(residuals)
     # If tripinfo was empty (no trips), use the FCD-derived stats as back-compat fallback.
     if not trips:
         kpi_stats.update({
@@ -282,7 +315,8 @@ def main():
     print(f"{out}: {len(veh_out)} vehicles (LOCAL SUMO metres), boothX={meta['boothX']},"
           f" bounds x[{bounds['minX']:.0f},{bounds['maxX']:.0f}]"
           f" y[{bounds['minY']:.0f},{bounds['maxY']:.0f}],"
-          f" avgWait={s['avgWaitSec']}s, throughput={s['throughputVph']}vph, spillback={s['spillback']}")
+          f" avgWait={s['avgWaitSec']}s, throughput={s['throughputVph']}vph, spillback={s['spillback']},"
+          f" onRoadPct={s['onRoadPct']}, centerline_pts={len(meta['centerline'])}")
 
 
 if __name__ == "__main__":

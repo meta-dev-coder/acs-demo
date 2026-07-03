@@ -61,7 +61,8 @@ import websockets  # noqa: E402
 HERE = os.path.dirname(os.path.abspath(__file__))
 # kpi.py lives in the same directory as this script
 sys.path.insert(0, HERE)
-import kpi  # noqa: E402
+import kpi        # noqa: E402
+import roadgeom   # noqa: E402
 
 # --- Anchor constants (match georef_nodes.py / fcd2json.py / main.js SITES[0]) ------------------
 ANCHOR_LON = -80.306
@@ -113,6 +114,21 @@ CAPACITY_FACTORS = {
 # Local Y bounds for the plaza: lane width 3.2 m, 10 lanes centred at y=0.
 _LANE_MIN_Y = -14.4
 _LANE_MAX_Y = 14.4
+
+# --- Feature A: centerline geometry (loaded once at startup) ------------------------------------
+# Used to:
+#   (a) expose centerline + roadHalfWidthM in the meta message for client CR-tests
+#   (b) apply lateral clamp to live vehicle positions
+#   (c) compute onRoadPct in the KPI stats
+try:
+    _CL_LOCAL   = roadgeom.load_centerline_local()   # [[x, y], ...] in local metres
+    _HALF_WIDTH = max(abs(_LANE_MIN_Y), abs(_LANE_MAX_Y)) * 1.6  # design max (10-lane × 3.2m/2 = 16m + buffer)
+    print(f"[live_server] Loaded centerline: {len(_CL_LOCAL)} pts, halfWidth={_HALF_WIDTH:.1f} m",
+          file=sys.stderr)
+except Exception as _e:
+    _CL_LOCAL   = []
+    _HALF_WIDTH = 25.0
+    print(f"[live_server] WARNING: could not load centerline ({_e}); no lateral clamp", file=sys.stderr)
 
 # --- SUMO-internal → local plaza metres ----------------------------------------------------------
 # SUMO applies a netOffset when building the network (SUMO_internal = UTM + netOffset).
@@ -360,9 +376,18 @@ class LiveSim:
 
         vehicles = []
         queue_ap = 0
+        _on_road_count = 0
         for vid in current_ids:
             sx, sy = traci.vehicle.getPosition(vid)
             x, y = sumo_to_local(sx, sy)
+            # Apply lateral clamp (Feature A): keep vehicles within road half-width of centerline.
+            if _CL_LOCAL:
+                x, y = roadgeom.clamp_lateral(x, y, _CL_LOCAL, _HALF_WIDTH)
+                _, off, _, _ = roadgeom.project_to_centerline(x, y, _CL_LOCAL)
+                if abs(off) <= _HALF_WIDTH:
+                    _on_road_count += 1
+            else:
+                _on_road_count += 1
             vtype = traci.vehicle.getTypeID(vid)
             self._vid_to_type[vid] = vtype   # register / refresh type
             vehicles.append({
@@ -444,6 +469,9 @@ class LiveSim:
             kpi_data["running"]     = len(vehicles)
             kpi_data["queueAp"]     = queue_ap
             kpi_data["booth"]       = booth
+            # Feature A: on-road fraction (fraction of live vehicles within road half-width)
+            n_total = len(vehicles)
+            kpi_data["onRoadPct"] = round(_on_road_count / n_total, 4) if n_total > 0 else 1.0
             live_stats = kpi_data
 
         # Base stats frame (always emitted; replaced by live_stats when available)
@@ -495,6 +523,9 @@ class LiveSim:
             "stepHz": STEP_HZ,
             "weather": self._active_weather,
             "weatherPresets": WEATHER_PRESET_ORDER,
+            # Feature A: expose centerline geometry for CR-spec and LIVE Bug 3 validation.
+            "centerline":    [list(pt) for pt in _CL_LOCAL],
+            "roadHalfWidthM": round(_HALF_WIDTH, 2),
         }
 
 

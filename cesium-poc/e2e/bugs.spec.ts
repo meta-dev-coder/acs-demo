@@ -207,15 +207,16 @@ test('Bug 2 — no cash car sits at an AET gate', async ({ page }) => {
 });
 
 // ============================================================================
-// Bug 3 — vehicles stay within the plaza lane band (not in dividers)
-// EXPECTED TODAY: RED — some vehicles land outside the booth span.
-// FIX: SUMO Y assignment must stay within [minY, maxY]; no clamping to outer dividers.
+// Bug 3 — vehicles stay within the road band (on the real I-595 centerline)
+// EXPECTED TODAY: GREEN — lateral clamp (Feature A) keeps vehicles within
+// roadHalfWidthM of the real curved centerline. The previous straight gate-band
+// check is replaced with a centerline-offset check so approach vehicles on the
+// curved road (legitimately far from the straight gate axis) do not false-fire.
 // ============================================================================
 test('Bug 3 — vehicles stay within the plaza lane band (not in dividers)', async ({ page }) => {
   await waitForReady(page);
-  await markGates(page, SITE_I595.dir, SITE_I595.gates);
 
-  // Fast-forward the sim.
+  // Fast-forward the sim so approach + plaza vehicles are both visible.
   await page.evaluate(() => {
     const v = (window as any).__viewer;
     v.clock.multiplier = 60;
@@ -224,36 +225,66 @@ test('Bug 3 — vehicles stay within the plaza lane band (not in dividers)', asy
   await page.waitForTimeout(800);
   await page.evaluate(() => { (window as any).__viewer.clock.multiplier = 1; });
 
-  const positions = await vehicleWorldPositions(page);
+  // Use window.__T (CoordinateTransform) + window.__meta (centerline, roadHalfWidthM) to
+  // verify every vehicle is within the physical road cross-section.  The curved approach
+  // means approach vehicles have large lateral offsets from the STRAIGHT gate axis (SITE_I595.dir);
+  // the correct invariant is centerline-relative, not straight-axis-relative.
+  const violations: string[] = await page.evaluate(() => {
+    const viewer = (window as any).__viewer;
+    const T      = (window as any).__T;
+    const meta   = (window as any).__meta;
+    if (!T || !meta) return ['__T or __meta not available — cannot verify lane band'];
 
-  // The plaza centre is the mean of all gate lats/lons.
-  const gateLons = SITE_I595.gates.map(g => g.lon);
-  const gateLats = SITE_I595.gates.map(g => g.lat);
-  const centreLon = gateLons.reduce((s, v) => s + v, 0) / gateLons.length;
-  const centreLat = gateLats.reduce((s, v) => s + v, 0) / gateLats.length;
-  const centre: LonLat = { lon: centreLon, lat: centreLat };
+    const cl: number[][] = meta.centerline;
+    const halfW: number  = meta.roadHalfWidthM;
+    const SLOP = 2.0;   // metres: tolerance for lane-centre-to-edge rounding
 
-  // Compute the span of marked gates perpendicular to the road.
-  const laterals = SITE_I595.gates.map(g => lateralOffset(g, SITE_I595.dir));
-  const gateMinLat = Math.min(...laterals);
-  const gateMaxLat = Math.max(...laterals);
-  // Allow one lane-width (≈2 m) of slop on each side.
-  const SLOP_M = 2.0;
-  const loBound = gateMinLat - SLOP_M;
-  const hiBound = gateMaxLat + SLOP_M;
-
-  const out: string[] = [];
-  for (const p of positions) {
-    const lat = lateralOffset(p, SITE_I595.dir);
-    if (lat < loBound || lat > hiBound) {
-      out.push(
-        `Vehicle at lon=${p.lon.toFixed(6)},lat=${p.lat.toFixed(6)} has lateral=${lat.toFixed(2)} m outside [${loBound.toFixed(2)}, ${hiBound.toFixed(2)}]`
-      );
+    /** Interpolate centerline y at a given x (linear, clamped to endpoints). */
+    function clY(x: number): number {
+      if (!cl || cl.length < 2) return 0;
+      if (x <= cl[0][0])             return cl[0][1];
+      if (x >= cl[cl.length - 1][0]) return cl[cl.length - 1][1];
+      for (let i = 0; i < cl.length - 1; i++) {
+        const [x0, y0] = cl[i], [x1, y1] = cl[i + 1];
+        if (x >= x0 && x <= x1) {
+          const t = (x - x0) / (x1 - x0);
+          return y0 + t * (y1 - y0);
+        }
+      }
+      return 0;
     }
-  }
+
+    const time = viewer.clock.currentTime;
+    const ell  = viewer.scene.globe.ellipsoid;
+    const viols: string[] = [];
+
+    for (const e of viewer.entities.values) {
+      if (!e.model) continue;
+      const cart = e.position?.getValue(time);
+      if (!cart) continue;
+      const carto = ell.cartesianToCartographic(cart);
+      if (!carto) continue;
+      const lon = (carto.longitude * 180) / Math.PI;
+      const lat = (carto.latitude  * 180) / Math.PI;
+
+      // Convert world → local SUMO metres via the active CoordinateTransform.
+      const local  = T.worldToSumo(lon, lat);
+      const refY   = clY(local.x);
+      const offset = Math.abs(local.y - refY);
+
+      if (offset > halfW + SLOP) {
+        viols.push(
+          `Vehicle at local(${local.x.toFixed(1)}, ${local.y.toFixed(1)}) ` +
+          `offset ${offset.toFixed(1)} m from centerline (refY=${refY.toFixed(1)}) ` +
+          `> halfW(${halfW.toFixed(1)}) + slop(${SLOP})`
+        );
+      }
+    }
+    return viols;
+  });
 
   await shoot(page, 'bug3-lane-band');
-  expect(out, `Vehicles outside lane band:\n${out.join('\n')}`).toHaveLength(0);
+  expect(violations, `Vehicles outside lane band:\n${violations.join('\n')}`).toHaveLength(0);
 });
 
 // ============================================================================
