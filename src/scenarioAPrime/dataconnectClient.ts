@@ -47,11 +47,15 @@ interface DcSearchResponse {
  *  auth state into each other. */
 export function createDataConnectClient(
   baseUrl: string,
-  credentials: { username?: string; password?: string } = {}
+  credentials: { username?: string; password?: string; bearerToken?: string } = {}
 ): DataConnectClient {
   const BASE_URL = baseUrl.replace(/\/$/, "");
   const USERNAME = credentials.username || "demo";
   const PASSWORD = credentials.password || "demo";
+  // Pre-acquired bearer token (e.g. a Bentley IMS OIDC access token): the production
+  // DataConnect deployment authenticates via IMS — its /api/authenticate returns 404 — so when a
+  // token is supplied we skip login() entirely and cannot refresh (a 401 is terminal auth-failed).
+  const FIXED_BEARER = credentials.bearerToken || null;
 
   const statusListeners = new Set<(status: DcStatus) => void>();
   let currentStatus: DcStatus = "offline";
@@ -73,6 +77,12 @@ export function createDataConnectClient(
   /** POST /api/authenticate — any credentials are accepted by the shim; a real instance would
    * reject bad ones with a non-2xx, which this surfaces as "auth-failed". */
   async function login(): Promise<{ token: string; refreshToken: string }> {
+    if (FIXED_BEARER) {
+      token = FIXED_BEARER;
+      refreshToken = "";
+      setStatus("online");
+      return { token, refreshToken };
+    }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {

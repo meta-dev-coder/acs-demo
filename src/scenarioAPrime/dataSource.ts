@@ -96,6 +96,9 @@ export async function fetchAllClasses(search?: string): Promise<DcLoadResult> {
     const client = createDataConnectClient(dcBase, {
       username: qs.get("dcuser") || undefined,
       password: qs.get("dcpass") || undefined,
+      // ?dctoken= — pre-acquired IMS OIDC bearer token; the production DataConnect deployment
+      // has no /api/authenticate (IMS-only), so this is the live-tier path for the real instance.
+      bearerToken: qs.get("dctoken") || undefined,
     });
     await client.login();
     const rows = (await Promise.all(

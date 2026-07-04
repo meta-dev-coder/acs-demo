@@ -29,6 +29,10 @@ const params = new URLSearchParams(location.search);
 const BASE_URL = (params.get("dc") || "http://localhost:8787").replace(/\/$/, "");
 const USERNAME = params.get("dcuser") || "demo";
 const PASSWORD = params.get("dcpass") || "demo";
+// ?dctoken= — pre-acquired IMS OIDC bearer token. The production DataConnect deployment
+// authenticates via Bentley IMS (its /api/authenticate returns 404), so with a token supplied
+// login() short-circuits and a later 401 is terminal auth-failed (no refresh possible).
+const FIXED_BEARER = params.get("dctoken") || null;
 
 export function getBaseUrl() {
   return BASE_URL;
@@ -63,6 +67,12 @@ let refreshToken = null;
 /** POST /api/authenticate — any credentials are accepted by the shim; a real instance would
  * reject bad ones with a non-2xx, which this surfaces as "auth-failed". */
 export async function login() {
+  if (FIXED_BEARER) {
+    token = FIXED_BEARER;
+    refreshToken = "";
+    setStatus("online");
+    return { token, refreshToken };
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
