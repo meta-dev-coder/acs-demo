@@ -22,6 +22,8 @@ import {
 } from "../scenarioB/manager";
 import { placeAndDecorateC, teardownC, getCDecorator } from "../scenarioC/managerC";
 import { placeAndDecorateD, getDDecorator } from "../scenarioD/managerD";
+import { getAPrimeDecorator, placeAndDecorateAPrime } from "../scenarioAPrime/manager";
+import { storeAPrime } from "../scenarioAPrime/storeAPrime";
 import { registerReDecorate, store, type Scenario } from "../scenarioA/store";
 
 export function onIModelConnected(iModel: IModelConnection): void {
@@ -40,6 +42,7 @@ async function reDecorate(scenario: Scenario): Promise<void> {
   if (!vp) return;
   try {
     if (scenario === "A") await placeAndDecorateA(vp);
+    else if (scenario === "A'") await placeAndDecorateAPrime(vp);
     else if (scenario === "B") await placeAndDecorateB(vp);
     else if (scenario === "D") await placeAndDecorateD(vp);
     else await placeAndDecorateC(vp);
@@ -56,6 +59,8 @@ function reframeOnActiveData(vp: ScreenViewport, scenario: Scenario): void {
   const focus =
     scenario === "A"
       ? [...snap.worldByTag.values()]
+      : scenario === "A'"
+      ? [...storeAPrime.getSnapshot().worldByTag.values()]
       : [...snap.segmentMidById.values()];
   const pe = vp.iModel.projectExtents;
   let frame: Range3d | undefined;
@@ -97,6 +102,12 @@ export function configureViewport(vp: ScreenViewport): void {
       await placeAndDecorateB(vp);
       await placeAndDecorateC(vp);
       await placeAndDecorateD(vp);
+      // A′ fetches its dataset over the network (dataSource.ts's three-tier fallback) — run it
+      // after the built-in scenarios so a slow/failed DataConnect fetch never delays the initial
+      // camera frame, and swallow its own errors (keep-previous-on-failure already handles the
+      // store side; a load failure here just means an empty A′ tab until the user retries).
+      // eslint-disable-next-line no-console -- same warn-on-failure pattern as the try/catch below
+      void placeAndDecorateAPrime(vp).catch((e) => console.warn("[Scenario A′] initial placement failed:", e));
 
       const snap = store.getSnapshot();
       // Frame the whole corridor top-down as the start view: western assets spread out as distinct
@@ -160,6 +171,9 @@ export function configureViewport(vp: ScreenViewport): void {
         getCDecorator()?.invalidate();
         getDDecorator()?.invalidate();
       });
+      // A′ has its own store (storeAPrime.ts, separate from the shared A/B `store` above) — wire
+      // it separately so its inspect()/loadAssets() updates invalidate its decorator too.
+      storeAPrime.subscribe(() => getAPrimeDecorator()?.invalidate());
     }
   })();
 }

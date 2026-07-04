@@ -75,12 +75,12 @@ describe("M0 regression — Scenario B scoring unchanged", () => {
 
 // ── Registry shape ─────────────────────────────────────────────────────────────────────────
 describe("M0 — scenario registry exposes A, B, C, and D", () => {
-  it("ALL_SCENARIOS contains exactly 'A', 'B', 'C', 'D' in order", () => {
-    expect(ALL_SCENARIOS).toEqual(["A", "B", "C", "D"]);
+  it("ALL_SCENARIOS contains exactly 'A', 'A\\'', 'B', 'C', 'D' in order", () => {
+    expect(ALL_SCENARIOS).toEqual(["A", "A'", "B", "C", "D"]);
   });
 
   it("SCENARIO_REGISTRY has an entry for each key with required fields", () => {
-    const keys: ScenarioKey[] = ["A", "B", "C", "D"];
+    const keys: ScenarioKey[] = ["A", "A'", "B", "C", "D"];
     for (const k of keys) {
       const entry = SCENARIO_REGISTRY[k];
       expect(entry).toBeTruthy();
@@ -92,6 +92,10 @@ describe("M0 — scenario registry exposes A, B, C, and D", () => {
 
   it("Scenario A registry entry has label 'Asset Reliability'", () => {
     expect(SCENARIO_REGISTRY["A"].tabLabel).toBe("Asset Reliability");
+  });
+
+  it("Scenario A' registry entry has label 'A′ · Asset Reliability (DataConnect)'", () => {
+    expect(SCENARIO_REGISTRY["A'"].tabLabel).toBe("A′ · Asset Reliability (DataConnect)");
   });
 
   it("Scenario B registry entry has label 'Safety Hotspots'", () => {

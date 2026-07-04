@@ -16,6 +16,9 @@ import { frameWorld } from "../scenarioA/viewportUtils";
 import type { RiskBand, ScoredAsset } from "../scenarioA/types";
 import { bandMeta as segBandMeta } from "../scenarioB/safetyScoring";
 import type { ScoredSegment } from "../scenarioB/types";
+import { storeAPrime } from "../scenarioAPrime/storeAPrime";
+import { useScenarioAPrimeState } from "../scenarioAPrime/useScenarioAPrimeState";
+import type { ScoredAssetPrime } from "../scenarioAPrime/types";
 import { GuidedTour, shouldAutoStartTour } from "./GuidedTour";
 import { DataSourceSwitcher, DataTablePanel } from "./DataSource";
 import { SCENARIO_REGISTRY, ALL_SCENARIOS } from "./scenarioRegistry";
@@ -57,6 +60,11 @@ function frameSegment(id: string) {
   const m = store.getSnapshot().segmentMidById.get(id);
   if (m) frameWorld(m, 260);
 }
+function framePrimeAsset(tag: string) {
+  storeAPrime.inspect(tag);
+  const w = storeAPrime.getSnapshot().worldByTag.get(tag);
+  if (w) frameWorld(w, 120);
+}
 
 /* ----------------------------------- top bar ----------------------------------- */
 function TopBar({
@@ -91,15 +99,52 @@ function TopBar({
       {(scenario === "A" || scenario === "B" || scenario === "C") && (
         <DataSourceSwitcher scenario={scenario} dataOpen={dataOpen} onToggleData={onToggleData} />
       )}
+      {scenario === "A'" && <DataConnectStatusChip />}
       <button className="tour-fab" onClick={onStartTour}>● Take a tour</button>
     </div>
+  );
+}
+
+/** Small status chip showing which DataConnect tier is currently serving Scenario A′'s asset
+ *  data — "online" (live API), "snapshot"/"local" (static fallback JSON), or "offline" (every
+ *  tier failed; storeAPrime.sourceError is set and the previous dataset, if any, is kept). */
+function DataConnectStatusChip() {
+  const s = useScenarioAPrimeState();
+  const label = s.loading
+    ? "Loading…"
+    : s.sourceError
+    ? "Offline"
+    : s.tier === "live"
+    ? "Online"
+    : s.tier === "snapshot"
+    ? "Snapshot"
+    : s.tier === "local"
+    ? "Local"
+    : "—";
+  const color = s.loading
+    ? "var(--sd-dim)"
+    : s.sourceError
+    ? "var(--red)"
+    : s.tier === "live"
+    ? "var(--green)"
+    : s.tier === "none"
+    ? "var(--sd-dim)"
+    : "var(--amber)";
+  return (
+    <span
+      className="sd-chip"
+      style={{ cursor: "default", color, borderColor: color }}
+      title={s.sourceError ?? `DataConnect tier: ${s.tier} · ${s.assets.length} assets`}
+    >
+      ● DataConnect: {label}
+    </span>
   );
 }
 
 /* ----------------------------------- left list ----------------------------------- */
 function Legend({ scenario }: { scenario: ScenarioKey }) {
   if (scenario === "C" || scenario === "D") return null; // C/D have no risk-band legend
-  const meta = scenario === "A" ? bandMeta : segBandMeta;
+  const meta = scenario === "A" || scenario === "A'" ? bandMeta : segBandMeta;
   return (
     <div className="sd-legend-row">
       {BANDS.map((b) => (
@@ -154,6 +199,72 @@ function AssetLeftList({
             key={a.asset_tag}
             className={`sd-row ${s.inspectedTag === a.asset_tag ? "sel" : ""}`}
             onClick={() => frameAsset(a.asset_tag)}
+          >
+            <span className="sd-dot" style={{ background: bandMeta(a.band).color }} />
+            <span className="nm">
+              <div className="t">{a.label}</div>
+              <div className="s">{a.asset_tag} · {a.asset_class.replace(/_/g, " ")}</div>
+            </span>
+            <span className="pct" style={{ color: bandMeta(a.band).color }}>
+              {Math.round(a.score * 100)}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+/* ---- Scenario A′ left list (DataConnect) ---- */
+function AssetPrimeLeftList({
+  q,
+  band,
+  setBand,
+}: {
+  q: string;
+  band: RiskBand | "all";
+  setBand: (b: RiskBand | "all") => void;
+}) {
+  const s = useScenarioAPrimeState();
+  const ql = q.trim().toLowerCase();
+  const assets = useMemo(
+    () =>
+      s.assets.filter(
+        (a) =>
+          (band === "all" || a.band === band) &&
+          (ql === "" ||
+            a.label.toLowerCase().includes(ql) ||
+            a.asset_tag.toLowerCase().includes(ql))
+      ),
+    [s.assets, band, ql]
+  );
+  return (
+    <>
+      <div className="sd-chips">
+        {(["all", ...BANDS] as const).map((b) => (
+          <span
+            key={b}
+            className={`sd-chip ${band === b ? "on" : ""}`}
+            onClick={() => setBand(b)}
+          >
+            {b === "all" ? "All" : bandMeta(b).label}
+          </span>
+        ))}
+      </div>
+      {s.sourceError && (
+        <div style={{ padding: "6px 14px", fontSize: 11.5, color: "var(--red)" }}>{s.sourceError}</div>
+      )}
+      {s.loading && assets.length === 0 && (
+        <div style={{ padding: "6px 14px", fontSize: 11.5, color: "var(--sd-dim)" }}>
+          Loading DataConnect assets…
+        </div>
+      )}
+      <div className="sd-list">
+        {assets.map((a) => (
+          <div
+            key={a.asset_tag}
+            className={`sd-row ${s.inspectedTag === a.asset_tag ? "sel" : ""}`}
+            onClick={() => framePrimeAsset(a.asset_tag)}
           >
             <span className="sd-dot" style={{ background: bandMeta(a.band).color }} />
             <span className="nm">
@@ -1002,7 +1113,15 @@ function LeftPanel({ scenario, onCollapse }: { scenario: ScenarioKey; onCollapse
       <div className="sd-panel-h">
         <button className="sd-collapse" title="Collapse" onClick={onCollapse}>‹</button>
         <h3>
-          {scenario === "A" ? "ITS Assets" : scenario === "B" ? "Corridor Segments" : scenario === "C" ? "Express Sections" : "Lane Closure"}
+          {scenario === "A"
+            ? "ITS Assets"
+            : scenario === "A'"
+            ? "ITS Assets (DataConnect)"
+            : scenario === "B"
+            ? "Corridor Segments"
+            : scenario === "C"
+            ? "Express Sections"
+            : "Lane Closure"}
         </h3>
         <Legend scenario={scenario} />
       </div>
@@ -1016,6 +1135,7 @@ function LeftPanel({ scenario, onCollapse }: { scenario: ScenarioKey; onCollapse
         </div>
       )}
       {scenario === "A" && <AssetLeftList q={q} band={band} setBand={setBand} />}
+      {scenario === "A'" && <AssetPrimeLeftList q={q} band={band} setBand={setBand} />}
       {scenario === "B" && <SegmentLeftList q={q} band={band} setBand={setBand} />}
       {scenario === "C" && <TollingLeftList />}
       {scenario === "D" && <ClosureLeftList />}
@@ -1089,6 +1209,62 @@ function AssetInspector({ asset }: { asset: ScoredAsset }) {
       >
         {isIn ? "✓ In proactive work package" : "＋ Add to work package"}
       </button>
+    </div>
+  );
+}
+
+/* ---- Scenario A′ inspector (DataConnect) ---- */
+function AssetPrimeInspector({ asset }: { asset: ScoredAssetPrime }) {
+  const m = bandMeta(asset.band);
+  return (
+    <div className="sd-insp">
+      <h2>{asset.label}</h2>
+      <div className="sub">{asset.asset_tag} · {asset.location_desc}</div>
+
+      <div className="sd-sec">
+        <h4>Predicted failure risk</h4>
+        <span className="sd-big" style={{ color: m.color }}>{Math.round(asset.score * 100)}%</span>{" "}
+        <span className="sd-chiprisk" style={{ background: m.color }}>{m.label}</span>
+      </div>
+
+      {asset.drivers.length > 0 && (
+        <div className="sd-sec">
+          <h4>Why it&apos;s at risk</h4>
+          {asset.drivers.map((d) => (<div className="sd-driver" key={d.key}>• {d.label}</div>))}
+        </div>
+      )}
+
+      <div className="sd-sec">
+        <h4>Recommended action</h4>
+        <div className="sd-action">{asset.recommendedAction}</div>
+      </div>
+
+      <div className="sd-sec">
+        <h4>Asset</h4>
+        <dl className="sd-meta">
+          <dt>Class</dt><dd>{asset.asset_class.replace(/_/g, " ")}</dd>
+          <dt>Condition</dt>
+          <dd style={{ color: bandMeta(asset.band).color }}>{conditionLabel(asset.band)}</dd>
+          <dt>Age vs. rated life</dt>
+          <dd>
+            {ageYears(asset.install_date)} / {asset.expected_life_years} yr
+            {" "}({Math.round((ageYears(asset.install_date) / asset.expected_life_years) * 100)}%)
+          </dd>
+          <dt>Installed</dt><dd>{asset.install_date}</dd>
+          <dt>Last inspection</dt><dd>{asset.last_inspection_date}</dd>
+          <dt>Last work order</dt><dd>{asset.last_workorder_date}</dd>
+          <dt>Open tickets</dt><dd>{asset.open_tickets}</dd>
+        </dl>
+      </div>
+
+      <div className="sd-sec">
+        <h4>Related DataConnect records</h4>
+        <dl className="sd-meta">
+          <dt>Work orders</dt><dd>{asset._related.workOrders}</dd>
+          <dt>Inspections</dt><dd>{asset._related.inspections}</dd>
+          <dt>Incidents</dt><dd>{asset._related.incidents}</dd>
+        </dl>
+      </div>
     </div>
   );
 }
@@ -1380,7 +1556,11 @@ function TollingInspector() {
 
 function RightPanel({ scenario, onCollapse }: { scenario: ScenarioKey; onCollapse: () => void }) {
   const s = useScenarioState();
+  const sPrime = useScenarioAPrimeState();
   const asset = s.inspectedTag ? s.assets.find((a) => a.asset_tag === s.inspectedTag) : undefined;
+  const assetPrime = sPrime.inspectedTag
+    ? sPrime.assets.find((a) => a.asset_tag === sPrime.inspectedTag)
+    : undefined;
   const seg = s.inspectedSegmentId ? s.segments.find((g) => g.segment_id === s.inspectedSegmentId) : undefined;
   const pkg = s.assets.filter((a) => s.packageTags.includes(a.asset_tag));
 
@@ -1399,6 +1579,16 @@ function RightPanel({ scenario, onCollapse }: { scenario: ScenarioKey; onCollaps
           <div className="sd-insp"><div className="empty">{SCENARIO_REGISTRY["A"].inspectorEmptyText}</div></div>
         )}
         {pkg.length > 0 && <WorkPackagePanel assets={pkg} />}
+      </div>
+    );
+  }
+  if (scenario === "A'") {
+    return (
+      <div className="sd-right">
+        {head}
+        {assetPrime ? <AssetPrimeInspector asset={assetPrime} /> : (
+          <div className="sd-insp"><div className="empty">{SCENARIO_REGISTRY["A'"].inspectorEmptyText}</div></div>
+        )}
       </div>
     );
   }
@@ -1443,6 +1633,32 @@ function KpiBarA() {
       <div className="item"><div className="v green">{wp.closuresAvoided}</div><div className="l">Closures avoidable (proactive)</div></div>
       <div className="item"><div className="v green">{fmt$(wp.revenueProtected)}</div><div className="l">Toll revenue protected</div></div>
       <div className="note">Synthetic data · scores from config · placement: {s.placementMode}</div>
+    </div>
+  );
+}
+
+/* ---- Scenario A′ KPI bar (DataConnect) ---- */
+function KpiBarAPrime() {
+  const s = useScenarioAPrimeState();
+  const wp = computeWorkPackage(s.assets.filter((a) => a.band === "red"));
+  const tierLabel =
+    s.tier === "live" ? "Live" : s.tier === "snapshot" ? "Snapshot" : s.tier === "local" ? "Local" : "—";
+  return (
+    <div className="sd-kpi">
+      <div className="item"><div className="v" style={{ color: "var(--red)" }}>{s.bandCounts.red}</div><div className="l">Act now</div></div>
+      <div className="item"><div className="v" style={{ color: "var(--amber)" }}>{s.bandCounts.amber}</div><div className="l">Watch</div></div>
+      <div className="item"><div className="v green">{wp.closuresAvoided}</div><div className="l">Closures avoidable (proactive)</div></div>
+      <div className="item"><div className="v green">{fmt$(wp.revenueProtected)}</div><div className="l">Toll revenue protected</div></div>
+      <div className="item">
+        <div className="v" style={{ color: s.sourceError ? "var(--red)" : "var(--sd-text)" }}>
+          {s.sourceError ? "Error" : tierLabel}
+        </div>
+        <div className="l">DataConnect tier</div>
+      </div>
+      <div className="note">
+        DataConnect data · reused Scenario A scoring engine · placement: {s.placementMode}
+        {" "}· {s.assets.length} assets
+      </div>
     </div>
   );
 }
@@ -1506,6 +1722,7 @@ function KpiBarC() {
 
 function KpiBar({ scenario }: { scenario: ScenarioKey }) {
   if (scenario === "A") return <KpiBarA />;
+  if (scenario === "A'") return <KpiBarAPrime />;
   if (scenario === "B") return <KpiBarB />;
   if (scenario === "D") return <KpiBarD />;
   return <KpiBarC />;

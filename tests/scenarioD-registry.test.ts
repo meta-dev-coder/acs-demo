@@ -18,8 +18,8 @@ import {
 // ── §Registry shape ────────────────────────────────────────────────────────────────────────
 
 describe("M0 Scenario D — registry shape", () => {
-  it("ALL_SCENARIOS contains 'D' as the fourth entry", () =>
-    expect(ALL_SCENARIOS).toEqual(["A", "B", "C", "D"]));
+  it("ALL_SCENARIOS contains 'D' as the last entry", () =>
+    expect(ALL_SCENARIOS).toEqual(["A", "A'", "B", "C", "D"]));
 
   it("SCENARIO_REGISTRY['D'] has tabLabel 'Lane Closure'", () =>
     expect(SCENARIO_REGISTRY["D"].tabLabel).toBe("Lane Closure"));
@@ -40,8 +40,8 @@ describe("M0 Scenario D — registry shape", () => {
 // ── §Regression guards ─────────────────────────────────────────────────────────────────────
 
 describe("M0 Scenario D — registry regression guards (A/B/C unchanged)", () => {
-  it("ALL_SCENARIOS[0..2] are A, B, C unchanged", () =>
-    expect(ALL_SCENARIOS.slice(0, 3)).toEqual(["A", "B", "C"]));
+  it("ALL_SCENARIOS minus the new A' entry are still A, B, C, D in order unchanged", () =>
+    expect(ALL_SCENARIOS.filter((k) => k !== "A'")).toEqual(["A", "B", "C", "D"]));
 
   it("SCENARIO_REGISTRY['A'].tabLabel === 'Asset Reliability'", () =>
     expect(SCENARIO_REGISTRY["A"].tabLabel).toBe("Asset Reliability"));

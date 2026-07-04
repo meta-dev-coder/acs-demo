@@ -274,6 +274,18 @@ export function smoothPolyline(pts: Point3d[], passes = 1): Point3d[] {
   return cur;
 }
 
+/** Clamp a point's XYZ into a Range3d, so a stray/out-of-range geographic conversion can never
+ *  place a pin (or fling the camera) off the model — mirrors the frame-clamping scene/init.ts
+ *  already does for the camera, applied per-point instead. No-op for a null/empty range. */
+export function clampToExtents(pt: Point3d, extents: Range3d): Point3d {
+  if (extents.isNull) return pt;
+  return Point3d.create(
+    Math.min(Math.max(pt.x, extents.low.x), extents.high.x),
+    Math.min(Math.max(pt.y, extents.low.y), extents.high.y),
+    Math.min(Math.max(pt.z, extents.low.z), extents.high.z)
+  );
+}
+
 /** Order points monotonically along the chord (first->last) and drop near-duplicates, so a set of
  *  road-snapped samples reads as a clean ribbon along the road instead of a back-and-forth zigzag. */
 export function orderAlongChord(pts: Point3d[], dedupeM = 2): Point3d[] {

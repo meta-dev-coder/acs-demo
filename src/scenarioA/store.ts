@@ -6,7 +6,12 @@ import { Point3d } from "@itwin/core-geometry";
 import type { ScoredAsset } from "./types";
 import type { ScoredSegment } from "../scenarioB/types";
 
-export type Scenario = "A" | "B" | "C" | "D";
+// "A'" (Scenario A′ — Asset Reliability / DataConnect) is included here only so this shared
+// tab-selection type stays assignable from scenarioRegistry.ts's ScenarioKey (Shell.tsx passes
+// ALL_SCENARIOS entries straight into store.setScenario()). Scenario A′ has its own store
+// (scenarioAPrime/storeAPrime.ts) and is not otherwise handled by this file — Shell/scene wiring
+// for it is chunk 2.
+export type Scenario = "A" | "A'" | "B" | "C" | "D";
 
 /** Parsed CSV (or built-in) rows backing the active dataset, for the "Data" table view. */
 export interface TableData {

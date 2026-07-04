@@ -7,9 +7,9 @@
  * Imported in tests (node env) so this file MUST NOT import any React or DOM APIs.
  *--------------------------------------------------------------------------------------------*/
 
-export type ScenarioKey = "A" | "B" | "C" | "D";
+export type ScenarioKey = "A" | "A'" | "B" | "C" | "D";
 
-export const ALL_SCENARIOS: ScenarioKey[] = ["A", "B", "C", "D"];
+export const ALL_SCENARIOS: ScenarioKey[] = ["A", "A'", "B", "C", "D"];
 
 export interface ScenarioRegistryEntry {
   /** Label shown on the tab button in the top bar. */
@@ -30,6 +30,13 @@ export const SCENARIO_REGISTRY: Record<ScenarioKey, ScenarioRegistryEntry> = {
     leftEmptyText: "Search assets…",
     inspectorEmptyText:
       "Select an ITS asset — on the model or in the list — to see its failure risk, drivers, and recommended action.",
+  },
+  "A'": {
+    tabLabel: "A′ · Asset Reliability (DataConnect)",
+    leftRailLabel: "ASSETS (DC)",
+    leftEmptyText: "Search DataConnect assets…",
+    inspectorEmptyText:
+      "Select a DataConnect ITS asset — on the model or in the list — to see its failure risk, drivers, and recommended action, sourced live from DataConnect.",
   },
   B: {
     tabLabel: "Safety Hotspots",
