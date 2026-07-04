@@ -115,25 +115,29 @@ def write_routes_xml(rows, vtypes_file, out_path, scenario):  # noqa: ARG001
         fid = f"f{flow_id}"
         flow_id += 1
 
-        # departLane assignment:
-        #   Cash (pl_0..pl_2)  → ap_0 (rightmost approach lane, connects to fo_0..fo_3)
-        #   AET  (pl_3..pl_6)  → ap_1 (middle approach lane, connects to fo_4..fo_6)
-        #   AET  (pl_7..pl_9)  → ap_2 (leftmost approach lane, connects to fo_7..fo_9)
-        #   Truck (pl_9)       → ap_2 (leftmost)
-        # This minimises cross-lane weaving in the fan-out and prevents cash from blocking
-        # the AET lanes.  Lane indices are 0-based (SUMO lane 0 = rightmost = ap_0).
+        # departLane assignment MUST match the group mapping wired into plaza.con.xml /
+        # georef_nodes.py's LANE_GROUP_BOUNDARIES — those files are the single source of
+        # truth for the group split (currently 4/3/3):
+        #   pl_0..pl_3 → ap_0 (rightmost approach lane, connects to fo_0..fo_3)
+        #   pl_4..pl_6 → ap_1 (middle approach lane,    connects to fo_4..fo_6)
+        #   pl_7..pl_9 → ap_2 (leftmost approach lane,  connects to fo_7..fo_9, incl. truck pl_9)
+        # Booth lanes are also within-group hard-partitioned by changeLeft/changeRight="" at
+        # the group boundaries (georef_nodes.py), so a booth on the wrong side of a boundary
+        # here would be structurally unreachable from the assigned departLane — must stay in
+        # lockstep with that grouping, not just "close enough".  Lane indices are 0-based
+        # (SUMO lane 0 = rightmost = ap_0).
         lane_idx_str = booth.split("_")[-1] if "_" in booth else "0"
         try:
             lane_idx = int(lane_idx_str)
         except ValueError:
             lane_idx = 0
 
-        if pay_type == "cash":
-            depart_lane = "0"    # ap_0: rightmost → cash booths pl_0..pl_2
+        if lane_idx <= 3:
+            depart_lane = "0"    # ap_0: rightmost → booths pl_0..pl_3 (incl. cash pl_0..pl_2)
         elif lane_idx <= 6:
-            depart_lane = "1"    # ap_1: middle → AET booths pl_3..pl_6
+            depart_lane = "1"    # ap_1: middle → booths pl_4..pl_6
         else:
-            depart_lane = "2"    # ap_2: leftmost → AET booths pl_7..pl_9 (incl. truck pl_9)
+            depart_lane = "2"    # ap_2: leftmost → booths pl_7..pl_9 (incl. truck pl_9)
 
         lines.append(f'  <!-- {booth} | {b_start}-{b_end}s | {veh_class}/{pay_type} | {count} vehicles -->')
         lines.append(

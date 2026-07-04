@@ -15,9 +15,9 @@ Covers (design A0):
     i.e. broadly E-W / matches BEARING_DEG within a loose tolerance).
 """
 import math
-import shutil
 import sys
 import os
+import tempfile
 import unittest.mock as mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -152,22 +152,20 @@ def test_residual_stats_on_road_pct():
 
 def test_offline_fallback_hardcoded():
     """With every network call forced to raise, road_centerline.load() must
-    still succeed via the hardcoded last-resort polyline."""
-    cache_path = road_centerline._CACHE
-    backup_path = cache_path + ".bak_test"
-    had_cache = os.path.exists(cache_path)
-    if had_cache:
-        shutil.copyfile(cache_path, backup_path)
+    still succeed via the hardcoded last-resort polyline. Writes to a TEMP
+    cache path so the real, committed sumo/centerline.json is never touched."""
+    fd, tmp_path = tempfile.mkstemp(suffix=".json", prefix="centerline_test_")
+    os.close(fd)
 
     def _raise(*a, **kw):
         raise OSError("network disabled for test")
 
     try:
         with mock.patch("urllib.request.urlopen", side_effect=_raise):
-            data = road_centerline.load(force_refresh=True)
+            data = road_centerline.load(force_refresh=True, cache_path=tmp_path)
     finally:
-        if had_cache:
-            shutil.move(backup_path, cache_path)
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
     utm_pts = data.get("utm", [])
     check(

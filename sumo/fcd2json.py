@@ -45,6 +45,7 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 import kpi as _kpi
 import roadgeom as _roadgeom
+import road_centerline as _road_centerline
 
 QUEUE_SPEED = 0.5       # m/s; below this a vehicle counts as "queued"
 
@@ -56,11 +57,31 @@ SUMO_REF_X = 530.0    # booth stop line x (local metres)
 SUMO_REF_Y = 0.0
 
 # Road half-width for the lateral clamp / on-road validation (Feature A).
-# Fixed design constant — MUST match live_server.py's _HALF_WIDTH so offline
-# and live specs validate against the same band. Derived from the plaza's
-# known lane geometry (10 lanes x 3.2 m / 2 = 14.4 m half-span) with a 1.6x
-# buffer, NOT from the sample bounds being clamped (that would be circular).
-ROAD_HALF_WIDTH_M = 14.4 * 1.6
+#
+# This is the SUMO toll-plaza fan-out half-width (plazaHalfWidthM), NOT the
+# mainline's halfWidthM (a 3-lane, ~5.5 m figure) — the whole vehicle trip,
+# including the 10-lane booth plaza, must validate against the wider band, or
+# most plaza samples would read as "off-road". Both figures are
+# laneCount*laneWidth/2-based; see road_centerline.py's PLAZA_LANE_COUNT /
+# PLAZA_LANE_WIDTH_M for where this number actually comes from — it is read
+# from centerline.json (single source of truth, shared with live_server.py's
+# equivalent _HALF_WIDTH) rather than duplicated here.
+def _load_plaza_half_width_m():
+    """Read plazaHalfWidthM from centerline.json (written by road_centerline.py).
+    Falls back to the same formula with default constants if centerline.json is
+    unavailable/stale (should not happen in normal builds — road_centerline.py
+    runs before fcd2json.py in build.sh). Reads the cache file directly (no
+    network fallback) to avoid an unwanted live fetch mid-conversion."""
+    try:
+        with open(_road_centerline._CACHE) as f:
+            data = json.load(f)
+        hw = data.get("plazaHalfWidthM")
+        if hw:
+            return float(hw)
+    except Exception as exc:
+        print(f"[fcd2json] WARNING: could not read plazaHalfWidthM from centerline.json "
+              f"({exc}); using fallback formula", file=sys.stderr)
+    return (_road_centerline.PLAZA_LANE_COUNT * _road_centerline.PLAZA_LANE_WIDTH_M) / 2.0
 
 # Default net.xml path relative to this script's directory
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -240,8 +261,13 @@ def main():
     _ensure_transform(net_path)
 
     # ---- Load road centerline (for lateral clamp + on-road validation) ----
-    cl_local = _roadgeom.load_centerline_local()   # [[x, y], ...] in local metres
-    road_half_width = ROAD_HALF_WIDTH_M             # fixed constant, not sample-derived
+    # Use the AS-BUILT hybrid centerline (straight plaza core + curved real
+    # approach/departure, read back from the generated net) rather than the raw
+    # fetched source line: the plaza core is intentionally kept on the straight
+    # bearing-104 tangent (see georef_nodes.py), so the raw source can sit tens of
+    # metres off-axis there even though no vehicle ever leaves the built road.
+    cl_local = _roadgeom.load_asbuilt_centerline_local()   # [[x, y], ...] in local metres
+    road_half_width = _load_plaza_half_width_m()   # from centerline.json, not sample-derived
 
     vehicles, t_end, queue_per_step, spillback = parse_fcd(fcd, net_path)
 

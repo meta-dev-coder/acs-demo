@@ -53,8 +53,24 @@ or required):
                  prior (again via roadgeom.project_to_centerline) to report
                  meanAbsOffsetM / p95OffsetM / maxOffsetM / agreementPct3m /
                  nPoints / coveragePct.
-  7. Output    — sumo/centerline_ml.json, same [[E,N],...] UTM shape as
-                 centerline.json plus a "validation" block.
+  7. Lane marks — VALIDATION ONLY (never feeds back into the net/centerline):
+                 within the corridor band (corridor_mask_from_prior), lane paint
+                 reads as a bright, thin, road-parallel top-hat residual (pixel
+                 luminance minus a wide local box-blur background — a box-blur
+                 stand-in for scipy's morphological white top-hat, same no-scipy
+                 constraint as the rest of this module). Bright residual pixels
+                 are connected-component labeled (pure-numpy 8-connectivity
+                 two-pass union-find, standing in for scipy.ndimage.label),
+                 filtered to components that are elongated (PCA long/short axis
+                 ratio) AND aligned with the corridor bearing, then each
+                 survivor's centroid is projected onto the ML centerline via
+                 roadgeom.project_to_centerline (reused verbatim) to get a
+                 signed lateral offset. Offsets are clustered into 2-6 lane-line
+                 positions via a smoothed 1-D histogram peak search (equivalent
+                 to 1-D k-means for evenly-spaced peaks, without pre-committing
+                 to a k). See detect_lane_lines().
+  8. Output    — sumo/centerline_ml.json, same [[E,N],...] UTM shape as
+                 centerline.json plus "validation" and "lanes" blocks.
 
 Documented upgrade note (NOT implemented here — torch/cv2 unavailable in this
 environment and intentionally not added as dependencies): the full D-LinkNet
@@ -77,6 +93,7 @@ test_road_detect.py):
   synthesize_scene(...), affine_forward(...), affine_inverse(...),
   compute_features(...), weak_labels(...), train_logreg(...), extract_centerline(...),
   validate_against_prior(...), erode(...), dilate(...)
+  detect_lane_lines(...), top_hat_residual(...), connected_components_8(...)
 """
 from __future__ import annotations
 
@@ -518,6 +535,238 @@ def extract_centerline(prob: np.ndarray, mask: np.ndarray, affine: dict) -> list
 
 
 # ════════════════════════════════════════════════════════════════════════════
+# 5b. Lane-marking detection (VALIDATION ONLY — never feeds back into the net)
+# ════════════════════════════════════════════════════════════════════════════
+
+def _pixel_size_m(affine: dict) -> float:
+    """Approximate metres-per-pixel along the column axis. Exact for a
+    north-up/orthogonal affine; good to sub-percent for this module's
+    near-orthogonal Web-Mercator-derived affines."""
+    return math.hypot(affine["b"], affine["e"])
+
+
+def _local_mean_box(channel: np.ndarray, k: int) -> np.ndarray:
+    """k x k local mean via the same integral-image box filter as _local_std5."""
+    return _box_filter_sum(channel, k) / float(k * k)
+
+
+def top_hat_residual(mosaic: np.ndarray, k: int = 15) -> np.ndarray:
+    """
+    White-top-hat-style brightness residual: luminance minus a wide local
+    box-blur background estimate (a box blur standing in for scipy's
+    morphological opening — no scipy/cv2 in this module). Lane paint reads as
+    a strong positive residual against the surrounding asphalt; broad shading/
+    texture is absorbed into the local mean and cancels out.
+    """
+    img = mosaic.astype(np.float64)
+    lum = 0.299 * img[..., 0] + 0.587 * img[..., 1] + 0.114 * img[..., 2]
+    bg = _local_mean_box(lum, k)
+    return lum - bg
+
+
+def connected_components_8(mask: np.ndarray):
+    """
+    Two-pass union-find 8-connectivity connected-component labeling — a pure
+    numpy/python stand-in for scipy.ndimage.label (intentionally not a
+    dependency of this module). Returns (labels int32 (H, W), n_components);
+    labels are 0 (background) or 1..n_components.
+    """
+    H, W = mask.shape
+    labels = np.zeros((H, W), dtype=np.int32)
+    parent = [0]
+
+    def find(x: int) -> int:
+        root = x
+        while parent[root] != root:
+            root = parent[root]
+        while parent[x] != root:
+            parent[x], x = root, parent[x]
+        return root
+
+    def union(a: int, b: int) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[rb if ra < rb else ra] = ra if ra < rb else rb
+
+    next_label = 1
+    for r in range(H):
+        cols = np.nonzero(mask[r])[0]
+        for c in cols:
+            neigh = []
+            if c > 0 and labels[r, c - 1]:
+                neigh.append(int(labels[r, c - 1]))
+            if r > 0:
+                if labels[r - 1, c]:
+                    neigh.append(int(labels[r - 1, c]))
+                if c > 0 and labels[r - 1, c - 1]:
+                    neigh.append(int(labels[r - 1, c - 1]))
+                if c < W - 1 and labels[r - 1, c + 1]:
+                    neigh.append(int(labels[r - 1, c + 1]))
+            if neigh:
+                m = min(neigh)
+                labels[r, c] = m
+                for n in neigh:
+                    union(m, n)
+            else:
+                labels[r, c] = next_label
+                parent.append(next_label)
+                next_label += 1
+
+    flat = labels.ravel()
+    nz_idx = np.nonzero(flat)[0]
+    for idx in nz_idx:
+        flat[idx] = find(int(flat[idx]))
+    uniq = np.unique(flat[nz_idx]) if nz_idx.size else np.empty((0,), dtype=np.int32)
+    remap = {int(v): i + 1 for i, v in enumerate(uniq)}
+    for idx in nz_idx:
+        flat[idx] = remap[int(flat[idx])]
+    return labels, len(uniq)
+
+
+def _component_stats(labels: np.ndarray, n_components: int, affine: dict, row_offset: int, col_offset: int):
+    """Yield (mean_E, mean_N, elongation, bearing_deg[0,180), npix) per
+    connected component (1-indexed) with >= 4 pixels, via PCA on its UTM
+    footprint (long/short eigenvalue ratio = elongation, long-axis eigenvector
+    = orientation)."""
+    for lbl in range(1, n_components + 1):
+        rr, cc = np.nonzero(labels == lbl)
+        if rr.size < 4:
+            continue
+        E, N = affine_forward(affine, (cc + col_offset).astype(float), (rr + row_offset).astype(float))
+        pts = np.column_stack([E, N])
+        mean = pts.mean(axis=0)
+        centered = pts - mean
+        cov = (centered.T @ centered) / max(1, len(pts) - 1)
+        evals, evecs = np.linalg.eigh(cov)
+        minor_len = math.sqrt(max(float(evals[0]), 1e-9))
+        major_len = math.sqrt(max(float(evals[-1]), 1e-9))
+        elongation = major_len / max(minor_len, 1e-6)
+        major_axis = evecs[:, -1]
+        bearing = math.degrees(math.atan2(major_axis[0], major_axis[1])) % 180.0
+        yield float(mean[0]), float(mean[1]), elongation, bearing, int(rr.size)
+
+
+def _cluster_offsets_histogram(offsets, weights, half_width_m: float, bin_m: float = 0.3,
+                                min_sep_m: float = 1.8, k_range: tuple = (2, 6)) -> dict:
+    """
+    Cluster 1-D signed lateral offsets into 2-6 lane-line positions via a
+    smoothed histogram peak search: bin (weighted by component pixel count),
+    3-tap smooth, take local maxima at least `min_sep_m` apart (strongest
+    first), keep at most k_range[1]. This is equivalent to 1-D k-means for
+    well-separated, evenly-spaced peaks like lane lines, without having to
+    commit to a k up front. Returns fewer than k_range[0] peaks as "no
+    detection" (laneCountDetected=0) rather than forcing a fit.
+    """
+    k_min, k_max = k_range
+    if len(offsets) < k_min:
+        return {"laneLineOffsetsM": [], "laneCountDetected": 0, "meanLaneWidthM": 0.0}
+
+    offs = np.asarray(offsets, dtype=float)
+    wts = np.asarray(weights, dtype=float)
+    lo = min(-3.0 * half_width_m, float(offs.min()) - bin_m)
+    hi = max(3.0 * half_width_m, float(offs.max()) + bin_m)
+    n_bins = max(8, int((hi - lo) / bin_m))
+    hist, edges = np.histogram(offs, bins=n_bins, range=(lo, hi), weights=wts)
+    kernel = np.array([1.0, 2.0, 1.0])
+    kernel /= kernel.sum()
+    smoothed = np.convolve(hist, kernel, mode="same")
+    centers = (edges[:-1] + edges[1:]) / 2.0
+
+    peak_idx = [i for i in range(1, len(smoothed) - 1)
+                if smoothed[i] > 0 and smoothed[i] >= smoothed[i - 1] and smoothed[i] >= smoothed[i + 1]]
+    peak_idx.sort(key=lambda i: -smoothed[i])
+
+    chosen = []
+    for i in peak_idx:
+        if all(abs(centers[i] - centers[j]) >= min_sep_m for j in chosen):
+            chosen.append(i)
+    if len(chosen) > k_max:
+        chosen = sorted(chosen, key=lambda i: -smoothed[i])[:k_max]
+    chosen.sort(key=lambda i: centers[i])
+
+    if len(chosen) < k_min:
+        return {"laneLineOffsetsM": [round(float(centers[i]), 3) for i in chosen],
+                "laneCountDetected": 0, "meanLaneWidthM": 0.0}
+
+    line_offsets = [round(float(centers[i]), 3) for i in chosen]
+    diffs = np.diff(line_offsets)
+    mean_width = round(float(np.mean(diffs)), 3) if diffs.size else 0.0
+    return {
+        "laneLineOffsetsM": line_offsets,
+        "laneCountDetected": int(len(line_offsets) - 1),
+        "meanLaneWidthM": mean_width,
+    }
+
+
+def detect_lane_lines(mosaic: np.ndarray, affine: dict, corridor_mask: np.ndarray, ref_utm: list,
+                       half_width_m: float, bearing_deg: float = BEARING_DEG, box_k_m: float = 1.0,
+                       min_elongation: float = 2.5, angle_tol_deg: float = 30.0, bin_m: float = 0.3,
+                       min_sep_m: float = 1.8, k_range: tuple = (2, 6)) -> dict:
+    """
+    Detect lane-marking lines within `corridor_mask` — pass the DETECTED ROAD
+    mask (the classifier's prob>=0.5 mask intersected with the geometric
+    corridor band, i.e. this module's own `mask` in detect()), not the raw
+    geometric corridor: the geometric band alone still includes shoulder/grass,
+    and lane spacing (~3-4 m) is close enough to the geometric band's width
+    that including non-road pixels invites false positives from grass-noise/
+    road-edge contrast rather than real paint. VALIDATION ONLY — this never
+    feeds back into the net or the centerline.
+
+    box_k_m (top-hat background window, in metres) must stay well BELOW the
+    real lane-to-lane spacing (~3-4 m): a window comparable to or larger than
+    the spacing pulls neighbouring lines into each line's own "local
+    background" estimate and washes out the very contrast being detected.
+
+    Returns {laneLineOffsetsM, laneCountDetected, meanLaneWidthM,
+    nCandidateComponents, nAcceptedComponents}. See module docstring section 7
+    for the full pipeline.
+    """
+    empty = {"laneLineOffsetsM": [], "laneCountDetected": 0, "meanLaneWidthM": 0.0,
+              "nCandidateComponents": 0, "nAcceptedComponents": 0}
+    if not corridor_mask.any() or len(ref_utm) < 2:
+        return empty
+
+    px_size = _pixel_size_m(affine)
+    box_k = max(3, int(round(box_k_m / max(px_size, 1e-6))))
+    if box_k % 2 == 0:
+        box_k += 1
+
+    residual = top_hat_residual(mosaic, k=box_k)
+    in_corridor = residual[corridor_mask]
+    if in_corridor.size < 20:
+        return empty
+
+    thresh = max(float(np.percentile(in_corridor, 97.0)),
+                 float(np.mean(in_corridor) + 2.0 * np.std(in_corridor)))
+    bright_mask = (residual >= thresh) & corridor_mask
+    if not bright_mask.any():
+        return empty
+
+    rows_all, cols_all = np.nonzero(corridor_mask)
+    r0, r1 = int(rows_all.min()), int(rows_all.max()) + 1
+    c0, c1 = int(cols_all.min()), int(cols_all.max()) + 1
+    labels, n_components = connected_components_8(bright_mask[r0:r1, c0:c1])
+
+    bearing_ref = bearing_deg % 180.0
+    offsets, weights = [], []
+    for mean_E, mean_N, elongation, bearing, npix in _component_stats(labels, n_components, affine, r0, c0):
+        if elongation < min_elongation:
+            continue
+        diff = abs(bearing - bearing_ref)
+        diff = min(diff, 180.0 - diff)
+        if diff > angle_tol_deg:
+            continue
+        _, off, _, _ = roadgeom.project_to_centerline(mean_E, mean_N, ref_utm)
+        offsets.append(off)
+        weights.append(npix)
+
+    result = _cluster_offsets_histogram(offsets, weights, half_width_m, bin_m, min_sep_m, k_range)
+    result["nCandidateComponents"] = int(n_components)
+    result["nAcceptedComponents"] = len(offsets)
+    return result
+
+
+# ════════════════════════════════════════════════════════════════════════════
 # 6. Validation vs the vector prior (reuses roadgeom.project_to_centerline)
 # ════════════════════════════════════════════════════════════════════════════
 
@@ -698,8 +947,9 @@ def detect(offline: bool = False, force_refetch: bool = False, return_debug: boo
     with np.errstate(divide="ignore", invalid="ignore", over="ignore"):  # see train_logreg note
         prob = _sigmoid(X_full @ w).reshape(height, width)
 
+    corridor_only_mask = corridor_mask_from_prior(affine, prior_utm, half_width, (height, width))
     mask = clean_mask(prob >= 0.5)
-    mask &= corridor_mask_from_prior(affine, prior_utm, half_width, (height, width))
+    mask &= corridor_only_mask
     ml_utm = extract_centerline(prob, mask, affine)
     print(f"[road_detect] extracted {len(ml_utm)} centerline points")
 
@@ -707,12 +957,16 @@ def detect(offline: bool = False, force_refetch: bool = False, return_debug: boo
     validation = validate_against_prior(ml_utm, validation_target)
     print(f"[road_detect] validation: {validation}")
 
+    lanes = detect_lane_lines(mosaic, affine, mask, ml_utm, half_width)
+    print(f"[road_detect] lanes: {lanes}")
+
     out = {
         "utm": ml_utm,
         "source": source_tag,
         "laneCount": lane_count,
         "halfWidthM": half_width,
         "validation": validation,
+        "lanes": lanes,
     }
     with open(_ML_CACHE, "w") as f:
         json.dump(out, f, separators=(",", ":"))
@@ -728,6 +982,7 @@ def main():
     force = "--refresh" in sys.argv
     result = detect(offline=offline, force_refetch=force)
     print("[road_detect] validation:", json.dumps(result["validation"], indent=2))
+    print("[road_detect] lanes:", json.dumps(result["lanes"], indent=2))
 
 
 if __name__ == "__main__":

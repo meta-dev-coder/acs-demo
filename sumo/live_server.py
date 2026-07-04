@@ -39,7 +39,7 @@ Client -> server commands:
 
 Work-zone (Feature B) fields:
   meta().workzone / step().stats.workzone -> None when no closure is active, else
-  {"lane","offsetFt","speedMph","divertPct","closureStartX","taperLengthM","nCones",
+  {"lane","offsetFt","speedMph","divertPct","closureStartX","closureEndX","taperLengthM","nCones",
    "signStationsM", ...} — the step-stats version additionally carries the live RILCA
   queue numbers (maxQueueVeh, maxQueueMi, recoveryTimeH, maxDelayMin, permissible,
   capacityVph) computed from sumo/kpi.py's pure workzone() assembler.
@@ -240,6 +240,7 @@ class LiveSim:
         self._wz_start_t = None       # sim time (s) the closure went active — t1 origin for workzone_queue
         self._wz_diverted = 0         # cumulative count of percent-diversion vaporizations
         self._wz_orig_speed = None    # lane's pre-closure max speed, for openLane restore
+        self._wz_forced_lc = set()    # vids currently under forced early-merge laneChangeMode
         self._arrival_deque = deque() # (sim_t, n) rolling window of insertions, for arrivals_vph
         self._last_queue_ap = 0       # previous step's approach queue length (diversion trigger)
 
@@ -254,6 +255,7 @@ class LiveSim:
         self._arrival_deque.clear()
         self._booth_occ = {g: 0 for g in GATES}
         self._booth_tot = {g: 0 for g in GATES}
+        self._wz_forced_lc = set()    # sim restarted: old vehicle ids no longer exist
         if self.workzone:
             self._wz_start_t = None   # scenario looped/reset: restart t1 accounting for the still-active closure
 
@@ -326,6 +328,19 @@ class LiveSim:
         candidates = [g for g in GATES if g.rsplit("_", 1)[0] == edge and g not in self.closed]
         return candidates[0] if candidates else None
 
+    def _ap_open_sibling(self, lane):
+        """Adjacent open AP approach lane to force-merge into when `lane` is the active
+        work-zone closure (single-lane closure, so any other AP lane is open)."""
+        try:
+            idx = AP_LANES.index(lane)
+        except ValueError:
+            return None
+        if idx + 1 < N_AP_LANES:
+            return AP_LANES[idx + 1]
+        if idx - 1 >= 0:
+            return AP_LANES[idx - 1]
+        return None
+
     def close_gate(self, lane):
         if lane not in GATES:
             return False
@@ -352,6 +367,13 @@ class LiveSim:
     # crash loop. A speed-limit closure produces the same MUTCD/RILCA closure physics (the lane
     # becomes effectively impassable -> upstream queue -> reduced approach capacity) without
     # touching insertion permissions, so it can't hit this failure mode.
+    #
+    # The speed-drop alone is only a backstop, though: with a FIXED departLane, vehicles still
+    # insert directly onto the closed lane and then crawl through the coned-off taper rather than
+    # merging out before it. step()'s per-step early-merge sweep is the actual enforcement — it
+    # positively commands traci.vehicle.changeLane() for any vehicle on the closed lane once its
+    # position enters the merge zone (closureStart - earlyMergeBufferM .. closureEnd), including
+    # newly-inserted vehicles on their first step.
     _WZ_CLOSED_SPEED = 0.5  # m/s
 
     def _apply_lane_closure(self, lane):
@@ -407,6 +429,7 @@ class LiveSim:
         }
         self._wz_geometry = {
             "closureStartX":  round(_NODE_B_LOCAL_X - taper_m, 1),
+            "closureEndX":    round(_NODE_B_LOCAL_X, 1),
             "taperLengthM":   taper_m,
             "nCones":         kpi.n_cones(taper_ft, cone_spacing_ft),
             "signStationsM":  [round(ft * 0.3048) for ft in sign_ft],
@@ -414,6 +437,7 @@ class LiveSim:
         self._wz_start_t = None
         self._wz_diverted = 0
         self._arrival_deque.clear()
+        self._wz_forced_lc = set()
         if self._started:
             self._apply_lane_closure(lane)
         return True
@@ -425,6 +449,12 @@ class LiveSim:
         closed_lane = self.workzone["lane"]
         if self._started:
             self._clear_lane_closure(closed_lane)
+            for vid in self._wz_forced_lc:
+                try:
+                    traci.vehicle.setLaneChangeMode(vid, 1621)
+                except traci.TraCIException:
+                    pass
+        self._wz_forced_lc = set()
         self.workzone = None
         self._wz_geometry = None
         self._wz_start_t = None
@@ -533,13 +563,56 @@ class LiveSim:
                             self._wz_diverted += 1
                         except traci.TraCIException:
                             pass
-            # Early merge: keep vehicles currently in the closed lane in an assertive lane-change
-            # mode so they merge ahead of the taper rather than at the last moment.
+            # Early merge ENFORCEMENT: the lane speed-drop alone is a backstop — vehicles with a
+            # fixed departLane on the closed lane still insert onto it and crawl through the coned
+            # taper. So every step, any vehicle currently on the closed lane whose position is
+            # within the merge zone (closureStart - earlyMergeBufferM .. closureEnd) gets an
+            # explicit traci.vehicle.changeLane() command onto the adjacent open lane — a positive
+            # merge-out rather than hoping the default lane-change model reacts in time. Newly
+            # inserted vehicles (fixed departLane == the closed lane) are swept the same way on
+            # their very first step here, since getLastStepVehicleIDs already reports them.
+            #
+            # IMPORTANT: 1621 (SUMO's DEFAULT laneChangeMode) is NOT "assertive" — it is a no-op,
+            # which is why the previous version of this sweep had no effect (the reported bug).
+            # To make an explicit changeLane() actually execute promptly we must first disable the
+            # vehicle's competing autonomous lane-change motivations (strategic/cooperative/speed-
+            # gain/right-drive) and let the TraCI-requested change proceed even past the default
+            # safety-gap check (the "512" mode below: all autonomous bits 0, TraCI bits '10' ==
+            # override safety for TraCI-commanded changes only) — otherwise the vehicle's own
+            # lane-changer keeps overriding/aborting the commanded merge. Restore the vehicle to
+            # SUMO's default mode once it is clear of the merge zone (or off the closed lane).
+            _MERGE_LC_MODE = 512
+            closed_lane = self.workzone["lane"]
+            sibling = self._ap_open_sibling(closed_lane)
+            geom = self._wz_geometry or {}
+            merge_zone_start = geom.get("closureStartX", _NODE_B_LOCAL_X) - _CLOSURE_CFG.get("earlyMergeBufferM", 150.0)
+            merge_zone_end = geom.get("closureEndX", _NODE_B_LOCAL_X)
+            sibling_idx = int(sibling.rsplit("_", 1)[1]) if sibling else None
+            in_zone_now = set()
             try:
-                for vid in traci.lane.getLastStepVehicleIDs(self.workzone["lane"]):
-                    traci.vehicle.setLaneChangeMode(vid, 1621)
+                for vid in traci.lane.getLastStepVehicleIDs(closed_lane):
+                    try:
+                        if sibling_idx is None:
+                            continue
+                        sx, sy = traci.vehicle.getPosition(vid)
+                        vx, _ = sumo_to_local(sx, sy)
+                        if merge_zone_start <= vx <= merge_zone_end:
+                            in_zone_now.add(vid)
+                            traci.vehicle.setLaneChangeMode(vid, _MERGE_LC_MODE)
+                            traci.vehicle.changeLane(vid, sibling_idx, 5.0)
+                    except traci.TraCIException:
+                        pass
             except traci.TraCIException:
                 pass
+            # Restore default lane-change behaviour for vehicles that were forced last step but
+            # have since left the closed lane / merge zone (successful merge, or past the taper).
+            for vid in self._wz_forced_lc:
+                if vid not in in_zone_now:
+                    try:
+                        traci.vehicle.setLaneChangeMode(vid, 1621)
+                    except traci.TraCIException:
+                        pass
+            self._wz_forced_lc = in_zone_now
 
         # --- Collect vehicle data + update type registry ---
         current_ids = set(traci.vehicle.getIDList())

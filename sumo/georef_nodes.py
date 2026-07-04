@@ -32,6 +32,22 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
+import road_centerline  # noqa: E402 — needs sys.path patched above
+
+# Lane widths (single source of truth in road_centerline.py). Both are 3.7 m today (real
+# AASHTO freeway lane width) so the mainline and the booth fan-out render at one consistent,
+# realistic width — this is what makes FCD lateral positions line up with imagery lane centres.
+MAINLINE_LANE_WIDTH_M = road_centerline.DEFAULT_LANE_WIDTH_M
+PLAZA_LANE_WIDTH_M    = road_centerline.PLAZA_LANE_WIDTH_M
+
+# 10 booth lanes (pl_0..pl_9) form 3 lane GROUPS fed one-to-one by the 3 approach lanes:
+#   ap_0 -> pl_0..pl_3 (4 lanes), ap_1 -> pl_4..pl_6 (3 lanes), ap_2 -> pl_7..pl_9 (3 lanes).
+# Vehicles may change sub-lanes WITHIN a group but must never cross a group boundary — the
+# boundaries sit between lane index 3|4 and 6|7. Applied to fo/pl/fi (all three 10-lane edges
+# have adjacent lanes across the whole cross-section, so free lane-changing could otherwise
+# hop a vehicle across groups on any of them, not just at the booths).
+LANE_GROUP_BOUNDARIES = [(3, 4), (6, 7)]  # (last lane of group, first lane of next group)
+
 # ── Anchor constants (identical to fcd2json.py / live_server.py / main.js SITES[0]) ──
 ANCHOR_LON  = -80.306
 ANCHOR_LAT  =  26.1124
@@ -167,7 +183,6 @@ def _shape_str(utm_pts_in_shape):
 def main():
     # Load the cached centerline (written by road_centerline.py).
     try:
-        import road_centerline
         cl_data  = road_centerline.load()
         utm_cl   = cl_data["utm"]
         print(f"[georef_nodes] Centerline: {len(utm_cl)} pts", flush=True)
@@ -195,10 +210,26 @@ def main():
         # sampled segment starts behind E and the shape jumps backward.
         E_E, N_E = local_to_utm(630, 0)                   # node E stays straight
         s_E = _project_to_cl(utm_cl, E_E, N_E)
-        dp_shape_utm = _cl_segment(utm_cl, s_E, s_anchor + 400.0)
-        # Prepend E's own UTM so the shape begins exactly at the straight-plaza node.
-        if not dp_shape_utm or dp_shape_utm[0] != (E_E, N_E):
-            dp_shape_utm = [(E_E, N_E)] + dp_shape_utm
+        cl_after_E = _cl_segment(utm_cl, s_E, s_anchor + 400.0)
+        # E sits on the straight plaza tangent, which can be tens of metres off the
+        # real fetched centerline at station s_E (the straight core is a deliberate
+        # design choice — see the module docstring — not a geometry error). Splicing
+        # E_E directly onto the first raw-centerline sample below it would create a
+        # hard lateral jump right at the straight/curved boundary. Instead, taper
+        # E's offset from the raw centerline down to zero over BLEND_M metres of
+        # arc length, so the departure shape bends smoothly away from the plaza
+        # instead of kinking.
+        BLEND_M = 150.0
+        foot_E  = _walk_cl(utm_cl, s_E)
+        offset_E = (E_E - foot_E[0], N_E - foot_E[1])
+        dp_shape_utm = [(E_E, N_E)]
+        cum_dist = 0.0
+        prev_pt  = foot_E
+        for pt in cl_after_E:
+            cum_dist += math.hypot(pt[0] - prev_pt[0], pt[1] - prev_pt[1])
+            prev_pt = pt
+            f = max(0.0, 1.0 - cum_dist / BLEND_M)
+            dp_shape_utm.append((pt[0] + offset_E[0] * f, pt[1] + offset_E[1] * f))
         # Append F explicitly.
         if dp_shape_utm[-1] != (E_F, N_F):
             dp_shape_utm.append((E_F, N_F))
@@ -251,6 +282,29 @@ def main():
     ap_shape_attr = (f' shape="{_shape_str(ap_shape_utm)}"' if ap_shape_utm else "")
     dp_shape_attr = (f' shape="{_shape_str(dp_shape_utm)}"' if dp_shape_utm else "")
 
+    # SUMO's changeLeft/changeRight lane attributes are an ALLOW-list of vClasses (default
+    # "all"); netconvert rejects an empty/"none" value outright ("Attribute ... is empty" /
+    # "Unknown vehicle class 'none'") — there is no literal "nobody may change" keyword. All
+    # plaza.vtypes.xml vTypes use vClass="passenger" or "truck", so listing an unused vClass
+    # (verified against a standalone net+sim: a passenger vehicle asked to reach the far lane
+    # never crosses) blocks every simulated vehicle while still satisfying the non-empty
+    # attribute requirement.
+    NO_SIMULATED_VCLASS = "rail"
+
+    def _group_boundary_lanes_xml():
+        """<lane> overrides for the two group boundaries (3|4 and 6|7): the lane on the
+        low side gets changeLeft=NO_SIMULATED_VCLASS (may not change UP into the next group)
+        and the lane on the high side gets changeRight=NO_SIMULATED_VCLASS (may not change
+        DOWN into the previous group). Within-group changes (e.g. lane 1<->2, lane 4<->5) are
+        untouched and stay allowed."""
+        parts = []
+        for lo, hi in LANE_GROUP_BOUNDARIES:
+            parts.append(f'    <lane index="{lo}" changeLeft="{NO_SIMULATED_VCLASS}"/>\n')
+            parts.append(f'    <lane index="{hi}" changeRight="{NO_SIMULATED_VCLASS}"/>\n')
+        return "".join(parts)
+
+    group_lanes_xml = _group_boundary_lanes_xml()
+
     edg_path = os.path.join(HERE, "plaza.edg.xml")
     with open(edg_path, "w") as f:
         f.write(
@@ -258,18 +312,33 @@ def main():
             '<!-- Edges. Speeds in m/s (29.06 ≈ 65 mph). SINGLE-ROADWAY fan-out: a 3-lane mainline widens to 10\n'
             '     adjacent booth lanes (pl_0 .. pl_9) and narrows back to 3.\n'
             '     ap and dp carry shape= attributes so vehicles follow the real I-595 centerline.\n'
+            f'     All edges use width="{MAINLINE_LANE_WIDTH_M}"/"{PLAZA_LANE_WIDTH_M}" (real freeway lane\n'
+            '     width, road_centerline.py) instead of the SUMO 3.2 m default, so FCD lateral positions\n'
+            '     line up with imagery lane centres.\n'
+            '     The 10 booth lanes form 3 GROUPS fed one-to-one by the 3 approach lanes:\n'
+            '       ap_0 -> pl_0..pl_3 (4), ap_1 -> pl_4..pl_6 (3), ap_2 -> pl_7..pl_9 (3) — see\n'
+            f'     plaza.con.xml. changeLeft/changeRight="{NO_SIMULATED_VCLASS}" (a vClass no\n'
+            '     simulated vehicle uses) on the boundary lanes (3|4, 6|7) of fo/pl/fi blocks\n'
+            '     sub-lane changes from crossing a group boundary; within-group changes stay\n'
+            '     allowed.\n'
             '     Regenerated by georef_nodes.py — do NOT hand-edit. -->\n'
             '<edges>\n'
             f'  <edge id="ap" from="A" to="B" numLanes="3"  speed="29.06" priority="3" '
-            f'spreadType="center"{ap_shape_attr}/>  <!-- approach (3) -->\n'
-            '  <edge id="fo" from="B" to="C" numLanes="10" speed="13.40" priority="3" '
-            'spreadType="center"/>  <!-- fan-out (10) -->\n'
-            '  <edge id="pl" from="C" to="D" numLanes="10" speed="8.00"  priority="3" '
-            'spreadType="center"/>  <!-- booths (10)  -->\n'
-            '  <edge id="fi" from="D" to="E" numLanes="10" speed="13.40" priority="3" '
-            'spreadType="center"/>  <!-- fan-in (10)  -->\n'
+            f'width="{MAINLINE_LANE_WIDTH_M}" spreadType="center"{ap_shape_attr}/>  <!-- approach (3) -->\n'
+            f'  <edge id="fo" from="B" to="C" numLanes="10" speed="13.40" priority="3" '
+            f'width="{PLAZA_LANE_WIDTH_M}" spreadType="center">  <!-- fan-out (10) -->\n'
+            f'{group_lanes_xml}'
+            '  </edge>\n'
+            f'  <edge id="pl" from="C" to="D" numLanes="10" speed="8.00"  priority="3" '
+            f'width="{PLAZA_LANE_WIDTH_M}" spreadType="center">  <!-- booths (10)  -->\n'
+            f'{group_lanes_xml}'
+            '  </edge>\n'
+            f'  <edge id="fi" from="D" to="E" numLanes="10" speed="13.40" priority="3" '
+            f'width="{PLAZA_LANE_WIDTH_M}" spreadType="center">  <!-- fan-in (10)  -->\n'
+            f'{group_lanes_xml}'
+            '  </edge>\n'
             f'  <edge id="dp" from="E" to="F" numLanes="3"  speed="29.06" priority="3" '
-            f'spreadType="center"{dp_shape_attr}/>  <!-- departure (3) -->\n'
+            f'width="{MAINLINE_LANE_WIDTH_M}" spreadType="center"{dp_shape_attr}/>  <!-- departure (3) -->\n'
             '</edges>\n'
         )
     print(f"Wrote {edg_path}", flush=True)

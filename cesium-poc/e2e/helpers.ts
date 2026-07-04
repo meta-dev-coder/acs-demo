@@ -35,22 +35,25 @@ export const SITE_I595: { dir: [LonLat, LonLat]; gates: LonLat[] } = {
     { lon: -80.3069707, lat: 26.1126189 },  // up-road
     { lon: -80.3050293, lat: 26.1121811 },  // down-road
   ],
-  // 10 gates — one per SUMO lane pl_0..pl_9, derived from sumoToWorld(530, -14.4+3.2*i)
-  // with anchor=-80.306,26.1124, bearingDeg=104, scale=1.0 (true-to-scale, real 3.2 m lane
-  // spacing in world).  i=0..2 → cash lanes (pl_0..pl_2); i=3..9 → AET lanes.
-  // At scale=1.0, adjacent-lane world distance = 3.2 m > GATE_PROXIMITY_M=3 m, so no
+  // 10 gates — one per SUMO lane pl_0..pl_9, derived from sumoToWorld(530, -16.65+3.7*i)
+  // with anchor=-80.306,26.1124, bearingDeg=104, scale=1.0 (true-to-scale, real 3.7 m AASHTO
+  // lane spacing in world — see sumo/road_centerline.py PLAZA_LANE_WIDTH_M; this is the real
+  // lane-CENTRE spacing, matching main.js PLAZA_HALF_SPAN_M=16.65 = (10-1)*3.7/2 and the actual
+  // SUMO FCD sample y-values at the booth line: -16.65, -12.95, ..., +16.65).
+  // i=0..2 → cash lanes (pl_0..pl_2); i=3..9 → AET lanes.
+  // At scale=1.0, adjacent-lane world distance = 3.7 m > GATE_PROXIMITY_M=3 m, so no
   // cash vehicle can ever be within 3 m of an AET gate (or vice-versa) at booth stop.
   gates: [
-    { lon: -80.3060349, lat: 26.1122736 },  // pl_0  cash  y=-14.4
-    { lon: -80.3060271, lat: 26.1123017 },  // pl_1  cash  y=-11.2
-    { lon: -80.3060194, lat: 26.1123298 },  // pl_2  cash  y= -8.0
-    { lon: -80.3060116, lat: 26.1123579 },  // pl_3  AET   y= -4.8
-    { lon: -80.3060039, lat: 26.1123860 },  // pl_4  AET   y= -1.6
-    { lon: -80.3059961, lat: 26.1124140 },  // pl_5  AET   y= +1.6
-    { lon: -80.3059884, lat: 26.1124421 },  // pl_6  AET   y= +4.8
-    { lon: -80.3059806, lat: 26.1124702 },  // pl_7  AET   y= +8.0
-    { lon: -80.3059729, lat: 26.1124983 },  // pl_8  AET   y=+11.2
-    { lon: -80.3059651, lat: 26.1125264 },  // pl_9  AET   y=+14.4
+    { lon: -80.3060403, lat: 26.1122538 },  // pl_0  cash  y=-16.65
+    { lon: -80.3060313, lat: 26.1122863 },  // pl_1  cash  y=-12.95
+    { lon: -80.3060224, lat: 26.1123188 },  // pl_2  cash  y= -9.25
+    { lon: -80.3060134, lat: 26.1123513 },  // pl_3  AET   y= -5.55
+    { lon: -80.3060045, lat: 26.1123838 },  // pl_4  AET   y= -1.85
+    { lon: -80.3059955, lat: 26.1124162 },  // pl_5  AET   y= +1.85
+    { lon: -80.3059866, lat: 26.1124487 },  // pl_6  AET   y= +5.55
+    { lon: -80.3059776, lat: 26.1124812 },  // pl_7  AET   y= +9.25
+    { lon: -80.3059687, lat: 26.1125137 },  // pl_8  AET   y=+12.95
+    { lon: -80.3059597, lat: 26.1125462 },  // pl_9  AET   y=+16.65
   ],
 };
 

@@ -46,13 +46,23 @@ const MIN_PIXEL_SIZE  = { car: 26,  truck: 30    };   // keep visible at max zoo
 const MODEL_YAW_OFFSET = { car: -110, truck: -30 };   // mesh nose alignment (tuned per request)
 const DIMS = { cash: [4.8, 2.0, 1.6], etc: [4.8, 2.0, 1.6], truck: [12, 2.6, 3.2] };
 const N_BOOTHS = 10;
-// Fixed plaza half-span: 10 lanes x 3.2 m / 2 = 14.4 m. The plaza core (fo/pl/fi) stays a straight,
-// symmetric-about-y=0 tangent by design (Feature A curved-road net — see sumo/georef_nodes.py), so
-// this is a FIXED constant, not derived from meta.bounds.minY/maxY: those now span the whole curved
-// approach/departure trajectory (up to ~55 m), not just the booth line. Using bounds here would make
-// booth markers and the mark-gates transform scale wildly wrong (this WAS a real regression — see
-// e2e/bugs.spec.ts Bug 2). Mirrors fcd2json.py's ROAD_HALF_WIDTH_M, which documents the same rule.
-const PLAZA_HALF_SPAN_M = 14.4;
+// Fixed plaza half-span: this is the CENTRE-to-CENTRE half-span across the 10 booth lanes —
+// (N_BOOTHS - 1) * laneWidth / 2 = 9 * 3.7 / 2 = 16.65 m (real AASHTO freeway lane width, see
+// sumo/road_centerline.py PLAZA_LANE_WIDTH_M / PLAZA_LANE_COUNT) — NOT the plaza's edge-to-edge
+// half-width (that's meta.roadHalfWidthM = N_BOOTHS * laneWidth / 2 = 18.5 m, a different quantity
+// used only for the on-road clamp). computeBooths() below spaces N_BOOTHS lane markers evenly
+// across [-PLAZA_HALF_SPAN_M, +PLAZA_HALF_SPAN_M] using (N_BOOTHS - 1) gaps, which lands each
+// marker exactly on its lane's real centre (-16.65, -12.95, ..., +16.65 — verified against the
+// SUMO fcd samples at the booth line); buildTransformFromMarks() also uses this same half-span as
+// the "real-world span the 10 marked gates cover" denominator, so the two MUST use the same
+// quantity (lane-centre span, not plaza edge-to-edge width) or the derived scale is wrong and
+// vehicles land within one lane's width of the wrong-type gate (this WAS Bug 2's root cause —
+// see e2e/bugs.spec.ts Bug 2 and e2e/helpers.ts SITE_I595.gates, which must be generated from this
+// same lane-centre spacing). The plaza core (fo/pl/fi) stays a straight, symmetric-about-y=0
+// tangent by design (Feature A curved-road net — see sumo/georef_nodes.py), so this is a FIXED
+// constant, not derived from meta.bounds.minY/maxY: those now span the whole curved
+// approach/departure trajectory (up to ~55 m), not just the booth line.
+const PLAZA_HALF_SPAN_M = 16.65;
 // Cash booths per scenario. Baseline: 3 cash (pl_0..2). Intervention ("Convert 2 cash → AET"):
 // pl_1 & pl_2 are converted to AET (turn GREEN), only pl_0 stays cash — so green cars flow through the
 // converted booths and the orange (cash) cars queue at the single remaining cash booth.
@@ -720,6 +730,12 @@ function renderWorkzoneHud() {
 
   const btn = $("wz-close");
   if (btn) { btn.textContent = spec ? "Reopen lane" : "Close lane"; btn.classList.toggle("on", !!spec); }
+
+  // OFFLINE mode has no live SUMO/traci to actually re-route traffic off the closed lane — the
+  // TTC overlay + RILCA numbers are schematic-only there. Make that explicit so it isn't mistaken
+  // for LIVE physics (see live_server.py's per-step early-merge enforcement, LIVE-only).
+  const note = $("wz-offline-note");
+  if (note) note.classList.toggle("hidden", !(spec && !liveMode));
 }
 
 // ============================================================================ MARK GATES (user clicks each real toll gate)

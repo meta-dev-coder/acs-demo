@@ -8,7 +8,10 @@
  *
  * Invariants:
  *   CR1 — window.__meta carries centerline (> 2 pts) and roadHalfWidthM > 0
- *   CR2 — centerline bearing change first→last segment > 8° (proves real curve, not straight)
+ *   CR2 — centerline max per-segment bearing deviation from the overall chord > 8° (proves a
+ *         real curve exists somewhere along the path; NOT first-vs-last endpoint bearing, which
+ *         nets near-zero for a real road that bows out and returns to the same heading — see
+ *         CR2 test body for why endpoint-only comparison is the wrong invariant here)
  *   CR3 — centerline max |y| in local metres > 10 m (road deviates from straight bearing axis)
  *   CR4 — every vehicle local-y offset from the centerline ≤ roadHalfWidthM + 2 m (on-road)
  *   CR5 — window.__kpi.onRoadPct ≥ 0.98 (lateral-clamp validation metric)
@@ -37,9 +40,20 @@ test('CR1 — window.__meta carries centerline (> 2 pts) and roadHalfWidthM > 0'
 });
 
 // ---------------------------------------------------------------------------
-// CR2 — bearing change from first to last centerline segment exceeds 8°
+// CR2 — max per-segment bearing deviation from the overall chord exceeds 8°
 // ---------------------------------------------------------------------------
-test('CR2 — centerline bearing change first→last segment > 8° (real curve)', async ({ page }) => {
+//
+// NOTE on invariant choice: an earlier version of this test compared the bearing of the
+// *first* centerline segment to the bearing of the *last* segment. That works for a road
+// that curves monotonically in one direction, but the real FDOT I-595 geometry this branch
+// now feeds in (road_centerline.py + georef_nodes.py, replacing the old synthetic ~15°-swing
+// fallback polyline) bows away from the straight bearing-104° axis and then bows back — CR3
+// independently proves that bow (max |y| ≈ 26 m, well over its 10 m bar). Net first→last
+// bearing change is therefore only ≈0.3°, which would wrongly read as "straight" even though
+// the road plainly curves. The correct proof of curvature is the *maximum* deviation any
+// segment's bearing takes from the overall start→end chord bearing, not the net endpoint
+// delta. Threshold is unchanged at 8° — this is a measurement fix, not a loosened tolerance.
+test('CR2 — centerline max per-segment bearing deviation from chord > 8° (real curve)', async ({ page }) => {
   await waitForReady(page);
 
   // Pull meta.centerline — [[x0,y0],[x1,y1],...] in local SUMO metres.
@@ -47,21 +61,26 @@ test('CR2 — centerline bearing change first→last segment > 8° (real curve)'
   const cl: number[][] = await page.evaluate(() => (window as any).__meta?.centerline);
 
   expect(cl,         'meta.centerline must be present').toBeTruthy();
-  expect(cl.length,  'need ≥ 3 points to compare first vs last segment').toBeGreaterThanOrEqual(3);
+  expect(cl.length,  'need ≥ 3 points to derive a chord and per-segment bearings').toBeGreaterThanOrEqual(3);
 
-  // Bearing of first segment: atan2(Δy, Δx) in local (angle from x-axis, degrees).
-  const firstBearing = Math.atan2(cl[1][1] - cl[0][1], cl[1][0] - cl[0][0]) * 180 / Math.PI;
-  // Bearing of last segment.
-  const n = cl.length;
-  const lastBearing  = Math.atan2(cl[n-1][1] - cl[n-2][1], cl[n-1][0] - cl[n-2][0]) * 180 / Math.PI;
+  const bearing = (a: number[], b: number[]) => Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI;
+  const wrap = (d: number) => { const a = Math.abs(d); return a > 180 ? 360 - a : a; };
 
-  // Wrap to shortest angular difference.
-  let diff = Math.abs(firstBearing - lastBearing);
-  if (diff > 180) diff = 360 - diff;
+  // Overall chord bearing: straight line from first to last centerline point — the
+  // corridor's net direction, regardless of how it bows in between.
+  const chordBearing = bearing(cl[0], cl[cl.length - 1]);
 
-  expect(diff,
-    `Centerline bearing change = ${diff.toFixed(1)}° (first=${firstBearing.toFixed(1)}°, ` +
-    `last=${lastBearing.toFixed(1)}°) — must exceed 8° to prove a real curve`
+  let maxDev = 0;
+  let maxDevIdx = -1;
+  for (let i = 0; i < cl.length - 1; i++) {
+    const segBearing = bearing(cl[i], cl[i + 1]);
+    const dev = wrap(segBearing - chordBearing);
+    if (dev > maxDev) { maxDev = dev; maxDevIdx = i; }
+  }
+
+  expect(maxDev,
+    `Max per-segment bearing deviation from chord = ${maxDev.toFixed(1)}° (segment #${maxDevIdx}, ` +
+    `chord=${chordBearing.toFixed(1)}°) — must exceed 8° to prove a real curve`
   ).toBeGreaterThan(8);
 
   await shoot(page, 'cr2-bearing-change');

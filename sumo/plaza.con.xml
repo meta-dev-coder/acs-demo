@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- SINGLE-ROADWAY fan-out: 3 approach lanes widen to 10 adjacent booth lanes, then merge back to 3.
      Split is 4 / 3 / 3 (right / centre / left) so every booth lane (pl_0..pl_9) is reachable and
-     addressable. SUMO lane 0 = rightmost. -->
+     addressable. SUMO lane 0 = rightmost.
+     These 3 splits are lane GROUPS: ap_0->pl_0..3, ap_1->pl_4..6, ap_2->pl_7..9. Vehicles may
+     change sub-lanes WITHIN a group but must never cross a group boundary — enforced by
+     changeLeft/changeRight="rail" (a vClass no simulated vehicle uses, since SUMO has no
+     literal "nobody" value) on the boundary lanes (3|4, 6|7) of fo/pl/fi in plaza.edg.xml
+     (written by georef_nodes.py). csv2counts.py's departLane assignment MUST stay in lockstep
+     with this same 4/3/3 split. -->
 <connections>
   <!-- ===== fan-out at B: ap(3) -> fo(10), 4/3/3 ===== -->
   <connection from="ap" to="fo" fromLane="0" toLane="0"/>

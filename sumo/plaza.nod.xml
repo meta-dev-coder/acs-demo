@@ -5,10 +5,10 @@
      UTM anchor: E=569388.720, N=2888316.492
      Nodes A/B/F repositioned onto real I-595 centerline (curved net). -->
 <nodes>
-  <node id="A" x="568890.520" y="2888494.899" type="priority"/>  <!-- approach start -->
-  <node id="B" x="569263.465" y="2888351.293" type="priority"/>  <!-- fan-out start  -->
+  <node id="A" x="568871.906" y="2888434.544" type="priority"/>  <!-- approach start -->
+  <node id="B" x="569257.626" y="2888329.160" type="priority"/>  <!-- fan-out start  -->
   <node id="C" x="569359.612" y="2888323.750" type="priority"/>  <!-- booth entry    -->
   <node id="D" x="569388.720" y="2888316.492" type="priority"/>  <!-- booth exit/anchor -->
   <node id="E" x="569485.750" y="2888292.300" type="priority"/>  <!-- fan-in end     -->
-  <node id="F" x="569781.040" y="2888239.036" type="priority"/>  <!-- departure end  -->
+  <node id="F" x="569770.164" y="2888194.236" type="priority"/>  <!-- departure end  -->
 </nodes>

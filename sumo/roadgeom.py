@@ -103,6 +103,53 @@ def load_centerline_local() -> list[list[float]]:
     return local
 
 
+def load_asbuilt_centerline_local() -> list[list[float]]:
+    """
+    Build the AS-BUILT road centerline — straight plaza core (nodes C, D) stitched
+    to the curved real approach/departure shapes (edges ap: A->B, dp: E->F) — by
+    reading the actual generated plaza.nod.xml / plaza.edg.xml.
+
+    load_centerline_local() returns the raw fetched FDOT/OSM source line, which can
+    sit tens of metres off the fixed plaza anchor because the plaza core is
+    intentionally kept on the straight bearing-104 tangent (see georef_nodes.py's
+    PLAZA_STRAIGHT_NODES) rather than bent onto the real curve. That raw source is
+    fine for proving "this is real curved geometry" (window.__meta), but it is the
+    WRONG reference for the on-road clamp/validation, which must check vehicles
+    against the road they are actually built to drive on. This function returns
+    that as-driven road instead.
+
+    Falls back to load_centerline_local() if the generated net files are missing/
+    malformed (e.g. a fallback/no-curve build without ap/dp shapes).
+    """
+    import xml.etree.ElementTree as ET
+
+    nod_path = os.path.join(_HERE, "plaza.nod.xml")
+    edg_path = os.path.join(_HERE, "plaza.edg.xml")
+    try:
+        nodes = {n.get("id"): (float(n.get("x")), float(n.get("y")))
+                 for n in ET.parse(nod_path).getroot().findall("node")}
+        edges = {e.get("id"): e for e in ET.parse(edg_path).getroot().findall("edge")}
+
+        def _shape_or_straight(edge_id, a, b):
+            e = edges.get(edge_id)
+            shape = e.get("shape") if e is not None else None
+            if not shape:
+                return [nodes[a], nodes[b]]
+            return [tuple(float(v) for v in pair.split(",")) for pair in shape.split()]
+
+        ap = _shape_or_straight("ap", "A", "B")   # curved (or straight fallback)
+        dp = _shape_or_straight("dp", "E", "F")   # curved (or straight fallback)
+
+        utm_path = ap + [nodes["C"], nodes["D"]] + dp
+    except Exception:
+        return load_centerline_local()
+
+    local = [list(_utm_to_local(E, N)) for E, N in utm_path]
+    if local and local[-1][0] < local[0][0]:
+        local = local[::-1]
+    return local
+
+
 def project_to_centerline(
     px: float, py: float, poly: list[list[float]]
 ) -> tuple[float, float, float, float]:

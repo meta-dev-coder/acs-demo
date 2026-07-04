@@ -14,5 +14,6 @@
     "maxDelayMin": 30.0
   },
   "diversionQueueThresholdVeh": 8,
-  "workzonePostPeakFactor": 0.5
+  "workzonePostPeakFactor": 0.5,
+  "earlyMergeBufferM": 150.0
 }
