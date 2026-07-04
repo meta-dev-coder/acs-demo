@@ -18,7 +18,7 @@ import { RootLayout } from "./RootLayout";
 import { ProgressLinear } from "@itwin/itwinui-react";
 import { App } from "./App";
 import { TokenView } from "./TokenView";
-import { Landing } from "../app/Landing";
+import { useEffect } from "react";
 
 const rootRoute = createRootRoute({
   component: RootLayout,
@@ -54,17 +54,25 @@ const indexRoute = createRoute({
     const { iTwinId, iModelId, changesetId } = indexRoute.useSearch();
     const { state, signIn } = useAuthorizationContext();
 
-    if (state === AuthorizationState.Unauthenticated) {
-      // No cached IMS session — show the public landing instead of auto-redirecting to sign-in.
-      return <Landing onSignIn={() => void signIn()} />;
-    }
+    // No intermediate landing page: the multi-demo launcher at the site root is the front door
+    // (it offers the SUMO×Cesium twin etc.). With no cached IMS session, go straight to the
+    // interactive Bentley sign-in.
+    useEffect(() => {
+      if (state === AuthorizationState.Unauthenticated) void signIn();
+    }, [state, signIn]);
 
     return (
       <div className="viewer-container">
-        {state === AuthorizationState.Pending ? (
+        {state !== AuthorizationState.Authorized ? (
           <div className="centered">
             <div className="signin-content">
-              <ProgressLinear labels={["Loading..."]} />
+              <ProgressLinear
+                labels={[
+                  state === AuthorizationState.Unauthenticated
+                    ? "Redirecting to Bentley sign-in..."
+                    : "Loading...",
+                ]}
+              />
             </div>
           </div>
         ) : (

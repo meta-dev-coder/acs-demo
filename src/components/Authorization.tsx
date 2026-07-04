@@ -16,8 +16,9 @@ import { useNavigate } from "@tanstack/react-router";
 
 export enum AuthorizationState {
   Pending,
-  /** No cached session found — silent sign-in failed. Show the landing page; wait for the
-   *  user to opt in via `signIn()` rather than auto-redirecting to Bentley IMS. */
+  /** No cached session found — silent sign-in failed. The index route reacts by firing the
+   *  interactive `signIn()` redirect to Bentley IMS (no intermediate landing page — the
+   *  multi-demo launcher at the site root is the front door). */
   Unauthenticated,
   Authorized,
 }
@@ -107,9 +108,9 @@ export function AuthorizationProvider(props: PropsWithChildren<unknown>) {
         // app boots straight into the viewer, same as before this change.
         await authClient.signInSilent();
       } catch {
-        // No cached session: land on the pre-auth landing page instead of auto-firing the
-        // interactive IMS redirect. The user opts in via the "Operational Twin" card, which
-        // calls the `signIn` context method below.
+        // No cached session: flip to Unauthenticated — the index route then auto-fires the
+        // interactive IMS redirect (`signIn` below). Kept out of this effect so the OIDC
+        // callback route never races it.
         if (!cancelled) {
           setContextValue((prev) => ({
             ...prev,
