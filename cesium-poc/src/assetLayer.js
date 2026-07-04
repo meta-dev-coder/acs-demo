@@ -8,7 +8,7 @@
  * collection is attached to viewer.scene.primitives / before the next render tick — never added
  * one at a time across frames.
  */
-import { PointPrimitiveCollection, Color, Cartesian3, NearFarScalar } from "cesium";
+import { PointPrimitiveCollection, Color, Cartesian3, NearFarScalar, ScreenSpaceEventHandler, ScreenSpaceEventType } from "cesium";
 import { bandMeta } from "./scoringA.js";
 
 const POINT_HEIGHT_M = 3; // small absolute height offset above the ellipsoid — matches the
@@ -60,6 +60,14 @@ export function buildAssetLayer(viewer, scoredAssets) {
 
 /** scene.pick() wrapper — returns the ScoredAsset under a click, or null if nothing (or
  * something else) was hit. */
+/** Left-click pick wiring lives here (not main.js) — main.js is renderer-agnostic and imports no
+ * Cesium types; this module owns everything Cesium-specific about the asset layer. */
+export function installAssetPicking(viewer, onPick) {
+  const handler = new ScreenSpaceEventHandler(viewer.scene.canvas);
+  handler.setInputAction((click) => onPick(click.position), ScreenSpaceEventType.LEFT_CLICK);
+  return handler;
+}
+
 export function pickAsset(viewer, windowPosition) {
   const picked = viewer.scene.pick(windowPosition);
   if (!picked) return null;

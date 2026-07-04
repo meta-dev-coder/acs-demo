@@ -2,10 +2,14 @@ import { defineConfig } from "vite";
 import cesium from "vite-plugin-cesium";
 
 // vite-plugin-cesium wires up CESIUM_BASE_URL + static asset copying for us.
-// base: override via POC_BASE_PATH for GitHub Pages sub-path deploys (e.g. "/acs-demo/twin/").
-// Defaults to "/" so local dev (npm start) and the Playwright e2e suite are unaffected.
 export default defineConfig({
-  base: process.env.POC_BASE_PATH || "/",
+  // Under GitHub Pages the toll twin is served from a sub-path (/acs-demo/twin/). The deploy
+  // workflow sets CESIUM_BASE_PATH (POC_BASE_PATH kept as an alias for older scripts); local dev
+  // leaves both unset → "/" so npm start and the Playwright e2e suite are unaffected. All runtime
+  // asset URLs resolve against import.meta.env.BASE_URL so data/ and models/ load under either base.
+  base: process.env.CESIUM_BASE_PATH || process.env.POC_BASE_PATH || "/",
   plugins: [cesium()],
-  server: { port: 5180, open: true },
+  // Port 5188 (not the default 5180) keeps this NTTA worktree isolated from a sibling session's
+  // dev server sharing localhost. Disable auto-open under headless e2e.
+  server: { port: 5188, open: false, strictPort: true },
 });

@@ -1,4 +1,4 @@
-html, body, #cesiumContainer {
+html, body, #cesiumContainer, #arcgisContainer {
   width: 100%;
   height: 100%;
   margin: 0;
@@ -6,6 +6,8 @@ html, body, #cesiumContainer {
   overflow: hidden;
   font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
 }
+/* ArcGIS SceneView fills its container; pin the mount to the full viewport so the map uses 100%. */
+#arcgisContainer { position: absolute; inset: 0; }
 
 .panel {
   position: absolute;
@@ -27,6 +29,64 @@ html, body, #cesiumContainer {
 .hud-eyebrow { font-size: 10px; letter-spacing: 1.4px; color: #6fb1ff; font-weight: 700; }
 .hud-title { font-size: 22px; font-weight: 700; margin: 4px 0 2px; }
 .hud-sub { font-size: 11px; color: #9fb0c3; margin-bottom: 14px; }
+
+/* ---- Panel header (always visible) + collapse ---- */
+.head-row { display: flex; align-items: center; gap: 8px; }
+.head-row .hud-eyebrow { flex: 1; }
+.panel.collapsed { width: 264px; }
+.panel.collapsed .hud-sub { margin-bottom: 0; }
+.panel.collapsed .panel-body { display: none; }
+
+.collapse-btn {
+  flex: none; width: 24px; height: 24px; padding: 0; line-height: 1;
+  border-radius: 6px; border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.05); color: #cdd8e6; cursor: pointer;
+  font-size: 12px; transition: background 0.15s;
+}
+.collapse-btn:hover { background: rgba(255,255,255,0.14); }
+.collapse-btn:focus-visible { outline: 2px solid #6fb1ff; outline-offset: 1px; }
+
+/* ---- Renderer badge (which 3D engine is drawing) ---- */
+.rbadge {
+  flex: none; display: inline-flex; align-items: center; gap: 5px;
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 999px; white-space: nowrap;
+  border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: #cdd8e6;
+}
+.rbadge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.rbadge.cesium { color: #8fc0ff; border-color: rgba(111,177,255,0.45); background: rgba(111,177,255,0.14); }
+.rbadge.arcgis { color: #8fd66a; border-color: rgba(108,194,74,0.50); background: rgba(108,194,74,0.15); }
+
+/* ---- Renderer toggle (switch engine from the homepage — no ?renderer= URL needed) ---- */
+.rtoggle {
+  flex: none; display: inline-flex; padding: 2px; gap: 2px;
+  border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05);
+}
+.rtoggle .rt-btn {
+  appearance: none; cursor: pointer; border: 0; background: transparent; color: #8c9bb0;
+  font: inherit; font-size: 9.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+  padding: 3px 9px; border-radius: 999px; white-space: nowrap; transition: color .12s, background .12s;
+}
+.rtoggle .rt-btn:hover { color: #dbe6f4; }
+.rtoggle .rt-btn.on[data-renderer="cesium"] { color: #0b1220; background: #8fc0ff; }
+.rtoggle .rt-btn.on[data-renderer="arcgis"] { color: #0b1220; background: #8fd66a; }
+.rtoggle .rt-btn:focus-visible { outline: 2px solid rgba(255,255,255,0.55); outline-offset: 1px; }
+
+/* ---- Segmented speed control ---- */
+.ctl-label { font-size: 10px; font-weight: 600; color: #9fb0c3; text-transform: uppercase; letter-spacing: 0.4px; }
+.seg { display: inline-flex; margin-left: auto; border-radius: 7px; overflow: hidden; border: 1px solid rgba(255,255,255,0.14); }
+.seg button {
+  font-size: 10.5px; font-weight: 700; padding: 5px 9px; min-width: 30px;
+  border: none; border-left: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04); color: #b7c6d8; cursor: pointer; transition: background 0.12s;
+}
+.seg button:first-child { border-left: none; }
+.seg button:hover { background: rgba(255,255,255,0.1); }
+.seg button.on { background: #2f6df6; color: #fff; }
+
+/* ---- Cesium native widgets: hide the redundant clock dial, keep the timeline clear of the panel ---- */
+.cesium-viewer-animationContainer { display: none !important; }
+.cesium-viewer-timelineContainer { left: 336px !important; }
 
 .toggle { display: flex; gap: 6px; margin-bottom: 14px; }
 .toggle button {
@@ -326,6 +386,59 @@ html, body, #cesiumContainer {
   border-radius: 6px; padding: 8px; margin-bottom: 8px;
 }
 .dc-panel-related { font-size: 9.5px; color: #8fa3bb; }
+
+/* ---- Asset operations (gantry health + incident scenario) ---- */
+.assetops-hud {
+  margin-bottom: 10px;
+  padding: 10px 10px 12px;
+  background: rgba(57, 192, 214, 0.06);
+  border: 1px solid rgba(57, 192, 214, 0.24);
+  border-radius: 8px;
+}
+.ao-h {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 9.5px; font-weight: 700; color: #7fdcec;
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+}
+.ao-src {
+  margin-left: auto; font-size: 8.5px; letter-spacing: 0.5px;
+  color: #8fd66a; background: rgba(108, 194, 74, 0.14);
+  border: 1px solid rgba(108, 194, 74, 0.4); border-radius: 999px; padding: 1px 6px;
+}
+.ao-gantries { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+.ao-g {
+  display: flex; align-items: center; gap: 7px; font-size: 11px;
+  padding: 4px 7px; border-radius: 6px; background: rgba(255, 255, 255, 0.04);
+}
+.ao-g .ao-dot { width: 8px; height: 8px; border-radius: 50%; background: #39c0d6; flex: none; }
+.ao-g.deg { background: rgba(255, 77, 77, 0.12); }
+.ao-g.deg .ao-dot { background: #ff4d4d; box-shadow: 0 0 6px rgba(255, 77, 77, 0.8); }
+.ao-g .ao-name { flex: 1; color: #dce7f0; font-weight: 600; }
+.ao-g .ao-badge { font-size: 8.5px; font-weight: 700; letter-spacing: 0.4px; color: #7d8da3; }
+.ao-g.deg .ao-badge { color: #ff8f8f; }
+
+.ao-run {
+  width: 100%; margin-bottom: 8px; padding: 8px 10px; border-radius: 7px; cursor: pointer;
+  font-size: 11px; font-weight: 700;
+  border: 1px solid rgba(57, 192, 214, 0.5); background: rgba(57, 192, 214, 0.16); color: #cfeff6;
+  transition: background 0.15s;
+}
+.ao-run:hover { background: rgba(57, 192, 214, 0.26); }
+.ao-run.on { background: #e8412f; border-color: #e8412f; color: #fff; }
+
+.ao-kpis { display: flex; flex-direction: column; gap: 1px; }
+.ao-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 10.5px; padding: 2px 0; }
+.ao-k { color: #a7c3cc; }
+.ao-v { font-weight: 700; color: #eef6f8; font-variant-numeric: tabular-nums; text-align: right; }
+.ao-v.warn, .ao-v .warn, .warn { color: #ff6b6b; }
+.ao-v.good { color: #2ecc71; }
+.ao-delta { font-size: 9px; font-weight: 700; color: #ff8f6b; white-space: nowrap; }
+.risk-nominal { color: #2ecc71; } .risk-moderate { color: #ffc857; } .risk-elevated { color: #ff6b6b; }
+.ao-dispatch {
+  margin-top: 6px; font-size: 10px; font-weight: 600; color: #ffd9a8;
+  background: rgba(255, 140, 40, 0.12); border: 1px solid rgba(255, 140, 40, 0.3);
+  border-radius: 6px; padding: 5px 8px;
+}
 
 /* ---- Full-viewport weather tint overlay ---- */
 #weather-overlay {

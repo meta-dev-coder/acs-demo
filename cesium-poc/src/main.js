@@ -8,46 +8,24 @@
  * This means BOTH vehicles AND gate markers go through the same T, so marking at any location
  * on the map moves traffic WITH the markers — the mark-coupling invariant is always maintained.
  */
-import {
-  Ion, Viewer, Terrain, Cartesian3, Color, JulianDate, Math as CMath,
-  SampledPositionProperty, SampledProperty, Transforms, Matrix4,
-  TimeInterval, TimeIntervalCollection, ClockRange, ExtrapolationType,
-  HermitePolynomialApproximation, EllipsoidTerrainProvider, UrlTemplateImageryProvider,
-  ImageryLayer, HeadingPitchRange, HeadingPitchRoll, ConstantPositionProperty,
-  CallbackProperty, LabelStyle, VerticalOrigin, Cartesian2, NearFarScalar,
-  ScreenSpaceEventHandler, ScreenSpaceEventType,
-} from "cesium";
-import "cesium/Build/Cesium/Widgets/widgets.css";
+// main.js is renderer-AGNOSTIC: it owns orchestration (scenario state, websocket, KPIs, gates,
+// marking) and drives a renderer adapter. It imports NO Cesium types directly — the CesiumRenderer
+// (and, behind ?renderer=arcgis, an ArcGIS adapter) own everything renderer-specific.
 import "./style.css";
 import { CoordinateTransform } from "./transform.js";
 import { buildWorkZone, clearWorkZone, rilcaWorkzone, CLOSURE_CONFIG } from "./workzone.js";
+import { CesiumRenderer } from "./renderers/cesium.js";
+import { assetKpis } from "./assetOps.js";
 import { login, fetchClass, onStatus } from "./dataconnect.js";
 import { adaptDataConnectAssets, scoreAssets } from "./scoringA.js";
-import { buildAssetLayer, disposeAssetLayer, pickAsset } from "./assetLayer.js";
+import { buildAssetLayer, disposeAssetLayer, pickAsset, installAssetPicking } from "./assetLayer.js";
 
+const toRad = (deg) => (deg * Math.PI) / 180;
 const ION = import.meta.env.VITE_CESIUM_ION_TOKEN;
-if (ION) Ion.defaultAccessToken = ION;
+// Resolve a bundled asset against the deploy base (/ in dev, /acs-demo/twin/ on Pages) so absolute
+// "/data/…" refs don't break when the app is served from a sub-path.
+const asset = (p) => import.meta.env.BASE_URL + String(p).replace(/^\//, "");
 
-// Runtime fetch/model URIs are plain strings — Vite does NOT rewrite them at build time (unlike
-// index.html src/href attributes), so under a sub-path deploy (POC_BASE_PATH) they must be joined
-// against BASE_URL explicitly. dataUrl("data/baseline.json") -> "/acs-demo/twin/data/baseline.json".
-const dataUrl = (path) => import.meta.env.BASE_URL + path.replace(/^\//, "");
-
-const EPOCH = JulianDate.fromIso8601("2025-01-01T00:00:00Z");
-const COLORS = {
-  cash: Color.fromCssColorString("#ff9b1a"),
-  etc: Color.fromCssColorString("#1ccb40"),
-  truck: Color.fromCssColorString("#3a80e8"),
-};
-// Vehicle model sizing:
-//   car.glb — native body 4.8 m long (X=-2.4..+2.4), 2.0 m wide, 1.35 m tall.  scale=1.0 → real sedan.
-//   truck.glb — Cesium Milk Truck, native Z span ≈4.87 m.  scale=2.465 → ~12 m semi.
-const VEHICLE_SCALE   = { car: 1.0, truck: 1.25 };    // truck ~2.5× car length, not 5×
-const MIN_PIXEL_SIZE  = { car: 26,  truck: 30    };   // keep visible at max zoom-out
-// Per-model yaw correction (deg): each glTF has its own native forward axis, so align the mesh's
-// nose to the travel heading. Tuned by screenshot so cars/trucks point ALONG the corridor.
-const MODEL_YAW_OFFSET = { car: -110, truck: -30 };   // mesh nose alignment (tuned per request)
-const DIMS = { cash: [4.8, 2.0, 1.6], etc: [4.8, 2.0, 1.6], truck: [12, 2.6, 3.2] };
 const N_BOOTHS = 10;
 // Fixed plaza half-span: this is the CENTRE-to-CENTRE half-span across the 10 booth lanes —
 // (N_BOOTHS - 1) * laneWidth / 2 = 9 * 3.7 / 2 = 16.65 m (real AASHTO freeway lane width, see
@@ -69,9 +47,13 @@ const PLAZA_HALF_SPAN_M = 16.65;
 // Cash booths per scenario. Baseline: 3 cash (pl_0..2). Intervention ("Convert 2 cash → AET"):
 // pl_1 & pl_2 are converted to AET (turn GREEN), only pl_0 stays cash — so green cars flow through the
 // converted booths and the orange (cash) cars queue at the single remaining cash booth.
+// NTTA all-electronic reframing (NTTA has NO cash booths). The A/B contrasts what a LEGACY CASH PLAZA
+// would cost the operator (baseline: 3 cash lanes → queues/delay) vs the ALL-ELECTRONIC REALITY
+// (intervention: every lane AET → free-flow). Mechanics unchanged; the cash set drives booth colour +
+// the cash-queue behaviour. All-electronic = empty cash set (every booth green).
 const CASH_BY_SCENARIO = {
-  baseline: new Set(["pl_0", "pl_1", "pl_2"]),
-  intervention: new Set(["pl_0"]),
+  baseline: new Set(["pl_0", "pl_1", "pl_2"]),  // "if NTTA still ran a legacy cash plaza"
+  intervention: new Set([]),                     // "your all-electronic reality" — every lane AET
 };
 let activeCashLanes = CASH_BY_SCENARIO.baseline;
 // Default is localhost for local dev; a hosted page can point at any live server via ?ws=wss://host:port.
@@ -91,6 +73,11 @@ const NODE_B_UPSTREAM_OF_BOOTH_M = 130;
 // transform — proving the transform module is map-agnostic. Each ships a default transform (so it
 // works out of the box) and persists its own manual calibration under a per-site key. ----
 const SITES = [
+  // DNT mainline, Plano–Frisco TX (business-district stretch near The Star / Legacy) — the NTTA demo
+  // corridor (default). Anchor + bearing are ON the real carriageway from OSM: the DNT runs nearly due
+  // north here (bearing ≈ 1°) at lon ≈ -96.8229 (verified against OpenStreetMap way geometry).
+  { id: "dnt", name: "Dallas North Tollway · Plano–Frisco TX",
+    transform: { anchorLon: -96.8229, anchorLat: 33.0920, anchorHeight: 3, bearingDeg: 1, scale: 0.5, sumoRefX: 530, sumoRefY: 0 } },
   { id: "i595", name: "I-595 Express · Ft Lauderdale FL",
     transform: { anchorLon: -80.306, anchorLat: 26.1124, anchorHeight: 3, bearingDeg: 104, scale: 0.5, sumoRefX: 530, sumoRefY: 0 } },
   { id: "i95de", name: "I-95 Toll Plaza · Newark DE",
@@ -115,7 +102,7 @@ async function loadSite(id) {
     if (local) return local;
   } catch {}
   try {
-    const res = await fetch(dataUrl(`data/site-${id}.json`));
+    const res = await fetch(asset(`/data/site-${id}.json`));
     // vite's dev server returns index.html (200, text/html) for unknown /data paths instead of a
     // real 404, so a missing calibration file must be detected via content-type, not just res.ok.
     if (res.ok && (res.headers.get("content-type") || "").includes("json")) {
@@ -149,147 +136,214 @@ function computeBooths(meta) {
 }
 
 // ============================================================================ viewer
-async function makeViewer() {
-  const opts = {
-    animation: true, timeline: true, baseLayerPicker: false, geocoder: false,
-    homeButton: false, navigationHelpButton: false, sceneModePicker: false,
-    fullscreenButton: false, infoBox: false, selectionIndicator: false,
-  };
-  opts.baseLayer = new ImageryLayer(new UrlTemplateImageryProvider({
-    url: "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    maximumLevel: 19, credit: "Imagery © Esri, Maxar, Earthstar Geographics",
-  }));
-  if (ION) opts.terrain = Terrain.fromWorldTerrain();
-  else opts.terrainProvider = new EllipsoidTerrainProvider();
-  const viewer = new Viewer("cesiumContainer", opts);
-  viewer.scene.globe.enableLighting = false;
-  viewer.clock.clockRange = ClockRange.LOOP_STOP;
-  viewer.clock.multiplier = 6;
-  return viewer;
-}
-
-// orientation quaternion for a SUMO/compass angle, at the plaza-centre frame.
-// `type` selects the per-model yaw correction so the mesh nose points along travel.
-function orientFor(angleDeg, type) {
-  const at = T.sumoToWorld(T.p.sumoRefX, 0);
-  const yaw = T.headingRad(angleDeg) + CMath.toRadians(MODEL_YAW_OFFSET[type === "truck" ? "truck" : "car"]);
-  return Transforms.headingPitchRollQuaternion(at, new HeadingPitchRoll(yaw, 0, 0));
-}
+// The Cesium renderer adapter owns viewer creation (see renderers/cesium.js). main() holds
+// the returned Viewer as `viewer` and drives it directly for concerns not yet moved behind
+// the adapter; window.__viewer stays the same object so the e2e contract is unchanged.
+let R = null;  // the active renderer adapter (Cesium by default; ArcGIS via ?renderer=arcgis). Set in main().
+/** Set the active transform on BOTH the module (markers/camera still read it) and the renderer. */
+function setTransform(t) { T = t; R.setTransform(t); }
 
 // ============================================================================ booth markers
-let boothEntities = [];
 let closedSet = new Set();
 const desired = new Map();
 const isClosed = (lane) => !!desired.get(lane) || closedSet.has(lane);
 
-function rebuildBoothMarkers(viewer) {
-  boothEntities.forEach((e) => viewer.entities.remove(e.disc));
-  boothEntities = [];
-
-  for (const b of BOOTHS) {
-    // All booths are placed via T.sumoToWorld — marking rebuilds T, so booth markers follow.
-    const y = b.y;
-    const boothX = META ? META.boothX : T.p.sumoRefX;
-    const posCb = new CallbackProperty(() => T.sumoToWorld(boothX, y), false);
-    const disc = viewer.entities.add({
-      position: posCb,
-      ellipse: {
-        semiMajorAxis: 1.8, semiMinorAxis: 1.8,
-        material: (b.cash ? COLORS.cash : COLORS.etc).withAlpha(0.9),
-        outline: true, outlineColor: Color.WHITE.withAlpha(0.9), height: 1,
-      },
-      label: {
-        text: new CallbackProperty(() => (isClosed(b.lane) ? "✕" : ""), false),
-        font: "bold 13px sans-serif", fillColor: Color.WHITE, showBackground: true,
-        backgroundColor: Color.fromCssColorString("#c01a0e").withAlpha(0.92),
-        style: LabelStyle.FILL, pixelOffset: new Cartesian2(0, -14),
-        verticalOrigin: VerticalOrigin.BOTTOM, scaleByDistance: new NearFarScalar(200, 1, 3000, 0.5),
-      },
-    });
-    boothEntities.push({ lane: b.lane, disc });
-  }
-
-  // ONE "Toll plaza" label on the centre-line. Use a stable id + a CallbackProperty position so a
-  // rebuild REPLACES it (entities.add with an existing id throws → remove-then-add) instead of stacking
-  // a new label every time (that stacking was the "TOLL PLAZA × 9" bug).
+function rebuildBoothMarkers() {
+  // All markers place via the renderer through T.sumoToWorld (tracking:true) — marking rebuilds T,
+  // so booth discs and the plaza label follow. The gate ✕ label is a per-frame callback on isClosed.
+  R.clearMarkers();
   const boothX = META ? META.boothX : (T ? T.p.sumoRefX : 530);
-  const existing = viewer.entities.getById("toll-plaza-label");
-  if (existing) viewer.entities.remove(existing);
-  if (T) {
-    viewer.entities.add({
-      id: "toll-plaza-label",
-      position: new CallbackProperty(() => T.sumoToWorld(boothX - 26, 0), false),
-      label: {
-        text: "TOLL PLAZA", font: "bold 13px sans-serif",
-        fillColor: Color.fromCssColorString("#bfe0ff"), showBackground: true,
-        backgroundColor: Color.fromCssColorString("#0d1621").withAlpha(0.85),
-        scaleByDistance: new NearFarScalar(200, 1, 4000, 0.45),
-      },
+  for (const b of BOOTHS) {
+    R.placeMarker({
+      id: `booth:${b.lane}`, x: boothX, y: b.y, tracking: true,
+      disc: { radiusM: 1.8, colorCss: b.cash ? "#ff9b1a" : "#1ccb40", alpha: 0.9 },
+      label: { kind: "gate", textFn: () => (isClosed(b.lane) ? "✕" : "") },
     });
   }
+  // ONE "TOLL PLAZA" label on the centre-line (id-keyed, so a rebuild replaces it — the fix for the
+  // old "TOLL PLAZA × 9" stacking bug).
+  if (T) {
+    R.placeMarker({
+      id: "toll-plaza-label", x: boothX - 26, y: 0, tracking: true,
+      label: { kind: "plaza", text: "TOLL PLAZA" },
+    });
+  }
+  renderGantries();   // re-add gantry assets after any booth-marker rebuild (clearMarkers wiped them)
+}
+
+// ============================================================================ gantry assets (GIS layer)
+// The DNT toll gantries are geospatial ASSETS (Legacy / Headquarters / Gaylord), loaded from a GIS
+// export (public/data/dnt-gantries.json — stands in for a TxDOT/NTTA ArcGIS FeatureLayer). They place
+// onto the same corridor centerline as the traffic via T, and carry health status for the asset-ops
+// scenario. Rendered as cyan discs (red when a camera degrades) with name labels.
+let GANTRIES = [];
+let AVG_TOLL = 1.45;
+let assetIncidentOn = false;
+let gantrySource = "";   // where the gantry inventory came from (live ArcGIS vs local fallback)
+let tollRateSource = ""; // where the per-transaction toll came from (live NTTA rates vs default)
+
+// NTTA's OWN authoritative toll-rate table, hosted on their ArcGIS Online org — 194 toll points with
+// real per-class TagFare / PlateFare. Pulling the live TagFare here makes ArcGIS the system-of-record
+// for the ECONOMICS too, not just the geometry: revenue-at-risk is computed from real NTTA fares.
+const NTTA_TOLLRATES_URL = "https://services.arcgis.com/pS2RA6RqB5M3sZIg/arcgis/rest/services/NTTA_TollLocation_TollRates_View_PROD/FeatureServer/0/query";
+
+async function loadTollRates() {
+  const anchor = T ? { lon: T.p.anchorLon, lat: T.p.anchorLat } : { lon: -96.8229, lat: 33.0920 };
+  try {
+    const params = new URLSearchParams({
+      where: "CORRIDOR IN ('DNT','SRT') AND TagFare > 0",
+      geometry: `${anchor.lon},${anchor.lat}`, geometryType: "esriGeometryPoint", inSR: "4326",
+      distance: "8000", units: "esriSRUnit_Meter", spatialRel: "esriSpatialRelIntersects",
+      outFields: "TagFare", returnGeometry: "false", resultRecordCount: "80", f: "json",
+    });
+    const d = await (await fetch(`${NTTA_TOLLRATES_URL}?${params}`)).json();
+    const fares = (d.features || []).map((f) => Number(f.attributes?.TagFare)).filter((v) => v > 0).sort((a, b) => a - b);
+    if (!fares.length) throw new Error("no fares in response");
+    // A missed read = one gantry transaction not captured, so the revenue lost per missed read is a
+    // single-segment fare. AVG_TOLL is therefore the MEAN nearby TagFare — real NTTA money per read.
+    const avg = fares.reduce((s, v) => s + v, 0) / fares.length;
+    AVG_TOLL = Math.round(avg * 100) / 100;
+    tollRateSource = `NTTA rates · live ArcGIS ($${AVG_TOLL.toFixed(2)}/read · ${fares.length} pts)`;
+  } catch {
+    tollRateSource = "";   // leave AVG_TOLL at its gantry-source default
+  }
+}
+
+// NCTCOG regional "Toll Gantries" point layer — an authoritative, KEYLESS ArcGIS FeatureServer whose
+// points carry NTTA_Gantry_ID / Corridor / Maintaining_Authority. This is the geospatial system-of-record:
+// the demo queries REAL NTTA gantry locations near the corridor, not a synthetic stub.
+const NCTCOG_GANTRIES_URL = "https://geospatial.nctcog.org/map/rest/services/Transportation/DFWMaps_Roadway/MapServer/6/query";
+
+async function loadGantries() {
+  const anchor = T ? { lon: T.p.anchorLon, lat: T.p.anchorLat } : { lon: -96.8229, lat: 33.0920 };
+  try {
+    const params = new URLSearchParams({
+      where: "Corridor IN ('DNT','SRT')",
+      geometry: `${anchor.lon},${anchor.lat}`, geometryType: "esriGeometryPoint", inSR: "4326",
+      distance: "4000", units: "esriSRUnit_Meter", spatialRel: "esriSpatialRelIntersects",
+      outFields: "Corridor,Location,NTTA_Gantry_ID,Maintaining_Authority",
+      returnGeometry: "true", outSR: "4326", f: "geojson",
+    });
+    const d = await (await fetch(`${NCTCOG_GANTRIES_URL}?${params}`)).json();
+    // Dedup directional pairs by gantry id, keep the one nearest the corridor anchor, cap the list.
+    const seen = new Map();
+    for (const f of d.features || []) {
+      if (!f.geometry) continue;
+      const p = f.properties || {}, [lon, lat] = f.geometry.coordinates;
+      const gid = p.NTTA_Gantry_ID || p.Location;
+      const dist = Math.hypot(lon - anchor.lon, lat - anchor.lat);
+      const name = String(p.Location || gid).replace(/\s*\d\/\d$/, "").trim();
+      if (!seen.has(gid) || dist < seen.get(gid).dist) {
+        seen.set(gid, { id: gid, name, corridor: p.Corridor, authority: p.Maintaining_Authority || "NTTA", lon, lat, dist, status: "healthy" });
+      }
+    }
+    GANTRIES = Array.from(seen.values()).sort((a, b) => a.dist - b.dist).slice(0, 6);
+    if (!GANTRIES.length) throw new Error("no gantries in response");
+    gantrySource = `NCTCOG · ${GANTRIES[0].authority} (live ArcGIS)`;
+    AVG_TOLL = 1.45;
+  } catch {
+    // Fallback: local sample (keeps the demo working offline / if the ArcGIS host blocks CORS).
+    try {
+      const d = await (await fetch(asset("/data/dnt-gantries.json"))).json();
+      GANTRIES = (d.gantries || []).map((g) => ({ ...g }));
+      AVG_TOLL = d.avgTollUsd ?? 1.45;
+      gantrySource = "local sample";
+    } catch { GANTRIES = []; gantrySource = ""; }
+  }
+}
+
+function renderGantries() {
+  // Gantries are REAL GIS assets at fixed lon/lat (not synthetic corridor stations), so place them
+  // geographically — they stay put through re-calibration, as real infrastructure should.
+  for (const g of GANTRIES) {
+    if (g.lon == null) continue;
+    const degraded = g.status === "degraded";
+    R.placeMarker({
+      id: `gantry:${g.id}`, lon: g.lon, lat: g.lat,
+      disc: { radiusM: 3.4, colorCss: degraded ? "#ff4d4d" : "#39c0d6", alpha: 0.85 },
+      label: { kind: "gantry", text: g.name + (degraded ? " ⚠" : "") },
+    });
+  }
+}
+
+/** Fill the Asset Operations panel from the pure assetKpis engine + current throughput/weather. */
+function renderAssetOps() {
+  if (!$("assetops-hud")) return;
+  const src = $("ao-src");
+  if (src && gantrySource) {
+    const line = tollRateSource ? `${gantrySource} · ${tollRateSource}` : gantrySource;
+    src.textContent = line;
+    src.classList.toggle("live", line.includes("ArcGIS"));
+  }
+  const throughput = window.__kpi?.throughputVph ?? currentData?.stats?.throughputVph ?? 0;
+  const state = { gantries: GANTRIES, weather: _activeWeather, throughputVph: throughput, avgTollUsd: AVG_TOLL, peak: assetIncidentOn };
+  const k = assetKpis(state);
+  const nominal = assetKpis({ ...state, gantries: GANTRIES.map((g) => ({ ...g, status: "healthy" })), weather: "clear", peak: false });
+  const riskDelta = k.revenueRiskPerHr - nominal.revenueRiskPerHr;
+
+  const glist = $("ao-gantries");
+  if (glist) glist.innerHTML = GANTRIES.map((g) => {
+    const deg = g.status === "degraded";
+    return `<div class="ao-g ${deg ? "deg" : ""}"><span class="ao-dot"></span><span class="ao-name">${g.name.replace(" Gantry", "")}</span><span class="ao-badge">${deg ? "DEGRADED" : "OK"}</span></div>`;
+  }).join("");
+
+  const kv = $("ao-kpis");
+  if (kv) {
+    const riskChip = assetIncidentOn && riskDelta > 0 ? ` <span class="ao-delta">▲ $${riskDelta.toLocaleString()}/hr vs nominal</span>` : "";
+    kv.innerHTML =
+      `<div class="ao-row"><span class="ao-k">Plate/tag read rate</span><span class="ao-v ${k.readRatePct < 97 ? "warn" : "good"}">${k.readRatePct}%</span></div>` +
+      `<div class="ao-row"><span class="ao-k">Missed reads</span><span class="ao-v">${k.missedPerHr.toLocaleString()}/hr</span></div>` +
+      `<div class="ao-row"><span class="ao-k">Revenue at risk</span><span class="ao-v ${assetIncidentOn && k.revenueRiskPerHr > 0 ? "warn" : ""}">$${k.revenueRiskPerHr.toLocaleString()}/hr${riskChip}</span></div>` +
+      `<div class="ao-row"><span class="ao-k">Congestion risk</span><span class="ao-v risk-${k.congestionRisk}">${k.congestionRisk}</span></div>` +
+      `<div class="ao-row"><span class="ao-k">Maintenance</span><span class="ao-v">${k.maintenance.priority === "HIGH" ? `<b class="warn">HIGH</b> · ${k.maintenance.target}` : "nominal"}</span></div>` +
+      (k.dispatch ? `<div class="ao-dispatch">🛠 ${k.dispatch}</div>` : "");
+  }
+  const btn = $("ao-run");
+  if (btn) {
+    btn.textContent = assetIncidentOn ? "Reset — restore healthy + clear" : "Run incident: camera degradation + rain";
+    btn.classList.toggle("on", assetIncidentOn);
+  }
+}
+
+/** The headline scenario: degrade a gantry camera + heavy rain + peak-hour, or clear it. */
+function toggleIncident() {
+  assetIncidentOn = !assetIncidentOn;
+  const target = GANTRIES[0];   // the gantry nearest the plaza (most visible on the aerial)
+  if (target) target.status = assetIncidentOn ? "degraded" : "healthy";
+  const wsOpen = liveMode && ws && ws.readyState === WebSocket.OPEN;
+  applyWeatherOverlay(assetIncidentOn ? "heavyrain" : "clear", wsOpen);
+  const wsel = $("weather-select"); if (wsel) wsel.value = assetIncidentOn ? "heavyrain" : "clear";
+  rebuildBoothMarkers();   // re-renders gantries (status colour) + booths
+  renderAssetOps();
+  setStatus(assetIncidentOn
+    ? `⚠ Incident: ${target ? target.name : "gantry"} camera degraded + heavy rain + peak — revenue at risk, crew dispatched.`
+    : "Incident cleared — all gantries healthy, weather clear.");
 }
 
 // ============================================================================ offline playback
-let vehicleEntities = [];
 let currentData = null;
-let offlineUrl = dataUrl("data/baseline.json");
-
-function removeVehicles(viewer) {
-  vehicleEntities.forEach((e) => viewer.entities.remove(e));
-  vehicleEntities = [];
-}
+let offlineUrl = asset("/data/baseline.json");
 
 async function loadRun(viewer, url) {
   const data = await (await fetch(url)).json();
   currentData = data;
   META = data.meta;
   BOOTHS = computeBooths(META);
-  removeVehicles(viewer);
-  rebuildBoothMarkers(viewer);
+  R.clearSampled();
+  rebuildBoothMarkers();
   // New scenario data invalidates any active work-zone overlay (stale geometry/KPIs).
   clearWorkZone(viewer);
   activeWorkzoneSpec = null;
 
   if (!T) { setStatus("⊕ Calibrate the road to place + start the traffic."); return; }
 
-  const height = T.p.anchorHeight || 3;
-
+  // Vehicles are placed via the renderer through T.sumoToWorld — marking rebuilds T, so traffic follows.
   for (const v of data.vehicles) {
-    const pos = new SampledPositionProperty();
-    pos.setInterpolationOptions({ interpolationDegree: 2, interpolationAlgorithm: HermitePolynomialApproximation });
-    pos.forwardExtrapolationType = ExtrapolationType.HOLD;
-    const ang = new SampledProperty(Number);
-    for (const [t, x, y, a] of v.samples) {
-      const time = JulianDate.addSeconds(EPOCH, t, new JulianDate());
-      // All vehicles placed via T.sumoToWorld — marking rebuilds T, so traffic follows.
-      const world = T.sumoToWorld(x, y);
-      pos.addSample(time, world);
-      ang.addSample(time, a);
-    }
-    const a0 = v.samples[0][3];
-    vehicleEntities.push(viewer.entities.add({
-      availability: new TimeIntervalCollection([new TimeInterval({
-        start: JulianDate.addSeconds(EPOCH, v.samples[0][0], new JulianDate()),
-        stop: JulianDate.addSeconds(EPOCH, v.samples[v.samples.length - 1][0], new JulianDate()),
-      })]),
-      position: pos,
-      orientation: new CallbackProperty((time) => orientFor(ang.getValue(time) ?? a0, v.type), false),
-      model: {
-        uri: v.type === "truck" ? dataUrl("models/truck.glb") : dataUrl("models/car.glb"),
-        minimumPixelSize: MIN_PIXEL_SIZE[v.type === "truck" ? "truck" : "car"],
-        scale: VEHICLE_SCALE[v.type === "truck" ? "truck" : "car"],
-        color: COLORS[v.type] || Color.WHITE,
-        colorBlendMode: 2,  // MIX — tint while preserving model shape/shading
-        colorBlendAmount: 0.6,
-        silhouetteColor: Color.WHITE,
-        silhouetteSize: 1.0,
-      },
-    }));
+    R.addSampledVehicle({ type: v.type, samples: v.samples });
   }
-  viewer.clock.startTime = EPOCH.clone();
-  viewer.clock.stopTime = JulianDate.addSeconds(EPOCH, data.meta.tEnd, new JulianDate());
-  if (!trafficStarted) viewer.clock.currentTime = EPOCH.clone();
-  viewer.clock.shouldAnimate = trafficStarted;
+  R.clock.setRange(0, data.meta.tEnd);
+  if (!trafficStarted) R.clock.seek(0);
+  R.clock.setPlaying(trafficStarted);
   renderKpis(data.stats);
   if (trafficStarted) setStatus(`${data.vehicles.length} vehicles · ${Math.round(data.meta.tEnd)} s sim`);
 }
@@ -321,16 +375,9 @@ function applyWeatherOverlay(preset, sendToServer = true) {
     }
   }
 
-  // Fog: lower Cesium scene fog density so distant vehicles fade
-  if (window.__viewer) {
-    const fog = window.__viewer.scene.fog;
-    if (preset === "fog") {
-      fog.enabled = true;
-      fog.density = 0.002;
-    } else {
-      fog.enabled = false;
-    }
-  }
+  // Fog: lower scene fog density so distant vehicles fade
+  if (preset === "fog") R.setFog(true, 0.002);
+  else R.setFog(false);
 
   if (sendToServer) sendCmd({ cmd: "setWeather", preset });
 }
@@ -455,17 +502,15 @@ function renderKpis(s) {
 
   // ---- Feature B: work-zone HUD readouts (geometry from activeWorkzoneSpec, live numbers from s.workzone) ----
   renderWorkzoneHud();
+  // ---- Asset-operations KPIs (missed reads / revenue-risk react to live throughput + weather) ----
+  renderAssetOps();
 }
 
 // ============================================================================ camera
 let obliqueOn = false;
 function frameCamera(viewer) {
   if (!T) return;
-  const tgt = T.sumoToWorld(T.p.sumoRefX, 0);
-  const headingRad = T.headingRad(90);
-  const pitch = CMath.toRadians(obliqueOn ? -32 : -80);
-  viewer.camera.lookAt(tgt, new HeadingPitchRange(headingRad, pitch, obliqueOn ? 360 : 300));
-  viewer.camera.lookAtTransform(Matrix4.IDENTITY);
+  R.frameCamera({ x: T.p.sumoRefX, y: 0, headingDeg: 90, oblique: obliqueOn });
 }
 
 // ============================================================================ traffic gate
@@ -473,20 +518,18 @@ let calibrated = false;
 let trafficStarted = false;
 function startTraffic(viewer) {
   trafficStarted = true;
-  viewer.clock.currentTime = EPOCH.clone();
-  viewer.clock.shouldAnimate = true;
+  R.clock.seek(0);
+  R.clock.play();
 }
 
 // ============================================================================ live mode
 let ws = null, liveMode = false;
-const liveEntities = new Map();
 function setConn(on, text) { const e = $("conn"); e.className = "conn " + (on ? "on" : "off"); e.textContent = text; }
-function clearLive(viewer) { for (const e of liveEntities.values()) viewer.entities.remove(e); liveEntities.clear(); }
 
 function startLive(viewer) {
   liveMode = true;
-  viewer.clock.shouldAnimate = false;
-  removeVehicles(viewer);
+  R.clock.pause();
+  R.clearSampled();
   setConn(false, "socket: connecting…");
   $("gatePanel").classList.remove("hidden");
   try { ws = new WebSocket(WS_URL); } catch { setConn(false, "socket: failed"); return; }
@@ -505,7 +548,7 @@ function startLive(viewer) {
 function stopLive(viewer) {
   liveMode = false;
   if (ws) { try { ws.close(); } catch {} ws = null; }
-  clearLive(viewer);
+  R.clearLiveVehicles();
   closedSet = new Set();
   $("gatePanel").classList.add("hidden");
   setConn(false, "socket: offline");
@@ -535,7 +578,7 @@ function onMeta(viewer, m) {
     };
   }
   BOOTHS = computeBooths(META);
-  rebuildBoothMarkers(viewer);
+  rebuildBoothMarkers();
   renderGatePanel();
   closedSet = new Set(m.closed || []);
   setStatus("Live · waiting for first step…");
@@ -545,32 +588,13 @@ function onStep(viewer, m) {
   const seen = new Set();
   for (const v of m.vehicles) {
     seen.add(v.id);
-    // Live data carries raw local SUMO x,y — place via T.sumoToWorld.
-    const world = T ? T.sumoToWorld(v.x, v.y) : null;
-    if (!world) continue;
-    let e = liveEntities.get(v.id);
-    if (!e) {
-      e = viewer.entities.add({
-        position: new ConstantPositionProperty(world),
-        orientation: orientFor(v.angle, v.type),
-        model: {
-          uri: v.type === "truck" ? dataUrl("models/truck.glb") : dataUrl("models/car.glb"),
-          minimumPixelSize: MIN_PIXEL_SIZE[v.type === "truck" ? "truck" : "car"],
-          scale: VEHICLE_SCALE[v.type === "truck" ? "truck" : "car"],
-          color: COLORS[v.type] || Color.WHITE,
-          colorBlendMode: 2,  // MIX — tint while preserving model shape/shading
-          colorBlendAmount: 0.6,
-          silhouetteColor: Color.WHITE,
-          silhouetteSize: 1.0,
-        },
-      });
-      liveEntities.set(v.id, e);
-    } else {
-      e.position.setValue(world);
-      e.orientation = orientFor(v.angle, v.type);
-    }
+    // Live data carries raw local SUMO x,y — the renderer places it via T.sumoToWorld.
+    if (!T) continue;
+    const p = { id: v.id, type: v.type, x: v.x, y: v.y, angleDeg: v.angle };
+    if (R.hasVehicle(v.id)) R.updateVehicle(p);
+    else R.addLiveVehicle(p);
   }
-  for (const [id, e] of liveEntities) if (!seen.has(id)) { viewer.entities.remove(e); liveEntities.delete(id); }
+  for (const id of R.liveIds()) if (!seen.has(id)) R.removeVehicle(id);
   syncGateButtons();
   const s = m.stats || {};
   // Render KPIs from live step when the stats carry the Phase 0 schema.
@@ -869,7 +893,7 @@ async function loadDcAssets(viewer) {
 
 async function loadDcSnapshot(viewer) {
   try {
-    const get = (name) => fetch(dataUrl(`dataconnect-data/${name}.json`)).then((r) => {
+    const get = (name) => fetch(asset(`/dataconnect-data/${name}.json`)).then((r) => {
       if (!r.ok || !(r.headers.get("content-type") || "").includes("json")) throw new Error(name);
       return r.json();
     });
@@ -918,27 +942,30 @@ function installDataConnectAssets(viewer) {
     };
   }
 
-  const dcHandler = new ScreenSpaceEventHandler(viewer.scene.canvas);
-  dcHandler.setInputAction((click) => {
+  // Cesium-only feature: the point-primitive layer + pick handler need a Cesium Scene. Under
+  // ?renderer=arcgis there is no viewer.scene — leave the panel visible but inert (badge stays
+  // offline) rather than crashing boot.
+  if (!viewer?.scene?.canvas) return;
+  installAssetPicking(viewer, (position) => {
     if (!dcEnabled || !dcCollection || !dcCollection.show) return;
-    const asset = pickAsset(viewer, click.position);
-    if (asset) showDcAssetPanel(asset);
-  }, ScreenSpaceEventType.LEFT_CLICK);
+    const a = pickAsset(viewer, position);
+    if (a) showDcAssetPanel(a);
+  });
 }
 
 // ============================================================================ MARK GATES (user clicks each real toll gate)
 // The user marks the road direction (2 clicks) then clicks each real toll gate on the aerial.
 // Marking rebuilds T from the clicks, then reloads vehicles (placed via T.sumoToWorld) AND
 // rebuilds booth markers (also via T.sumoToWorld) — so traffic and markers always coincide.
-const mark = { on: false, dir: [], gates: [], handler: null };
+const mark = { on: false, dir: [], gates: [] };
 function buildTransformFromMarks(dir, gates) {
   const [up, down] = dir;
-  const mLat = 110540, mLon0 = 111320 * Math.cos(CMath.toRadians(up.lat));
+  const mLat = 110540, mLon0 = 111320 * Math.cos(toRad(up.lat));
   const bearingDeg = ((Math.atan2((down.lon - up.lon) * mLon0, (down.lat - up.lat) * mLat) * 180) / Math.PI + 360) % 360;
   const anchorLon = gates.reduce((s, g) => s + g.lon, 0) / gates.length;
   const anchorLat = gates.reduce((s, g) => s + g.lat, 0) / gates.length;
-  const mLon = 111320 * Math.cos(CMath.toRadians(anchorLat));
-  const Br = CMath.toRadians(bearingDeg);
+  const mLon = 111320 * Math.cos(toRad(anchorLat));
+  const Br = toRad(bearingDeg);
   const perp = (g) => ((g.lon - anchorLon) * mLon) * -Math.cos(Br) + ((g.lat - anchorLat) * mLat) * Math.sin(Br);
   const ps = gates.map(perp);
   const span = (Math.max(...ps) - Math.min(...ps)) || 1;
@@ -951,7 +978,7 @@ function buildTransformFromMarks(dir, gates) {
 function finishMarking(viewer, btn) {
   if (mark.dir.length < 2 || mark.gates.length < 2) { setStatus("Mark up-road, down-road, then at least 2 gates."); return; }
   // Build a new T from the user's clicks; BOTH vehicles and booth markers use T.sumoToWorld.
-  T = buildTransformFromMarks(mark.dir, mark.gates);
+  setTransform(buildTransformFromMarks(mark.dir, mark.gates));
   calibrated = true; mark.on = false;
   btn.textContent = "⊕ Mark gates"; btn.classList.remove("on", "pulse");
   try { localStorage.setItem(siteKey(siteId), JSON.stringify({ t: T.toJSON(), g: mark.gates })); } catch {}
@@ -964,28 +991,26 @@ function finishMarking(viewer, btn) {
 function installMarking(viewer) {
   const btn = $("btn-calib");
   if (!btn) return;
+  // Register the pick handler once; it only acts while mark.on. The renderer delivers {lon,lat}.
+  R.onPick((ll) => {
+    if (!mark.on) return;
+    if (!ll) { setStatus("Couldn't read that point — click on the road."); return; }
+    if (mark.dir.length === 0) { mark.dir.push(ll); setStatus("Mark 2 — click a point DOWN-road (travel direction)"); return; }
+    if (mark.dir.length === 1) { mark.dir.push(ll); setStatus("Now click EACH toll gate left→right. Click ✓ Finish when done."); return; }
+    mark.gates.push(ll);
+    // Preview the new transform after each gate click so markers track the clicks.
+    if (mark.gates.length >= 2) {
+      setTransform(buildTransformFromMarks(mark.dir, mark.gates));
+    }
+    rebuildBoothMarkers();
+    setStatus(`Gate ${mark.gates.length} marked — keep clicking gates, or ✓ Finish.`);
+  });
   btn.onclick = () => {
     if (mark.on) { finishMarking(viewer, btn); return; }   // 2nd click = Finish
     mark.on = true; mark.dir = []; mark.gates = [];
-    viewer.clock.shouldAnimate = false;   // Bug 1 fix: pause traffic while user is picking points
+    R.clock.pause();   // Bug 1 fix: pause traffic while user is picking points
     btn.textContent = "✓ Finish"; btn.classList.add("on");
     setStatus("Mark 1 — click a point UP-road (where traffic enters)");
-    if (mark.handler) return;
-    mark.handler = new ScreenSpaceEventHandler(viewer.scene.canvas);
-    mark.handler.setInputAction((click) => {
-      if (!mark.on) return;
-      const ll = CoordinateTransform.pickLonLat(viewer, click.position);
-      if (!ll) { setStatus("Couldn't read that point — click on the road."); return; }
-      if (mark.dir.length === 0) { mark.dir.push(ll); setStatus("Mark 2 — click a point DOWN-road (travel direction)"); return; }
-      if (mark.dir.length === 1) { mark.dir.push(ll); setStatus("Now click EACH toll gate left→right. Click ✓ Finish when done."); return; }
-      mark.gates.push(ll);
-      // Preview the new transform after each gate click so markers track the clicks.
-      if (mark.gates.length >= 2) {
-        T = buildTransformFromMarks(mark.dir, mark.gates);
-      }
-      rebuildBoothMarkers(viewer);
-      setStatus(`Gate ${mark.gates.length} marked — keep clicking gates, or ✓ Finish.`);
-    }, ScreenSpaceEventType.LEFT_CLICK);
   };
 }
 /** Wires #btn-export-calib: download the current site's localStorage calibration record as
@@ -1010,18 +1035,36 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
 
 // ============================================================================ boot
 (async function main() {
-  const viewer = await makeViewer();
+  // Renderer switch: ?renderer=arcgis selects the ArcGIS adapter (lazy-loaded so the Cesium bundle is
+  // untouched) — this is the "jump straight to ESRI-ARCGIS NTTA" route. Default = Cesium.
+  const useArcgis = new URLSearchParams(location.search).get("renderer") === "arcgis";
+  let viewer;
+  if (useArcgis) {
+    $("cesiumContainer").style.display = "none";
+    $("arcgisContainer").style.display = "";
+    // Let the browser lay out the freshly-shown container to full height BEFORE ArcGIS measures it,
+    // else the SceneView sizes its WebGL canvas to a partial height and the map won't fill the area.
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const { ArcgisRenderer } = await import("./renderers/arcgis.js");
+    R = new ArcgisRenderer();
+    viewer = await R.init("arcgisContainer", {});
+  } else {
+    R = new CesiumRenderer();
+    viewer = await R.init("cesiumContainer", { ionToken: ION });
+  }
   const bBase = $("btn-baseline"), bInt = $("btn-intervention"), bLive = $("btn-live");
 
   // Every site ships a default transform, so the app is ALWAYS placed enough to render — it flies
   // straight to the plaza (never the bare globe) and starts traffic. ⊕ Mark gates refines placement.
-  { const s = await loadSite(siteId); T = s.transform; }
+  { const s = await loadSite(siteId); setTransform(s.transform); }
   calibrated = true;
   trafficStarted = true;          // ship-with-default-transform → run immediately (no globe, no blank)
   _currentScenario = "baseline";  // boot always loads baseline; ensures baselineStats is captured
 
+  await loadGantries();           // GIS asset inventory (gantries) — placed by rebuildBoothMarkers
+  await loadTollRates();          // real NTTA per-read TagFare → revenue-at-risk uses live ArcGIS $
   await loadRun(viewer, offlineUrl);
-  viewer.clock.currentTime = EPOCH.clone();  // ensure sim starts at t=0 on boot
+  R.clock.seek(0);  // ensure sim starts at t=0 on boot
   renderGatePanel();
   installMarking(viewer);
   installExportCalibration();
@@ -1067,8 +1110,8 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
     startTraffic(viewer);
     frameCamera(viewer);
   };
-  bBase.onclick = () => selectOffline(dataUrl("data/baseline.json"), bBase, "baseline");
-  bInt.onclick = () => selectOffline(dataUrl("data/intervention.json"), bInt, "intervention");
+  bBase.onclick = () => selectOffline(asset("/data/baseline.json"), bBase, "baseline");
+  bInt.onclick = () => selectOffline(asset("/data/intervention.json"), bInt, "intervention");
   bLive.onclick = () => {
     [bBase, bInt].forEach((b) => b.classList.remove("on"));
     bLive.classList.add("on");
@@ -1082,6 +1125,53 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
     frameCamera(viewer);
   };
 
+  // ---- Renderer toggle: show which 3D engine is drawing AND let you switch from the homepage,
+  //      so the ESRI/ArcGIS view is reachable without hand-typing ?renderer=arcgis. Switching a
+  //      whole SDK live is impractical, so the inactive button reloads the page with the right
+  //      param (preserving every other query param). ----
+  const rtCesium = $("rt-cesium"), rtArcgis = $("rt-arcgis");
+  if (rtCesium && rtArcgis) {
+    rtCesium.classList.toggle("on", !useArcgis);
+    rtArcgis.classList.toggle("on", useArcgis);
+    const switchTo = (target) => {
+      if ((target === "arcgis") === useArcgis) return;  // already on it
+      const p = new URLSearchParams(location.search);
+      if (target === "arcgis") p.set("renderer", "arcgis"); else p.delete("renderer");
+      const qs = p.toString();
+      location.assign(location.pathname + (qs ? "?" + qs : "") + location.hash);
+    };
+    rtCesium.onclick = () => switchTo("cesium");
+    rtArcgis.onclick = () => switchTo("arcgis");
+  }
+
+  // ---- Minimize / expand the control panel ----
+  const collapseBtn = $("btn-collapse");
+  if (collapseBtn) {
+    collapseBtn.onclick = () => {
+      const collapsed = $("hud").classList.toggle("collapsed");
+      collapseBtn.textContent = collapsed ? "▸" : "▾";
+      collapseBtn.setAttribute("aria-expanded", String(!collapsed));
+      collapseBtn.title = collapsed ? "Expand panel" : "Minimize panel";
+    };
+  }
+
+  // ---- Playback speed (both renderers, via the shared clock adapter) ----
+  const speedSeg = $("speed-seg");
+  if (speedSeg) {
+    const speedBtns = speedSeg.querySelectorAll("button");
+    speedBtns.forEach((b) => {
+      b.onclick = () => {
+        R.clock.setMultiplier(Number(b.dataset.mult));
+        speedBtns.forEach((x) => x.classList.toggle("on", x === b));
+      };
+    });
+  }
+
+  // ---- Asset-ops incident scenario (camera degradation + rain + peak) ----
+  const aoRun = $("ao-run");
+  if (aoRun) aoRun.onclick = () => toggleIncident();
+  renderAssetOps();
+
   // ---- SITE SELECTOR: switch the transform to a different real toll corridor (same SUMO plaza). ----
   const sel = $("site-select");
   if (sel) {
@@ -1089,10 +1179,10 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
     sel.value = siteId;
     sel.onchange = async () => {
       siteId = sel.value;
-      { const s = await loadSite(siteId); T = s.transform; }
+      { const s = await loadSite(siteId); setTransform(s.transform); }
       stopLive(viewer);
       [bInt, bLive].forEach((b) => b.classList.remove("on")); bBase.classList.add("on");
-      offlineUrl = dataUrl("data/baseline.json");
+      offlineUrl = asset("/data/baseline.json");
       trafficStarted = false;
       await loadRun(viewer, offlineUrl);
       startTraffic(viewer);
@@ -1116,7 +1206,10 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
   }
 
   // debug hooks for headless verification
-  window.__viewer = viewer;
+  window.__viewer = useArcgis ? null : viewer;  // Cesium-specific (raw Viewer) — the existing e2e contract
+  window.__view = R.raw();                        // renderer-neutral (Viewer or SceneView)
+  window.__R = R;                                 // the active renderer adapter (for renderer-specific specs)
+  window.__arcgisReady = useArcgis;               // ArcGIS smoke specs wait on this
   window.__startTraffic = () => startTraffic(viewer);
   window.__markGates = (dir, gates) => { mark.dir = dir; mark.gates = gates; finishMarking(viewer, $("btn-calib")); };
   // Feature B: MUTCD/RILCA work-zone lane closure hooks (TTC overlay + KPIs) — see closeLaneHook.

@@ -6,19 +6,33 @@
     <title>I-595 Toll-Plaza Flow — SUMO × Cesium</title>
   </head>
   <body>
+    <!-- Render surface. Exactly one is populated per load: Cesium by default, or the ArcGIS
+         SceneView when the app is opened with ?renderer=arcgis. Both fill the viewport (style.css). -->
     <div id="cesiumContainer"></div>
+    <div id="arcgisContainer" style="display:none"></div>
 
     <!-- Title + scenario story -->
     <div id="hud" class="panel">
-      <div class="hud-eyebrow">OPERATIONAL DIGITAL TWIN</div>
-      <div class="hud-title">Toll-Plaza Throughput</div>
-      <div class="hud-sub">SuperDNA Tech</div>
+      <div class="panel-head">
+        <div class="head-row">
+          <span class="hud-eyebrow">OPERATIONAL DIGITAL TWIN</span>
+          <div id="renderer-toggle" class="rtoggle" role="group" aria-label="3D renderer">
+            <button id="rt-cesium" class="rt-btn" data-renderer="cesium" title="Draw with CesiumJS">CesiumJS</button>
+            <button id="rt-arcgis" class="rt-btn" data-renderer="arcgis" title="Draw with Esri ArcGIS">Esri · ArcGIS</button>
+          </div>
+          <span id="renderer-badge" hidden></span>
+          <button id="btn-collapse" class="collapse-btn" aria-label="Minimize panel" aria-expanded="true" title="Minimize panel">▾</button>
+        </div>
+        <div class="hud-title">All-Electronic Tolling</div>
+        <div class="hud-sub">SuperDNA · NTTA Operations Twin</div>
+      </div>
 
+      <div class="panel-body" id="panel-body">
       <select id="site-select" class="site-select" title="Same SUMO plaza, different real toll corridor"></select>
 
       <div class="toggle">
-        <button id="btn-baseline" class="on">Today · 3 cash + 7 AET</button>
-        <button id="btn-intervention">Convert 2 cash → AET</button>
+        <button id="btn-baseline" class="on">Legacy cash plaza</button>
+        <button id="btn-intervention">All-electronic (AET)</button>
         <button id="btn-live">● LIVE</button>
       </div>
 
@@ -50,6 +64,17 @@
         </select>
       </div>
 
+      <!-- Playback speed (works in both renderers via the shared clock) -->
+      <div class="ctl-row">
+        <span class="ctl-label">Speed</span>
+        <div class="seg" id="speed-seg" role="group" aria-label="Playback speed">
+          <button data-mult="1">1×</button>
+          <button data-mult="6" class="on">6×</button>
+          <button data-mult="12">12×</button>
+          <button data-mult="24">24×</button>
+        </div>
+      </div>
+
       <!-- Camera + live gate controls -->
       <div class="ctl-row">
         <button id="btn-view" class="mini">Oblique view</button>
@@ -59,7 +84,7 @@
       </div>
 
       <div id="gatePanel" class="gates hidden">
-        <div class="gates-h">Booth gates — click to close / open (B0–B2 cash, rest AET)</div>
+        <div class="gates-h">Gantry lanes — click to close / open (all-electronic; legacy-cash view shows B0–B2 as cash)</div>
         <div id="gates-all" class="gate-grid"></div>
       </div>
 
@@ -95,7 +120,16 @@
         <div id="dc-asset-kpis" class="dc-asset-kpis hidden"></div>
       </div>
 
+      <!-- Asset operations: gantry health + the camera-degradation incident scenario -->
+      <div id="assetops-hud" class="assetops-hud">
+        <div class="ao-h">Asset operations · gantry health <span id="ao-src" class="ao-src">GIS · ArcGIS</span></div>
+        <div id="ao-gantries" class="ao-gantries"></div>
+        <button id="ao-run" class="ao-run">Run incident: camera degradation + rain</button>
+        <div id="ao-kpis" class="ao-kpis"></div>
+      </div>
+
       <div id="status" class="status">Loading…</div>
+      </div><!-- /panel-body -->
     </div>
 
     <!-- DataConnect asset info panel (populated on point pick) — separate floating panel so it
