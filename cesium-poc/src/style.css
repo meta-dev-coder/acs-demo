@@ -244,6 +244,15 @@ html, body, #cesiumContainer {
 .wz-badge-none { background: rgba(255, 255, 255, 0.05); color: #7d8da3; }
 .wz-badge-green { background: rgba(46, 204, 113, 0.18); color: #2ecc71; border: 1px solid rgba(46, 204, 113, 0.4); }
 .wz-badge-red   { background: rgba(255, 107, 107, 0.18); color: #ff6b6b; border: 1px solid rgba(255, 107, 107, 0.4); }
+.wz-offline-note {
+  margin-top: 8px;
+  font-size: 10px;
+  font-style: italic;
+  line-height: 1.5;
+  color: #ffb066;
+  border-top: 1px solid rgba(255, 106, 0, 0.22);
+  padding-top: 6px;
+}
 
 /* ---- Full-viewport weather tint overlay ---- */
 #weather-overlay {
