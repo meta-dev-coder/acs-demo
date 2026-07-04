@@ -57,3 +57,5 @@ sumo/plaza.net.xml
 
 # vite caches
 **/.vite/
+# Local-dev symlink to cesium-poc's DataConnect snapshot (tier c) — never commit
+public/dataconnect-data

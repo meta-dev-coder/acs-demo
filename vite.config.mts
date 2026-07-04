@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 import react from "@vitejs/plugin-react";
+import cesium from "vite-plugin-cesium";
 
 const ENV_PREFIX = "IMJS_";
 
@@ -15,6 +16,12 @@ export default defineConfig(() => {
     },
     plugins: [
       react(),
+      // Wires CESIUM_BASE_URL + copies Cesium's static assets (Workers/Assets/Widgets), same as
+      // cesium-poc. rebuildCesium is REQUIRED here (unlike cesium-poc): the default mode injects
+      // a synchronous <script src="cesium/Cesium.js"> into index.html — every tab would pay the
+      // full Cesium download up front. Rebuilding routes cesium through Rollup instead, so it
+      // lands in the lazy-loaded A′ CesiumView chunk and tabs A–D pay no bundle cost.
+      cesium({ rebuildCesium: true }),
       viteStaticCopy({
         targets: [
           {

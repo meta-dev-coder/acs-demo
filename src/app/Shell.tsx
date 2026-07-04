@@ -8,7 +8,7 @@
  * and future scenarios is purely additive. The A/B panel components are unchanged.
  *--------------------------------------------------------------------------------------------*/
 import "./shell.css";
-import { type ReactNode, useMemo, useState } from "react";
+import { lazy, type ReactNode, Suspense, useMemo, useState } from "react";
 import { store, useScenarioState } from "../scenarioA/store";
 import { ageYears, bandMeta, conditionLabel } from "../scenarioA/scoring";
 import { computeWorkPackage } from "../scenarioA/workPackage";
@@ -19,6 +19,11 @@ import type { ScoredSegment } from "../scenarioB/types";
 import { storeAPrime } from "../scenarioAPrime/storeAPrime";
 import { useScenarioAPrimeState } from "../scenarioAPrime/useScenarioAPrimeState";
 import type { ScoredAssetPrime } from "../scenarioAPrime/types";
+
+/** Scenario A′'s hero panel is a native CesiumJS globe (DataConnect lon/lat straight onto world
+ *  imagery). Lazy so the ~9 MB cesium chunk is only fetched the first time the A′ tab opens —
+ *  tabs A–D keep their bundle size, and the iTwin <Viewer> stays mounted underneath. */
+const CesiumViewLazy = lazy(async () => import("../scenarioAPrime/CesiumView"));
 import { GuidedTour, shouldAutoStartTour } from "./GuidedTour";
 import { DataSourceSwitcher, DataTablePanel } from "./DataSource";
 import { SCENARIO_REGISTRY, ALL_SCENARIOS } from "./scenarioRegistry";
@@ -1656,7 +1661,7 @@ function KpiBarAPrime() {
         <div className="l">DataConnect tier</div>
       </div>
       <div className="note">
-        DataConnect data · reused Scenario A scoring engine · placement: {s.placementMode}
+        DataConnect data · reused Scenario A scoring engine · Cesium view (native WGS84)
         {" "}· {s.assets.length} assets
       </div>
     </div>
@@ -1765,6 +1770,17 @@ export function Shell({ viewer }: { viewer: ReactNode }) {
       )}
       <div className="sd-viewer">
         {viewer}
+        {scenario === "A'" && (
+          <Suspense
+            fallback={
+              <div style={{ display: "grid", placeItems: "center", background: "#0b1622", color: "var(--sd-dim)", fontSize: 13 }}>
+                Loading Cesium view…
+              </div>
+            }
+          >
+            <CesiumViewLazy />
+          </Suspense>
+        )}
         {dataOpen && (scenario === "A" || scenario === "B" || scenario === "C") && (
           <DataTablePanel scenario={scenario} onClose={() => setDataOpen(false)} />
         )}
