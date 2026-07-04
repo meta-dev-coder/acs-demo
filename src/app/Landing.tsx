@@ -163,7 +163,7 @@ export function Landing({ onSignIn }: { onSignIn: () => void }) {
         />
         <Card
           as="a"
-          href="./twin/"
+          href="../twin/"
           eyebrow="SUMO × Cesium"
           title="Toll-Plaza Physics Twin (SUMO × Cesium)"
           subtitle="Live traffic physics · lane-closure planning · no sign-in"
