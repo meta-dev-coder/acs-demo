@@ -140,23 +140,61 @@ function rebuildBoothMarkers() {
 let GANTRIES = [];
 let AVG_TOLL = 1.45;
 let assetIncidentOn = false;
+let gantrySource = "";   // where the gantry inventory came from (live ArcGIS vs local fallback)
+
+// NCTCOG regional "Toll Gantries" point layer — an authoritative, KEYLESS ArcGIS FeatureServer whose
+// points carry NTTA_Gantry_ID / Corridor / Maintaining_Authority. This is the geospatial system-of-record:
+// the demo queries REAL NTTA gantry locations near the corridor, not a synthetic stub.
+const NCTCOG_GANTRIES_URL = "https://geospatial.nctcog.org/map/rest/services/Transportation/DFWMaps_Roadway/MapServer/6/query";
 
 async function loadGantries() {
+  const anchor = T ? { lon: T.p.anchorLon, lat: T.p.anchorLat } : { lon: -96.8229, lat: 33.0920 };
   try {
-    const d = await (await fetch("/data/dnt-gantries.json")).json();
-    GANTRIES = (d.gantries || []).map((g) => ({ ...g }));
-    AVG_TOLL = d.avgTollUsd ?? 1.45;
-  } catch { GANTRIES = []; }
+    const params = new URLSearchParams({
+      where: "Corridor IN ('DNT','SRT')",
+      geometry: `${anchor.lon},${anchor.lat}`, geometryType: "esriGeometryPoint", inSR: "4326",
+      distance: "4000", units: "esriSRUnit_Meter", spatialRel: "esriSpatialRelIntersects",
+      outFields: "Corridor,Location,NTTA_Gantry_ID,Maintaining_Authority",
+      returnGeometry: "true", outSR: "4326", f: "geojson",
+    });
+    const d = await (await fetch(`${NCTCOG_GANTRIES_URL}?${params}`)).json();
+    // Dedup directional pairs by gantry id, keep the one nearest the corridor anchor, cap the list.
+    const seen = new Map();
+    for (const f of d.features || []) {
+      if (!f.geometry) continue;
+      const p = f.properties || {}, [lon, lat] = f.geometry.coordinates;
+      const gid = p.NTTA_Gantry_ID || p.Location;
+      const dist = Math.hypot(lon - anchor.lon, lat - anchor.lat);
+      const name = String(p.Location || gid).replace(/\s*\d\/\d$/, "").trim();
+      if (!seen.has(gid) || dist < seen.get(gid).dist) {
+        seen.set(gid, { id: gid, name, corridor: p.Corridor, authority: p.Maintaining_Authority || "NTTA", lon, lat, dist, status: "healthy" });
+      }
+    }
+    GANTRIES = Array.from(seen.values()).sort((a, b) => a.dist - b.dist).slice(0, 6);
+    if (!GANTRIES.length) throw new Error("no gantries in response");
+    gantrySource = `NCTCOG · ${GANTRIES[0].authority} (live ArcGIS)`;
+    AVG_TOLL = 1.45;
+  } catch {
+    // Fallback: local sample (keeps the demo working offline / if the ArcGIS host blocks CORS).
+    try {
+      const d = await (await fetch("/data/dnt-gantries.json")).json();
+      GANTRIES = (d.gantries || []).map((g) => ({ ...g }));
+      AVG_TOLL = d.avgTollUsd ?? 1.45;
+      gantrySource = "local sample";
+    } catch { GANTRIES = []; gantrySource = ""; }
+  }
 }
 
 function renderGantries() {
-  if (!T) return;
+  // Gantries are REAL GIS assets at fixed lon/lat (not synthetic corridor stations), so place them
+  // geographically — they stay put through re-calibration, as real infrastructure should.
   for (const g of GANTRIES) {
+    if (g.lon == null) continue;
     const degraded = g.status === "degraded";
     R.placeMarker({
-      id: `gantry:${g.id}`, x: g.station, y: 0, tracking: true,
+      id: `gantry:${g.id}`, lon: g.lon, lat: g.lat,
       disc: { radiusM: 3.4, colorCss: degraded ? "#ff4d4d" : "#39c0d6", alpha: 0.85 },
-      label: { kind: "gantry", text: g.name.replace(" Gantry", "") + (degraded ? " ⚠" : "") },
+      label: { kind: "gantry", text: g.name + (degraded ? " ⚠" : "") },
     });
   }
 }
@@ -164,6 +202,8 @@ function renderGantries() {
 /** Fill the Asset Operations panel from the pure assetKpis engine + current throughput/weather. */
 function renderAssetOps() {
   if (!$("assetops-hud")) return;
+  const src = $("ao-src");
+  if (src && gantrySource) { src.textContent = gantrySource; src.classList.toggle("live", gantrySource.includes("ArcGIS")); }
   const throughput = window.__kpi?.throughputVph ?? currentData?.stats?.throughputVph ?? 0;
   const state = { gantries: GANTRIES, weather: _activeWeather, throughputVph: throughput, avgTollUsd: AVG_TOLL, peak: assetIncidentOn };
   const k = assetKpis(state);
@@ -197,7 +237,7 @@ function renderAssetOps() {
 /** The headline scenario: degrade a gantry camera + heavy rain + peak-hour, or clear it. */
 function toggleIncident() {
   assetIncidentOn = !assetIncidentOn;
-  const target = GANTRIES.find((g) => g.id === "DNT-HQ") || GANTRIES[0];
+  const target = GANTRIES[0];   // the gantry nearest the plaza (most visible on the aerial)
   if (target) target.status = assetIncidentOn ? "degraded" : "healthy";
   const wsOpen = liveMode && ws && ws.readyState === WebSocket.OPEN;
   applyWeatherOverlay(assetIncidentOn ? "heavyrain" : "clear", wsOpen);

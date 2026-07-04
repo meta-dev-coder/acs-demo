@@ -258,7 +258,8 @@ export class ArcgisRenderer {
   placeMarker(m) {
     const existing = this._markers.get(m.id);
     if (existing) this._markerLayer.remove(existing.graphic);
-    const { lon, lat } = this._T.sumoToLonLat(m.x, m.y);
+    // Geo markers (real GIS assets) carry lon/lat directly; corridor markers go through the transform.
+    const { lon, lat } = m.lon != null ? { lon: m.lon, lat: m.lat } : this._T.sumoToLonLat(m.x, m.y);
     const text = m.label ? (m.label.textFn ? m.label.textFn() : m.label.text) : null;
     const g = new Graphic({
       geometry: new Point({ longitude: lon, latitude: lat, z: 0 }),

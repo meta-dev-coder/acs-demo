@@ -7,8 +7,11 @@ test("gantry assets render and the incident scenario drives asset-ops KPIs", asy
   await waitForReady(page);
   await page.waitForTimeout(3000);
 
-  // 3 DNT gantries load from the GIS asset inventory and list in the panel.
-  expect(await page.evaluate(() => document.querySelectorAll("#ao-gantries .ao-g").length)).toBe(3);
+  // DNT gantries load from the ArcGIS GIS source (live NCTCOG FeatureServer, or the local fallback)
+  // and list in the panel.
+  const nGantries = await page.evaluate(() => document.querySelectorAll("#ao-gantries .ao-g").length);
+  expect(nGantries).toBeGreaterThanOrEqual(1);
+  expect(nGantries).toBeLessThanOrEqual(6);
 
   // Nominal: high read rate, no dispatch.
   const nominalKpis = await page.evaluate(() => (window as any).__kpi);

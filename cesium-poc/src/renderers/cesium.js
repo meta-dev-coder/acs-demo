@@ -13,7 +13,7 @@
  * compass degrees; the adapter applies the transform + per-model yaw offset internally.
  */
 import {
-  Ion, Viewer, Terrain, Color, JulianDate, Math as CMath,
+  Ion, Viewer, Terrain, Cartesian3, Color, JulianDate, Math as CMath,
   SampledPositionProperty, SampledProperty, Transforms, Matrix4,
   TimeInterval, TimeIntervalCollection, ClockRange, ExtrapolationType,
   HermitePolynomialApproximation, EllipsoidTerrainProvider, UrlTemplateImageryProvider,
@@ -225,9 +225,12 @@ export class CesiumRenderer {
   placeMarker(m) {
     const existing = this._markers.get(m.id);
     if (existing) { this._viewer.entities.remove(existing); this._markers.delete(m.id); }
-    const position = m.tracking
-      ? new CallbackProperty(() => this._T.sumoToWorld(m.x, m.y), false)
-      : this._T.sumoToWorld(m.x, m.y);
+    // Geo markers (real GIS assets at fixed lon/lat) place directly; corridor markers go through T.
+    const position = m.lon != null
+      ? Cartesian3.fromDegrees(m.lon, m.lat, this._T?.p.anchorHeight ?? 3)
+      : m.tracking
+        ? new CallbackProperty(() => this._T.sumoToWorld(m.x, m.y), false)
+        : this._T.sumoToWorld(m.x, m.y);
     // Carry the stable marker id onto the entity so tooling/tests can tell booth discs (booth:*)
     // from gantry assets (gantry:*) and the plaza label — they are otherwise all ellipse/label entities.
     const opts = { id: m.id, position };
