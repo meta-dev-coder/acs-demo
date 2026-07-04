@@ -22,22 +22,52 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
+
+      # ---------- Phase 1: ACS iTwin app → /acs-demo/acs/ ----------
+      - name: Install ACS (iTwin) deps
+        run: npm install
         env:
-          # test-only dev dep; don't pull a ~150MB browser on the Pages runner
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"   # test-only dev dep; skip the ~150MB browser
+      - name: Build ACS (iTwin) app
+        run: npm run build
+        env:
+          IMJS_BASE_PATH: /acs-demo/acs/
+
+      # ---------- Phase 2 & 3: Cesium+SUMO / Esri toll twin → /acs-demo/twin/ ----------
+      - name: Install toll-twin deps
+        run: npm install
+        working-directory: cesium-poc
+        env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
-      # base path must match the repo name for project Pages (https://<user>.github.io/acs-demo/)
-      - run: npm run build
+      - name: Build toll twin (Cesium + Esri, one bundle)
+        run: npm run build
+        working-directory: cesium-poc
         env:
-          IMJS_BASE_PATH: /acs-demo/
-      # SPA fallback: GitHub Pages serves only static files, so client-side routes
-      # (e.g. /signin-callback) 404. Serving index.html as the 404 page boots the SPA,
-      # which then handles the route — same role S3's "error document" played for water-poc.
-      - run: cp dist/index.html dist/404.html
+          CESIUM_BASE_PATH: /acs-demo/twin/
+
+      # ---------- Assemble the multi-demo site under one Pages root ----------
+      - name: Assemble _site (launcher + acs/ + twin/)
+        run: |
+          # vite-plugin-cesium copies the Cesium runtime under the base path (dist/acs-demo/twin/cesium)
+          # while vite's own assets go to dist/assets — inconsistent for sub-path serving. Hoist the
+          # runtime to dist/cesium so it sits beside index.html/assets when dropped into _site/twin/.
+          if [ -d cesium-poc/dist/acs-demo/twin/cesium ]; then
+            mv cesium-poc/dist/acs-demo/twin/cesium cesium-poc/dist/cesium
+            rm -rf cesium-poc/dist/acs-demo
+          fi
+          rm -rf _site && mkdir -p _site/acs _site/twin
+          cp landing/index.html _site/index.html          # launcher = the front door
+          cp -r dist/.          _site/acs/                 # Phase 1 (Bentley iTwin)
+          cp -r cesium-poc/dist/. _site/twin/             # Phase 2 (Cesium) + Phase 3 (?renderer=arcgis)
+          # Global SPA/OAuth fallback: GitHub Pages serves ONE 404.html for every unmatched path.
+          # Point it at the ACS app's index so the Bentley redirect (/acs-demo/acs/signin-callback)
+          # boots the iTwin SPA and completes the token exchange.
+          cp _site/acs/index.html _site/404.html
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: _site
 
   deploy:
     needs: build

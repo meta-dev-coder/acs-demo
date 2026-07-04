@@ -111,7 +111,7 @@ export class CesiumRenderer {
   _model(type) {
     const k = this._carKey(type);
     return {
-      uri: type === "truck" ? "/models/truck.glb" : "/models/car.glb",
+      uri: import.meta.env.BASE_URL + (type === "truck" ? "models/truck.glb" : "models/car.glb"),
       minimumPixelSize: MIN_PIXEL_SIZE[k],
       scale: VEHICLE_SCALE[k],
       color: COLORS[type] || Color.WHITE,

@@ -19,6 +19,9 @@ import { assetKpis } from "./assetOps.js";
 
 const toRad = (deg) => (deg * Math.PI) / 180;
 const ION = import.meta.env.VITE_CESIUM_ION_TOKEN;
+// Resolve a bundled asset against the deploy base (/ in dev, /acs-demo/twin/ on Pages) so absolute
+// "/data/…" refs don't break when the app is served from a sub-path.
+const asset = (p) => import.meta.env.BASE_URL + String(p).replace(/^\//, "");
 
 const N_BOOTHS = 10;
 // Fixed plaza half-span: 10 lanes x 3.2 m / 2 = 14.4 m. The plaza core (fo/pl/fi) stays a straight,
@@ -205,7 +208,7 @@ async function loadGantries() {
   } catch {
     // Fallback: local sample (keeps the demo working offline / if the ArcGIS host blocks CORS).
     try {
-      const d = await (await fetch("/data/dnt-gantries.json")).json();
+      const d = await (await fetch(asset("/data/dnt-gantries.json"))).json();
       GANTRIES = (d.gantries || []).map((g) => ({ ...g }));
       AVG_TOLL = d.avgTollUsd ?? 1.45;
       gantrySource = "local sample";
@@ -283,7 +286,7 @@ function toggleIncident() {
 
 // ============================================================================ offline playback
 let currentData = null;
-let offlineUrl = "/data/baseline.json";
+let offlineUrl = asset("/data/baseline.json");
 
 async function loadRun(viewer, url) {
   const data = await (await fetch(url)).json();
@@ -837,8 +840,8 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
     startTraffic(viewer);
     frameCamera(viewer);
   };
-  bBase.onclick = () => selectOffline("/data/baseline.json", bBase, "baseline");
-  bInt.onclick = () => selectOffline("/data/intervention.json", bInt, "intervention");
+  bBase.onclick = () => selectOffline(asset("/data/baseline.json"), bBase, "baseline");
+  bInt.onclick = () => selectOffline(asset("/data/intervention.json"), bInt, "intervention");
   bLive.onclick = () => {
     [bBase, bInt].forEach((b) => b.classList.remove("on"));
     bLive.classList.add("on");
@@ -909,7 +912,7 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
       { const s = loadSite(siteId); setTransform(s.transform); }
       stopLive(viewer);
       [bInt, bLive].forEach((b) => b.classList.remove("on")); bBase.classList.add("on");
-      offlineUrl = "/data/baseline.json";
+      offlineUrl = asset("/data/baseline.json");
       trafficStarted = false;
       await loadRun(viewer, offlineUrl);
       startTraffic(viewer);

@@ -25,10 +25,12 @@ import TextSymbol3DLayer from "@arcgis/core/symbols/TextSymbol3DLayer.js";
 
 // Per-type vehicle appearance (ArcGIS palette + glb). Metre sizes (near real, lightly enlarged so they
 // still read at the top-down demo zoom — ArcGIS has no Cesium-style minimumPixelSize floor).
+const CAR_GLB = import.meta.env.BASE_URL + "models/car.glb";
+const TRUCK_GLB = import.meta.env.BASE_URL + "models/truck.glb";
 const VEH = {
-  cash:  { href: "/models/car.glb",   color: [255, 155, 26],  w: 2.6, d: 6,  h: 2.4 },
-  etc:   { href: "/models/car.glb",   color: [28, 203, 64],   w: 2.6, d: 6,  h: 2.4 },
-  truck: { href: "/models/truck.glb", color: [58, 128, 232],  w: 3,   d: 13, h: 3.6 },
+  cash:  { href: CAR_GLB,   color: [255, 155, 26],  w: 2.6, d: 6,  h: 2.4 },
+  etc:   { href: CAR_GLB,   color: [28, 203, 64],   w: 2.6, d: 6,  h: 2.4 },
+  truck: { href: TRUCK_GLB, color: [58, 128, 232],  w: 3,   d: 13, h: 3.6 },
 };
 // glb nose vs its default facing (deg, CW). Heading is computed from the actual travel direction
 // (motion vector), so this is ONLY the model's native-forward correction. Tuned by screenshot.
