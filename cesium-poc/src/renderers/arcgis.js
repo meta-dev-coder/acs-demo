@@ -9,6 +9,7 @@
  * ArcGIS has no scene clock, so the offline sampled tracks are driven by an internal rAF loop that
  * interpolates each vehicle's pose at the current sim time (see _tick).
  */
+import "@arcgis/core/assets/esri/themes/dark/main.css";  // ArcGIS's own CSS — sizes .esri-view to fill
 import esriConfig from "@arcgis/core/config.js";
 import EsriMap from "@arcgis/core/Map.js";  // aliased: bare `Map` would shadow the built-in JS Map
 import Basemap from "@arcgis/core/Basemap.js";
@@ -22,16 +23,16 @@ import ObjectSymbol3DLayer from "@arcgis/core/symbols/ObjectSymbol3DLayer.js";
 import IconSymbol3DLayer from "@arcgis/core/symbols/IconSymbol3DLayer.js";
 import TextSymbol3DLayer from "@arcgis/core/symbols/TextSymbol3DLayer.js";
 
-// Per-type vehicle appearance (ArcGIS palette + glb). Sizes are exaggerated ~3x real so the vehicles
-// read clearly at the top-down demo zoom (ArcGIS has no Cesium-style minimumPixelSize floor).
+// Per-type vehicle appearance (ArcGIS palette + glb). Metre sizes (near real, lightly enlarged so they
+// still read at the top-down demo zoom — ArcGIS has no Cesium-style minimumPixelSize floor).
 const VEH = {
-  cash:  { href: "/models/car.glb",   color: [255, 155, 26],  w: 6,  d: 15, h: 5 },
-  etc:   { href: "/models/car.glb",   color: [28, 203, 64],   w: 6,  d: 15, h: 5 },
-  truck: { href: "/models/truck.glb", color: [58, 128, 232],  w: 7,  d: 22, h: 7 },
+  cash:  { href: "/models/car.glb",   color: [255, 155, 26],  w: 2.6, d: 6,  h: 2.4 },
+  etc:   { href: "/models/car.glb",   color: [28, 203, 64],   w: 2.6, d: 6,  h: 2.4 },
+  truck: { href: "/models/truck.glb", color: [58, 128, 232],  w: 3,   d: 13, h: 3.6 },
 };
-// glb nose vs ArcGIS heading (deg, CW from north): the world travel heading is the SUMO angle rotated
-// into the placed corridor; this per-model offset aligns the mesh nose to travel. Tuned by screenshot.
-const ARCGIS_YAW_OFFSET = { car: 90, truck: 90 };
+// glb nose vs its default facing (deg, CW). Heading is computed from the actual travel direction
+// (motion vector), so this is ONLY the model's native-forward correction. Tuned by screenshot.
+const GLB_NOSE_DEG = { car: 0, truck: 0 };
 
 // @arcgis/core loads its workers/assets from a matching CDN by default; pin it explicitly so the
 // Vite dev/prod bundle never needs to copy them. (Keyless — same public Esri imagery Cesium uses.)
@@ -121,9 +122,13 @@ export class ArcgisRenderer {
         if (rec.graphic) { this._gfx.remove(rec.graphic); rec.graphic = null; }
         continue;
       }
-      const [x, y, a] = this._sampleAt(rec, t);
+      const [x, y] = this._sampleAt(rec, t);
       const { lon, lat } = this._T.sumoToLonLat(x, y);
-      const h = this._headingFor(a, rec.type);
+      // Heading from the travel direction of the current sample segment (robust on curves).
+      const s = rec.samples, i = rec.idx, j = Math.min(i + 1, s.length - 1);
+      const q0 = this._T.sumoToLonLat(s[i][1], s[i][2]);
+      const q1 = this._T.sumoToLonLat(s[j][1], s[j][2]);
+      const h = this._headingFromMove(q0.lon, q0.lat, q1.lon, q1.lat, rec.type, rec.lastH);
       if (!rec.graphic) {
         rec.graphic = this._graphic(rec.type, lon, lat, h);
         rec.lastH = h;
@@ -160,9 +165,18 @@ export class ArcgisRenderer {
 
   // ---- vehicle helpers ----
   _carKey(type) { return type === "truck" ? "truck" : "car"; }
-  _headingFor(angleDeg, type) {
-    const off = ARCGIS_YAW_OFFSET[this._carKey(type)];
-    return (((angleDeg + (this._T?.p.bearingDeg || 0) + off) % 360) + 360) % 360;
+  // Compass bearing (deg, CW from north) from lon/lat p0 -> p1.
+  _bearingDeg(lo0, la0, lo1, la1) {
+    const east = (lo1 - lo0) * Math.cos((la0 * Math.PI) / 180);
+    const north = la1 - la0;
+    if (Math.abs(east) < 1e-12 && Math.abs(north) < 1e-12) return null; // no movement
+    return (((Math.atan2(east, north) * 180) / Math.PI) + 360) % 360;
+  }
+  // Heading for the glb: the travel-direction bearing + the model's native-nose offset.
+  _headingFromMove(lo0, la0, lo1, la1, type, fallback) {
+    const b = this._bearingDeg(lo0, la0, lo1, la1);
+    if (b == null) return fallback ?? 0;
+    return ((b + GLB_NOSE_DEG[this._carKey(type)]) % 360 + 360) % 360;
   }
   _symbol(type, headingDeg) {
     const s = VEH[type] || VEH.etc;
@@ -192,24 +206,26 @@ export class ArcgisRenderer {
     this._sampled = [];
   }
 
-  // ---- live imperative vehicles ----
+  // ---- live imperative vehicles (heading from motion between steps) ----
   addLiveVehicle(v) {
     const { lon, lat } = this._T.sumoToLonLat(v.x, v.y);
-    const g = this._graphic(v.type, lon, lat, this._headingFor(v.angleDeg, v.type));
+    const g = this._graphic(v.type, lon, lat, 0);
     this._gfx.add(g);
-    this._live.set(v.id, g);
+    this._live.set(v.id, { g, lon, lat, h: 0 });
   }
   updateVehicle(v) {
-    const g = this._live.get(v.id);
-    if (!g) return;
+    const rec = this._live.get(v.id);
+    if (!rec) return;
     const { lon, lat } = this._T.sumoToLonLat(v.x, v.y);
-    g.geometry = new Point({ longitude: lon, latitude: lat, z: 0 });
-    g.symbol = this._symbol(v.type, this._headingFor(v.angleDeg, v.type));
+    const h = this._headingFromMove(rec.lon, rec.lat, lon, lat, v.type, rec.h);
+    rec.g.geometry = new Point({ longitude: lon, latitude: lat, z: 0 });
+    if (Math.abs(h - rec.h) > 2) { rec.g.symbol = this._symbol(v.type, h); rec.h = h; }
+    rec.lon = lon; rec.lat = lat;
   }
   hasVehicle(id) { return this._live.has(id); }
   liveIds() { return Array.from(this._live.keys()); }
-  removeVehicle(id) { const g = this._live.get(id); if (g) { this._gfx.remove(g); this._live.delete(id); } }
-  clearLiveVehicles() { for (const g of this._live.values()) this._gfx.remove(g); this._live.clear(); }
+  removeVehicle(id) { const rec = this._live.get(id); if (rec) { this._gfx.remove(rec.g); this._live.delete(id); } }
+  clearLiveVehicles() { for (const rec of this._live.values()) this._gfx.remove(rec.g); this._live.clear(); }
   // ---- markers (booth discs + gate ✕ / TOLL PLAZA labels) ----
   _markerSymbol(m, text) {
     const layers = [];

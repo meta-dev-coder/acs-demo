@@ -712,6 +712,9 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
   if (useArcgis) {
     $("cesiumContainer").style.display = "none";
     $("arcgisContainer").style.display = "";
+    // Let the browser lay out the freshly-shown container to full height BEFORE ArcGIS measures it,
+    // else the SceneView sizes its WebGL canvas to a partial height and the map won't fill the area.
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     const { ArcgisRenderer } = await import("./renderers/arcgis.js");
     R = new ArcgisRenderer();
     viewer = await R.init("arcgisContainer", {});

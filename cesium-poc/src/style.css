@@ -1,4 +1,4 @@
-html, body, #cesiumContainer {
+html, body, #cesiumContainer, #arcgisContainer {
   width: 100%;
   height: 100%;
   margin: 0;
@@ -6,6 +6,8 @@ html, body, #cesiumContainer {
   overflow: hidden;
   font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
 }
+/* ArcGIS SceneView fills its container; pin the mount to the full viewport so the map uses 100%. */
+#arcgisContainer { position: absolute; inset: 0; }
 
 .panel {
   position: absolute;
