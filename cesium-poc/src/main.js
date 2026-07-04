@@ -819,11 +819,23 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
     frameCamera(viewer);
   };
 
-  // ---- Renderer badge: make it obvious which 3D engine is drawing ----
-  const badge = $("renderer-badge");
-  if (badge) {
-    badge.textContent = useArcgis ? "Esri · ArcGIS" : "CesiumJS";
-    badge.classList.add(useArcgis ? "arcgis" : "cesium");
+  // ---- Renderer toggle: show which 3D engine is drawing AND let you switch from the homepage,
+  //      so the ESRI/ArcGIS view is reachable without hand-typing ?renderer=arcgis. Switching a
+  //      whole SDK live is impractical, so the inactive button reloads the page with the right
+  //      param (preserving every other query param). ----
+  const rtCesium = $("rt-cesium"), rtArcgis = $("rt-arcgis");
+  if (rtCesium && rtArcgis) {
+    rtCesium.classList.toggle("on", !useArcgis);
+    rtArcgis.classList.toggle("on", useArcgis);
+    const switchTo = (target) => {
+      if ((target === "arcgis") === useArcgis) return;  // already on it
+      const p = new URLSearchParams(location.search);
+      if (target === "arcgis") p.set("renderer", "arcgis"); else p.delete("renderer");
+      const qs = p.toString();
+      location.assign(location.pathname + (qs ? "?" + qs : "") + location.hash);
+    };
+    rtCesium.onclick = () => switchTo("cesium");
+    rtArcgis.onclick = () => switchTo("arcgis");
   }
 
   // ---- Minimize / expand the control panel ----

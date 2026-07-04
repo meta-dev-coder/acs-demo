@@ -57,6 +57,21 @@ html, body, #cesiumContainer, #arcgisContainer {
 .rbadge.cesium { color: #8fc0ff; border-color: rgba(111,177,255,0.45); background: rgba(111,177,255,0.14); }
 .rbadge.arcgis { color: #8fd66a; border-color: rgba(108,194,74,0.50); background: rgba(108,194,74,0.15); }
 
+/* ---- Renderer toggle (switch engine from the homepage — no ?renderer= URL needed) ---- */
+.rtoggle {
+  flex: none; display: inline-flex; padding: 2px; gap: 2px;
+  border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05);
+}
+.rtoggle .rt-btn {
+  appearance: none; cursor: pointer; border: 0; background: transparent; color: #8c9bb0;
+  font: inherit; font-size: 9.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+  padding: 3px 9px; border-radius: 999px; white-space: nowrap; transition: color .12s, background .12s;
+}
+.rtoggle .rt-btn:hover { color: #dbe6f4; }
+.rtoggle .rt-btn.on[data-renderer="cesium"] { color: #0b1220; background: #8fc0ff; }
+.rtoggle .rt-btn.on[data-renderer="arcgis"] { color: #0b1220; background: #8fd66a; }
+.rtoggle .rt-btn:focus-visible { outline: 2px solid rgba(255,255,255,0.55); outline-offset: 1px; }
+
 /* ---- Segmented speed control ---- */
 .ctl-label { font-size: 10px; font-weight: 600; color: #9fb0c3; text-transform: uppercase; letter-spacing: 0.4px; }
 .seg { display: inline-flex; margin-left: auto; border-radius: 7px; overflow: hidden; border: 1px solid rgba(255,255,255,0.14); }
