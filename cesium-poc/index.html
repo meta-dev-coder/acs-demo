@@ -82,8 +82,25 @@
         <div id="wz-offline-note" class="wz-offline-note hidden">Schematic — offline replay does not re-route traffic; go LIVE for physics.</div>
       </div>
 
+      <!-- Component 4: DataConnect-backed Scenario A asset layer (see cesium-poc/src/dataconnect.js
+           + scoringA.js + assetLayer.js). Toggled on demand — fetch/score/place is deferred to
+           first enable, not boot, so the plain SUMO twin still loads instantly with no DataConnect
+           dependency. -->
+      <div id="dc-panel" class="dc-panel">
+        <div class="dc-h">DataConnect asset condition</div>
+        <div class="ctl-row">
+          <button id="btn-dc-assets" class="mini">Assets (DataConnect)</button>
+          <span id="dc-status" class="dc-status offline">DataConnect: offline</span>
+        </div>
+        <div id="dc-asset-kpis" class="dc-asset-kpis hidden"></div>
+      </div>
+
       <div id="status" class="status">Loading…</div>
     </div>
+
+    <!-- DataConnect asset info panel (populated on point pick) — separate floating panel so it
+         doesn't fight the main HUD's left-side real estate. -->
+    <div id="dc-asset-panel" class="panel dc-asset-panel hidden"></div>
 
     <!-- Full-viewport weather tint overlay (toggled by main.js applyWeatherOverlay) -->
     <div id="weather-overlay" style="display:none"></div>

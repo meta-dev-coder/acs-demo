@@ -21,6 +21,9 @@ import "cesium/Build/Cesium/Widgets/widgets.css";
 import "./style.css";
 import { CoordinateTransform } from "./transform.js";
 import { buildWorkZone, clearWorkZone, rilcaWorkzone, CLOSURE_CONFIG } from "./workzone.js";
+import { login, fetchClass, onStatus } from "./dataconnect.js";
+import { adaptDataConnectAssets, scoreAssets } from "./scoringA.js";
+import { buildAssetLayer, disposeAssetLayer, pickAsset } from "./assetLayer.js";
 
 const ION = import.meta.env.VITE_CESIUM_ION_TOKEN;
 if (ION) Ion.defaultAccessToken = ION;
@@ -738,6 +741,161 @@ function renderWorkzoneHud() {
   if (note) note.classList.toggle("hidden", !(spec && !liveMode));
 }
 
+// ============================================================================ Component 4/5: DataConnect asset layer
+// "Assets (DataConnect)" toggle: on first enable, log in + fetch the 6 DataConnect classes the
+// design spec calls for, run them through the scoringA.js adapter + scorer, and place the result
+// as ONE PointPrimitiveCollection (assetLayer.js). Deferred to first click (not boot) so the base
+// SUMO/Cesium twin keeps loading instantly with zero DataConnect dependency.
+let dcEnabled = false;
+let dcCollection = null;   // the live PointPrimitiveCollection, or null if never loaded
+let dcScored = [];         // last-good scored assets (kept on failure — keep-previous-on-failure)
+let dcPollTimer = null;
+
+const DC_CLASSES = {
+  assetRegistry: "asset_registry",
+  workOrders: "work_orders",
+  safetyInspections: "safety_inspections_v3",
+  roadwayInspections: "roadway_inspections_v3",
+  itsInspections: "its_inspections_v3",
+  incidents: "incidents_v3",
+};
+
+function setDcStatusBadge(status) {
+  const el = $("dc-status");
+  if (!el) return;
+  el.className = "dc-status " + status;
+  el.textContent = "DataConnect: " + (status === "auth-failed" ? "auth failed" : status);
+}
+
+function renderDcAssetKpis(scored) {
+  const el = $("dc-asset-kpis");
+  if (!el) return;
+  const bands = { red: 0, amber: 0, green: 0 };
+  let top = null;
+  for (const a of scored) {
+    if (bands[a.band] != null) bands[a.band]++;
+    if (!top || a.score > top.score) top = a;
+  }
+  el.classList.remove("hidden");
+  el.innerHTML = `
+    <div class="dc-asset-kpi red"><span class="v">${bands.red}</span><span class="l">Act now</span></div>
+    <div class="dc-asset-kpi amber"><span class="v">${bands.amber}</span><span class="l">Watch</span></div>
+    <div class="dc-asset-kpi green"><span class="v">${bands.green}</span><span class="l">Healthy</span></div>
+    ${top ? `<div class="dc-top-risk">Top risk: <b>${top.label}</b> (${top.asset_tag}) · score ${(top.score * 100).toFixed(0)}</div>` : ""}
+  `;
+
+  // Debug hook for headless verification (e2e).
+  window.__dcAssets = {
+    count: scored.length,
+    bands,
+    topRisk: top ? { id: top.asset_tag, score: top.score } : null,
+  };
+}
+
+function showDcAssetPanel(asset) {
+  const panel = $("dc-asset-panel");
+  if (!panel) return;
+  const driversHtml = (asset.drivers || [])
+    .map((d) => `<div class="dc-driver"><span>${d.label}</span><span class="dc-driver-val">${Math.round(d.contribution * 100)}%</span></div>`)
+    .join("") || '<div class="dc-driver-none">No significant risk drivers</div>';
+  const rel = asset._related || {};
+
+  panel.classList.remove("hidden");
+  panel.innerHTML = `
+    <button id="dc-asset-panel-close" class="dc-panel-close" aria-label="Close">&times;</button>
+    <div class="dc-panel-h">${asset.label}</div>
+    <div class="dc-panel-sub">${asset.asset_tag} · ${asset.asset_class}</div>
+    <div class="dc-panel-band ${asset.band}">${asset.band.toUpperCase()} · score ${(asset.score * 100).toFixed(0)}</div>
+    <div class="dc-panel-row"><span>Location</span><span>${asset.location_desc}</span></div>
+    <div class="dc-panel-row"><span>Install date</span><span>${asset.install_date}</span></div>
+    <div class="dc-panel-row"><span>Last inspection</span><span>${asset.last_inspection_date}</span></div>
+    <div class="dc-panel-row"><span>Last work order</span><span>${asset.last_workorder_date}</span></div>
+    <div class="dc-panel-drivers">${driversHtml}</div>
+    <div class="dc-panel-action">${asset.recommendedAction}</div>
+    <div class="dc-panel-related">Work orders ${rel.workOrders || 0} · Inspections ${rel.inspections || 0} · Incidents ${rel.incidents || 0}</div>
+  `;
+  const closeBtn = $("dc-asset-panel-close");
+  if (closeBtn) closeBtn.onclick = () => panel.classList.add("hidden");
+}
+
+function stopDcPolling() {
+  if (dcPollTimer) { clearInterval(dcPollTimer); dcPollTimer = null; }
+}
+/** Lightweight background connectivity check while the layer is enabled — exercises the
+ * offline/auth-failed badge transitions (e.g. the shim being killed) without re-fetching /
+ * re-scoring / rebuilding the whole ~5k-point layer every tick. Data is only ever replaced on a
+ * FULL successful reload (loadDcAssets), so a failed ping here just flips the badge and leaves
+ * dcCollection/dcScored exactly as they were (keep-previous-on-failure). */
+function startDcPolling() {
+  stopDcPolling();
+  dcPollTimer = setInterval(() => {
+    fetchClass(DC_CLASSES.assetRegistry, { pageSize: 1 }).catch(() => {});
+  }, 15_000);
+}
+
+async function loadDcAssets(viewer) {
+  try {
+    await login();
+    const [assetRegistry, workOrders, safetyInspections, roadwayInspections, itsInspections, incidents] =
+      await Promise.all([
+        fetchClass(DC_CLASSES.assetRegistry, { pageSize: 500 }),
+        fetchClass(DC_CLASSES.workOrders, { pageSize: 500 }),
+        fetchClass(DC_CLASSES.safetyInspections, { pageSize: 500 }),
+        fetchClass(DC_CLASSES.roadwayInspections, { pageSize: 500 }),
+        fetchClass(DC_CLASSES.itsInspections, { pageSize: 500 }),
+        fetchClass(DC_CLASSES.incidents, { pageSize: 500 }),
+      ]);
+    const raw = adaptDataConnectAssets({
+      assetRegistry, workOrders, safetyInspections, roadwayInspections, itsInspections, incidents,
+    });
+    const scored = scoreAssets(raw, []);
+
+    // Only now, with a fully-scored replacement in hand, touch the live layer/state.
+    const prevCollection = dcCollection;
+    dcCollection = buildAssetLayer(viewer, scored);
+    if (prevCollection) disposeAssetLayer(viewer, prevCollection);
+    dcScored = scored;
+    renderDcAssetKpis(scored);
+    startDcPolling();
+  } catch (err) {
+    console.warn("[DataConnect] asset load failed — keeping previous layer/data", err);
+    // keep-previous-on-failure: dcCollection/dcScored/window.__dcAssets are left untouched.
+  }
+}
+
+function installDataConnectAssets(viewer) {
+  onStatus(setDcStatusBadge);
+
+  const btn = $("btn-dc-assets");
+  if (btn) {
+    btn.onclick = async () => {
+      dcEnabled = !dcEnabled;
+      btn.classList.toggle("on", dcEnabled);
+      if (!dcEnabled) {
+        stopDcPolling();
+        if (dcCollection) dcCollection.show = false;
+        $("dc-asset-kpis")?.classList.add("hidden");
+        $("dc-asset-panel")?.classList.add("hidden");
+        return;
+      }
+      if (dcCollection) {
+        dcCollection.show = true;
+        $("dc-asset-kpis")?.classList.remove("hidden");
+        startDcPolling();
+        return;
+      }
+      await loadDcAssets(viewer);
+    };
+  }
+
+  const dcHandler = new ScreenSpaceEventHandler(viewer.scene.canvas);
+  dcHandler.setInputAction((click) => {
+    if (!dcEnabled || !dcCollection || !dcCollection.show) return;
+    const asset = pickAsset(viewer, click.position);
+    if (asset) showDcAssetPanel(asset);
+  }, ScreenSpaceEventType.LEFT_CLICK);
+}
+
 // ============================================================================ MARK GATES (user clicks each real toll gate)
 // The user marks the road direction (2 clicks) then clicks each real toll gate on the aerial.
 // Marking rebuilds T from the clicks, then reloads vehicles (placed via T.sumoToWorld) AND
@@ -837,6 +995,7 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
   renderGatePanel();
   installMarking(viewer);
   installExportCalibration();
+  installDataConnectAssets(viewer);
 
   // ---- Feature B: work-zone HUD wiring (lane selector + close/reopen button) ----
   const wzLaneSel = $("wz-lane-select");
