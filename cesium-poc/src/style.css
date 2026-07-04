@@ -275,6 +275,7 @@ html, body, #cesiumContainer {
 .dc-status.online { color: #2ecc71; }
 .dc-status.offline { color: #ff7a6b; }
 .dc-status.auth-failed { color: #f1a325; }
+.dc-status.snapshot { color: #6db3f2; }
 
 .dc-asset-kpis { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 10px; }
 .dc-asset-kpi {

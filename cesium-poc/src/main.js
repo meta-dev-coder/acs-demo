@@ -860,6 +860,36 @@ async function loadDcAssets(viewer) {
   } catch (err) {
     console.warn("[DataConnect] asset load failed — keeping previous layer/data", err);
     // keep-previous-on-failure: dcCollection/dcScored/window.__dcAssets are left untouched.
+    // Static-host fallback: no live API AND nothing loaded yet -> one-shot snapshot of the same
+    // class JSONs shipped with the build (public/dataconnect-data/, produced by
+    // tools/dataconnect_export.py). Same adapter + scoring path; only the transport differs.
+    if (!dcScored.length) await loadDcSnapshot(viewer);
+  }
+}
+
+async function loadDcSnapshot(viewer) {
+  try {
+    const get = (name) => fetch(dataUrl(`dataconnect-data/${name}.json`)).then((r) => {
+      if (!r.ok || !(r.headers.get("content-type") || "").includes("json")) throw new Error(name);
+      return r.json();
+    });
+    const [assetRegistry, workOrders, safetyInspections, roadwayInspections, itsInspections, incidents] =
+      await Promise.all([
+        get(DC_CLASSES.assetRegistry), get(DC_CLASSES.workOrders), get(DC_CLASSES.safetyInspections),
+        get(DC_CLASSES.roadwayInspections), get(DC_CLASSES.itsInspections), get(DC_CLASSES.incidents),
+      ]);
+    const scored = scoreAssets(adaptDataConnectAssets({
+      assetRegistry, workOrders, safetyInspections, roadwayInspections, itsInspections, incidents,
+    }), []);
+    const prevCollection = dcCollection;
+    dcCollection = buildAssetLayer(viewer, scored);
+    if (prevCollection) disposeAssetLayer(viewer, prevCollection);
+    dcScored = scored;
+    renderDcAssetKpis(scored);
+    stopDcPolling(); // snapshot mode is static — no live endpoint to poll
+    setDcStatusBadge("snapshot");
+  } catch (err) {
+    console.warn("[DataConnect] snapshot fallback unavailable", err);
   }
 }
 
