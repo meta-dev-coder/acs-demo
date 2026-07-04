@@ -232,7 +232,10 @@ export function adaptDataConnectAssets(classes: Partial<DataConnectClasses> = {}
     const asset_tag = String(rawId);
     const category = rec["Asset Category"];
     const asset_class = mapAssetClass(category);
-    const label: string = rec["Asset Description"] || rec["Notes"] || category || asset_tag;
+    // String() coercion is load-bearing: ~1% of real asset_registry rows carry a NUMERIC
+    // "Asset Description" (and some a numeric "Segment"), and downstream UI calls
+    // label.toLowerCase() (A′ search filter) — a raw number here crashes the search bar.
+    const label: string = String(rec["Asset Description"] || rec["Notes"] || category || asset_tag);
     const location_desc: string =
       [rec["Segment"], rec["Location Category"]].filter(Boolean).join(" · ") || "Unspecified segment";
 

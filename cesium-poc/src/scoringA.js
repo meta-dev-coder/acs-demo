@@ -318,7 +318,10 @@ export function adaptDataConnectAssets({
     const asset_tag = String(rawId);
     const category = rec["Asset Category"];
     const asset_class = mapAssetClass(category);
-    const label = rec["Asset Description"] || rec["Notes"] || category || asset_tag;
+    // String() coercion is load-bearing: ~1% of real asset_registry rows carry a NUMERIC
+    // "Asset Description" — downstream string ops (search filters, Cesium label text) crash on
+    // a raw number. Same fix as the root app's scenarioAPrime/adapter.ts.
+    const label = String(rec["Asset Description"] || rec["Notes"] || category || asset_tag);
     const location_desc =
       [rec["Segment"], rec["Location Category"]].filter(Boolean).join(" · ") ||
       "Unspecified segment";

@@ -122,6 +122,25 @@ describe("adaptDataConnectAssets — fixture row mapping", () => {
     expect(out).toHaveLength(0);
   });
 
+  it("coerces non-string label sources to strings (39/5013 real asset_registry rows carry a numeric Asset Description — regression: search bar crashed on label.toLowerCase)", () => {
+    const out = adaptDataConnectAssets({
+      assetRegistry: [
+        {
+          "Asset ID": "NUM-1",
+          "Asset Category": "DMS",
+          "Asset Description": 60021, // numeric in the real export
+          "Segment": 4, // also numeric in some rows
+          "X Coordinates": -80.25,
+          "Y Coordinates": 26.09,
+        },
+      ],
+    });
+    expect(typeof out[0].label).toBe("string");
+    expect(out[0].label).toBe("60021");
+    expect(typeof out[0].location_desc).toBe("string");
+    expect(() => out[0].label.toLowerCase()).not.toThrow();
+  });
+
   it("falls back to a slugified AssetClass for categories outside the known map", () => {
     const out = adaptDataConnectAssets({
       assetRegistry: [
