@@ -55,6 +55,12 @@ jobs:
             mv cesium-poc/dist/acs-demo/twin/cesium cesium-poc/dist/cesium
             rm -rf cesium-poc/dist/acs-demo
           fi
+          # Same hoist for the ROOT app: the A' tab's Cesium panel makes the ACS build emit its
+          # cesium runtime at dist/acs-demo/acs/cesium — move it beside index.html/assets too.
+          if [ -d dist/acs-demo/acs/cesium ]; then
+            mv dist/acs-demo/acs/cesium dist/cesium
+            rm -rf dist/acs-demo
+          fi
           rm -rf _site && mkdir -p _site/acs _site/twin
           cp landing/index.html _site/index.html          # launcher = the front door
           cp -r dist/.          _site/acs/                 # Phase 1 (Bentley iTwin)
