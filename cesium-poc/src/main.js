@@ -141,6 +141,34 @@ let GANTRIES = [];
 let AVG_TOLL = 1.45;
 let assetIncidentOn = false;
 let gantrySource = "";   // where the gantry inventory came from (live ArcGIS vs local fallback)
+let tollRateSource = ""; // where the per-transaction toll came from (live NTTA rates vs default)
+
+// NTTA's OWN authoritative toll-rate table, hosted on their ArcGIS Online org — 194 toll points with
+// real per-class TagFare / PlateFare. Pulling the live TagFare here makes ArcGIS the system-of-record
+// for the ECONOMICS too, not just the geometry: revenue-at-risk is computed from real NTTA fares.
+const NTTA_TOLLRATES_URL = "https://services.arcgis.com/pS2RA6RqB5M3sZIg/arcgis/rest/services/NTTA_TollLocation_TollRates_View_PROD/FeatureServer/0/query";
+
+async function loadTollRates() {
+  const anchor = T ? { lon: T.p.anchorLon, lat: T.p.anchorLat } : { lon: -96.8229, lat: 33.0920 };
+  try {
+    const params = new URLSearchParams({
+      where: "CORRIDOR IN ('DNT','SRT') AND TagFare > 0",
+      geometry: `${anchor.lon},${anchor.lat}`, geometryType: "esriGeometryPoint", inSR: "4326",
+      distance: "8000", units: "esriSRUnit_Meter", spatialRel: "esriSpatialRelIntersects",
+      outFields: "TagFare", returnGeometry: "false", resultRecordCount: "80", f: "json",
+    });
+    const d = await (await fetch(`${NTTA_TOLLRATES_URL}?${params}`)).json();
+    const fares = (d.features || []).map((f) => Number(f.attributes?.TagFare)).filter((v) => v > 0).sort((a, b) => a - b);
+    if (!fares.length) throw new Error("no fares in response");
+    // A missed read = one gantry transaction not captured, so the revenue lost per missed read is a
+    // single-segment fare. AVG_TOLL is therefore the MEAN nearby TagFare — real NTTA money per read.
+    const avg = fares.reduce((s, v) => s + v, 0) / fares.length;
+    AVG_TOLL = Math.round(avg * 100) / 100;
+    tollRateSource = `NTTA rates · live ArcGIS ($${AVG_TOLL.toFixed(2)}/read · ${fares.length} pts)`;
+  } catch {
+    tollRateSource = "";   // leave AVG_TOLL at its gantry-source default
+  }
+}
 
 // NCTCOG regional "Toll Gantries" point layer — an authoritative, KEYLESS ArcGIS FeatureServer whose
 // points carry NTTA_Gantry_ID / Corridor / Maintaining_Authority. This is the geospatial system-of-record:
@@ -203,7 +231,11 @@ function renderGantries() {
 function renderAssetOps() {
   if (!$("assetops-hud")) return;
   const src = $("ao-src");
-  if (src && gantrySource) { src.textContent = gantrySource; src.classList.toggle("live", gantrySource.includes("ArcGIS")); }
+  if (src && gantrySource) {
+    const line = tollRateSource ? `${gantrySource} · ${tollRateSource}` : gantrySource;
+    src.textContent = line;
+    src.classList.toggle("live", line.includes("ArcGIS"));
+  }
   const throughput = window.__kpi?.throughputVph ?? currentData?.stats?.throughputVph ?? 0;
   const state = { gantries: GANTRIES, weather: _activeWeather, throughputVph: throughput, avgTollUsd: AVG_TOLL, peak: assetIncidentOn };
   const k = assetKpis(state);
@@ -772,6 +804,7 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
   _currentScenario = "baseline";  // boot always loads baseline; ensures baselineStats is captured
 
   await loadGantries();           // GIS asset inventory (gantries) — placed by rebuildBoothMarkers
+  await loadTollRates();          // real NTTA per-read TagFare → revenue-at-risk uses live ArcGIS $
   await loadRun(viewer, offlineUrl);
   R.clock.seek(0);  // ensure sim starts at t=0 on boot
   renderGatePanel();
