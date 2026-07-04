@@ -17,7 +17,7 @@
  *   - click a pin  -> storeAPrime.inspect(tag)  (inspector + left list highlight update).
  *   - list click   -> storeAPrime.inspect(tag)  -> this component flies to the asset.
  *--------------------------------------------------------------------------------------------*/
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   ArcGisMapServerImageryProvider,
   BoundingSphere,
@@ -50,6 +50,30 @@ const PIXEL_SIZE: Record<string, number> = { red: 14, amber: 11, green: 8 };
 
 function bandColor(band: string): Color {
   return Color.fromCssColorString(bandMeta(band as "red" | "amber" | "green").color);
+}
+
+/** Cluster disc: band-colored circle with a white rim (drawn once per color, cached) — the
+ *  billboard behind the cluster's count label, matching the iTwin cluster pins' look. */
+const discCache = new Map<string, string>();
+function clusterDisc(cssColor: string): string {
+  const cached = discCache.get(cssColor);
+  if (cached) return cached;
+  const size = 36;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return "";
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, size / 2 - 3, 0, Math.PI * 2);
+  ctx.fillStyle = cssColor;
+  ctx.fill();
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = "#ffffff";
+  ctx.stroke();
+  const url = canvas.toDataURL();
+  discCache.set(cssColor, url);
+  return url;
 }
 
 /** Rebuild the data source's entities from the store's current assets. */
@@ -96,7 +120,7 @@ function flyToAll(viewer: Viewer, assets: ScoredAssetPrime[]): void {
   viewer.camera.flyToBoundingSphere(sphere, { duration: 1.6 });
 }
 
-export default function CesiumView(): JSX.Element {
+export default function CesiumView(): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -126,6 +150,32 @@ export default function CesiumView(): JSX.Element {
     ds.clustering.enabled = true;
     ds.clustering.pixelRange = 34;
     ds.clustering.minimumClusterSize = 3;
+    // Style clusters like the iTwin cluster pins: a disc colored by the WORST band inside,
+    // with the asset count on it (Cesium's default is a bare white number, which reads as
+    // unexplained digits floating on the map).
+    const BAND_RANK: Record<string, number> = { red: 3, amber: 2, green: 1 };
+    ds.clustering.clusterEvent.addEventListener((clustered, cluster) => {
+      let worst = "green";
+      for (const e of clustered) {
+        const a = storeAPrime.getSnapshot().assets.find((x) => x.asset_tag === e.id);
+        if (a && (BAND_RANK[a.band] ?? 0) > (BAND_RANK[worst] ?? 0)) worst = a.band;
+      }
+      cluster.billboard.show = true;
+      cluster.billboard.image = clusterDisc(bandMeta(worst as "red" | "amber" | "green").color);
+      cluster.billboard.verticalOrigin = VerticalOrigin.CENTER;
+      cluster.billboard.disableDepthTestDistance = Number.POSITIVE_INFINITY;
+      cluster.label.show = true;
+      cluster.label.text = String(clustered.length);
+      cluster.label.font = "700 13px 'Segoe UI', sans-serif";
+      cluster.label.fillColor = Color.WHITE;
+      cluster.label.outlineColor = Color.fromCssColorString("#10151c");
+      cluster.label.outlineWidth = 2;
+      cluster.label.style = LabelStyle.FILL_AND_OUTLINE;
+      cluster.label.horizontalOrigin = HorizontalOrigin.CENTER;
+      cluster.label.verticalOrigin = VerticalOrigin.CENTER;
+      cluster.label.pixelOffset = new Cartesian2(0, 0);
+      cluster.label.disableDepthTestDistance = Number.POSITIVE_INFINITY;
+    });
     void viewer.dataSources.add(ds);
 
     let lastAssets = storeAPrime.getSnapshot().assets;
