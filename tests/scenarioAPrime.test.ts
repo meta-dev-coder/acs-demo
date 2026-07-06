@@ -12,6 +12,7 @@ import {
   fetchAllClasses,
   loadAssetsPrime,
   resolveDcBaseUrl,
+  snapshotUrl,
 } from "../src/scenarioAPrime/dataSource";
 import { storeAPrime } from "../src/scenarioAPrime/storeAPrime";
 import type { DcRow } from "../src/scenarioAPrime/types";
@@ -213,6 +214,17 @@ describe("resolveDcBaseUrl", () => {
   });
 });
 
+describe("snapshotUrl — deployed-snapshot path is anchored to BASE_URL, not the page URL", () => {
+  it("resolves ../twin under the Pages base regardless of the address bar's trailing slash", () => {
+    // Pages: app base /acs-demo/acs/ -> data lives beside it at /acs-demo/twin/.
+    expect(snapshotUrl("asset_registry", "/acs-demo/acs/")).toBe(
+      "/acs-demo/twin/dataconnect-data/asset_registry.json"
+    );
+    // Local dev: base "/" -> "/twin/..." (404s locally, falling through to tier (c) as designed).
+    expect(snapshotUrl("asset_registry", "/")).toBe("/twin/dataconnect-data/asset_registry.json");
+  });
+});
+
 describe("fetchAllClasses — tier selection", () => {
   it("selects live -> snapshot -> local in priority order as each tier is (un)available", async () => {
     // (a) ?dc=<base> present -> live DataConnect API client.
@@ -230,7 +242,7 @@ describe("fetchAllClasses — tier selection", () => {
     // (b) no ?dc= -> deployed snapshot path.
     global.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.includes("../twin/dataconnect-data/")) return fakeResponse([{ mock: "snapshot" }]);
+      if (url.includes("/twin/dataconnect-data/")) return fakeResponse([{ mock: "snapshot" }]);
       throw new Error("unexpected url in snapshot-tier test: " + url);
     }) as unknown as typeof fetch;
     const snapshot = await fetchAllClasses("");
@@ -240,7 +252,7 @@ describe("fetchAllClasses — tier selection", () => {
     // (c) snapshot fetch fails -> local dev-root fallback.
     global.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.includes("../twin/dataconnect-data/")) return fakeResponse(null, { ok: false, status: 404 });
+      if (url.includes("/twin/dataconnect-data/")) return fakeResponse(null, { ok: false, status: 404 });
       if (url.startsWith("/dataconnect-data/")) return fakeResponse([{ mock: "local" }]);
       throw new Error("unexpected url in local-tier test: " + url);
     }) as unknown as typeof fetch;

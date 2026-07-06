@@ -5,10 +5,11 @@
  *   (a) ?dc=<base> query param present  -> live DataConnect API (dataconnectClient.ts), the
  *       same login()+fetchClass() pagination/timeout/refresh-once-on-401 logic ported from
  *       cesium-poc/src/dataconnect.js.
- *   (b) else a static snapshot fetch at "../twin/dataconnect-data/<class>.json" — the DEPLOYED
- *       layout (this app is served from /acs-demo/acs/, the twin + its DataConnect data from
- *       /acs-demo/twin/). A plain relative fetch resolves correctly against the page's own URL,
- *       so no base-path math is needed here.
+ *   (b) else a static snapshot fetch at "<BASE_URL>../twin/dataconnect-data/<class>.json" — the
+ *       DEPLOYED layout (this app is served from /acs-demo/acs/, the twin + its DataConnect
+ *       data from /acs-demo/twin/). Resolved against the build-time BASE_URL, not the page URL
+ *       (see snapshotUrl below — the post-OAuth page URL can lack its trailing slash, which
+ *       silently re-anchors a page-relative fetch one directory up).
  *   (c) else "/dataconnect-data/<class>.json" (site-root) — local dev fallback, tried only when
  *       (b) fails (e.g. running this app standalone, not under the deployed /acs-demo/ tree).
  *
@@ -71,6 +72,20 @@ async function fetchJsonArray(url: string): Promise<DcRow[]> {
   return body as DcRow[];
 }
 
+/** Deployed-snapshot URL for one DataConnect class. Resolved against the app's build-time
+ *  BASE_URL ("/acs-demo/acs/" on Pages, "/" locally), NOT the page URL: after the OAuth
+ *  redirect the SPA can sit at a no-trailing-slash URL (/acs-demo/acs), where a page-relative
+ *  "../twin/…" fetch shifts up one directory to /twin/… and 404s — the exact "assets load on
+ *  my machine but not on a fresh one" failure (a cached IMS session skips the redirect, so the
+ *  trailing slash survives and the old relative fetch happened to work). */
+export function snapshotUrl(
+  name: string,
+  base: string = import.meta.env?.BASE_URL || "/"
+): string {
+  return new URL(`../twin/dataconnect-data/${name}.json`, new URL(base, "http://resolve.invalid"))
+    .pathname;
+}
+
 function zipClasses(names: string[], rowsList: DcRow[][]): DataConnectClasses {
   const byName = new Map(names.map((n, i) => [n, rowsList[i]]));
   return {
@@ -108,7 +123,7 @@ export async function fetchAllClasses(search?: string): Promise<DcLoadResult> {
   }
 
   try {
-    const rows = await Promise.all(names.map((n) => fetchJsonArray(`../twin/dataconnect-data/${n}.json`)));
+    const rows = await Promise.all(names.map((n) => fetchJsonArray(snapshotUrl(n))));
     return { classes: zipClasses(names, rows), tier: "snapshot" };
   } catch {
     const rows = await Promise.all(names.map((n) => fetchJsonArray(`/dataconnect-data/${n}.json`)));
