@@ -122,8 +122,8 @@
     "inspection_date": "2024-06-07T00:00:00",
     "inspection_time": "09:45",
     "inspector_name": "L. Patel",
-    "x_coordinate": null,
-    "y_coordinate": null,
+    "x_coordinate": -80.32952785,
+    "y_coordinate": 26.1176701,
     "weather": "Clear",
     "traffic_conditions": "Heavy",
     "observed_condition": "Impact-related damage observed",
@@ -171,8 +171,7 @@
     "risk_rating_1_5_v3": 2,
     "risk_reason_standardized": "Low observed safety risk based on checklist findings",
     "safety_issue_description_v3": "Inspection completed with no notable issues.",
-    "inspection_form_family": "Roadway Safety Inspection V3",
-    "_coordinateIssue": "out of corridor bounds (lon=26.1176701, lat=-8.32952785)"
+    "inspection_form_family": "Roadway Safety Inspection V3"
   },
   {
     "inspection_id": "INSP-100239",
@@ -935,8 +934,8 @@
     "inspection_date": "2024-09-04T00:00:00",
     "inspection_time": "06:15",
     "inspector_name": "T. Nguyen",
-    "x_coordinate": null,
-    "y_coordinate": null,
+    "x_coordinate": -80.32952785,
+    "y_coordinate": 26.1176701,
     "weather": "Clear",
     "traffic_conditions": "Heavy",
     "observed_condition": "Impact-related damage observed",
@@ -984,8 +983,7 @@
     "risk_rating_1_5_v3": 3,
     "risk_reason_standardized": "Low observed safety risk based on checklist findings",
     "safety_issue_description_v3": "Inspection completed with no notable issues.",
-    "inspection_form_family": "Roadway Safety Inspection V3",
-    "_coordinateIssue": "out of corridor bounds (lon=26.1176701, lat=-8.32952785)"
+    "inspection_form_family": "Roadway Safety Inspection V3"
   },
   {
     "inspection_id": "INSP-100240",
@@ -2212,8 +2210,8 @@
     "inspection_date": "2024-12-02T00:00:00",
     "inspection_time": "09:45",
     "inspector_name": "L. Patel",
-    "x_coordinate": null,
-    "y_coordinate": null,
+    "x_coordinate": -80.32952785,
+    "y_coordinate": 26.1176701,
     "weather": "Storm Recovery",
     "traffic_conditions": "Heavy",
     "observed_condition": "Poor",
@@ -2261,8 +2259,7 @@
     "risk_rating_1_5_v3": 2,
     "risk_reason_standardized": "Low observed safety risk based on checklist findings",
     "safety_issue_description_v3": "Inspection completed with no notable issues.",
-    "inspection_form_family": "Roadway Safety Inspection V3",
-    "_coordinateIssue": "out of corridor bounds (lon=26.1176701, lat=-8.32952785)"
+    "inspection_form_family": "Roadway Safety Inspection V3"
   },
   {
     "inspection_id": "INSP-100139",
@@ -4185,8 +4182,8 @@
     "inspection_date": "2025-03-21T00:00:00",
     "inspection_time": "13:00",
     "inspector_name": "R. Gomez",
-    "x_coordinate": null,
-    "y_coordinate": null,
+    "x_coordinate": -80.32952785,
+    "y_coordinate": 26.1176701,
     "weather": "Windy",
     "traffic_conditions": "Peak Congestion",
     "observed_condition": "Accelerated wear",
@@ -4234,8 +4231,7 @@
     "risk_rating_1_5_v3": 5,
     "risk_reason_standardized": "Impact attenuation may not perform as intended during a crash",
     "safety_issue_description_v3": "Crash attenuator damaged or cartridge expiration concern",
-    "inspection_form_family": "Roadway Safety Inspection V3",
-    "_coordinateIssue": "out of corridor bounds (lon=26.1176701, lat=-8.32952785)"
+    "inspection_form_family": "Roadway Safety Inspection V3"
   },
   {
     "inspection_id": "INSP-100140",
@@ -5694,8 +5690,8 @@
     "inspection_date": "2025-05-07T00:00:00",
     "inspection_time": "17:15",
     "inspector_name": "J. Morgan",
-    "x_coordinate": null,
-    "y_coordinate": null,
+    "x_coordinate": -80.32952785,
+    "y_coordinate": 26.1176701,
     "weather": "Humid",
     "traffic_conditions": "Light",
     "observed_condition": "Poor",
@@ -5743,8 +5739,7 @@
     "risk_rating_1_5_v3": 4,
     "risk_reason_standardized": "Low observed safety risk based on checklist findings",
     "safety_issue_description_v3": "Inspection completed with no notable issues.",
-    "inspection_form_family": "Roadway Safety Inspection V3",
-    "_coordinateIssue": "out of corridor bounds (lon=26.1176701, lat=-8.32952785)"
+    "inspection_form_family": "Roadway Safety Inspection V3"
   },
   {
     "inspection_id": "INSP-100279",
@@ -5985,8 +5980,8 @@
     "inspection_date": "2025-05-18T00:00:00",
     "inspection_time": "06:45",
     "inspector_name": "L. Patel",
-    "x_coordinate": null,
-    "y_coordinate": null,
+    "x_coordinate": -80.32952785,
+    "y_coordinate": 26.1176701,
     "weather": "Windy",
     "traffic_conditions": "Light",
     "observed_condition": "Good",
@@ -6034,8 +6029,7 @@
     "risk_rating_1_5_v3": 2,
     "risk_reason_standardized": "Low observed safety risk based on checklist findings",
     "safety_issue_description_v3": "Inspection completed with no notable issues.",
-    "inspection_form_family": "Roadway Safety Inspection V3",
-    "_coordinateIssue": "out of corridor bounds (lon=26.1176701, lat=-8.32952785)"
+    "inspection_form_family": "Roadway Safety Inspection V3"
   },
   {
     "inspection_id": "INSP-100155",
@@ -6508,8 +6502,8 @@
     "inspection_date": "2025-06-15T00:00:00",
     "inspection_time": "07:15",
     "inspector_name": "R. Gomez",
-    "x_coordinate": null,
-    "y_coordinate": null,
+    "x_coordinate": -80.32952785,
+    "y_coordinate": 26.1176701,
     "weather": "Storm Recovery",
     "traffic_conditions": "Heavy",
     "observed_condition": "Poor",
@@ -6557,8 +6551,7 @@
     "risk_rating_1_5_v3": 2,
     "risk_reason_standardized": "Routine condition observation",
     "safety_issue_description_v3": "Outfall instability or scour noted",
-    "inspection_form_family": "Roadway Safety Inspection V3",
-    "_coordinateIssue": "out of corridor bounds (lon=26.1176701, lat=-8.32952785)"
+    "inspection_form_family": "Roadway Safety Inspection V3"
   },
   {
     "inspection_id": "INSP-100042",
@@ -8249,8 +8242,8 @@
     "inspection_date": "2025-08-06T00:00:00",
     "inspection_time": "11:45",
     "inspector_name": "T. Nguyen",
-    "x_coordinate": null,
-    "y_coordinate": null,
+    "x_coordinate": -80.32952785,
+    "y_coordinate": 26.1176701,
     "weather": "Clear",
     "traffic_conditions": "Moderate",
     "observed_condition": "Accelerated wear",
@@ -8298,8 +8291,7 @@
     "risk_rating_1_5_v3": 2,
     "risk_reason_standardized": "Low observed safety risk based on checklist findings",
     "safety_issue_description_v3": "Inspection completed with no notable issues.",
-    "inspection_form_family": "Roadway Safety Inspection V3",
-    "_coordinateIssue": "out of corridor bounds (lon=26.1176701, lat=-8.32952785)"
+    "inspection_form_family": "Roadway Safety Inspection V3"
   },
   {
     "inspection_id": "INSP-100049",
@@ -9062,8 +9054,8 @@
     "inspection_date": "2025-08-22T00:00:00",
     "inspection_time": "13:15",
     "inspector_name": "L. Patel",
-    "x_coordinate": null,
-    "y_coordinate": null,
+    "x_coordinate": -80.32952785,
+    "y_coordinate": 26.1176701,
     "weather": "Clear",
     "traffic_conditions": "Light",
     "observed_condition": "Impact-related damage observed",
@@ -9111,8 +9103,7 @@
     "risk_rating_1_5_v3": 3,
     "risk_reason_standardized": "Ride quality degradation with potential tire and suspension damage risk; Progressive structural or pavement support loss risk",
     "safety_issue_description_v3": "Potholes or localized surface failures observed; Erosion undermining pavement or roadside feature",
-    "inspection_form_family": "Roadway Safety Inspection V3",
-    "_coordinateIssue": "out of corridor bounds (lon=26.1176701, lat=-8.32952785)"
+    "inspection_form_family": "Roadway Safety Inspection V3"
   },
   {
     "inspection_id": "INSP-100017",
@@ -11093,8 +11084,8 @@
     "inspection_date": "2025-11-12T00:00:00",
     "inspection_time": "07:30",
     "inspector_name": "C. Walker",
-    "x_coordinate": null,
-    "y_coordinate": null,
+    "x_coordinate": -80.32952785,
+    "y_coordinate": 26.1176701,
     "weather": "Humid",
     "traffic_conditions": "Moderate",
     "observed_condition": "Fair",
@@ -11142,8 +11133,7 @@
     "risk_rating_1_5_v3": 1,
     "risk_reason_standardized": "Low observed safety risk based on checklist findings",
     "safety_issue_description_v3": "Inspection completed with no notable issues.",
-    "inspection_form_family": "Roadway Safety Inspection V3",
-    "_coordinateIssue": "out of corridor bounds (lon=26.1176701, lat=-8.32952785)"
+    "inspection_form_family": "Roadway Safety Inspection V3"
   },
   {
     "inspection_id": "INSP-100259",
@@ -11152,8 +11142,8 @@
     "inspection_date": "2025-11-12T00:00:00",
     "inspection_time": "13:15",
     "inspector_name": "R. Gomez",
-    "x_coordinate": null,
-    "y_coordinate": null,
+    "x_coordinate": -80.32952785,
+    "y_coordinate": 26.1176701,
     "weather": "Storm Recovery",
     "traffic_conditions": "Incident Spillback",
     "observed_condition": "Poor",
@@ -11201,8 +11191,7 @@
     "risk_rating_1_5_v3": 2,
     "risk_reason_standardized": "Routine condition observation",
     "safety_issue_description_v3": "Surface raveling or delamination observed",
-    "inspection_form_family": "Roadway Safety Inspection V3",
-    "_coordinateIssue": "out of corridor bounds (lon=26.1176701, lat=-8.32952785)"
+    "inspection_form_family": "Roadway Safety Inspection V3"
   },
   {
     "inspection_id": "INSP-100249",
@@ -12603,8 +12592,8 @@
     "inspection_date": "2026-01-25T00:00:00",
     "inspection_time": "18:15",
     "inspector_name": "T. Nguyen",
-    "x_coordinate": null,
-    "y_coordinate": null,
+    "x_coordinate": -80.32952785,
+    "y_coordinate": 26.1176701,
     "weather": "Overcast",
     "traffic_conditions": "Moderate",
     "observed_condition": "Good",
@@ -12652,8 +12641,7 @@
     "risk_rating_1_5_v3": 2,
     "risk_reason_standardized": "Low observed safety risk based on checklist findings",
     "safety_issue_description_v3": "Inspection completed with no notable issues.",
-    "inspection_form_family": "Roadway Safety Inspection V3",
-    "_coordinateIssue": "out of corridor bounds (lon=26.1176701, lat=-8.32952785)"
+    "inspection_form_family": "Roadway Safety Inspection V3"
   },
   {
     "inspection_id": "INSP-100149",
@@ -13010,8 +12998,8 @@
     "inspection_date": "2026-02-17T00:00:00",
     "inspection_time": "08:15",
     "inspector_name": "R. Gomez",
-    "x_coordinate": null,
-    "y_coordinate": null,
+    "x_coordinate": -80.32952785,
+    "y_coordinate": 26.1176701,
     "weather": "Clear",
     "traffic_conditions": "Peak Congestion",
     "observed_condition": "Accelerated wear",
@@ -13059,8 +13047,7 @@
     "risk_rating_1_5_v3": 3,
     "risk_reason_standardized": "Low observed safety risk based on checklist findings",
     "safety_issue_description_v3": "Inspection completed with no notable issues.",
-    "inspection_form_family": "Roadway Safety Inspection V3",
-    "_coordinateIssue": "out of corridor bounds (lon=26.1176701, lat=-8.32952785)"
+    "inspection_form_family": "Roadway Safety Inspection V3"
   },
   {
     "inspection_id": "INSP-100200",
@@ -13881,8 +13868,8 @@
     "inspection_date": "2026-04-25T00:00:00",
     "inspection_time": "11:45",
     "inspector_name": "R. Gomez",
-    "x_coordinate": null,
-    "y_coordinate": null,
+    "x_coordinate": -80.32952785,
+    "y_coordinate": 26.1176701,
     "weather": "Rain",
     "traffic_conditions": "Heavy",
     "observed_condition": "Fair",
@@ -13930,8 +13917,7 @@
     "risk_rating_1_5_v3": 3,
     "risk_reason_standardized": "Low observed safety risk based on checklist findings",
     "safety_issue_description_v3": "Inspection completed with no notable issues.",
-    "inspection_form_family": "Roadway Safety Inspection V3",
-    "_coordinateIssue": "out of corridor bounds (lon=26.1176701, lat=-8.32952785)"
+    "inspection_form_family": "Roadway Safety Inspection V3"
   },
   {
     "inspection_id": "INSP-100298",
@@ -14346,8 +14332,8 @@
     "inspection_date": "2026-05-31T00:00:00",
     "inspection_time": "10:15",
     "inspector_name": "R. Gomez",
-    "x_coordinate": null,
-    "y_coordinate": null,
+    "x_coordinate": -80.32952785,
+    "y_coordinate": 26.1176701,
     "weather": "Windy",
     "traffic_conditions": "Heavy",
     "observed_condition": "Good",
@@ -14395,8 +14381,7 @@
     "risk_rating_1_5_v3": 2,
     "risk_reason_standardized": "Recovery risk for errant vehicles re-entering the travel way",
     "safety_issue_description_v3": "Edge drop-off greater than 2 inches",
-    "inspection_form_family": "Roadway Safety Inspection V3",
-    "_coordinateIssue": "out of corridor bounds (lon=26.1176701, lat=-8.32952785)"
+    "inspection_form_family": "Roadway Safety Inspection V3"
   },
   {
     "inspection_id": "INSP-100025",

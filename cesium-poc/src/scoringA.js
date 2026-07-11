@@ -14,7 +14,11 @@
  * per render) so the demo is stable across reloads. This is adapter-only synthesis; it does not
  * touch the scoring math itself.
  *--------------------------------------------------------------------------------------------*/
-import rawConfig from "./scoringConfig.json";
+// `with { type: "json" }` is required by Node's ESM loader (not merely a Vite/esbuild nicety —
+// plain `node --test` throws ERR_IMPORT_ATTRIBUTE_MISSING without it) so this stays importable
+// in plain Node, per this file's own header comment. Vite/esbuild 0.21+ parse it too.
+import rawConfig from "./scoringConfig.json" with { type: "json" };
+import { isAccidentCategory } from "./uc1Data.js";
 
 export const config = rawConfig;
 
@@ -285,13 +289,16 @@ function synthesizeLifecycle(assetTag, assetClass, hasHeavyTraffic, hasSevereInc
 
 /**
  * adaptDataConnectAssets({assetRegistry, workOrders, safetyInspections, roadwayInspections,
- * itsInspections, incidents}) -> RawAsset[]
+ * itsInspections, incidents, tickets}) -> RawAsset[]
  *
  * Joins every dataset back to asset_registry by Asset ID (work_orders/incidents use "Asset ID" /
- * "damaged_asset_id"; the three inspection classes use "asset_id"). Produces one RawAsset per
- * asset_registry row that has usable coordinates. Extra fields beyond RawAsset (`lon`, `lat`,
- * `_related`) ride along through scoreAsset()'s `{...a, ...}` spread untouched, for
- * assetLayer.js's placement + info-panel needs.
+ * "damaged_asset_id"; the three inspection classes use "asset_id"; tickets — new V6 class, see
+ * uc1Data.js's TICKETS_CLASS — use "Asset ID" like work orders). Produces one RawAsset per
+ * asset_registry row that has usable coordinates, EXCEPT rows tagged Asset Category "Accidents"
+ * (isAccidentCategory(), uc1Data.js): those are dated safety events, not physical assets, and are
+ * split out of this stream entirely — see uc1Data.js's extractAccidents() for where they go
+ * instead. Extra fields beyond RawAsset (`lon`, `lat`, `_related`) ride along through
+ * scoreAsset()'s `{...a, ...}` spread untouched, for assetLayer.js's placement + info-panel needs.
  */
 export function adaptDataConnectAssets({
   assetRegistry = [],
@@ -300,15 +307,18 @@ export function adaptDataConnectAssets({
   roadwayInspections = [],
   itsInspections = [],
   incidents = [],
+  tickets = [],
 } = {}) {
   const woByAsset = groupByAssetId(workOrders, "Asset ID");
   const safetyByAsset = groupByAssetId(safetyInspections, "asset_id");
   const roadwayByAsset = groupByAssetId(roadwayInspections, "asset_id");
   const itsByAsset = groupByAssetId(itsInspections, "asset_id");
   const incidentsByAsset = groupByAssetId(incidents, "damaged_asset_id");
+  const ticketsByAsset = groupByAssetId(tickets, "Asset ID");
 
   const out = [];
   for (const rec of assetRegistry) {
+    if (isAccidentCategory(rec["Asset Category"])) continue; // dated safety event, not an asset — see extractAccidents()
     const rawId = rec["Asset ID"];
     if (rawId == null || rawId === "") continue;
     const lon = Number(rec["X Coordinates"]);
@@ -331,6 +341,7 @@ export function adaptDataConnectAssets({
     const roadway = roadwayByAsset.get(asset_tag) || [];
     const its = itsByAsset.get(asset_tag) || [];
     const assetIncidents = incidentsByAsset.get(asset_tag) || [];
+    const assetTickets = ticketsByAsset.get(asset_tag) || [];
     const inspections = [...safety, ...roadway, ...its];
 
     const open_tickets = wo.filter((w) => OPEN_STATUSES.has(w["Work Order Status"])).length;
@@ -374,6 +385,7 @@ export function adaptDataConnectAssets({
         workOrders: wo.length,
         inspections: inspections.length,
         incidents: assetIncidents.length,
+        tickets: assetTickets.length,
       },
     });
   }

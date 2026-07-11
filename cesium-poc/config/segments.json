@@ -1,0 +1,30 @@
+[
+  {
+    "id": "west",
+    "name": "West Segment",
+    "lonBand": [-80.361496, -80.3108292],
+    "laneCount": 3,
+    "demandScale": 0.62
+  },
+  {
+    "id": "central-west",
+    "name": "Central-West Segment",
+    "lonBand": [-80.3105545, -80.2717667],
+    "laneCount": 3,
+    "demandScale": 1.1
+  },
+  {
+    "id": "central",
+    "name": "Central Segment",
+    "lonBand": [-80.2716751, -80.2290878],
+    "laneCount": 3,
+    "demandScale": 1.08
+  },
+  {
+    "id": "east",
+    "name": "East Segment",
+    "lonBand": [-80.2288895, -80.1756363],
+    "laneCount": 3,
+    "demandScale": 1.2
+  }
+]

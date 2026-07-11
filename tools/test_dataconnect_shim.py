@@ -112,7 +112,7 @@ def test_pagination_math(port, token):
                          body={"className": "asset_registry", "page": 1, "pageSize": 1000}, token=token)
     total = first["total"]
     check("pagination: total is the full asset_registry.json record count",
-          total == 5013, f"got {total}")
+          total == 5015, f"got {total}")
 
     page_size = 1000
     last_full_page = total // page_size  # 1-indexed page number of the last full page
@@ -161,7 +161,7 @@ def test_field_filter(port, token):
                                  token=token)
     check("filtered search -> 200", status == 200, f"got {status}")
     check("filtered search: total is less than the unfiltered class total",
-          0 < filtered["total"] < 5013, filtered["total"])
+          0 < filtered["total"] < 5015, filtered["total"])
     check("filtered search: total matches the known Lighting count (2679)",
           filtered["total"] == 2679, filtered["total"])
     check("filtered search: every returned item matches the filter",

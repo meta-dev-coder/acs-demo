@@ -1,0 +1,15 @@
+{
+  "_comment": "UC1 P2-a synthetic demand curve knobs (config-driven per CLAUDE.md — no magic numbers in demand.js). baseVph is the segment's headline flow at multiplier 1.0 (a weekday AM/PM peak); actual vph = baseVph * hourMultiplier(hour, weekday|weekend) * segment.demandScale.",
+  "baseVph": 4200,
+  "troughMultiplier": 0.08,
+  "shoulderMultiplier": 0.35,
+  "dayStartHour": 6,
+  "dayEndHour": 22,
+  "weekdayPeaks": [
+    { "name": "AM", "startHour": 7, "endHour": 9, "peakMultiplier": 1.0, "rampHours": 1.25 },
+    { "name": "PM", "startHour": 16, "endHour": 19, "peakMultiplier": 1.0, "rampHours": 1.5 }
+  ],
+  "weekendPeaks": [
+    { "name": "midday", "startHour": 11, "endHour": 16, "peakMultiplier": 0.62, "rampHours": 2 }
+  ]
+}

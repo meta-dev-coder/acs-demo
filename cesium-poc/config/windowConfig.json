@@ -1,0 +1,33 @@
+{
+  "_comment": "UC1 P2-b window-evaluator config (design spec §3). All lane-closure revenue/delay/safety math is driven from here — nothing scoring-related is hardcoded in windowEval.js. tollRateUsd/weights are the 'missing numbers seeded in config, surfaced as editable assumptions' from spec Decision 4; sliders in the trust panel (P5) mutate a clone of this object at runtime.",
+  "sliceMinutes": 15,
+  "workZoneCapacityVphpl": 1600,
+  "mergeFriction": 0.9,
+  "tollRateUsd": 2.5,
+  "revenueUncertaintyBand": 0.15,
+  "weights": {
+    "revenue": 0.5,
+    "delay": 0.2,
+    "safety": 0.3,
+    "crew": 0
+  },
+  "crewCostUsd": 0,
+  "scoreNormalization": {
+    "_comment": "Reference scales that turn R(w)/delay/E(w)/crew into comparable ~0-1ish magnitudes before the weighted sum. Tunable, not load-bearing for ranking correctness (weights dominate rank order).",
+    "revenueRefUsd": 5000,
+    "delayRefMin": 30,
+    "exposureRef": 1,
+    "crewRefUsd": 1000
+  },
+  "crashExposure": {
+    "_comment": "normalizerVeh: 'typical' vehicle exposure a closure window sees, used to scale the blended incident rate into an index. segmentBlendK: shrinkage constant (spec §3 rate blend) — segment weight = n/(n+k), so a segment with 0 sample rows falls back to the corridor-wide rate exactly, and weight grows toward 1 as segment sample size n grows relative to k.",
+    "normalizerVeh": 5000,
+    "segmentBlendK": 5
+  },
+  "candidateHeuristics": {
+    "_comment": "The 3 system-suggested windows (spec §3): next weeknight overnight, next weekend morning, next weekday 14:00 (the teaching-bad option — daytime closure during travel hours).",
+    "overnight": { "label": "Overnight (weeknight 23:00)", "hour": 23, "durationHours": 4, "dayType": "weeknight" },
+    "weekendMorning": { "label": "Weekend morning (07:00)", "hour": 7, "durationHours": 4, "dayType": "weekend" },
+    "weekdayPm": { "label": "Weekday 14:00 (peak-adjacent)", "hour": 14, "durationHours": 4, "dayType": "weekday" }
+  }
+}

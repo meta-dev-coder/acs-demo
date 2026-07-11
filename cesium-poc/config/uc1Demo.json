@@ -1,0 +1,9 @@
+{
+  "heroWorkOrderId": "WO-900543",
+  "heroAssetId": "11754",
+  "rationale": "Open WO WO-900543 (asset 11754, East Segment) has a linked ticket (TIC-500663), a failed inspection within 500m (risk 5), and 22 accidents within 500m.",
+  "notes": "Perfect match: all three hero criteria satisfied by real V6 data.",
+  "isPerfectMatch": true,
+  "criteriaMet": 3,
+  "candidatesConsidered": 154
+}

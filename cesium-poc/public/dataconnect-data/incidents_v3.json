@@ -16,15 +16,17 @@
     "speeding_involved_y_n": "Yes",
     "safety_devices_present": "Barrier wall",
     "damaged_asset_id": "11563",
-    "damaged_asset_description": "False",
+    "damaged_asset_description": "Lighting",
     "police_report_number": "PR-188588",
     "recommended_next_action": "Review hotspot segment",
     "location_notes": "Central Segment - Fatality precursor corridor",
     "scenario_category": "Safety",
     "scenario_name": "Fatality precursor corridor",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.25240228,
+    "y_coordinate (from asset)": 26.09852804
   },
   {
     "incident_id": "INC-200063",
@@ -43,15 +45,17 @@
     "speeding_involved_y_n": "Yes",
     "safety_devices_present": "Attenuator",
     "damaged_asset_id": "11894",
-    "damaged_asset_description": "False",
+    "damaged_asset_description": "WGT",
     "police_report_number": "PR-885933",
     "recommended_next_action": "Create work order",
     "location_notes": "Central Segment - Highest-impact closure patterns",
     "scenario_category": "Executive",
     "scenario_name": "Highest-impact closure patterns",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.21608009,
+    "y_coordinate (from asset)": 26.08311289
   },
   {
     "incident_id": "INC-200004",
@@ -70,15 +74,17 @@
     "speeding_involved_y_n": "No",
     "safety_devices_present": "ITS warning devices",
     "damaged_asset_id": "11894",
-    "damaged_asset_description": "False",
+    "damaged_asset_description": "WGT",
     "police_report_number": "PR-693851",
     "recommended_next_action": "Temporary mitigation",
     "location_notes": "Central Segment - Fatality precursor corridor",
     "scenario_category": "Safety",
     "scenario_name": "Fatality precursor corridor",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.21608009,
+    "y_coordinate (from asset)": 26.08311289
   },
   {
     "incident_id": "INC-200049",
@@ -104,8 +110,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Multi-signal hotspot with delayed mitigation",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central-West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.3046494,
+    "y_coordinate (from asset)": 26.1127148
   },
   {
     "incident_id": "INC-200060",
@@ -131,8 +139,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Multi-signal hotspot with delayed mitigation",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central-West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2937317,
+    "y_coordinate (from asset)": 26.1093578
   },
   {
     "incident_id": "INC-200017",
@@ -151,15 +161,17 @@
     "speeding_involved_y_n": "Yes",
     "safety_devices_present": "ITS warning devices",
     "damaged_asset_id": "11117",
-    "damaged_asset_description": "False",
+    "damaged_asset_description": "Lighting",
     "police_report_number": "PR-374526",
     "recommended_next_action": "Temporary mitigation",
     "location_notes": "East Segment - Repeat crash / lane closure cluster",
     "scenario_category": "Safety",
     "scenario_name": "Repeat crash / lane closure cluster",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.31668684,
+    "y_coordinate (from asset)": 26.11491405
   },
   {
     "incident_id": "INC-200006",
@@ -185,8 +197,10 @@
     "scenario_category": "Safety",
     "scenario_name": "Fatality precursor corridor",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.32952785,
+    "y_coordinate (from asset)": 26.1176701
   },
   {
     "incident_id": "INC-200067",
@@ -212,8 +226,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Highest-impact closure patterns",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2469482,
+    "y_coordinate (from asset)": 26.0977783
   },
   {
     "incident_id": "INC-200038",
@@ -239,8 +255,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Open backlog near recent failed inspections",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2177811,
+    "y_coordinate (from asset)": 26.0911102
   },
   {
     "incident_id": "INC-200022",
@@ -259,15 +277,17 @@
     "speeding_involved_y_n": "Yes",
     "safety_devices_present": "Warning signs",
     "damaged_asset_id": "182",
-    "damaged_asset_description": "False",
+    "damaged_asset_description": "Detector",
     "police_report_number": "PR-135753",
     "recommended_next_action": "Temporary mitigation",
     "location_notes": "East Segment - Repeat crash / lane closure cluster",
     "scenario_category": "Safety",
     "scenario_name": "Repeat crash / lane closure cluster",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.34062038,
+    "y_coordinate (from asset)": 26.11894077
   },
   {
     "incident_id": "INC-200027",
@@ -293,8 +313,10 @@
     "scenario_category": "Reliability",
     "scenario_name": "ITS repeat communications failures",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2361145,
+    "y_coordinate (from asset)": 26.0961113
   },
   {
     "incident_id": "INC-200037",
@@ -320,8 +342,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Open backlog near recent failed inspections",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2155533,
+    "y_coordinate (from asset)": 26.0911102
   },
   {
     "incident_id": "INC-200016",
@@ -347,8 +371,10 @@
     "scenario_category": "Safety",
     "scenario_name": "Repeat crash / lane closure cluster",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2103653,
+    "y_coordinate (from asset)": 26.088419
   },
   {
     "incident_id": "INC-200001",
@@ -367,15 +393,17 @@
     "speeding_involved_y_n": "Yes",
     "safety_devices_present": "Attenuator",
     "damaged_asset_id": "11511",
-    "damaged_asset_description": "False",
+    "damaged_asset_description": "Lighting",
     "police_report_number": "PR-202163",
     "recommended_next_action": "Create work order",
     "location_notes": "Central Segment - Fatality precursor corridor",
     "scenario_category": "Safety",
     "scenario_name": "Fatality precursor corridor",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.25747676,
+    "y_coordinate (from asset)": 26.10056618
   },
   {
     "incident_id": "INC-200033",
@@ -401,8 +429,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Open backlog near recent failed inspections",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.1967087,
+    "y_coordinate (from asset)": 26.0851345
   },
   {
     "incident_id": "INC-200076",
@@ -428,8 +458,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Assets with repeated spend but persistent issues",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.3211136,
+    "y_coordinate (from asset)": 26.1158295
   },
   {
     "incident_id": "INC-200057",
@@ -455,8 +487,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Multi-signal hotspot with delayed mitigation",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central-West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.3138885,
+    "y_coordinate (from asset)": 26.1149998
   },
   {
     "incident_id": "INC-200073",
@@ -475,15 +509,17 @@
     "speeding_involved_y_n": "No",
     "safety_devices_present": "Attenuator",
     "damaged_asset_id": "11563",
-    "damaged_asset_description": "False",
+    "damaged_asset_description": "Lighting",
     "police_report_number": "PR-705072",
     "recommended_next_action": "Review hotspot segment",
     "location_notes": "Central Segment - Highest-impact closure patterns",
     "scenario_category": "Executive",
     "scenario_name": "Highest-impact closure patterns",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.25240228,
+    "y_coordinate (from asset)": 26.09852804
   },
   {
     "incident_id": "INC-200048",
@@ -509,8 +545,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Multi-signal hotspot with delayed mitigation",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central-West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2768784,
+    "y_coordinate (from asset)": 26.1050606
   },
   {
     "incident_id": "INC-200059",
@@ -536,8 +574,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Multi-signal hotspot with delayed mitigation",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central-West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.3186111,
+    "y_coordinate (from asset)": 26.1149998
   },
   {
     "incident_id": "INC-200081",
@@ -563,8 +603,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Assets with repeated spend but persistent issues",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.3278732,
+    "y_coordinate (from asset)": 26.1173611
   },
   {
     "incident_id": "INC-200005",
@@ -583,15 +625,17 @@
     "speeding_involved_y_n": "No",
     "safety_devices_present": "Warning signs",
     "damaged_asset_id": "11894",
-    "damaged_asset_description": "False",
+    "damaged_asset_description": "WGT",
     "police_report_number": "PR-208566",
     "recommended_next_action": "Review hotspot segment",
     "location_notes": "Central Segment - Fatality precursor corridor",
     "scenario_category": "Safety",
     "scenario_name": "Fatality precursor corridor",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.21608009,
+    "y_coordinate (from asset)": 26.08311289
   },
   {
     "incident_id": "INC-200036",
@@ -610,15 +654,17 @@
     "speeding_involved_y_n": "Yes",
     "safety_devices_present": "Guardrail",
     "damaged_asset_id": "11117",
-    "damaged_asset_description": "False",
+    "damaged_asset_description": "Lighting",
     "police_report_number": "PR-141391",
     "recommended_next_action": "Review hotspot segment",
     "location_notes": "East Segment - Open backlog near recent failed inspections",
     "scenario_category": "Operations",
     "scenario_name": "Open backlog near recent failed inspections",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.31668684,
+    "y_coordinate (from asset)": 26.11491405
   },
   {
     "incident_id": "INC-200039",
@@ -644,8 +690,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Open backlog near recent failed inspections",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2177811,
+    "y_coordinate (from asset)": 26.0911102
   },
   {
     "incident_id": "INC-200050",
@@ -671,8 +719,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Multi-signal hotspot with delayed mitigation",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central-West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.3046494,
+    "y_coordinate (from asset)": 26.1127148
   },
   {
     "incident_id": "INC-200021",
@@ -691,15 +741,17 @@
     "speeding_involved_y_n": "No",
     "safety_devices_present": "ITS warning devices",
     "damaged_asset_id": "167",
-    "damaged_asset_description": "False",
+    "damaged_asset_description": "Detector",
     "police_report_number": "PR-767199",
     "recommended_next_action": "Review hotspot segment",
     "location_notes": "East Segment - Repeat crash / lane closure cluster",
     "scenario_category": "Safety",
     "scenario_name": "Repeat crash / lane closure cluster",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.30875584,
+    "y_coordinate (from asset)": 26.11307398
   },
   {
     "incident_id": "INC-200030",
@@ -725,8 +777,10 @@
     "scenario_category": "Reliability",
     "scenario_name": "Recurring field device repairs after closure",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.3278732,
+    "y_coordinate (from asset)": 26.1173611
   },
   {
     "incident_id": "INC-200065",
@@ -752,8 +806,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Highest-impact closure patterns",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2463913,
+    "y_coordinate (from asset)": 26.0980549
   },
   {
     "incident_id": "INC-200047",
@@ -779,8 +835,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Multi-signal hotspot with delayed mitigation",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central-West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.3194427,
+    "y_coordinate (from asset)": 26.1155491
   },
   {
     "incident_id": "INC-200074",
@@ -806,8 +864,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Assets with repeated spend but persistent issues",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.3294449,
+    "y_coordinate (from asset)": 26.1186104
   },
   {
     "incident_id": "INC-200061",
@@ -826,15 +886,17 @@
     "speeding_involved_y_n": "Yes",
     "safety_devices_present": "Warning signs",
     "damaged_asset_id": "11511",
-    "damaged_asset_description": "False",
+    "damaged_asset_description": "Lighting",
     "police_report_number": "PR-737747",
     "recommended_next_action": "Open investigation task",
     "location_notes": "Central Segment - Highest-impact closure patterns",
     "scenario_category": "Executive",
     "scenario_name": "Highest-impact closure patterns",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.25747676,
+    "y_coordinate (from asset)": 26.10056618
   },
   {
     "incident_id": "INC-200023",
@@ -860,8 +922,10 @@
     "scenario_category": "Safety",
     "scenario_name": "Repeat crash / lane closure cluster",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.1969604,
+    "y_coordinate (from asset)": 26.084013
   },
   {
     "incident_id": "INC-200034",
@@ -887,8 +951,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Open backlog near recent failed inspections",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.1967087,
+    "y_coordinate (from asset)": 26.0851345
   },
   {
     "incident_id": "INC-200024",
@@ -914,8 +980,10 @@
     "scenario_category": "Safety",
     "scenario_name": "Repeat crash / lane closure cluster",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2177811,
+    "y_coordinate (from asset)": 26.0905552
   },
   {
     "incident_id": "INC-200056",
@@ -941,8 +1009,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Multi-signal hotspot with delayed mitigation",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central-West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.3191605,
+    "y_coordinate (from asset)": 26.1161118
   },
   {
     "incident_id": "INC-200026",
@@ -961,15 +1031,17 @@
     "speeding_involved_y_n": "Yes",
     "safety_devices_present": "Barrier wall",
     "damaged_asset_id": "11511",
-    "damaged_asset_description": "False",
+    "damaged_asset_description": "Lighting",
     "police_report_number": "PR-785062",
     "recommended_next_action": "Review hotspot segment",
     "location_notes": "Central Segment - ITS repeat communications failures",
     "scenario_category": "Reliability",
     "scenario_name": "ITS repeat communications failures",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.25747676,
+    "y_coordinate (from asset)": 26.10056618
   },
   {
     "incident_id": "INC-200058",
@@ -995,8 +1067,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Multi-signal hotspot with delayed mitigation",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central-West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.3138885,
+    "y_coordinate (from asset)": 26.1149998
   },
   {
     "incident_id": "INC-200032",
@@ -1022,8 +1096,10 @@
     "scenario_category": "Reliability",
     "scenario_name": "Recurring field device repairs after closure",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.3247223,
+    "y_coordinate (from asset)": 26.1167927
   },
   {
     "incident_id": "INC-200028",
@@ -1049,8 +1125,10 @@
     "scenario_category": "Reliability",
     "scenario_name": "ITS repeat communications failures",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2469482,
+    "y_coordinate (from asset)": 26.0977783
   },
   {
     "incident_id": "INC-200079",
@@ -1076,8 +1154,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Assets with repeated spend but persistent issues",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.3219452,
+    "y_coordinate (from asset)": 26.1169453
   },
   {
     "incident_id": "INC-200009",
@@ -1103,8 +1183,10 @@
     "scenario_category": "Safety",
     "scenario_name": "Fatality precursor corridor",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2589798,
+    "y_coordinate (from asset)": 26.1009426
   },
   {
     "incident_id": "INC-200075",
@@ -1130,8 +1212,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Assets with repeated spend but persistent issues",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.3294449,
+    "y_coordinate (from asset)": 26.1186104
   },
   {
     "incident_id": "INC-200071",
@@ -1157,8 +1241,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Highest-impact closure patterns",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2649536,
+    "y_coordinate (from asset)": 26.1023045
   },
   {
     "incident_id": "INC-200015",
@@ -1184,8 +1270,10 @@
     "scenario_category": "Safety",
     "scenario_name": "Repeat crash / lane closure cluster",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.1967087,
+    "y_coordinate (from asset)": 26.0851345
   },
   {
     "incident_id": "INC-200066",
@@ -1211,8 +1299,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Highest-impact closure patterns",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2463913,
+    "y_coordinate (from asset)": 26.0980549
   },
   {
     "incident_id": "INC-200069",
@@ -1231,15 +1321,17 @@
     "speeding_involved_y_n": "No",
     "safety_devices_present": "Guardrail",
     "damaged_asset_id": "11826",
-    "damaged_asset_description": "False",
+    "damaged_asset_description": "Lighting",
     "police_report_number": "PR-667517",
     "recommended_next_action": "Create work order",
     "location_notes": "Central Segment - Highest-impact closure patterns",
     "scenario_category": "Executive",
     "scenario_name": "Highest-impact closure patterns",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.20059043,
+    "y_coordinate (from asset)": 26.09113263
   },
   {
     "incident_id": "INC-200020",
@@ -1265,8 +1357,10 @@
     "scenario_category": "Safety",
     "scenario_name": "Repeat crash / lane closure cluster",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2177811,
+    "y_coordinate (from asset)": 26.0911102
   },
   {
     "incident_id": "INC-200045",
@@ -1292,8 +1386,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Open backlog near recent failed inspections",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2127762,
+    "y_coordinate (from asset)": 26.0897217
   },
   {
     "incident_id": "INC-200018",
@@ -1319,8 +1415,10 @@
     "scenario_category": "Safety",
     "scenario_name": "Repeat crash / lane closure cluster",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2155533,
+    "y_coordinate (from asset)": 26.0911102
   },
   {
     "incident_id": "INC-200088",
@@ -1346,8 +1444,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Assets with repeated spend but persistent issues",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.3247223,
+    "y_coordinate (from asset)": 26.1175003
   },
   {
     "incident_id": "INC-200002",
@@ -1373,8 +1473,10 @@
     "scenario_category": "Safety",
     "scenario_name": "Fatality precursor corridor",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2361145,
+    "y_coordinate (from asset)": 26.0961113
   },
   {
     "incident_id": "INC-200086",
@@ -1400,8 +1502,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Assets with repeated spend but persistent issues",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2180252,
+    "y_coordinate (from asset)": 26.0908127
   },
   {
     "incident_id": "INC-200029",
@@ -1427,8 +1531,10 @@
     "scenario_category": "Reliability",
     "scenario_name": "ITS repeat communications failures",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2469482,
+    "y_coordinate (from asset)": 26.0977783
   },
   {
     "incident_id": "INC-200040",
@@ -1447,15 +1553,17 @@
     "speeding_involved_y_n": "No",
     "safety_devices_present": "Attenuator",
     "damaged_asset_id": "167",
-    "damaged_asset_description": "False",
+    "damaged_asset_description": "Detector",
     "police_report_number": "PR-660524",
     "recommended_next_action": "Create work order",
     "location_notes": "East Segment - Open backlog near recent failed inspections",
     "scenario_category": "Operations",
     "scenario_name": "Open backlog near recent failed inspections",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.30875584,
+    "y_coordinate (from asset)": 26.11307398
   },
   {
     "incident_id": "INC-200055",
@@ -1481,8 +1589,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Multi-signal hotspot with delayed mitigation",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central-West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2892761,
+    "y_coordinate (from asset)": 26.1087532
   },
   {
     "incident_id": "INC-200068",
@@ -1508,8 +1618,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Highest-impact closure patterns",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2589798,
+    "y_coordinate (from asset)": 26.1009426
   },
   {
     "incident_id": "INC-200084",
@@ -1535,8 +1647,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Assets with repeated spend but persistent issues",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2952805,
+    "y_coordinate (from asset)": 26.1094437
   },
   {
     "incident_id": "INC-200064",
@@ -1562,8 +1676,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Highest-impact closure patterns",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.32952785,
+    "y_coordinate (from asset)": 26.1176701
   },
   {
     "incident_id": "INC-200025",
@@ -1589,8 +1705,10 @@
     "scenario_category": "Safety",
     "scenario_name": "Repeat crash / lane closure cluster",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2127762,
+    "y_coordinate (from asset)": 26.0897217
   },
   {
     "incident_id": "INC-200080",
@@ -1616,8 +1734,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Assets with repeated spend but persistent issues",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.3219452,
+    "y_coordinate (from asset)": 26.1169453
   },
   {
     "incident_id": "INC-200012",
@@ -1643,8 +1763,10 @@
     "scenario_category": "Safety",
     "scenario_name": "Fatality precursor corridor",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2649536,
+    "y_coordinate (from asset)": 26.1023045
   },
   {
     "incident_id": "INC-200072",
@@ -1670,8 +1792,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Highest-impact closure patterns",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2649536,
+    "y_coordinate (from asset)": 26.1023045
   },
   {
     "incident_id": "INC-200041",
@@ -1690,15 +1814,17 @@
     "speeding_involved_y_n": "No",
     "safety_devices_present": "Barrier wall",
     "damaged_asset_id": "182",
-    "damaged_asset_description": "False",
+    "damaged_asset_description": "Detector",
     "police_report_number": "PR-489722",
     "recommended_next_action": "Review hotspot segment",
     "location_notes": "East Segment - Open backlog near recent failed inspections",
     "scenario_category": "Operations",
     "scenario_name": "Open backlog near recent failed inspections",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.34062038,
+    "y_coordinate (from asset)": 26.11894077
   },
   {
     "incident_id": "INC-200008",
@@ -1724,8 +1850,10 @@
     "scenario_category": "Safety",
     "scenario_name": "Fatality precursor corridor",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2469482,
+    "y_coordinate (from asset)": 26.0977783
   },
   {
     "incident_id": "INC-200043",
@@ -1751,8 +1879,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Open backlog near recent failed inspections",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.1969604,
+    "y_coordinate (from asset)": 26.084013
   },
   {
     "incident_id": "INC-200019",
@@ -1778,8 +1908,10 @@
     "scenario_category": "Safety",
     "scenario_name": "Repeat crash / lane closure cluster",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2155533,
+    "y_coordinate (from asset)": 26.0911102
   },
   {
     "incident_id": "INC-200031",
@@ -1805,8 +1937,10 @@
     "scenario_category": "Reliability",
     "scenario_name": "Recurring field device repairs after closure",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2180252,
+    "y_coordinate (from asset)": 26.0908127
   },
   {
     "incident_id": "INC-200046",
@@ -1832,8 +1966,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Open backlog near recent failed inspections",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2127762,
+    "y_coordinate (from asset)": 26.0897217
   },
   {
     "incident_id": "INC-200062",
@@ -1859,8 +1995,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Highest-impact closure patterns",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2361145,
+    "y_coordinate (from asset)": 26.0961113
   },
   {
     "incident_id": "INC-200051",
@@ -1886,8 +2024,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Multi-signal hotspot with delayed mitigation",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central-West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.3027802,
+    "y_coordinate (from asset)": 26.1113796
   },
   {
     "incident_id": "INC-200010",
@@ -1906,15 +2046,17 @@
     "speeding_involved_y_n": "No",
     "safety_devices_present": "Barrier wall",
     "damaged_asset_id": "11826",
-    "damaged_asset_description": "False",
+    "damaged_asset_description": "Lighting",
     "police_report_number": "PR-454397",
     "recommended_next_action": "Review hotspot segment",
     "location_notes": "Central Segment - Fatality precursor corridor",
     "scenario_category": "Safety",
     "scenario_name": "Fatality precursor corridor",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.20059043,
+    "y_coordinate (from asset)": 26.09113263
   },
   {
     "incident_id": "INC-200070",
@@ -1933,15 +2075,17 @@
     "speeding_involved_y_n": "Yes",
     "safety_devices_present": "ITS warning devices",
     "damaged_asset_id": "11826",
-    "damaged_asset_description": "False",
+    "damaged_asset_description": "Lighting",
     "police_report_number": "PR-207052",
     "recommended_next_action": "Review hotspot segment",
     "location_notes": "Central Segment - Highest-impact closure patterns",
     "scenario_category": "Executive",
     "scenario_name": "Highest-impact closure patterns",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.20059043,
+    "y_coordinate (from asset)": 26.09113263
   },
   {
     "incident_id": "INC-200087",
@@ -1967,8 +2111,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Assets with repeated spend but persistent issues",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2180252,
+    "y_coordinate (from asset)": 26.0908127
   },
   {
     "incident_id": "INC-200077",
@@ -1994,8 +2140,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Assets with repeated spend but persistent issues",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.3321152,
+    "y_coordinate (from asset)": 26.1186123
   },
   {
     "incident_id": "INC-200035",
@@ -2021,8 +2169,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Open backlog near recent failed inspections",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2103653,
+    "y_coordinate (from asset)": 26.088419
   },
   {
     "incident_id": "INC-200083",
@@ -2048,8 +2198,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Assets with repeated spend but persistent issues",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.3308563,
+    "y_coordinate (from asset)": 26.1189404
   },
   {
     "incident_id": "INC-200044",
@@ -2075,8 +2227,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Open backlog near recent failed inspections",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2177811,
+    "y_coordinate (from asset)": 26.0905552
   },
   {
     "incident_id": "INC-200003",
@@ -2102,8 +2256,10 @@
     "scenario_category": "Safety",
     "scenario_name": "Fatality precursor corridor",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2361145,
+    "y_coordinate (from asset)": 26.0961113
   },
   {
     "incident_id": "INC-200082",
@@ -2129,8 +2285,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Assets with repeated spend but persistent issues",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.333168,
+    "y_coordinate (from asset)": 26.1188889
   },
   {
     "incident_id": "INC-200085",
@@ -2156,8 +2314,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Assets with repeated spend but persistent issues",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2952805,
+    "y_coordinate (from asset)": 26.1094437
   },
   {
     "incident_id": "INC-200053",
@@ -2183,8 +2343,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Multi-signal hotspot with delayed mitigation",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central-West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2965393,
+    "y_coordinate (from asset)": 26.1110344
   },
   {
     "incident_id": "INC-200007",
@@ -2210,8 +2372,10 @@
     "scenario_category": "Safety",
     "scenario_name": "Fatality precursor corridor",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2463913,
+    "y_coordinate (from asset)": 26.0980549
   },
   {
     "incident_id": "INC-200013",
@@ -2237,8 +2401,10 @@
     "scenario_category": "Safety",
     "scenario_name": "Fatality precursor corridor",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2649536,
+    "y_coordinate (from asset)": 26.1023045
   },
   {
     "incident_id": "INC-200042",
@@ -2257,15 +2423,17 @@
     "speeding_involved_y_n": "Yes",
     "safety_devices_present": "ITS warning devices",
     "damaged_asset_id": "182",
-    "damaged_asset_description": "False",
+    "damaged_asset_description": "Detector",
     "police_report_number": "PR-609938",
     "recommended_next_action": "Open investigation task",
     "location_notes": "East Segment - Open backlog near recent failed inspections",
     "scenario_category": "Operations",
     "scenario_name": "Open backlog near recent failed inspections",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "East Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.34062038,
+    "y_coordinate (from asset)": 26.11894077
   },
   {
     "incident_id": "INC-200052",
@@ -2291,8 +2459,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Multi-signal hotspot with delayed mitigation",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central-West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.3027802,
+    "y_coordinate (from asset)": 26.1113796
   },
   {
     "incident_id": "INC-200011",
@@ -2311,15 +2481,17 @@
     "speeding_involved_y_n": "No",
     "safety_devices_present": "Attenuator",
     "damaged_asset_id": "11826",
-    "damaged_asset_description": "False",
+    "damaged_asset_description": "Lighting",
     "police_report_number": "PR-141511",
     "recommended_next_action": "Open investigation task",
     "location_notes": "Central Segment - Fatality precursor corridor",
     "scenario_category": "Safety",
     "scenario_name": "Fatality precursor corridor",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.20059043,
+    "y_coordinate (from asset)": 26.09113263
   },
   {
     "incident_id": "INC-200078",
@@ -2345,8 +2517,10 @@
     "scenario_category": "Executive",
     "scenario_name": "Assets with repeated spend but persistent issues",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.3321152,
+    "y_coordinate (from asset)": 26.1186123
   },
   {
     "incident_id": "INC-200054",
@@ -2372,8 +2546,10 @@
     "scenario_category": "Operations",
     "scenario_name": "Multi-signal hotspot with delayed mitigation",
     "root_cause": null,
-    "Segment": null,
-    "notes": null
+    "Segment": "Central-West Segment",
+    "notes": null,
+    "x_coordinate (from asset)": -80.2965393,
+    "y_coordinate (from asset)": 26.1110344
   },
   {
     "incident_id": "INC-200055",
@@ -2400,7 +2576,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200056",
@@ -2427,7 +2605,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200057",
@@ -2454,7 +2634,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200058",
@@ -2481,7 +2663,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200059",
@@ -2508,7 +2692,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200060",
@@ -2535,7 +2721,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200061",
@@ -2562,7 +2750,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200062",
@@ -2589,7 +2779,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200063",
@@ -2616,7 +2808,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200064",
@@ -2643,7 +2837,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200065",
@@ -2670,7 +2866,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200066",
@@ -2697,7 +2895,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200067",
@@ -2724,7 +2924,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200068",
@@ -2751,7 +2953,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200069",
@@ -2778,7 +2982,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200070",
@@ -2805,7 +3011,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200071",
@@ -2832,7 +3040,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200072",
@@ -2859,7 +3069,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200073",
@@ -2886,7 +3098,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200074",
@@ -2913,7 +3127,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200075",
@@ -2940,7 +3156,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200076",
@@ -2967,7 +3185,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200077",
@@ -2994,7 +3214,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200078",
@@ -3021,7 +3243,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200079",
@@ -3048,7 +3272,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200080",
@@ -3075,7 +3301,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200081",
@@ -3102,7 +3330,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200082",
@@ -3129,7 +3359,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200083",
@@ -3156,7 +3388,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200084",
@@ -3183,7 +3417,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200085",
@@ -3210,7 +3446,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200086",
@@ -3237,7 +3475,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200087",
@@ -3264,7 +3504,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200088",
@@ -3291,7 +3533,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200089",
@@ -3318,7 +3562,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200090",
@@ -3345,7 +3591,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200091",
@@ -3372,7 +3620,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200092",
@@ -3399,7 +3649,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200093",
@@ -3426,7 +3678,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200094",
@@ -3453,7 +3707,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200095",
@@ -3480,7 +3736,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200096",
@@ -3507,7 +3765,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200097",
@@ -3534,7 +3794,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200098",
@@ -3561,7 +3823,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200099",
@@ -3588,7 +3852,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200100",
@@ -3615,7 +3881,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200101",
@@ -3642,7 +3910,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200102",
@@ -3669,7 +3939,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200103",
@@ -3696,7 +3968,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200104",
@@ -3723,7 +3997,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200105",
@@ -3750,7 +4026,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200106",
@@ -3777,7 +4055,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200107",
@@ -3804,7 +4084,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200108",
@@ -3831,7 +4113,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200109",
@@ -3858,7 +4142,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200110",
@@ -3885,7 +4171,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200111",
@@ -3912,7 +4200,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200112",
@@ -3939,7 +4229,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200113",
@@ -3966,7 +4258,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200114",
@@ -3993,7 +4287,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200115",
@@ -4020,7 +4316,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200116",
@@ -4047,7 +4345,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200117",
@@ -4074,7 +4374,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200118",
@@ -4101,7 +4403,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200119",
@@ -4128,7 +4432,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200120",
@@ -4155,7 +4461,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200121",
@@ -4182,7 +4490,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200122",
@@ -4209,7 +4519,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200123",
@@ -4236,7 +4548,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200124",
@@ -4263,7 +4577,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200125",
@@ -4290,7 +4606,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200126",
@@ -4317,7 +4635,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200127",
@@ -4344,7 +4664,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200128",
@@ -4371,7 +4693,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200129",
@@ -4398,7 +4722,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200130",
@@ -4425,7 +4751,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200131",
@@ -4452,7 +4780,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200132",
@@ -4479,7 +4809,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200133",
@@ -4506,7 +4838,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200134",
@@ -4533,7 +4867,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200135",
@@ -4560,7 +4896,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200136",
@@ -4587,7 +4925,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200137",
@@ -4614,7 +4954,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200138",
@@ -4641,7 +4983,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200139",
@@ -4668,7 +5012,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200140",
@@ -4695,7 +5041,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200141",
@@ -4722,7 +5070,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200142",
@@ -4749,7 +5099,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200143",
@@ -4776,7 +5128,9 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   },
   {
     "incident_id": "INC-200144",
@@ -4803,6 +5157,8 @@
     "scenario_name": null,
     "root_cause": null,
     "Segment": null,
-    "notes": "Included in V3 safety analytics enrichment set"
+    "notes": "Included in V3 safety analytics enrichment set",
+    "x_coordinate (from asset)": null,
+    "y_coordinate (from asset)": null
   }
 ]
