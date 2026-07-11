@@ -12,9 +12,11 @@
  * layer family.
  *
  * Flow: toggle WO layer -> click hero WO (UC1 demo button) -> context panel shows ticket +
- * accidents -> "Evaluate closure windows" -> 3 ranked rows -> "Schedule this window" -> decision
- * POSTs to the shim's write endpoint (asserted via a direct shim read-back AND the
- * #uc1-decisions-status badge).
+ * accidents -> "Evaluate closure windows" -> 3 ranked rows -> "Why trust this?" -> backtest tab
+ * honesty line -> Assumptions tab slider -> table re-ranks live -> exec KPI strip (4 tiles +
+ * seeded label) -> "Schedule this window" -> decision POSTs to the shim's write endpoint (asserted
+ * via a direct shim read-back AND the #uc1-decisions-status badge) -> visible SUMO run (P5-e
+ * Decision 6, reuses the existing __closeLane/work-zone machinery — asserted via window.__kpi.workzone).
  *
  * Run:
  *   cd cesium-poc && npx playwright test e2e/uc1-flow.spec.ts
@@ -178,6 +180,60 @@ test('UC1-FLOW: layer toggle -> hero WO context -> evaluate -> 3 ranked windows 
 
   await shoot(page, 'uc1-flow-2-window-panel');
 
+  // ---- P5-e item 1: "Why trust this?" -> backtest tab renders the honesty line verbatim ----
+  const trustBtn = page.locator('#uc1-trust-btn');
+  await expect(trustBtn).toBeVisible();
+  await trustBtn.click();
+
+  const trustPanel = page.locator('#uc1-trust-panel');
+  await expect(trustPanel).toBeVisible();
+  await expect(trustPanel.locator('.uc1-trust-honesty')).toContainText(
+    'traffic delay and exact revenue figures are calibrated in the pilot',
+  );
+
+  await shoot(page, 'uc1-flow-2b-trust-backtest');
+
+  // ---- P5-e item 1: Assumptions tab slider -> window table re-ranks live (slide-11 stress test) ----
+  const scoresBefore = await windowPanel.locator('.uc1-win-score').allTextContents();
+  const orderBefore = await windowPanel.locator('.uc1-win-row').evaluateAll((rows) =>
+    rows.map((r) => r.getAttribute('data-window-id')),
+  );
+
+  await trustPanel.locator('.uc1-trust-tab[data-tab="assumptions"]').click();
+  const revenueSlider = trustPanel.locator('input.uc1-trust-slider[data-path="weights.revenue"]');
+  await expect(revenueSlider).toBeVisible();
+  await revenueSlider.evaluate((el) => {
+    const input = el as HTMLInputElement;
+    input.value = '0';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+
+  await page.waitForFunction(
+    (before) => {
+      const scores = Array.from(document.querySelectorAll('#uc1-window-panel .uc1-win-score')).map((n) => n.textContent);
+      return JSON.stringify(scores) !== JSON.stringify(before);
+    },
+    scoresBefore,
+    { timeout: 10_000 },
+  );
+
+  const scoresAfter = await windowPanel.locator('.uc1-win-score').allTextContents();
+  const orderAfter = await windowPanel.locator('.uc1-win-row').evaluateAll((rows) =>
+    rows.map((r) => r.getAttribute('data-window-id')),
+  );
+  expect(scoresAfter, 'zeroing the revenue weight must change the recomputed scores').not.toEqual(scoresBefore);
+  console.log(`[uc1-flow] rank order before=${orderBefore.join(',')} after=${orderAfter.join(',')}`);
+
+  await shoot(page, 'uc1-flow-2c-assumptions-rerank');
+
+  // ---- P5-e item 2: exec KPI strip — 4 tiles + the seeded-history honesty label ----
+  await page.waitForFunction(() => !!(window as any).__uc1ExecKpis, { timeout: 20_000 });
+  const execStrip = page.locator('#uc1-exec-kpi-strip');
+  await expect(execStrip.locator('.uc1-exec-kpi')).toHaveCount(4);
+  await expect(execStrip.locator('.uc1-exec-kpi-note')).toContainText(/seeded/i);
+
+  await shoot(page, 'uc1-flow-2d-exec-kpi-strip');
+
   // ---- Schedule the top-ranked window -> decision POSTs to the shim's write endpoint ----
   const token = await shimToken();
   const totalBefore = await decisionsTotal(token);
@@ -195,6 +251,16 @@ test('UC1-FLOW: layer toggle -> hero WO context -> evaluate -> 3 ranked windows 
 
   const totalAfter = await decisionsTotal(token);
   expect(totalAfter).toBe(totalBefore + 1);
+
+  // ---- P5-e item 3: a successful schedule reuses the existing closure machinery for a visible
+  // SUMO run (offline here -> the same work-zone overlay/RILCA KPIs closeLaneHook always produces). ----
+  await page.waitForFunction(() => !!(window as any).__kpi?.workzone, { timeout: 15_000 });
+  const workzoneAfterSchedule = await page.evaluate(() => (window as any).__kpi?.workzone);
+  expect(workzoneAfterSchedule).toBeTruthy();
+
+  // ---- exec KPI strip refreshed with the just-scheduled decision (Decision 5: live appends to seed) ----
+  const execKpisAfterSchedule = await page.evaluate(() => (window as any).__uc1ExecKpis);
+  expect(execKpisAfterSchedule.decisionCount).toBeGreaterThan(0);
 
   await shoot(page, 'uc1-flow-3-decision-logged');
 });

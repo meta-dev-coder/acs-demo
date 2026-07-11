@@ -270,17 +270,13 @@ html, body, #cesiumContainer, #arcgisContainer {
   margin-bottom: 8px;
 }
 .wz-lane-select {
-  flex: 1;
-  padding: 6px 8px;
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.06);
-  color: #e8eef6;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
+  /* P5-e item 4: click-on-twin lane pick replaces this dropdown as the VISIBLE interaction.
+     Hidden via CSS only — stays in the DOM/functional so closure.spec.ts's window.__closeLane
+     path and #wz-close's `.value` read keep working unchanged. */
+  display: none;
 }
 .wz-lane-select option { color: #111; }
+.wz-lane-picked { flex: 1; font-size: 10.5px; color: #9fb0c3; }
 #wz-close.on { background: #e8412f; border-color: #e8412f; color: #fff; }
 .wz-readouts { margin-top: 8px; }
 .wz-row {
@@ -457,6 +453,74 @@ html, body, #cesiumContainer, #arcgisContainer {
 /* "Evaluate closure windows" — appended to #uc1-context-panel by main.js (contextPanel.js stays a
    pure renderer, see openUc1WorkOrderContext). Reuses .uc1-win-schedule-btn's palette, full width. */
 .uc1-evaluate-btn { display: block; width: 100%; margin-top: 10px; text-align: center; padding: 7px 8px; font-size: 10.5px; }
+
+/* "Why trust this?" — appended to #uc1-window-panel by main.js (appendUc1TrustButton), same
+   append-after-render treatment as .uc1-evaluate-btn above. */
+.uc1-trust-btn { display: block; width: 100%; margin-top: 10px; text-align: center; padding: 7px 8px; font-size: 10.5px; background: rgba(255, 255, 255, 0.06); }
+
+/* Exec KPI strip (execKpis.js's renderExecKpiStrip) — embedded in #uc1-panel (main HUD), not a
+   floating popup panel like the context/window/trust panels above. */
+.uc1-exec-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
+.uc1-exec-kpi {
+  border-radius: 8px; padding: 7px 5px; text-align: center; font-size: 10px;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.uc1-exec-kpi .v { font-size: 13px; font-weight: 800; display: block; color: #f2f5f8; }
+.uc1-exec-kpi .l { font-size: 7.5px; text-transform: uppercase; letter-spacing: 0.2px; opacity: 0.85; color: #9fb0c3; }
+.uc1-exec-kpi-note { font-size: 9px; font-style: italic; color: #7d8da3; margin-top: 6px; }
+
+/* UC1 trust — trustPanel.js (design spec §4 "Trust panel", two tabs: Backtest / Assumptions).
+   Reuses .dc-panel / .dc-panel-close / .dc-panel-h / .dc-panel-sub from the DataConnect panel
+   language (same as uc1-context-panel / uc1-window-panel above). */
+#uc1-trust-panel { top: 16px; right: 16px; left: auto; width: 360px; }
+
+.uc1-trust-tabs { display: flex; gap: 4px; margin: 8px 0 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+.uc1-trust-tab {
+  flex: 1; padding: 6px 4px; font-size: 10.5px; font-weight: 700; text-align: center; cursor: pointer;
+  background: transparent; border: none; border-bottom: 2px solid transparent; color: #8fa3bb;
+}
+.uc1-trust-tab:hover { color: #cdd8e6; }
+.uc1-trust-tab.on { color: #6fb1ff; border-bottom-color: #6fb1ff; }
+
+.uc1-trust-honesty {
+  font-size: 11px; font-weight: 700; line-height: 1.4; color: #f2f5f8;
+  background: rgba(241, 163, 37, 0.12); border: 1px solid rgba(241, 163, 37, 0.4); border-radius: 8px;
+  padding: 8px 10px; margin-bottom: 8px;
+}
+.uc1-trust-subhead { font-size: 9.5px; color: #8fa3bb; margin-bottom: 8px; }
+.uc1-trust-table-wrap { overflow-x: auto; }
+.uc1-trust-table { width: 100%; border-collapse: collapse; font-size: 9.5px; }
+.uc1-trust-table th {
+  text-align: left; font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.3px; color: #7d8da3;
+  padding: 4px 5px; border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+.uc1-trust-row td { padding: 4px 5px; vertical-align: top; border-bottom: 1px solid rgba(255, 255, 255, 0.06); color: #cdd8e6; }
+.uc1-trust-cell { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.uc1-trust-cell.green { color: #43d871; }
+.uc1-trust-sub { color: #7d8da3; font-size: 8.5px; }
+.uc1-trust-empty { font-size: 10px; color: #7d8da3; font-style: italic; margin-bottom: 8px; }
+.uc1-trust-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0 6px; }
+.uc1-trust-stat { background: rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 8px 9px; }
+.uc1-trust-stat-v { font-size: 17px; font-weight: 700; color: #f2f5f8; }
+.uc1-trust-stat-l { font-size: 8.5px; color: #9fb0c3; letter-spacing: 0.3px; text-transform: uppercase; margin-top: 2px; }
+.uc1-trust-coverage { font-size: 9.5px; font-style: italic; color: #7d8da3; margin-top: 4px; }
+
+.uc1-trust-assump-group { margin-bottom: 6px; }
+.uc1-trust-assump-subhead { font-size: 9.5px; font-weight: 700; color: #9fb0c3; text-transform: uppercase; letter-spacing: 0.3px; margin: 10px 0 4px; }
+.uc1-trust-assump-row { margin-bottom: 8px; }
+.uc1-trust-assump-label { font-size: 10.5px; color: #d6e3f0; margin-bottom: 3px; display: flex; align-items: center; gap: 6px; }
+.uc1-trust-slider-row { display: flex; align-items: center; gap: 8px; }
+.uc1-trust-slider { flex: 1; accent-color: #6fb1ff; }
+.uc1-trust-slider-v { font-size: 10px; font-variant-numeric: tabular-nums; color: #f2f5f8; min-width: 34px; text-align: right; }
+.uc1-trust-note { margin-top: 8px; font-size: 9.5px; font-style: italic; color: #7d8da3; display: flex; align-items: center; gap: 6px; }
+
+.uc1-trust-badge {
+  display: inline-block; font-size: 7.5px; font-weight: 800; letter-spacing: 0.4px; padding: 1px 5px;
+  border-radius: 4px; text-transform: uppercase; vertical-align: middle;
+}
+.uc1-trust-badge-synthetic { background: rgba(159, 176, 195, 0.18); color: #9fb0c3; border: 1px solid rgba(159, 176, 195, 0.4); }
+.uc1-trust-badge-real      { background: rgba(67, 147, 58, 0.18);   color: #43d871; border: 1px solid rgba(67, 147, 58, 0.4); }
+.uc1-trust-badge-external  { background: rgba(111, 177, 255, 0.18); color: #6fb1ff; border: 1px solid rgba(111, 177, 255, 0.4); }
 
 /* ---- Asset operations (gantry health + incident scenario) ---- */
 .assetops-hud {

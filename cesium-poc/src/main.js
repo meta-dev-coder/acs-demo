@@ -25,9 +25,13 @@ import { renderWorkOrderContext } from "./contextPanel.js";
 import { evaluateCandidates } from "./windowAssembly.js";
 import { renderWindowPanel } from "./windowPanel.js";
 import { createDemandModel } from "./demand.js";
+import { runBacktest } from "./backtest.js";
+import { renderTrustPanel, mergeAssumptionDefaults } from "./trustPanel.js";
+import { computeExecKpis, renderExecKpiStrip } from "./execKpis.js";
 import uc1Demo from "../config/uc1Demo.json" with { type: "json" };
 import uc1Segments from "../config/segments.json" with { type: "json" };
 import uc1WindowConfig from "../config/windowConfig.json" with { type: "json" };
+import uc1BacktestConfig from "../config/backtestConfig.json" with { type: "json" };
 
 const toRad = (deg) => (deg * Math.PI) / 180;
 const ION = import.meta.env.VITE_CESIUM_ION_TOKEN;
@@ -178,6 +182,7 @@ function rebuildBoothMarkers() {
     });
   }
   renderGantries();   // re-add gantry assets after any booth-marker rebuild (clearMarkers wiped them)
+  renderApLaneMarkers(); // re-add UC1 click-on-twin lane-pick markers (P5-e item 4)
 }
 
 // ============================================================================ gantry assets (GIS layer)
@@ -654,6 +659,62 @@ function syncGateButtons() {
 // the real arrival-driven RILCA queue numbers in stats.workzone (picked up by renderKpis -> here).
 let activeWorkzoneSpec = null; // { lane, offsetFt, speedMph, divertPct, closureStartX, closureEndX, taperLengthM, nCones, signStationsM, laneSign }
 
+// ---- P5-e item 4: click-on-twin lane pick — 3 small pickable markers on the approach lanes,
+// upstream of the plaza at the same station closeLaneHook's offline geometry uses (Node B),
+// replacing #wz-lane-select as the VISIBLE interaction (the select stays in the DOM/functional —
+// see index.html/style.css — so closure.spec.ts's window.__closeLane path is untouched). ----
+function apLanePickX() {
+  return (META ? META.boothX : (T ? T.p.sumoRefX : 530)) - NODE_B_UPSTREAM_OF_BOOTH_M;
+}
+
+/** Re-places the 3 approach-lane pick markers (wiped by R.clearMarkers() on every rebuild — see
+ * rebuildBoothMarkers). The currently-selected lane (uc1SelectedApLane) renders highlighted. */
+function renderApLaneMarkers() {
+  if (!T) return;
+  const x = apLanePickX();
+  for (const lane of AP_LANES) {
+    const y = AP_LANE_Y[lane] ?? 0;
+    R.placeMarker({
+      id: `wzlane:${lane}`, x, y, tracking: true,
+      disc: {
+        radiusM: 1.3,
+        colorCss: lane === uc1SelectedApLane ? "#2f6df6" : "#9fb0c3",
+        alpha: lane === uc1SelectedApLane ? 0.95 : 0.55,
+      },
+    });
+  }
+  const readout = $("wz-lane-picked");
+  if (readout) readout.textContent = `Approach lane: ${uc1SelectedApLane.replace("ap_", "L")} (click the twin to change)`;
+}
+
+/** installAssetPicking(viewer, cb) delivers a screen position on every left click (same generic
+ * wrapper assetLayer.js already uses for the DataConnect asset layer) — reused here rather than
+ * adding any new Cesium-specific picking code. The click is resolved to a ground lon/lat via
+ * CoordinateTransform.pickLonLat (already used internally by R.onPick for ⊕ Mark gates), then to
+ * SUMO metres via T.worldToSumo, so a click near the lane-pick station selects its nearest lane —
+ * clicks elsewhere on the twin (booths, gantries, the globe) are ignored. */
+function installUc1LanePick(viewer) {
+  if (!viewer?.scene?.canvas) return; // Cesium-only, same guard as installAssetPicking/installUc1
+  installAssetPicking(viewer, (position) => {
+    if (!T) return;
+    const ll = CoordinateTransform.pickLonLat(viewer, position);
+    if (!ll) return;
+    const { x, y } = T.worldToSumo(ll.lon, ll.lat);
+    if (Math.abs(x - apLanePickX()) > AP_LANE_PICK_TOLERANCE_M) return;
+    let nearest = AP_LANES[0], best = Infinity;
+    for (const lane of AP_LANES) {
+      const d = Math.abs(y - (AP_LANE_Y[lane] ?? 0));
+      if (d < best) { best = d; nearest = lane; }
+    }
+    if (nearest === uc1SelectedApLane) return;
+    uc1SelectedApLane = nearest;
+    const sel = $("wz-lane-select");
+    if (sel) sel.value = nearest; // keeps the hidden dropdown in sync — it stays functional
+    renderApLaneMarkers();
+    setStatus(`Approach lane ${nearest.replace("ap_", "")} selected on the twin.`);
+  });
+}
+
 function workzoneGeometryOnly(offsetFt, speedMph) {
   // arrivals/t1/q2 = 0 so only the geometry fields (taper/cones/signs) are meaningful here; the
   // queue/permissible fields get recomputed with real numbers by applyOfflineWorkzoneStats / the
@@ -805,6 +866,62 @@ let uc1DecisionQueue = [];      // in-memory queue of decision records that fail
                                  // successful write opportunistically drains this (keep-previous-
                                  // on-failure, matching data/loader.ts's pattern per design spec
                                  // §4 bullet 3 "Error handling").
+let uc1Viewer = null;           // the raw viewer, captured once by installUc1() — P5-e's trust/
+                                 // exec-kpi/SUMO-run wiring is triggered from event handlers that
+                                 // aren't nested inside main(), so it can't close over `viewer`.
+
+// ---- P5-e: trust panel (backtest cache + live-editable assumptions) — design spec §4 "Trust
+// panel" + Decision 2 (live stress-test moment). ----
+let uc1BacktestResult = null;   // runBacktest() is deterministic given (incidents, segments,
+                                 // config), which never change at runtime — computed once, cached.
+let uc1Assumptions = null;      // trustPanel.js's assumptions shape; lazily built from
+                                 // windowConfig.json + segments.json on first trust-panel open.
+
+/** Lazily builds the live-editable assumptions object (trustPanel.js's expected shape) from the
+ * committed config defaults — same values evaluateUc1Windows() would otherwise use unedited. */
+function ensureUc1Assumptions() {
+  if (uc1Assumptions) return uc1Assumptions;
+  const segmentDemandScale = {};
+  for (const s of uc1Segments) segmentDemandScale[s.id] = s.demandScale ?? 1;
+  uc1Assumptions = mergeAssumptionDefaults({
+    tollRateUsd: uc1WindowConfig.tollRateUsd,
+    weights: uc1WindowConfig.weights,
+    mergeFriction: uc1WindowConfig.mergeFriction,
+    segmentDemandScale,
+    segments: uc1Segments.map((s) => ({ id: s.id, name: s.name })),
+  });
+  return uc1Assumptions;
+}
+
+/** windowConfig.json clone with the live-editable assumptions fields overlaid — everything else
+ * (candidateHeuristics, scoreNormalization, etc.) stays the committed default. */
+function currentUc1WindowConfig() {
+  const a = ensureUc1Assumptions();
+  return { ...uc1WindowConfig, tollRateUsd: a.tollRateUsd, weights: { ...a.weights }, mergeFriction: a.mergeFriction };
+}
+
+/** A fresh demand model built from segments.json with each segment's demandScale overridden by
+ * the live assumptions (demand.js takes segments as a plain init arg — see its header — so a new
+ * model, not a mutation, is how a slider edit reaches it). */
+function currentUc1DemandModel() {
+  const a = ensureUc1Assumptions();
+  const segs = uc1Segments.map((s) => ({ ...s, demandScale: a.segmentDemandScale[s.id] ?? s.demandScale }));
+  return createDemandModel(undefined, segs);
+}
+
+// ---- P5-e: exec KPI strip (design spec §4 "Exec KPI strip" + Decision 5's seeded log). ----
+let uc1Decisions = [];   // decisions fetched on UC1 activation (shim seed+runtime, or the
+                          // snapshot fallback) + any locally-scheduled decision appended live.
+
+// ---- P5-e: visible SUMO run on schedule (design spec Decision 6) ----
+let uc1SelectedApLane = AP_LANES[0];  // approach lane chosen via click-on-twin (P5-e item 4),
+                                       // read by both #wz-close's dropdown fallback and the
+                                       // auto-triggered closure below.
+let uc1AutoCloseTimer = null;         // pending auto-reopen after a scheduled decision's SUMO run.
+const UC1_AUTO_CLOSE_MS = 20_000;
+const AP_LANE_WIDTH_M = 3.7;          // AASHTO lane width — matches PLAZA_LANE_WIDTH_M elsewhere.
+const AP_LANE_Y = { ap_0: -AP_LANE_WIDTH_M, ap_1: 0, ap_2: AP_LANE_WIDTH_M };
+const AP_LANE_PICK_TOLERANCE_M = 40;  // click-on-twin tolerance around the lane-pick station.
 
 const DC_CLASSES = {
   assetRegistry: "asset_registry",
@@ -973,6 +1090,7 @@ function buildUc1(viewer, { assetRegistry, workOrders, tickets, safetyInspection
   uc1Tickets = tickets || [];
   uc1Incidents = incidents || [];
   uc1Loaded = true;
+  loadUc1ExecKpis(); // P5-e item 2: "on UC1 activation" — fire-and-forget, handles its own failures
 
   // Cesium-only feature (matches installDataConnectAssets' own guard): under ?renderer=arcgis
   // there is no viewer.scene, so the data above still populates (context panel needs it) but no
@@ -989,6 +1107,38 @@ function buildUc1(viewer, { assetRegistry, workOrders, tickets, safetyInspection
   if (prevWo) disposeUc1Layer(viewer, prevWo);
   if (prevAcc) disposeUc1Layer(viewer, prevAcc);
   if (prevInsp) disposeUc1Layer(viewer, prevInsp);
+}
+
+/** P5-e item 2: exec KPI strip — fetches the "decisions" class (shim merges committed seed +
+ * gitignored runtime log) via dataconnect.js on UC1 activation, falling back to the committed
+ * seed snapshot when the shim is unreachable (static-host / offline posture, same as
+ * loadDcSnapshot). computeExecKpis() must work off the seed alone (Decision 5) so an empty/failed
+ * fetch still renders a non-empty strip as long as the snapshot loads. */
+async function loadUc1ExecKpis() {
+  let decisions = [];
+  try {
+    decisions = await fetchClass("decisions", { pageSize: 500 });
+  } catch (err) {
+    console.warn("[UC1] decisions fetch failed — falling back to the seed snapshot", err);
+    try {
+      const res = await fetch(asset("/dataconnect-data/decisions_seed.json"));
+      if (res.ok && (res.headers.get("content-type") || "").includes("json")) decisions = await res.json();
+    } catch (err2) {
+      console.warn("[UC1] decisions seed snapshot unavailable", err2);
+    }
+  }
+  uc1Decisions = Array.isArray(decisions) ? decisions : [];
+  renderUc1ExecKpiStrip();
+}
+
+/** computeExecKpis() (pure, execKpis.js) -> renderExecKpiStrip() (DOM). Re-run whenever
+ * uc1Decisions changes — on activation (loadUc1ExecKpis) and after every scheduled decision
+ * (scheduleUc1Decision appends locally rather than re-fetching, mirroring Decision 5's "the live
+ * decision appends to the seeded log"). */
+function renderUc1ExecKpiStrip() {
+  const kpis = computeExecKpis(uc1Decisions);
+  renderExecKpiStrip($("uc1-exec-kpi-strip"), kpis);
+  window.__uc1ExecKpis = kpis; // debug hook for headless verification (e2e)
 }
 
 /** Assembles + renders a picked work order's 500m context (contextPanel.js's Mic-Drop-1 panel),
@@ -1029,19 +1179,71 @@ function appendUc1EvaluateButton(wo) {
 
 /** "Evaluate closure windows" -> windowAssembly.js's evaluateCandidates() (P2 demand.js x
  * windowEval.js, pure) -> windowPanel.js's renderWindowPanel(), wired so its "Schedule this
- * window" buttons call scheduleUc1Decision(). Design spec §4 bullet 3. */
+ * window" buttons call scheduleUc1Decision(). Design spec §4 bullet 3.
+ *
+ * Uses currentUc1WindowConfig()/currentUc1DemandModel() (not the committed defaults) so the
+ * table reflects any live trust-panel assumption edits — this is what re-running evaluateUc1Windows
+ * from onAssumptionChange turns into the "stress-test" re-rank (design spec Decision 2, P5-e item 1).
+ */
 function evaluateUc1Windows(wo) {
+  uc1CurrentWo = wo;
   const data = evaluateCandidates(wo, {
     segments: uc1Segments,
     incidents: uc1Incidents,
-    windowConfig: uc1WindowConfig,
-    demandModel: uc1DemandModel,
+    windowConfig: currentUc1WindowConfig(),
+    demandModel: currentUc1DemandModel(),
   });
   renderWindowPanel($("uc1-window-panel"), { ...data, workOrder: wo }, (win, result, rank) =>
     scheduleUc1Decision(wo, win, result, rank)
   );
+  appendUc1TrustButton(wo);
   // Debug hook for headless verification (e2e) — mirrors window.__dcAssets's shape convention.
   window.__uc1Windows = { count: data.results.length, winnerIdx: data.winnerIdx };
+}
+
+/** Appends "Why trust this?" to the just-rendered window panel (design spec §4 "Trust panel" —
+ * same append-after-render split as appendUc1EvaluateButton, windowPanel.js stays a pure
+ * renderer). Also wraps the panel's own close button so closing it reopens any lane the schedule
+ * flow auto-closed for the visible SUMO run (P5-e item 3, Decision 6's "... or on panel close"). */
+function appendUc1TrustButton(wo) {
+  const panel = $("uc1-window-panel");
+  if (!panel || panel.classList.contains("hidden")) return;
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.id = "uc1-trust-btn";
+  btn.className = "uc1-win-schedule-btn uc1-trust-btn";
+  btn.textContent = "Why trust this?";
+  btn.onclick = () => openUc1TrustPanel(wo);
+  panel.appendChild(btn);
+
+  const closeBtn = panel.querySelector(".dc-panel-close");
+  if (closeBtn) {
+    const prevOnClick = closeBtn.onclick;
+    closeBtn.onclick = (ev) => {
+      reopenUc1AutoClosure();
+      if (typeof prevOnClick === "function") prevOnClick(ev);
+    };
+  }
+}
+
+/** "Why trust this?" -> backtest.js's runBacktest() (cached — deterministic, computed once) +
+ * trustPanel.js's renderTrustPanel(). onAssumptionChange re-runs evaluateUc1Windows() for the
+ * currently-open WO so the window table re-ranks live off the edited assumptions (the slide-11
+ * "stress-test" moment — Decision 2). */
+function openUc1TrustPanel(wo) {
+  if (!uc1BacktestResult) {
+    uc1BacktestResult = runBacktest({ incidents: uc1Incidents, segments: uc1Segments, config: uc1BacktestConfig });
+  }
+  renderTrustPanel($("uc1-trust-panel"), {
+    backtestResult: uc1BacktestResult,
+    assumptions: ensureUc1Assumptions(),
+    onAssumptionChange: (next) => {
+      uc1Assumptions = next;
+      if (uc1CurrentWo) evaluateUc1Windows(uc1CurrentWo);
+    },
+  });
+  // Debug hook for headless verification (e2e).
+  window.__uc1Trust = { open: true, workOrderId: wo?.id ?? uc1CurrentWo?.id ?? null };
 }
 
 /** Builds the decision's evidence bundle (design spec §4: window inputs, toll rate, demand slice
@@ -1064,7 +1266,7 @@ function buildUc1DecisionRecord(wo, win, result, rank) {
     },
     rank,
     score: result.score,
-    tollRateUsd: uc1WindowConfig.tollRateUsd,
+    tollRateUsd: currentUc1WindowConfig().tollRateUsd,
     revenueAtRiskUsd: result.revenueAtRiskUsd,
     avgDelayMin: result.queue?.avgDelayMin ?? null,
     laneAvailabilityPct: result.laneAvailabilityPct,
@@ -1120,6 +1322,12 @@ async function scheduleUc1Decision(wo, win, result, rank) {
     await flushUc1DecisionQueue();
     setUc1DecisionsBadge("online", `decisions: logged (${record.window.label})`);
     setStatus(`✓ Scheduled ${record.window.label} — decision logged (rank ${rank}).`);
+    // Decision 5: the live decision appends to the seeded exec-KPI log (no re-fetch needed).
+    uc1Decisions = [...uc1Decisions, record];
+    renderUc1ExecKpiStrip();
+    // Decision 6: the winning window triggers one visible SUMO run — only on a SUCCESSFUL
+    // schedule (an offline/queued decision gets no camera move / closure, per spec).
+    triggerUc1VisibleSumoRun(win, result);
   } catch (err) {
     console.warn("[UC1] decision write failed — queued in memory", err);
     uc1DecisionQueue.push(record);
@@ -1128,6 +1336,47 @@ async function scheduleUc1Decision(wo, win, result, rank) {
   }
   // Debug hook for headless verification (e2e).
   window.__uc1Decisions = { queued: uc1DecisionQueue.length, lastRecord: record };
+}
+
+/** Decision 6: "the winning window triggers one visible SUMO run" — fly the camera to the plaza,
+ * then reuse the EXISTING closure machinery (closeLaneHook) for the click-on-twin-selected
+ * approach lane: LIVE mode forwards the real closeLane command over the websocket (real traci
+ * physics); OFFLINE mode gets the same client-side work-zone overlay + schematic RILCA KPIs the
+ * manual "Close lane" button produces (closeLaneHook already branches on `liveMode` — no new
+ * physics here). Auto-reopens after UC1_AUTO_CLOSE_MS, or sooner if the window panel is closed
+ * (reopenUc1AutoClosure, wired in appendUc1TrustButton) or another decision is scheduled first. */
+function triggerUc1VisibleSumoRun(win, result) {
+  void result; // reserved for a future per-window closure spec; today's spec is the fixed demo default
+  const viewer = uc1Viewer;
+  if (!viewer || !T) return;
+
+  const boothX = META ? META.boothX : T.p.sumoRefX;
+  const { lon, lat } = T.sumoToLonLat(boothX, 0);
+  flyToLonLat(viewer, lon, lat, 260);
+
+  const lane = uc1SelectedApLane || AP_LANES[0];
+  if (activeWorkzoneSpec && activeWorkzoneSpec.lane !== lane) openLaneHook(viewer, activeWorkzoneSpec.lane);
+  closeLaneHook(viewer, lane, { offsetFt: 12, speedMph: 60 });
+
+  const isLive = liveMode && ws && ws.readyState === WebSocket.OPEN;
+  setStatus(
+    isLive
+      ? `▶ SUMO run started — closing ${lane} for ${win.label}.`
+      : `▶ ${win.label} scheduled — live SUMO feed offline, showing work-zone overlay for ${lane}.`
+  );
+
+  if (uc1AutoCloseTimer) clearTimeout(uc1AutoCloseTimer);
+  uc1AutoCloseTimer = setTimeout(() => {
+    uc1AutoCloseTimer = null;
+    if (activeWorkzoneSpec?.lane === lane) openLaneHook(viewer, lane);
+  }, UC1_AUTO_CLOSE_MS);
+}
+
+/** Reopens whatever lane triggerUc1VisibleSumoRun auto-closed, cancelling the pending timeout —
+ * called when the window panel is closed early (design spec Decision 6's "... or on panel close"). */
+function reopenUc1AutoClosure() {
+  if (uc1AutoCloseTimer) { clearTimeout(uc1AutoCloseTimer); uc1AutoCloseTimer = null; }
+  if (uc1Viewer && activeWorkzoneSpec) openLaneHook(uc1Viewer, activeWorkzoneSpec.lane);
 }
 
 /** "UC1 demo" hero shortcut (design spec §4, Mic-Drop 1): fly to config/uc1Demo.json's pinned
@@ -1148,6 +1397,8 @@ function openUc1Demo(viewer) {
  * controls triggers the shared DataConnect fetch (loadDcAssets) if it hasn't run yet; each layer
  * then toggles independently off that one shared load. */
 function installUc1(viewer) {
+  uc1Viewer = viewer; // P5-e: captured for the trust-panel/exec-KPI/SUMO-run handlers below, which
+                       // fire from DOM callbacks that don't otherwise close over main()'s `viewer`.
   const woBtn = $("btn-uc1-wo"), accBtn = $("btn-uc1-accidents"), inspBtn = $("btn-uc1-inspections"), demoBtn = $("btn-uc1-demo");
   const ensureUc1Loaded = async () => { if (!uc1Loaded) await loadDcAssets(viewer); };
 
@@ -1191,6 +1442,7 @@ function installUc1(viewer) {
     const picked = pickUc1Point(viewer, position);
     if (picked && picked.kind === "workOrder") openUc1WorkOrderContext(picked.record);
   });
+  installUc1LanePick(viewer); // P5-e item 4: click-on-twin approach-lane pick
 }
 
 function installDataConnectAssets(viewer) {

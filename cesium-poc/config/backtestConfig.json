@@ -1,0 +1,15 @@
+{
+  "_comment": "UC1 P5-a trust-panel BACKTEST config (design spec §4). Temporal holdout boundaries + duration-class thresholds live here so backtest.js has nothing scoring-related hardcoded. Year 1 = fit window, Year 2 = predicted/compared window. Both bounds are [start, end) on incident_date (ISO local, e.g. '2024-05-27T00:00:00').",
+  "holdout": {
+    "trainStart": "2024-04-01T00:00:00",
+    "trainEnd": "2025-04-01T00:00:00",
+    "testStart": "2025-04-01T00:00:00",
+    "testEnd": "2026-04-01T00:00:00"
+  },
+  "durationClasses": {
+    "_comment": "Coarse short/medium/long bucketing of lane_closure_duration_hours. short: <= shortMaxHours. medium: <= mediumMaxHours. long: above.",
+    "shortMaxHours": 2,
+    "mediumMaxHours": 5
+  },
+  "segmentRateBlendK": 5
+}

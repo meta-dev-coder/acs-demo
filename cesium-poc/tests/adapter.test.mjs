@@ -17,6 +17,7 @@ import {
   failedInspections,
   haversineMeters,
   buildWorkOrderContext,
+  gridBinPoints,
 } from "../src/uc1Data.js";
 
 // ---- shared fixtures --------------------------------------------------------------------------
@@ -339,6 +340,73 @@ test("haversineMeters matches a known great-circle distance within 0.5%", () => 
   // 1 degree of latitude is ~111,320 m; a pure north-south degree is the simplest sanity check.
   const d = haversineMeters(-80.21, 26.0, -80.21, 27.0);
   assert.ok(Math.abs(d - 111_320) / 111_320 < 0.005, `expected ~111320m, got ${d}`);
+});
+
+// ---- gridBinPoints (P5-d: uc1Layers.js closure-impact heat map, Mic-Drop 3) -----------------------
+
+test("gridBinPoints groups nearby points into one cell and counts them", () => {
+  const points = [
+    { lon: -80.30, lat: 26.10 },
+    { lon: -80.30001, lat: 26.10001 },
+    { lon: -80.29999, lat: 26.09999 },
+  ];
+  const cells = gridBinPoints(points, 400);
+  assert.equal(cells.length, 1);
+  assert.equal(cells[0].count, 3);
+  assert.ok(Math.abs(cells[0].lon - -80.3) < 1e-3);
+  assert.ok(Math.abs(cells[0].lat - 26.1) < 1e-3);
+});
+
+test("gridBinPoints separates points more than a cell apart into different cells", () => {
+  const points = [
+    { lon: -80.30, lat: 26.10 },
+    { lon: -80.10, lat: 26.10 }, // ~20km east — many cells away at 400m
+  ];
+  const cells = gridBinPoints(points, 400);
+  assert.equal(cells.length, 2);
+  assert.equal(cells[0].count, 1);
+  assert.equal(cells[1].count, 1);
+});
+
+test("gridBinPoints drops points with non-numeric lon/lat", () => {
+  const points = [
+    { lon: -80.30, lat: 26.10 },
+    { lat: 26.10 }, // missing lon entirely
+    { lon: -80.30 }, // missing lat entirely
+    { lon: -80.30, lat: "not-a-number" },
+  ];
+  const cells = gridBinPoints(points, 400);
+  assert.equal(cells.length, 1);
+  assert.equal(cells[0].count, 1);
+});
+
+test("gridBinPoints returns [] for empty/undefined input", () => {
+  assert.deepEqual(gridBinPoints([]), []);
+  assert.deepEqual(gridBinPoints(undefined), []);
+});
+
+test("gridBinPoints sorts cells densest-first", () => {
+  const points = [
+    { lon: -80.30, lat: 26.10 }, // cell A, x1
+    { lon: -80.10, lat: 26.10 }, // cell B, x2
+    { lon: -80.10001, lat: 26.10001 },
+  ];
+  const cells = gridBinPoints(points, 400);
+  assert.equal(cells.length, 2);
+  assert.equal(cells[0].count, 2);
+  assert.equal(cells[1].count, 1);
+});
+
+test("gridBinPoints total count across cells equals number of valid input points", () => {
+  const points = [
+    { lon: -80.30, lat: 26.10 },
+    { lon: -80.30, lat: 26.10 },
+    { lon: -80.28, lat: 26.11 },
+    { lon: -80.20, lat: 26.05 },
+  ];
+  const cells = gridBinPoints(points, 400);
+  const total = cells.reduce((sum, c) => sum + c.count, 0);
+  assert.equal(total, 4);
 });
 
 // ---- buildWorkOrderContext (P3-b): the 500m spatial join for the click-on-WO context panel -------

@@ -125,6 +125,57 @@ export function failedInspections(records = []) {
   return out;
 }
 
+// ---- grid-bin clustering (P5-d: uc1Layers.js closure-impact heat map, Mic-Drop 3) ---------------
+
+const DEFAULT_HEATMAP_CELL_SIZE_M = 400;
+
+/**
+ * gridBinPoints(points, cellSizeM = 400) -> [{lon, lat, count}]
+ *
+ * Pure grid-binning clusterer behind the closure-impact heat map (design spec §4 Decision 5,
+ * Mic-Drop Moment 3): bins `points` (each needing numeric lon/lat — anything else is dropped, same
+ * posture as nearby() below) into square cells of side `cellSizeM` meters, using an
+ * equirectangular approximation referenced to the input's mean latitude (fine at corridor scale —
+ * the same simplifying assumption haversineMeters()'s callers already make locally). Each
+ * surviving cell reports its point count and the CENTROID (mean lon/lat) of the points that fell
+ * in it, not the cell's geometric corner/center, so a rendered disc sits where the points actually
+ * are. Output is sorted densest-first (count desc, then lon asc for a stable order) so callers
+ * that only want the top clusters can just slice the front.
+ */
+export function gridBinPoints(points, cellSizeM = DEFAULT_HEATMAP_CELL_SIZE_M) {
+  const valid = [];
+  for (const p of points || []) {
+    const lon = toNum(p?.lon);
+    const lat = toNum(p?.lat);
+    if (lon == null || lat == null) continue;
+    valid.push({ lon, lat });
+  }
+  if (valid.length === 0) return [];
+
+  const meanLat = valid.reduce((sum, p) => sum + p.lat, 0) / valid.length;
+  const mPerDegLat = (Math.PI / 180) * EARTH_RADIUS_M;
+  const mPerDegLon = mPerDegLat * Math.cos(toRadians(meanLat)) || mPerDegLat; // guard pole edge case
+  const cellDegLat = cellSizeM / mPerDegLat;
+  const cellDegLon = cellSizeM / mPerDegLon;
+
+  const cells = new Map();
+  for (const p of valid) {
+    const key = `${Math.floor(p.lat / cellDegLat)}:${Math.floor(p.lon / cellDegLon)}`;
+    let cell = cells.get(key);
+    if (!cell) {
+      cell = { sumLon: 0, sumLat: 0, count: 0 };
+      cells.set(key, cell);
+    }
+    cell.sumLon += p.lon;
+    cell.sumLat += p.lat;
+    cell.count += 1;
+  }
+
+  return Array.from(cells.values())
+    .map((c) => ({ lon: c.sumLon / c.count, lat: c.sumLat / c.count, count: c.count }))
+    .sort((a, b) => b.count - a.count || a.lon - b.lon);
+}
+
 // ---- 500m haversine spatial join (P3-b: contextPanel.js) ---------------------------------------
 
 const EARTH_RADIUS_M = 6_371_000; // matches tools/uc1_hero_scan.py's haversine_m exactly.

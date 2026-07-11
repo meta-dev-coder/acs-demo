@@ -92,7 +92,13 @@
       <div id="workzone-hud" class="workzone-hud">
         <div class="wz-h">Work-zone lane closure &middot; MUTCD/RILCA</div>
         <div class="ctl-row">
+          <!-- #wz-lane-select is hidden via CSS only (style.css) — it stays in the DOM and
+               functional (closure.spec.ts drives window.__closeLane directly, and the "Close
+               lane" button below still reads its .value). Visible interaction is click-on-twin
+               lane pick (main.js's installUc1LanePick): click an approach-lane marker on the
+               plaza net to choose it — #wz-lane-picked mirrors the current pick. -->
           <select id="wz-lane-select" class="wz-lane-select" title="Approach lane to close"></select>
+          <span id="wz-lane-picked" class="wz-lane-picked">Click a lane on the twin</span>
           <button id="wz-close" class="mini">Close lane</button>
         </div>
         <div class="wz-readouts">
@@ -135,6 +141,10 @@
           <button id="btn-uc1-demo" class="mini">&#9654; UC1 demo</button>
           <span id="uc1-decisions-status" class="dc-status">decisions: —</span>
         </div>
+        <!-- Exec KPI strip (design spec §4 "Exec KPI strip") — execKpis.js's renderExecKpiStrip(),
+             populated on UC1 activation (main.js's loadUc1ExecKpis) and refreshed after every
+             scheduled decision. Empty until then (no hidden toggle needed — nothing to show). -->
+        <div id="uc1-exec-kpi-strip" class="uc1-exec-kpi-strip"></div>
       </div>
 
       <!-- Asset operations: gantry health + the camera-degradation incident scenario -->
@@ -160,8 +170,15 @@
     <div id="uc1-context-panel" class="panel dc-asset-panel hidden"></div>
 
     <!-- UC1 window panel (populated by windowPanel.js's renderWindowPanel() after "Evaluate
-         closure windows" -> windowAssembly.js's evaluateCandidates(), design spec §4 bullet 3). -->
+         closure windows" -> windowAssembly.js's evaluateCandidates(), design spec §4 bullet 3).
+         main.js appends "Why trust this?" after windowPanel.js's own render (P5-e), same
+         append-after-render split as uc1-context-panel's "Evaluate closure windows" button. -->
     <div id="uc1-window-panel" class="panel dc-asset-panel hidden"></div>
+
+    <!-- UC1 trust panel (trustPanel.js's renderTrustPanel() — Backtest + Assumptions tabs, design
+         spec §4 "Trust panel"). Opened by the "Why trust this?" button appended to the window
+         panel above (main.js's openUc1TrustPanel). -->
+    <div id="uc1-trust-panel" class="panel dc-asset-panel hidden"></div>
 
     <!-- Full-viewport weather tint overlay (toggled by main.js applyWeatherOverlay) -->
     <div id="weather-overlay" style="display:none"></div>
