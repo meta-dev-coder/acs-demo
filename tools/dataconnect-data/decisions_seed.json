@@ -1,0 +1,437 @@
+[
+  {
+    "id": "SEED-DEC-INC-200014",
+    "workOrderId": null,
+    "assetId": "11563",
+    "segmentId": "central",
+    "segmentName": "Central Segment",
+    "window": {
+      "start": "2024-05-27T04:00:00",
+      "durationHours": 7.0
+    },
+    "openLanes": 2,
+    "totalLanes": 3,
+    "closedCapacityVph": 2880.0,
+    "revenueAtRiskUsd": {
+      "point": 0.0,
+      "low": 0.0,
+      "high": 0.0,
+      "band": 0.15
+    },
+    "queue": {
+      "avgDelayMin": 0.0
+    },
+    "secondaryCrashExposure": 0.3704,
+    "score": 0.1111,
+    "decidedAt": "2024-05-27T04:00:00",
+    "incidentId": "INC-200014",
+    "seeded": true,
+    "source": "2024-26 closure history"
+  },
+  {
+    "id": "SEED-DEC-INC-200017",
+    "workOrderId": null,
+    "assetId": "11117",
+    "segmentId": "east",
+    "segmentName": "East Segment",
+    "window": {
+      "start": "2024-06-24T16:45:00",
+      "durationHours": 7.0
+    },
+    "openLanes": 2,
+    "totalLanes": 3,
+    "closedCapacityVph": 2880.0,
+    "revenueAtRiskUsd": {
+      "point": 0.0,
+      "low": 0.0,
+      "high": 0.0,
+      "band": 0.15
+    },
+    "queue": {
+      "avgDelayMin": 0.0
+    },
+    "secondaryCrashExposure": 0.4116,
+    "score": 0.1235,
+    "decidedAt": "2024-06-24T16:45:00",
+    "incidentId": "INC-200017",
+    "seeded": true,
+    "source": "2024-26 closure history"
+  },
+  {
+    "id": "SEED-DEC-INC-200016",
+    "workOrderId": null,
+    "assetId": "86A336-B4",
+    "segmentId": "east",
+    "segmentName": "East Segment",
+    "window": {
+      "start": "2024-08-03T06:15:00",
+      "durationHours": 5.0
+    },
+    "openLanes": 2,
+    "totalLanes": 3,
+    "closedCapacityVph": 2880.0,
+    "revenueAtRiskUsd": {
+      "point": 0.0,
+      "low": 0.0,
+      "high": 0.0,
+      "band": 0.15
+    },
+    "queue": {
+      "avgDelayMin": 0.0
+    },
+    "secondaryCrashExposure": 0.294,
+    "score": 0.0882,
+    "decidedAt": "2024-08-03T06:15:00",
+    "incidentId": "INC-200016",
+    "seeded": true,
+    "source": "2024-26 closure history"
+  },
+  {
+    "id": "SEED-DEC-INC-200073",
+    "workOrderId": null,
+    "assetId": "11563",
+    "segmentId": "central",
+    "segmentName": "Central Segment",
+    "window": {
+      "start": "2024-08-22T06:30:00",
+      "durationHours": 3.5
+    },
+    "openLanes": 2,
+    "totalLanes": 3,
+    "closedCapacityVph": 2880.0,
+    "revenueAtRiskUsd": {
+      "point": 0.0,
+      "low": 0.0,
+      "high": 0.0,
+      "band": 0.15
+    },
+    "queue": {
+      "avgDelayMin": 0.0
+    },
+    "secondaryCrashExposure": 0.1852,
+    "score": 0.0556,
+    "decidedAt": "2024-08-22T06:30:00",
+    "incidentId": "INC-200073",
+    "seeded": true,
+    "source": "2024-26 closure history"
+  },
+  {
+    "id": "SEED-DEC-INC-200039",
+    "workOrderId": null,
+    "assetId": "S-76101B",
+    "segmentId": "east",
+    "segmentName": "East Segment",
+    "window": {
+      "start": "2024-10-24T20:00:00",
+      "durationHours": 0.5
+    },
+    "openLanes": 2,
+    "totalLanes": 3,
+    "closedCapacityVph": 2880.0,
+    "revenueAtRiskUsd": {
+      "point": 0.0,
+      "low": 0.0,
+      "high": 0.0,
+      "band": 0.15
+    },
+    "queue": {
+      "avgDelayMin": 0.0
+    },
+    "secondaryCrashExposure": 0.0294,
+    "score": 0.0088,
+    "decidedAt": "2024-10-24T20:00:00",
+    "incidentId": "INC-200039",
+    "seeded": true,
+    "source": "2024-26 closure history"
+  },
+  {
+    "id": "SEED-DEC-INC-200074",
+    "workOrderId": null,
+    "assetId": "S-12003C",
+    "segmentId": "west",
+    "segmentName": "West Segment",
+    "window": {
+      "start": "2024-11-27T11:30:00",
+      "durationHours": 0.5
+    },
+    "openLanes": 2,
+    "totalLanes": 3,
+    "closedCapacityVph": 2880.0,
+    "revenueAtRiskUsd": {
+      "point": 0.0,
+      "low": 0.0,
+      "high": 0.0,
+      "band": 0.15
+    },
+    "queue": {
+      "avgDelayMin": 0.0
+    },
+    "secondaryCrashExposure": 0.0152,
+    "score": 0.0046,
+    "decidedAt": "2024-11-27T11:30:00",
+    "incidentId": "INC-200074",
+    "seeded": true,
+    "source": "2024-26 closure history"
+  },
+  {
+    "id": "SEED-DEC-INC-200056",
+    "workOrderId": null,
+    "assetId": "S-21033",
+    "segmentId": "central-west",
+    "segmentName": "Central-West Segment",
+    "window": {
+      "start": "2025-01-03T16:45:00",
+      "durationHours": 1.5
+    },
+    "openLanes": 2,
+    "totalLanes": 3,
+    "closedCapacityVph": 2880.0,
+    "revenueAtRiskUsd": {
+      "point": 0.0,
+      "low": 0.0,
+      "high": 0.0,
+      "band": 0.15
+    },
+    "queue": {
+      "avgDelayMin": 0.0
+    },
+    "secondaryCrashExposure": 0.0809,
+    "score": 0.0243,
+    "decidedAt": "2025-01-03T16:45:00",
+    "incidentId": "INC-200056",
+    "seeded": true,
+    "source": "2024-26 closure history"
+  },
+  {
+    "id": "SEED-DEC-INC-200015",
+    "workOrderId": null,
+    "assetId": "MARINA MILE-LC-Z7",
+    "segmentId": "east",
+    "segmentName": "East Segment",
+    "window": {
+      "start": "2025-03-22T01:45:00",
+      "durationHours": 3.5
+    },
+    "openLanes": 2,
+    "totalLanes": 3,
+    "closedCapacityVph": 2880.0,
+    "revenueAtRiskUsd": {
+      "point": 0.0,
+      "low": 0.0,
+      "high": 0.0,
+      "band": 0.15
+    },
+    "queue": {
+      "avgDelayMin": 0.0
+    },
+    "secondaryCrashExposure": 0.2058,
+    "score": 0.0617,
+    "decidedAt": "2025-03-22T01:45:00",
+    "incidentId": "INC-200015",
+    "seeded": true,
+    "source": "2024-26 closure history"
+  },
+  {
+    "id": "SEED-DEC-INC-200045",
+    "workOrderId": null,
+    "assetId": "S-77039",
+    "segmentId": "east",
+    "segmentName": "East Segment",
+    "window": {
+      "start": "2025-04-05T04:30:00",
+      "durationHours": 7.0
+    },
+    "openLanes": 2,
+    "totalLanes": 3,
+    "closedCapacityVph": 2880.0,
+    "revenueAtRiskUsd": {
+      "point": 0.0,
+      "low": 0.0,
+      "high": 0.0,
+      "band": 0.15
+    },
+    "queue": {
+      "avgDelayMin": 0.0
+    },
+    "secondaryCrashExposure": 0.4116,
+    "score": 0.1235,
+    "decidedAt": "2025-04-05T04:30:00",
+    "incidentId": "INC-200045",
+    "seeded": true,
+    "source": "2024-26 closure history"
+  },
+  {
+    "id": "SEED-DEC-INC-200040",
+    "workOrderId": null,
+    "assetId": "167",
+    "segmentId": "east",
+    "segmentName": "East Segment",
+    "window": {
+      "start": "2025-05-13T18:00:00",
+      "durationHours": 1.0
+    },
+    "openLanes": 2,
+    "totalLanes": 3,
+    "closedCapacityVph": 2880.0,
+    "revenueAtRiskUsd": {
+      "point": 0.0,
+      "low": 0.0,
+      "high": 0.0,
+      "band": 0.15
+    },
+    "queue": {
+      "avgDelayMin": 0.0
+    },
+    "secondaryCrashExposure": 0.0588,
+    "score": 0.0176,
+    "decidedAt": "2025-05-13T18:00:00",
+    "incidentId": "INC-200040",
+    "seeded": true,
+    "source": "2024-26 closure history"
+  },
+  {
+    "id": "SEED-DEC-INC-200080",
+    "workOrderId": null,
+    "assetId": "S-21001",
+    "segmentId": "west",
+    "segmentName": "West Segment",
+    "window": {
+      "start": "2025-06-19T23:15:00",
+      "durationHours": 7.0
+    },
+    "openLanes": 2,
+    "totalLanes": 3,
+    "closedCapacityVph": 2880.0,
+    "revenueAtRiskUsd": {
+      "point": 0.0,
+      "low": 0.0,
+      "high": 0.0,
+      "band": 0.15
+    },
+    "queue": {
+      "avgDelayMin": 0.0
+    },
+    "secondaryCrashExposure": 0.2127,
+    "score": 0.0638,
+    "decidedAt": "2025-06-19T23:15:00",
+    "incidentId": "INC-200080",
+    "seeded": true,
+    "source": "2024-26 closure history"
+  },
+  {
+    "id": "SEED-DEC-INC-200043",
+    "workOrderId": null,
+    "assetId": "860426-W-1-1",
+    "segmentId": "east",
+    "segmentName": "East Segment",
+    "window": {
+      "start": "2025-07-23T02:45:00",
+      "durationHours": 5.0
+    },
+    "openLanes": 2,
+    "totalLanes": 3,
+    "closedCapacityVph": 2880.0,
+    "revenueAtRiskUsd": {
+      "point": 0.0,
+      "low": 0.0,
+      "high": 0.0,
+      "band": 0.15
+    },
+    "queue": {
+      "avgDelayMin": 0.0
+    },
+    "secondaryCrashExposure": 0.294,
+    "score": 0.0882,
+    "decidedAt": "2025-07-23T02:45:00",
+    "incidentId": "INC-200043",
+    "seeded": true,
+    "source": "2024-26 closure history"
+  },
+  {
+    "id": "SEED-DEC-INC-200070",
+    "workOrderId": null,
+    "assetId": "11826",
+    "segmentId": "central",
+    "segmentName": "Central Segment",
+    "window": {
+      "start": "2025-08-21T02:45:00",
+      "durationHours": 3.5
+    },
+    "openLanes": 2,
+    "totalLanes": 3,
+    "closedCapacityVph": 2880.0,
+    "revenueAtRiskUsd": {
+      "point": 0.0,
+      "low": 0.0,
+      "high": 0.0,
+      "band": 0.15
+    },
+    "queue": {
+      "avgDelayMin": 0.0
+    },
+    "secondaryCrashExposure": 0.1852,
+    "score": 0.0556,
+    "decidedAt": "2025-08-21T02:45:00",
+    "incidentId": "INC-200070",
+    "seeded": true,
+    "source": "2024-26 closure history"
+  },
+  {
+    "id": "SEED-DEC-INC-200044",
+    "workOrderId": null,
+    "assetId": "S-76108C",
+    "segmentId": "east",
+    "segmentName": "East Segment",
+    "window": {
+      "start": "2025-08-27T12:15:00",
+      "durationHours": 2.0
+    },
+    "openLanes": 2,
+    "totalLanes": 3,
+    "closedCapacityVph": 2880.0,
+    "revenueAtRiskUsd": {
+      "point": 0.0,
+      "low": 0.0,
+      "high": 0.0,
+      "band": 0.15
+    },
+    "queue": {
+      "avgDelayMin": 0.0
+    },
+    "secondaryCrashExposure": 0.1176,
+    "score": 0.0353,
+    "decidedAt": "2025-08-27T12:15:00",
+    "incidentId": "INC-200044",
+    "seeded": true,
+    "source": "2024-26 closure history"
+  },
+  {
+    "id": "SEED-DEC-INC-200013",
+    "workOrderId": null,
+    "assetId": "A 4 69-Z5",
+    "segmentId": "central",
+    "segmentName": "Central Segment",
+    "window": {
+      "start": "2025-10-15T16:15:00",
+      "durationHours": 1.5
+    },
+    "openLanes": 2,
+    "totalLanes": 3,
+    "closedCapacityVph": 2880.0,
+    "revenueAtRiskUsd": {
+      "point": 0.0,
+      "low": 0.0,
+      "high": 0.0,
+      "band": 0.15
+    },
+    "queue": {
+      "avgDelayMin": 0.0
+    },
+    "secondaryCrashExposure": 0.0794,
+    "score": 0.0238,
+    "decidedAt": "2025-10-15T16:15:00",
+    "incidentId": "INC-200013",
+    "seeded": true,
+    "source": "2024-26 closure history"
+  }
+]

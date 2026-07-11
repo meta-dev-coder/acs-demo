@@ -62,3 +62,7 @@ public/dataconnect-data
 
 # UC1 source/reference docs (user-provided, not deliverables)
 UC1/
+
+# UC1 P4 shim write endpoint: decisions runtime log (gitignored on purpose — decisions_seed.json
+# is the committed, read-only seed; runtime/ is where live-written decisions land)
+tools/dataconnect-data/runtime/

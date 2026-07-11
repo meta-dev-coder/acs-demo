@@ -1,7 +1,7 @@
 /*
  * dataconnect.js — thin client for the DataConnect (Cohesive/Bentley) API protocol.
  *
- * Speaks the SAME three endpoints the live demo instance
+ * Speaks the SAME endpoints the live demo instance
  * (dataconnect-demo-dqa3.cohesivecloud.app) exposes, so this client can be pointed at either
  * tools/dataconnect_shim.py (local stand-in, default) or the real instance with only a
  * base-URL + credentials change — see docs/superpowers/specs/2026-07-04-dataconnect-scenario-a-
@@ -10,6 +10,10 @@
  *   POST /api/authenticate                       -> {token, refreshToken}
  *   GET  /api/data-mgmt/v1/class                  -> {classes:[{name, recordCount}, ...]}
  *   POST /api/data-mgmt/v1/curated-data/search    -> {items, page, pageSize, total}
+ *   POST /api/data-mgmt/v1/curated-data/update    -> {ok, record}  (UC1 P4, design spec §5 — the
+ *     shim writes to a gitignored runtime log; only className "decisions" is writable today.
+ *     writeRecord() below is the client seam. Same auth/timeout/retry-once-on-401 posture as
+ *     fetchClass — see requestJson.)
  *
  * Base URL: ?dc=<url> query param, else http://localhost:8787 (the shim's default port).
  * Credentials: ?dcuser=/?dcpass= query params, else demo defaults (the shim accepts anything;
@@ -177,4 +181,20 @@ export async function fetchClass(name, { pageSize = DEFAULT_PAGE_SIZE } = {}) {
     page += 1;
   }
   return items;
+}
+
+/**
+ * writeRecord(className, record) — POST /api/data-mgmt/v1/curated-data/update.
+ *
+ * Appends one record to a writable DataConnect class (today: "decisions", UC1 P4 design spec
+ * §5). Reuses requestJson's auth/timeout/retry-once-on-401 posture, so a caller only needs to
+ * decide what to do when this throws. Failure semantics belong to the caller (main.js) — this
+ * module never queues or retries writes itself, matching fetchClass's "report, don't recover"
+ * split. Resolves to the shim's `{ok, record}` envelope on success.
+ */
+export async function writeRecord(className, record) {
+  return requestJson("/api/data-mgmt/v1/curated-data/update", {
+    method: "POST",
+    body: { className, record },
+  });
 }

@@ -331,6 +331,7 @@ html, body, #cesiumContainer, #arcgisContainer {
   margin-bottom: 8px;
 }
 #btn-dc-assets.on { background: #2f6df6; border-color: #2f6df6; color: #fff; }
+#btn-uc1-wo.on, #btn-uc1-accidents.on, #btn-uc1-inspections.on { background: #2f6df6; border-color: #2f6df6; color: #fff; }
 .dc-status { font-size: 10px; font-weight: 600; white-space: nowrap; }
 .dc-status.online { color: #2ecc71; }
 .dc-status.offline { color: #ff7a6b; }
@@ -360,6 +361,11 @@ html, body, #cesiumContainer, #arcgisContainer {
   right: 16px;
   width: 300px;
 }
+
+/* UC1 work-order context panel — offset below the DataConnect asset panel (same right-edge
+   column) so a picked asset panel and a picked WO context panel can both be open without
+   overlapping. */
+#uc1-context-panel { top: 340px; }
 .dc-panel-close {
   position: absolute; top: 8px; right: 10px; background: none; border: none;
   color: #9fb0c3; font-size: 18px; line-height: 1; cursor: pointer;
@@ -386,6 +392,71 @@ html, body, #cesiumContainer, #arcgisContainer {
   border-radius: 6px; padding: 8px; margin-bottom: 8px;
 }
 .dc-panel-related { font-size: 9.5px; color: #8fa3bb; }
+
+/* UC1 — context panel (contextPanel.js): work-order 500m spatial-join sections. Reuses
+   .dc-panel / .dc-panel-close / .dc-panel-h / .dc-panel-sub / .dc-panel-band / .dc-panel-row from
+   the DataConnect asset panel above (same HUD visual language) — only the section/row layout
+   below is new. */
+.uc1-ctx-section { margin-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 8px; }
+.uc1-ctx-label {
+  font-size: 9.5px; font-weight: 700; color: #6fb1ff; text-transform: uppercase;
+  letter-spacing: 0.4px; margin-bottom: 6px;
+}
+.uc1-ctx-count { color: #9fb0c3; font-weight: 600; }
+.uc1-ctx-empty { font-size: 10px; color: #7d8da3; font-style: italic; }
+.uc1-ctx-row {
+  display: flex; align-items: center; gap: 6px; font-size: 10px; color: #cdd8e6;
+  padding: 3px 0;
+}
+.uc1-ctx-row-main { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uc1-ctx-row-sub { color: #8fa3bb; font-size: 9.5px; }
+.uc1-ctx-row-dist { color: #9fb0c3; font-size: 9.5px; white-space: nowrap; }
+.uc1-ctx-badge {
+  font-size: 8.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.3px;
+  padding: 2px 5px; border-radius: 4px; white-space: nowrap;
+}
+.uc1-ctx-badge.red   { background: rgba(214, 51, 46, 0.18);  color: #ff6b6b; }
+.uc1-ctx-badge.amber { background: rgba(241, 163, 37, 0.18); color: #f1a325; }
+.uc1-ctx-badge.green { background: rgba(67, 147, 58, 0.18);  color: #43d871; }
+
+/* UC1 — window panel (windowPanel.js): 3-candidate-window sparkline + ranked table (design spec
+   §4 bullet 3). Reuses .dc-panel / .dc-panel-close / .dc-panel-h / .dc-panel-sub from the
+   DataConnect asset panel (same HUD visual language); wider than the other right-column panels
+   since it hosts a table, so it gets its own width + left-edge placement. */
+#uc1-window-panel { top: 16px; left: 16px; right: auto; width: 420px; }
+.uc1-win-sparkline { margin: 6px 0 10px; }
+.uc1-win-sparkline svg { width: 100%; height: 56px; display: block; }
+.uc1-win-legend { display: flex; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
+.uc1-win-legend-item { display: inline-flex; align-items: center; gap: 4px; font-size: 9px; color: #9fb0c3; text-transform: capitalize; }
+.uc1-win-legend-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.uc1-win-table-wrap { overflow-x: auto; }
+.uc1-win-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+.uc1-win-table th {
+  text-align: left; font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.3px;
+  color: #7d8da3; font-weight: 700; padding: 3px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  white-space: nowrap;
+}
+.uc1-win-row td { padding: 5px 6px; vertical-align: top; border-bottom: 1px solid rgba(255, 255, 255, 0.06); color: #cdd8e6; }
+.uc1-win-row-winner { background: rgba(67, 147, 58, 0.1); }
+.uc1-win-rank { font-weight: 800; text-align: center; color: #f1c94f; width: 16px; }
+.uc1-win-label { font-weight: 700; font-size: 10.5px; }
+.uc1-win-sub { font-size: 8.5px; color: #8fa3bb; white-space: nowrap; }
+.uc1-win-cell { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.uc1-win-cell.red   { color: #ff6b6b; }
+.uc1-win-cell.amber { color: #f1a325; }
+.uc1-win-cell.green { color: #43d871; }
+.uc1-win-score { font-weight: 800; color: #f2f5f8; }
+.uc1-win-schedule-btn {
+  font-size: 9px; font-weight: 700; white-space: nowrap; padding: 4px 8px; border-radius: 5px;
+  border: 1px solid rgba(111, 177, 255, 0.4); background: rgba(111, 177, 255, 0.1); color: #6fb1ff;
+  cursor: pointer;
+}
+.uc1-win-schedule-btn:hover { background: #2f6df6; border-color: #2f6df6; color: #fff; }
+.uc1-win-note { margin-top: 8px; font-size: 9.5px; font-style: italic; color: #7d8da3; }
+
+/* "Evaluate closure windows" — appended to #uc1-context-panel by main.js (contextPanel.js stays a
+   pure renderer, see openUc1WorkOrderContext). Reuses .uc1-win-schedule-btn's palette, full width. */
+.uc1-evaluate-btn { display: block; width: 100%; margin-top: 10px; text-align: center; padding: 7px 8px; font-size: 10.5px; }
 
 /* ---- Asset operations (gantry health + incident scenario) ---- */
 .assetops-hud {

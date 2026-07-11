@@ -16,9 +16,18 @@ import { CoordinateTransform } from "./transform.js";
 import { buildWorkZone, clearWorkZone, rilcaWorkzone, CLOSURE_CONFIG } from "./workzone.js";
 import { CesiumRenderer } from "./renderers/cesium.js";
 import { assetKpis } from "./assetOps.js";
-import { login, fetchClass, onStatus } from "./dataconnect.js";
+import { login, fetchClass, writeRecord, onStatus } from "./dataconnect.js";
 import { adaptDataConnectAssets, scoreAssets } from "./scoringA.js";
 import { buildAssetLayer, disposeAssetLayer, pickAsset, installAssetPicking } from "./assetLayer.js";
+import { extractAccidents, openWorkOrders, failedInspections, buildWorkOrderContext, TICKETS_CLASS } from "./uc1Data.js";
+import { buildWorkOrderLayer, buildAccidentLayer, buildInspectionLayer, disposeUc1Layer, pickUc1Point, flyToLonLat } from "./uc1Layers.js";
+import { renderWorkOrderContext } from "./contextPanel.js";
+import { evaluateCandidates } from "./windowAssembly.js";
+import { renderWindowPanel } from "./windowPanel.js";
+import { createDemandModel } from "./demand.js";
+import uc1Demo from "../config/uc1Demo.json" with { type: "json" };
+import uc1Segments from "../config/segments.json" with { type: "json" };
+import uc1WindowConfig from "../config/windowConfig.json" with { type: "json" };
 
 const toRad = (deg) => (deg * Math.PI) / 180;
 const ION = import.meta.env.VITE_CESIUM_ION_TOKEN;
@@ -775,6 +784,28 @@ let dcCollection = null;   // the live PointPrimitiveCollection, or null if neve
 let dcScored = [];         // last-good scored assets (kept on failure — keep-previous-on-failure)
 let dcPollTimer = null;
 
+// ---- UC1: Lane Closure Revenue Optimizer (design spec §4) — three toggleable layers built off
+// the SAME DataConnect fetch above (loadDcAssets/loadDcSnapshot), plus the click-on-WO context
+// panel. Each layer has its own on/off state, independent of the "Assets (DataConnect)" toggle.
+let uc1WoCollection = null, uc1AccidentCollection = null, uc1InspectionCollection = null;
+let uc1WoOn = false, uc1AccidentsOn = false, uc1InspectionsOn = false;
+let uc1OpenWOs = [];            // openWorkOrders() rows — trigger list + pick index
+let uc1Accidents = [];          // extractAccidents() rows
+let uc1FailedInspections = [];  // failedInspections() rows (pooled across the 3 inspection classes)
+let uc1Tickets = [];            // raw Tickets rows (ticket join in buildWorkOrderContext)
+let uc1Incidents = [];          // raw Incidents_V3 rows (accident-history join)
+let uc1Loaded = false;          // true once buildUc1() has run at least once (set even under
+                                 // ?renderer=arcgis, where uc1*Collection stay null — see buildUc1)
+let uc1CurrentWo = null;        // the WO currently shown in the context panel — the "Evaluate
+                                 // closure windows" button's target (design spec §4 bullet 3/4)
+let uc1CurrentContext = null;   // buildWorkOrderContext() output for uc1CurrentWo (its `counts`
+                                 // feed the scheduled decision's evidence bundle's history counts)
+const uc1DemandModel = createDemandModel(undefined, uc1Segments);   // P2-a demand.js, segment-scaled
+let uc1DecisionQueue = [];      // in-memory queue of decision records that failed to POST — a
+                                 // successful write opportunistically drains this (keep-previous-
+                                 // on-failure, matching data/loader.ts's pattern per design spec
+                                 // §4 bullet 3 "Error handling").
+
 const DC_CLASSES = {
   assetRegistry: "asset_registry",
   workOrders: "work_orders",
@@ -782,6 +813,7 @@ const DC_CLASSES = {
   roadwayInspections: "roadway_inspections_v3",
   itsInspections: "its_inspections_v3",
   incidents: "incidents_v3",
+  tickets: TICKETS_CLASS,
 };
 
 function setDcStatusBadge(status) {
@@ -860,7 +892,7 @@ function startDcPolling() {
 async function loadDcAssets(viewer) {
   try {
     await login();
-    const [assetRegistry, workOrders, safetyInspections, roadwayInspections, itsInspections, incidents] =
+    const [assetRegistry, workOrders, safetyInspections, roadwayInspections, itsInspections, incidents, tickets] =
       await Promise.all([
         fetchClass(DC_CLASSES.assetRegistry, { pageSize: 500 }),
         fetchClass(DC_CLASSES.workOrders, { pageSize: 500 }),
@@ -868,19 +900,23 @@ async function loadDcAssets(viewer) {
         fetchClass(DC_CLASSES.roadwayInspections, { pageSize: 500 }),
         fetchClass(DC_CLASSES.itsInspections, { pageSize: 500 }),
         fetchClass(DC_CLASSES.incidents, { pageSize: 500 }),
+        fetchClass(DC_CLASSES.tickets, { pageSize: 500 }),
       ]);
     const raw = adaptDataConnectAssets({
-      assetRegistry, workOrders, safetyInspections, roadwayInspections, itsInspections, incidents,
+      assetRegistry, workOrders, safetyInspections, roadwayInspections, itsInspections, incidents, tickets,
     });
     const scored = scoreAssets(raw, []);
 
     // Only now, with a fully-scored replacement in hand, touch the live layer/state.
     const prevCollection = dcCollection;
     dcCollection = buildAssetLayer(viewer, scored);
+    dcCollection.show = dcEnabled; // UC1 layers can trigger this load without the DC toggle being on
     if (prevCollection) disposeAssetLayer(viewer, prevCollection);
     dcScored = scored;
     renderDcAssetKpis(scored);
+    if (!dcEnabled) $("dc-asset-kpis")?.classList.add("hidden"); // UC1-triggered load, DC toggle still off
     startDcPolling();
+    buildUc1(viewer, { assetRegistry, workOrders, safetyInspections, roadwayInspections, itsInspections, incidents, tickets });
   } catch (err) {
     console.warn("[DataConnect] asset load failed — keeping previous layer/data", err);
     // keep-previous-on-failure: dcCollection/dcScored/window.__dcAssets are left untouched.
@@ -897,24 +933,264 @@ async function loadDcSnapshot(viewer) {
       if (!r.ok || !(r.headers.get("content-type") || "").includes("json")) throw new Error(name);
       return r.json();
     });
-    const [assetRegistry, workOrders, safetyInspections, roadwayInspections, itsInspections, incidents] =
+    const [assetRegistry, workOrders, safetyInspections, roadwayInspections, itsInspections, incidents, tickets] =
       await Promise.all([
         get(DC_CLASSES.assetRegistry), get(DC_CLASSES.workOrders), get(DC_CLASSES.safetyInspections),
         get(DC_CLASSES.roadwayInspections), get(DC_CLASSES.itsInspections), get(DC_CLASSES.incidents),
+        get(DC_CLASSES.tickets),
       ]);
     const scored = scoreAssets(adaptDataConnectAssets({
-      assetRegistry, workOrders, safetyInspections, roadwayInspections, itsInspections, incidents,
+      assetRegistry, workOrders, safetyInspections, roadwayInspections, itsInspections, incidents, tickets,
     }), []);
     const prevCollection = dcCollection;
     dcCollection = buildAssetLayer(viewer, scored);
+    dcCollection.show = dcEnabled; // UC1 layers can trigger this load without the DC toggle being on
     if (prevCollection) disposeAssetLayer(viewer, prevCollection);
     dcScored = scored;
     renderDcAssetKpis(scored);
+    if (!dcEnabled) $("dc-asset-kpis")?.classList.add("hidden");
     stopDcPolling(); // snapshot mode is static — no live endpoint to poll
     setDcStatusBadge("snapshot");
+    buildUc1(viewer, { assetRegistry, workOrders, safetyInspections, roadwayInspections, itsInspections, incidents, tickets });
   } catch (err) {
     console.warn("[DataConnect] snapshot fallback unavailable", err);
   }
+}
+
+/**
+ * buildUc1(viewer, {assetRegistry, workOrders, tickets, safetyInspections, roadwayInspections,
+ * itsInspections, incidents}) — rebuilds the three UC1 trigger layers (design spec §4 bullet 1)
+ * off the same raw DataConnect classes loadDcAssets()/loadDcSnapshot() just fetched, and stashes
+ * the normalized data uc1's context panel needs for its 500m spatial join (uc1Data.js's
+ * buildWorkOrderContext()). Swap-then-dispose, same keep-previous-on-failure posture as the asset
+ * layer above (this only ever runs after a successful DC load, so "previous" here just means
+ * "replaced", never "left half-built").
+ */
+function buildUc1(viewer, { assetRegistry, workOrders, tickets, safetyInspections, roadwayInspections, itsInspections, incidents }) {
+  uc1Accidents = extractAccidents(assetRegistry);
+  uc1OpenWOs = openWorkOrders({ assetRegistry, workOrders, tickets, safetyInspections, roadwayInspections, itsInspections });
+  uc1FailedInspections = failedInspections([...(safetyInspections || []), ...(roadwayInspections || []), ...(itsInspections || [])]);
+  uc1Tickets = tickets || [];
+  uc1Incidents = incidents || [];
+  uc1Loaded = true;
+
+  // Cesium-only feature (matches installDataConnectAssets' own guard): under ?renderer=arcgis
+  // there is no viewer.scene, so the data above still populates (context panel needs it) but no
+  // primitive layers are built.
+  if (!viewer?.scene?.canvas) return;
+
+  const prevWo = uc1WoCollection, prevAcc = uc1AccidentCollection, prevInsp = uc1InspectionCollection;
+  uc1WoCollection = buildWorkOrderLayer(viewer, uc1OpenWOs);
+  uc1AccidentCollection = buildAccidentLayer(viewer, uc1Accidents);
+  uc1InspectionCollection = buildInspectionLayer(viewer, uc1FailedInspections);
+  uc1WoCollection.show = uc1WoOn;
+  uc1AccidentCollection.show = uc1AccidentsOn;
+  uc1InspectionCollection.show = uc1InspectionsOn;
+  if (prevWo) disposeUc1Layer(viewer, prevWo);
+  if (prevAcc) disposeUc1Layer(viewer, prevAcc);
+  if (prevInsp) disposeUc1Layer(viewer, prevInsp);
+}
+
+/** Assembles + renders a picked work order's 500m context (contextPanel.js's Mic-Drop-1 panel),
+ * then appends the "Evaluate closure windows" button (design spec §4 bullet 3) — contextPanel.js
+ * stays a pure renderer (its own docstring defers this wiring to "a later phase"/main.js), so the
+ * button is appended here rather than baked into that module's innerHTML. */
+function openUc1WorkOrderContext(wo) {
+  const ctx = buildWorkOrderContext(wo, {
+    assets: dcScored,
+    accidents: uc1Accidents,
+    inspections: uc1FailedInspections,
+    tickets: uc1Tickets,
+    incidents: uc1Incidents,
+  });
+  uc1CurrentWo = wo;
+  uc1CurrentContext = ctx;
+  renderWorkOrderContext($("uc1-context-panel"), { ...ctx, workOrder: wo });
+  appendUc1EvaluateButton(wo);
+  // A newly-picked WO invalidates any window table left over from a different WO.
+  $("uc1-window-panel")?.classList.add("hidden");
+  // Debug hook for headless verification (e2e) — mirrors window.__dcAssets's shape convention.
+  window.__uc1Context = { workOrderId: wo?.id ?? null, counts: ctx.counts };
+}
+
+/** Appends "Evaluate closure windows" to the just-rendered context panel. No-ops if the panel
+ * ended up hidden (renderWorkOrderContext hides+clears on a missing/empty context). */
+function appendUc1EvaluateButton(wo) {
+  const panel = $("uc1-context-panel");
+  if (!panel || panel.classList.contains("hidden")) return;
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.id = "uc1-evaluate-btn";
+  btn.className = "uc1-win-schedule-btn uc1-evaluate-btn";
+  btn.textContent = "Evaluate closure windows";
+  btn.onclick = () => evaluateUc1Windows(wo);
+  panel.appendChild(btn);
+}
+
+/** "Evaluate closure windows" -> windowAssembly.js's evaluateCandidates() (P2 demand.js x
+ * windowEval.js, pure) -> windowPanel.js's renderWindowPanel(), wired so its "Schedule this
+ * window" buttons call scheduleUc1Decision(). Design spec §4 bullet 3. */
+function evaluateUc1Windows(wo) {
+  const data = evaluateCandidates(wo, {
+    segments: uc1Segments,
+    incidents: uc1Incidents,
+    windowConfig: uc1WindowConfig,
+    demandModel: uc1DemandModel,
+  });
+  renderWindowPanel($("uc1-window-panel"), { ...data, workOrder: wo }, (win, result, rank) =>
+    scheduleUc1Decision(wo, win, result, rank)
+  );
+  // Debug hook for headless verification (e2e) — mirrors window.__dcAssets's shape convention.
+  window.__uc1Windows = { count: data.results.length, winnerIdx: data.winnerIdx };
+}
+
+/** Builds the decision's evidence bundle (design spec §4: window inputs, toll rate, demand slice
+ * summary, history counts from the currently-open context panel) for a scheduled window.
+ * `win` (NOT `window` — must not shadow the global, see scheduleUc1Decision's debug hook). */
+function buildUc1DecisionRecord(wo, win, result, rank) {
+  const slices = result?.queue?.slices || [];
+  const vphValues = slices.map((s) => s.demandVph ?? 0);
+  const counts = (uc1CurrentWo === wo && uc1CurrentContext?.counts) || {};
+  return {
+    decisionId: `${wo?.id ?? "unknown"}-${win.id}-${Date.now()}`,
+    workOrderId: wo?.id ?? null,
+    segment: wo?.segment ?? null,
+    segmentId: result.segmentId,
+    window: {
+      id: win.id,
+      label: win.label,
+      startIso: win.start.toISOString(),
+      durationHours: win.durationHours,
+    },
+    rank,
+    score: result.score,
+    tollRateUsd: uc1WindowConfig.tollRateUsd,
+    revenueAtRiskUsd: result.revenueAtRiskUsd,
+    avgDelayMin: result.queue?.avgDelayMin ?? null,
+    laneAvailabilityPct: result.laneAvailabilityPct,
+    secondaryCrashExposure: result.secondaryCrashExposure,
+    demandSliceSummary: {
+      sliceCount: slices.length,
+      totalArrivalsVeh: result.queue?.totalArrivals ?? null,
+      avgVph: vphValues.length ? vphValues.reduce((a, b) => a + b, 0) / vphValues.length : null,
+      maxVph: vphValues.length ? Math.max(...vphValues) : null,
+    },
+    historyCounts: {
+      hasTicket: !!counts.hasTicket,
+      inspections: counts.inspections ?? 0,
+      accidents: counts.accidents ?? 0,
+    },
+    scheduledAtIso: new Date().toISOString(),
+    source: "cesium-poc-uc1-demo",
+  };
+}
+
+/** Sets the "decisions: …" badge in the same visual idiom as #dc-status (setDcStatusBadge). */
+function setUc1DecisionsBadge(status, text) {
+  const el = $("uc1-decisions-status");
+  if (!el) return;
+  el.className = "dc-status " + status;
+  el.textContent = text;
+}
+
+/** Opportunistically drains uc1DecisionQueue on a successful write; stops at the first failure
+ * (still offline) and leaves the remainder queued. */
+async function flushUc1DecisionQueue() {
+  while (uc1DecisionQueue.length) {
+    const rec = uc1DecisionQueue[0];
+    try {
+      await writeRecord("decisions", rec);
+      uc1DecisionQueue.shift();
+    } catch {
+      return;
+    }
+  }
+}
+
+/** Schedule action (design spec §4 bullet 3 "Schedule action"): POST the evidence-bundle decision
+ * record to the shim's write endpoint via dataconnect.js's writeRecord(). Keep-previous-on-failure:
+ * a failed write queues the record in memory and flips the "decisions" badge offline, matching the
+ * existing #dc-status badge idiom — nothing already scheduled/rendered is rolled back.
+ * `win` (NOT `window` — a param literally named `window` would shadow the global for the rest of
+ * this function's body, silently breaking the `window.__uc1Decisions` debug hook below). */
+async function scheduleUc1Decision(wo, win, result, rank) {
+  const record = buildUc1DecisionRecord(wo, win, result, rank);
+  try {
+    await writeRecord("decisions", record);
+    await flushUc1DecisionQueue();
+    setUc1DecisionsBadge("online", `decisions: logged (${record.window.label})`);
+    setStatus(`✓ Scheduled ${record.window.label} — decision logged (rank ${rank}).`);
+  } catch (err) {
+    console.warn("[UC1] decision write failed — queued in memory", err);
+    uc1DecisionQueue.push(record);
+    setUc1DecisionsBadge("offline", `decisions: offline (${uc1DecisionQueue.length} queued)`);
+    setStatus("⚠ Could not log the decision (DataConnect offline) — queued locally.");
+  }
+  // Debug hook for headless verification (e2e).
+  window.__uc1Decisions = { queued: uc1DecisionQueue.length, lastRecord: record };
+}
+
+/** "UC1 demo" hero shortcut (design spec §4, Mic-Drop 1): fly to config/uc1Demo.json's pinned
+ * hero work order and open its context panel. No-ops with a console warning if the current
+ * dataset doesn't contain that WO id (e.g. a future re-export moves/closes it). */
+function openUc1Demo(viewer) {
+  const wo = uc1OpenWOs.find((w) => w.id === uc1Demo.heroWorkOrderId);
+  if (!wo) {
+    console.warn("[UC1] hero work order not found in current dataset:", uc1Demo.heroWorkOrderId);
+    return;
+  }
+  if (typeof wo.lon === "number" && typeof wo.lat === "number") flyToLonLat(viewer, wo.lon, wo.lat);
+  openUc1WorkOrderContext(wo);
+}
+
+/** Wires the three UC1 layer toggles + "UC1 demo" hero button + WO-pick -> context-panel path.
+ * Mirrors installDataConnectAssets()'s deferred-load pattern: the first click of ANY of these
+ * controls triggers the shared DataConnect fetch (loadDcAssets) if it hasn't run yet; each layer
+ * then toggles independently off that one shared load. */
+function installUc1(viewer) {
+  const woBtn = $("btn-uc1-wo"), accBtn = $("btn-uc1-accidents"), inspBtn = $("btn-uc1-inspections"), demoBtn = $("btn-uc1-demo");
+  const ensureUc1Loaded = async () => { if (!uc1Loaded) await loadDcAssets(viewer); };
+
+  if (woBtn) {
+    woBtn.onclick = async () => {
+      await ensureUc1Loaded();
+      uc1WoOn = !uc1WoOn;
+      woBtn.classList.toggle("on", uc1WoOn);
+      if (uc1WoCollection) uc1WoCollection.show = uc1WoOn;
+    };
+  }
+  if (accBtn) {
+    accBtn.onclick = async () => {
+      await ensureUc1Loaded();
+      uc1AccidentsOn = !uc1AccidentsOn;
+      accBtn.classList.toggle("on", uc1AccidentsOn);
+      if (uc1AccidentCollection) uc1AccidentCollection.show = uc1AccidentsOn;
+    };
+  }
+  if (inspBtn) {
+    inspBtn.onclick = async () => {
+      await ensureUc1Loaded();
+      uc1InspectionsOn = !uc1InspectionsOn;
+      inspBtn.classList.toggle("on", uc1InspectionsOn);
+      if (uc1InspectionCollection) uc1InspectionCollection.show = uc1InspectionsOn;
+    };
+  }
+  if (demoBtn) {
+    demoBtn.onclick = async () => {
+      await ensureUc1Loaded();
+      uc1WoOn = true; // hero point must be visible to fly to it
+      woBtn?.classList.add("on");
+      if (uc1WoCollection) uc1WoCollection.show = true;
+      openUc1Demo(viewer);
+    };
+  }
+
+  // Cesium-only pick path (same guard as installDataConnectAssets — no viewer.scene under ArcGIS).
+  if (!viewer?.scene?.canvas) return;
+  installAssetPicking(viewer, (position) => {
+    const picked = pickUc1Point(viewer, position);
+    if (picked && picked.kind === "workOrder") openUc1WorkOrderContext(picked.record);
+  });
 }
 
 function installDataConnectAssets(viewer) {
@@ -1069,6 +1345,7 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
   installMarking(viewer);
   installExportCalibration();
   installDataConnectAssets(viewer);
+  installUc1(viewer);
 
   // ---- Feature B: work-zone HUD wiring (lane selector + close/reopen button) ----
   const wzLaneSel = $("wz-lane-select");

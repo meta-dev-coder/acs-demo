@@ -21,6 +21,8 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHIM_PATH = os.path.join(HERE, "dataconnect_shim.py")
+SEED_PATH = os.path.join(HERE, "dataconnect-data", "decisions_seed.json")
+RUNTIME_PATH = os.path.join(HERE, "dataconnect-data", "runtime", "decisions.json")
 
 FAILURES = []
 
@@ -177,6 +179,75 @@ def test_field_filter(port, token):
           (status, none_match))
 
 
+def test_write_401_without_token(port):
+    status, _ = _request(port, "POST", "/api/data-mgmt/v1/curated-data/update",
+                          body={"className": "decisions", "record": {"id": "no-auth"}})
+    check("POST /curated-data/update without Authorization -> 401", status == 401, f"got {status}")
+
+
+def test_decisions_seed_merge(port, token):
+    seed = json.load(open(SEED_PATH))
+    seed_count = len(seed)
+    check("decisions_seed.json has ~15 seeded rows", seed_count >= 10, seed_count)
+    check("every seed row is labelled seeded/source",
+          all(r.get("seeded") is True and r.get("source") == "2024-26 closure history" for r in seed),
+          [r.get("id") for r in seed if not (r.get("seeded") is True and r.get("source"))])
+
+    # decisions class is readable (merged seed + runtime) even before any write happens.
+    status, before = _request(port, "POST", "/api/data-mgmt/v1/curated-data/search",
+                               body={"className": "decisions", "page": 1, "pageSize": 1000}, token=token)
+    check("search className=decisions -> 200 before any write", status == 200, f"got {status}")
+    check("decisions total before write == seed count", before.get("total") == seed_count, before.get("total"))
+
+    new_record = {"id": "TEST-DEC-1", "segmentId": "east", "score": 0.42, "note": "unit-test write"}
+    status, written = _request(port, "POST", "/api/data-mgmt/v1/curated-data/update",
+                                body={"className": "decisions", "record": new_record}, token=token)
+    check("POST /curated-data/update -> 200", status == 200, f"got {status}")
+    check("update response echoes the record", written.get("record", {}).get("id") == "TEST-DEC-1", written)
+
+    status, after = _request(port, "POST", "/api/data-mgmt/v1/curated-data/search",
+                              body={"className": "decisions", "page": 1, "pageSize": 1000}, token=token)
+    check("decisions total after one write == seed count + 1", after.get("total") == seed_count + 1,
+          after.get("total"))
+    ids = {r.get("id") for r in after.get("items", [])}
+    check("written record is present in a subsequent read (read-back merge)", "TEST-DEC-1" in ids, ids)
+    check("seed rows are still present alongside the written row",
+          all(r["id"] in ids for r in seed), ids)
+
+    check("runtime/decisions.json was created on disk by the write", os.path.exists(RUNTIME_PATH))
+    runtime_rows = json.load(open(RUNTIME_PATH))
+    check("runtime/decisions.json holds exactly the written row(s), not the seed",
+          len(runtime_rows) == 1 and runtime_rows[0]["id"] == "TEST-DEC-1", runtime_rows)
+
+
+def test_runtime_excluded_from_class_list(port, token):
+    status, data = _request(port, "GET", "/api/data-mgmt/v1/class", token=token)
+    check("GET /class -> 200", status == 200, f"got {status}")
+    names = {c["name"] for c in data.get("classes", [])}
+    check("class list includes decisions (merged seed+runtime)", "decisions" in names, names)
+    check("class list does NOT include decisions_seed as its own class",
+          "decisions_seed" not in names, names)
+    check("class list does NOT include a class named runtime",
+          "runtime" not in names, names)
+    check("class list does NOT include any name containing 'runtime'",
+          not any("runtime" in n for n in names), names)
+
+
+def test_seed_immutable(port, token):
+    before = open(SEED_PATH).read()
+    # A second write, to make doubly sure repeated writes never touch the seed file.
+    _request(port, "POST", "/api/data-mgmt/v1/curated-data/update",
+             body={"className": "decisions", "record": {"id": "TEST-DEC-2"}}, token=token)
+    after = open(SEED_PATH).read()
+    check("decisions_seed.json is byte-identical after writes (seed is immutable)", before == after)
+
+
+def test_write_unwritable_class_rejected(port, token):
+    status, data = _request(port, "POST", "/api/data-mgmt/v1/curated-data/update",
+                             body={"className": "asset_registry", "record": {"id": "x"}}, token=token)
+    check("POST /curated-data/update on a non-writable class -> 400", status == 400, f"got {status}")
+
+
 def test_cors_preflight(port):
     conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
     try:
@@ -207,6 +278,14 @@ def main():
         sys.exit("tools/dataconnect-data/asset_registry.json not found — run "
                  "`python3 tools/dataconnect_export.py <xlsx>` first.")
 
+    if not os.path.exists(SEED_PATH):
+        sys.exit("tools/dataconnect-data/decisions_seed.json not found — run "
+                 "`python3 tools/seed_decisions.py` first.")
+
+    # Fresh runtime state for a deterministic test run — the write tests assert exact counts.
+    if os.path.exists(RUNTIME_PATH):
+        os.remove(RUNTIME_PATH)
+
     port = _free_port()
     proc = subprocess.Popen(
         [sys.executable, SHIM_PATH, "--port", str(port)],
@@ -216,6 +295,7 @@ def main():
         _wait_for_port(port)
 
         test_401_without_token(port)
+        test_write_401_without_token(port)
         test_auth_flow(port)
 
         # Shared token for the tests that need one — fetched once, not re-derived per test.
@@ -225,6 +305,10 @@ def main():
         test_envelope_fields(port, token)
         test_pagination_math(port, token)
         test_field_filter(port, token)
+        test_decisions_seed_merge(port, token)
+        test_runtime_excluded_from_class_list(port, token)
+        test_seed_immutable(port, token)
+        test_write_unwritable_class_rejected(port, token)
         test_cors_preflight(port)
     finally:
         proc.terminate()
@@ -238,6 +322,9 @@ def main():
             if leftover and FAILURES:
                 print("\n--- shim stdout/stderr ---")
                 print(leftover)
+        # Leave no runtime artifact behind after a test run (gitignored anyway, but tidy).
+        if os.path.exists(RUNTIME_PATH):
+            os.remove(RUNTIME_PATH)
 
     print()
     if FAILURES:

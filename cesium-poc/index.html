@@ -120,6 +120,23 @@
         <div id="dc-asset-kpis" class="dc-asset-kpis hidden"></div>
       </div>
 
+      <!-- UC1: Lane Closure Revenue Optimizer — three toggleable trigger layers (open work
+           orders / accidents / failed inspections) built from the same DataConnect fetch above
+           (uc1Data.js + uc1Layers.js). "UC1 demo" flies to config/uc1Demo.json's hero work order
+           and opens its context panel (contextPanel.js). -->
+      <div id="uc1-panel" class="dc-panel">
+        <div class="dc-h">UC1 &middot; Lane closure revenue optimizer</div>
+        <div class="ctl-row">
+          <button id="btn-uc1-wo" class="mini">Work orders</button>
+          <button id="btn-uc1-accidents" class="mini">Accidents</button>
+          <button id="btn-uc1-inspections" class="mini">Failed inspections</button>
+        </div>
+        <div class="ctl-row">
+          <button id="btn-uc1-demo" class="mini">&#9654; UC1 demo</button>
+          <span id="uc1-decisions-status" class="dc-status">decisions: —</span>
+        </div>
+      </div>
+
       <!-- Asset operations: gantry health + the camera-degradation incident scenario -->
       <div id="assetops-hud" class="assetops-hud">
         <div class="ao-h">Asset operations · gantry health <span id="ao-src" class="ao-src">GIS · ArcGIS</span></div>
@@ -135,6 +152,16 @@
     <!-- DataConnect asset info panel (populated on point pick) — separate floating panel so it
          doesn't fight the main HUD's left-side real estate. -->
     <div id="dc-asset-panel" class="panel dc-asset-panel hidden"></div>
+
+    <!-- UC1 work-order context panel (populated on WO-layer pick — contextPanel.js's
+         renderWorkOrderContext(), same floating-panel treatment as dc-asset-panel above).
+         main.js appends an "Evaluate closure windows" button after contextPanel.js's own render
+         (see openUc1WorkOrderContext) — contextPanel.js itself stays untouched/pure-render. -->
+    <div id="uc1-context-panel" class="panel dc-asset-panel hidden"></div>
+
+    <!-- UC1 window panel (populated by windowPanel.js's renderWindowPanel() after "Evaluate
+         closure windows" -> windowAssembly.js's evaluateCandidates(), design spec §4 bullet 3). -->
+    <div id="uc1-window-panel" class="panel dc-asset-panel hidden"></div>
 
     <!-- Full-viewport weather tint overlay (toggled by main.js applyWeatherOverlay) -->
     <div id="weather-overlay" style="display:none"></div>

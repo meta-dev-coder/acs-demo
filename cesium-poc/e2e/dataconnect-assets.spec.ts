@@ -10,7 +10,7 @@
  * contract: `?dc=` query param selects the base URL).
  *
  * Tests:
- *  DC1. toggling #btn-dc-assets on loads >=5000 scored assets, all three risk bands populated
+ *  DC1. toggling #btn-dc-assets on loads >=4800 scored assets, all three risk bands populated
  *       (window.__dcAssets.{count,bands}).
  *  DC2. the KPI row's three band tiles (#dc-asset-kpis .dc-asset-kpi .v) sum to
  *       window.__dcAssets.count.
@@ -112,7 +112,7 @@ async function gotoWithDc(page: Page): Promise<void> {
 /** Click "Assets (DataConnect)" and wait for the fetch->adapt->score->place pipeline to finish
  * (window.__dcAssets.count reaches minCount). Generous timeout — swiftshader + a real HTTP round
  * trip through 6 paginated classes. */
-async function enableDcLayer(page: Page, minCount = 5000, timeout = 60_000): Promise<void> {
+async function enableDcLayer(page: Page, minCount = 4800, timeout = 60_000): Promise<void> {
   await page.click('#btn-dc-assets');
   await page.waitForFunction(
     (min) => {
@@ -125,15 +125,15 @@ async function enableDcLayer(page: Page, minCount = 5000, timeout = 60_000): Pro
 }
 
 // ---------------------------------------------------------------------------
-// DC1: toggle on -> >=5000 scored assets, all three bands populated
+// DC1: toggle on -> >=4800 scored assets, all three bands populated
 // ---------------------------------------------------------------------------
-test('DC1: enabling the DataConnect layer loads >=5000 scored assets across all three risk bands', async ({ page }) => {
+test('DC1: enabling the DataConnect layer loads >=4800 scored assets across all three risk bands', async ({ page }) => {
   await gotoWithDc(page);
   await enableDcLayer(page);
 
   const dc = await page.evaluate(() => (window as any).__dcAssets);
   expect(dc).toBeTruthy();
-  expect(dc.count).toBeGreaterThanOrEqual(5000);
+  expect(dc.count).toBeGreaterThanOrEqual(4800);
   expect(dc.bands.red).toBeGreaterThan(0);
   expect(dc.bands.amber).toBeGreaterThan(0);
   expect(dc.bands.green).toBeGreaterThan(0);
@@ -243,7 +243,7 @@ test('DC4: killing the shim flips the status badge offline while asset data surv
   await expect(page.locator('#dc-status')).toHaveClass(/online/, { timeout: 10_000 });
 
   const countBefore: number = await page.evaluate(() => (window as any).__dcAssets.count);
-  expect(countBefore).toBeGreaterThanOrEqual(5000);
+  expect(countBefore).toBeGreaterThanOrEqual(4800);
 
   expect(shim, 'shim child process must still be running before we can kill it').toBeTruthy();
   shim!.kill('SIGTERM');

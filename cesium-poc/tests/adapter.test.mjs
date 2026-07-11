@@ -14,6 +14,9 @@ import {
   openWorkOrders,
   incidentCoords,
   safetyInspectionEvent,
+  failedInspections,
+  haversineMeters,
+  buildWorkOrderContext,
 } from "../src/uc1Data.js";
 
 // ---- shared fixtures --------------------------------------------------------------------------
@@ -228,4 +231,246 @@ test("safetyInspectionEvent normalizes date/time/coords, tolerating missing coor
 
 test("TICKETS_CLASS names the DataConnect class slug for the new Tickets sheet", () => {
   assert.equal(TICKETS_CLASS, "tickets");
+});
+
+// ---- failedInspections (P3: uc1Layers.js "failed inspections" map layer) -----------------------
+// The three inspection classes spell pass/fail and risk differently (V6 export drift):
+//   safety:  pass_fail            + risk_rating_1_5_v3  + "x_coordinate (from roadway)"/"y_..."
+//   roadway: pass_fail            + risk_rating_1_5     + x_coordinate/y_coordinate
+//   its:     pass_or_fail         + risk_rating_1_5     + x_coordinates/y_coordinates
+
+const inspectionFixtures = [
+  {
+    // safety — Fail, risk 5, coords -> included
+    record_id: "SAFE-1",
+    asset_id: "A1",
+    date: "2025-02-01",
+    pass_fail: "Fail",
+    risk_rating_1_5_v3: 5,
+    "x_coordinate (from roadway)": -80.3,
+    "y_coordinate (from roadway)": 26.1,
+  },
+  {
+    // roadway — Fail, risk 4, coords -> included
+    inspection_id: "INSP-1",
+    asset_id: "A2",
+    inspection_date: "2025-02-02",
+    pass_fail: "Fail",
+    risk_rating_1_5: 4,
+    x_coordinate: -80.31,
+    y_coordinate: 26.11,
+  },
+  {
+    // its — Fail, risk 4, coords (plural spelling) -> included
+    inspection_id: "INSP-2",
+    asset_id: "A3",
+    date: "2025-02-03",
+    pass_or_fail: "Fail",
+    risk_rating_1_5: 4,
+    x_coordinates: -80.32,
+    y_coordinates: 26.12,
+  },
+  {
+    // Pass -> excluded even though risk is high
+    inspection_id: "INSP-3",
+    asset_id: "A4",
+    pass_fail: "Pass",
+    risk_rating_1_5: 5,
+    x_coordinate: -80.33,
+    y_coordinate: 26.13,
+  },
+  {
+    // Fail but risk below 4 -> excluded
+    inspection_id: "INSP-4",
+    asset_id: "A5",
+    pass_or_fail: "Fail",
+    risk_rating_1_5: 3,
+    x_coordinates: -80.34,
+    y_coordinates: 26.14,
+  },
+  {
+    // Fail, risk 4, but no coordinates anywhere -> excluded (nothing to map)
+    inspection_id: "INSP-5",
+    asset_id: "A6",
+    pass_fail: "Fail",
+    risk_rating_1_5: 4,
+  },
+];
+
+test("failedInspections keeps only Fail + risk>=4 records that carry coordinates", () => {
+  const out = failedInspections(inspectionFixtures);
+  const ids = out.map((r) => r.id);
+  assert.deepEqual(ids.sort(), ["INSP-1", "INSP-2", "SAFE-1"]);
+});
+
+test("failedInspections normalizes risk/coords/date across the three inspection classes' column spellings", () => {
+  const out = failedInspections(inspectionFixtures);
+  const safe = out.find((r) => r.id === "SAFE-1");
+  assert.equal(safe.assetId, "A1");
+  assert.equal(safe.risk, 5);
+  assert.equal(safe.date, "2025-02-01");
+  assert.equal(safe.lon, -80.3);
+  assert.equal(safe.lat, 26.1);
+
+  const roadway = out.find((r) => r.id === "INSP-1");
+  assert.equal(roadway.risk, 4);
+  assert.equal(roadway.date, "2025-02-02");
+  assert.equal(roadway.lon, -80.31);
+  assert.equal(roadway.lat, 26.11);
+
+  const its = out.find((r) => r.id === "INSP-2");
+  assert.equal(its.risk, 4);
+  assert.equal(its.lon, -80.32);
+  assert.equal(its.lat, 26.12);
+});
+
+test("failedInspections returns [] for empty/undefined input", () => {
+  assert.deepEqual(failedInspections([]), []);
+  assert.deepEqual(failedInspections(undefined), []);
+});
+
+// ---- haversineMeters -----------------------------------------------------------------------------
+
+test("haversineMeters is 0 for identical points", () => {
+  assert.equal(haversineMeters(-80.21, 26.09, -80.21, 26.09), 0);
+});
+
+test("haversineMeters matches a known great-circle distance within 0.5%", () => {
+  // 1 degree of latitude is ~111,320 m; a pure north-south degree is the simplest sanity check.
+  const d = haversineMeters(-80.21, 26.0, -80.21, 27.0);
+  assert.ok(Math.abs(d - 111_320) / 111_320 < 0.005, `expected ~111320m, got ${d}`);
+});
+
+// ---- buildWorkOrderContext (P3-b): the 500m spatial join for the click-on-WO context panel -------
+// Fixtures place a "near" record ~30-75m from the WO (well inside the 500m default radius) and a
+// "far" record several km away (well outside), matching the "hits inside/outside radius" fixture
+// shape the task calls for. `inspections` fixtures use failedInspections()'s own output shape
+// ({id, assetId, risk, date, lon, lat}) since that's the normalizer the map layer (uc1Layers.js)
+// already produces for this exact data; `accidents` fixtures use extractAccidents()'s output shape.
+
+const ctxWo = { id: "WO-CTX-1", segment: "East Segment", assetId: "11905", ticketId: "TIC-1", lon: -80.21, lat: 26.09 };
+
+const ctxTickets = [{ "Ticket ID": "TIC-1", "Asset ID": "11905", "Issue Category": "Signal fault" }];
+
+const ctxInspections = [
+  { id: "SI-NEAR", assetId: "11905", risk: 5, date: "2025-01-10", lon: -80.2105, lat: 26.0905 }, // ~75m
+  { id: "SI-FAR", assetId: "99999", risk: 4, date: "2025-02-01", lon: -80.25, lat: 26.09 }, // ~4km
+];
+
+const ctxAccidents = [
+  { id: "ACC-NEAR", lon: -80.2103, lat: 26.0902, date: "2024-11-22", description: "Accident A", segment: "East Segment" }, // ~37m
+  { id: "ACC-FAR", lon: -80.3, lat: 26.1, date: "2024-01-01", description: "Accident B", segment: "West Segment" }, // far
+];
+
+const ctxIncidents = [
+  { incident_id: "INC-NEAR", "x_coordinate (from asset)": -80.2098, "y_coordinate (from asset)": 26.0897 }, // ~39m
+  { incident_id: "INC-FAR", "x_coordinate (from asset)": -80.28, "y_coordinate (from asset)": 26.05 }, // far
+  { incident_id: "INC-NOCOORDS" }, // the ~90/178 rows with neither coords nor Segment — must not throw
+];
+
+const ctxAssets = [
+  { asset_tag: "11905", lon: -80.21, lat: 26.09, label: "Gate 1", asset_class: "Gate" }, // the WO's own asset -> excluded, not "nearby"
+  { asset_tag: "22222", lon: -80.2102, lat: 26.0898, label: "Camera 2", asset_class: "Camera" }, // ~30m
+  { asset_tag: "33333", lon: -80.4, lat: 26.2, label: "Sign 3", asset_class: "Sign" }, // far
+];
+
+function ctxSources(overrides = {}) {
+  return {
+    assets: ctxAssets,
+    accidents: ctxAccidents,
+    inspections: ctxInspections,
+    tickets: ctxTickets,
+    incidents: ctxIncidents,
+    ...overrides,
+  };
+}
+
+test("buildWorkOrderContext joins the linked ticket by wo.ticketId", () => {
+  const ctx = buildWorkOrderContext(ctxWo, ctxSources());
+  assert.ok(ctx.ticket);
+  assert.equal(ctx.ticket["Ticket ID"], "TIC-1");
+  assert.equal(ctx.counts.hasTicket, true);
+});
+
+test("buildWorkOrderContext ticket is null when wo has no ticketId (missing ticket)", () => {
+  const ctx = buildWorkOrderContext({ ...ctxWo, ticketId: undefined }, ctxSources());
+  assert.equal(ctx.ticket, null);
+  assert.equal(ctx.counts.hasTicket, false);
+});
+
+test("buildWorkOrderContext ticket is null when ticketId doesn't resolve in the tickets dataset", () => {
+  const ctx = buildWorkOrderContext({ ...ctxWo, ticketId: "TIC-404" }, ctxSources());
+  assert.equal(ctx.ticket, null);
+});
+
+test("buildWorkOrderContext keeps only inspections within the radius, nearest first", () => {
+  const ctx = buildWorkOrderContext(ctxWo, ctxSources());
+  assert.deepEqual(ctx.inspections.map((r) => r.id), ["SI-NEAR"]);
+  assert.ok(ctx.inspections[0].distanceM < 500);
+  assert.equal(ctx.counts.inspections, 1);
+});
+
+test("buildWorkOrderContext pools registry accidents + Incidents_V3 rows into one repeat-accident array within the radius", () => {
+  const ctx = buildWorkOrderContext(ctxWo, ctxSources());
+  const ids = ctx.accidents.map((r) => r.id ?? r.incident_id).sort();
+  assert.deepEqual(ids, ["ACC-NEAR", "INC-NEAR"]);
+  assert.equal(ctx.counts.accidents, 2);
+  for (const r of ctx.accidents) assert.ok(r.distanceM < 500);
+});
+
+test("buildWorkOrderContext tags pooled accident-history rows with their source", () => {
+  const ctx = buildWorkOrderContext(ctxWo, ctxSources());
+  const bySource = Object.fromEntries(ctx.accidents.map((r) => [r.id ?? r.incident_id, r.source]));
+  assert.equal(bySource["ACC-NEAR"], "registry");
+  assert.equal(bySource["INC-NEAR"], "incident");
+});
+
+test("buildWorkOrderContext excludes the WO's own linked asset from nearbyAssets but keeps other nearby assets", () => {
+  const ctx = buildWorkOrderContext(ctxWo, ctxSources());
+  const tags = ctx.nearbyAssets.map((a) => a.asset_tag);
+  assert.ok(!tags.includes("11905"), "the WO's own asset must not appear as a nearby asset");
+  assert.deepEqual(tags, ["22222"]);
+  assert.equal(ctx.counts.nearbyAssets, 1);
+});
+
+test("buildWorkOrderContext respects a custom radiusM", () => {
+  const ctxTight = buildWorkOrderContext(ctxWo, ctxSources(), 10); // tighter than every fixture's distance
+  assert.deepEqual(ctxTight.inspections, []);
+  assert.deepEqual(ctxTight.accidents, []);
+  assert.deepEqual(ctxTight.nearbyAssets, []);
+});
+
+test("buildWorkOrderContext returns empty arrays (not throw) for missing/empty source collections", () => {
+  const ctx = buildWorkOrderContext(ctxWo, {});
+  assert.equal(ctx.ticket, null);
+  assert.deepEqual(ctx.inspections, []);
+  assert.deepEqual(ctx.accidents, []);
+  assert.deepEqual(ctx.nearbyAssets, []);
+  assert.deepEqual(ctx.counts, { hasTicket: false, inspections: 0, accidents: 0, nearbyAssets: 0 });
+});
+
+test("buildWorkOrderContext returns empty spatial results (not throw) when the WO itself has no coords", () => {
+  const ctx = buildWorkOrderContext({ ...ctxWo, lon: null, lat: null }, ctxSources());
+  assert.deepEqual(ctx.inspections, []);
+  assert.deepEqual(ctx.accidents, []);
+  assert.deepEqual(ctx.nearbyAssets, []);
+  // ticket join is independent of coordinates and must still resolve
+  assert.ok(ctx.ticket);
+});
+
+test("buildWorkOrderContext composes cleanly with failedInspections() output (integration sanity)", () => {
+  const rawInspections = [
+    {
+      record_id: "SAFE-CTX",
+      asset_id: "11905",
+      date: "2025-03-01",
+      pass_fail: "Fail",
+      risk_rating_1_5_v3: 5,
+      "x_coordinate (from roadway)": -80.2101,
+      "y_coordinate (from roadway)": 26.0899,
+    },
+  ];
+  const ctx = buildWorkOrderContext(ctxWo, ctxSources({ inspections: failedInspections(rawInspections) }));
+  assert.deepEqual(ctx.inspections.map((r) => r.id), ["SAFE-CTX"]);
+  assert.equal(ctx.inspections[0].risk, 5);
 });

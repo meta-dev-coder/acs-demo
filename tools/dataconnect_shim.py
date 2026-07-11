@@ -26,6 +26,19 @@ POST /api/data-mgmt/v1/curated-data/search
       - page is 1-indexed. filters is an optional {field: value} exact-match map.
     -> 200 {"items": [...], "page": 1, "pageSize": 200, "total": 3504}
 
+POST /api/data-mgmt/v1/curated-data/update
+    Requires "Authorization: Bearer <token>".
+    Body: {"className": "decisions", "record": {...}}
+      - Only "decisions" is writable today (UC1 P4, design spec §5). Other classNames -> 400.
+    -> 200 {"ok": true, "record": {...}}
+    Appends to the gitignored runtime log (tools/dataconnect-data/runtime/decisions.json), never
+    to the committed seed (tools/dataconnect-data/decisions_seed.json). Reads of the "decisions"
+    class (both GET /class's recordCount and POST /curated-data/search) merge the seed with the
+    runtime log live, so a write is visible on the very next read without restarting the shim.
+    The class loader skips both decisions_seed.json (folded into "decisions", not its own class)
+    and the runtime/ directory (never becomes a class by accident; e2e runs never dirty the
+    working tree — review-mandated fix, design spec §5).
+
 Every response carries "Access-Control-Allow-Origin: *"; OPTIONS is answered for preflight.
 Any request to a data-mgmt endpoint without a well-formed "Authorization: Bearer ..." header
 gets a 401 — this is what exercises the client's auth path; the shim does not check the token
@@ -43,6 +56,7 @@ import base64
 import json
 import os
 import sys
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
@@ -51,21 +65,85 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(HERE, "dataconnect-data")
 DEFAULT_PORT = 8787
 
+# --- "decisions" class: committed read-only seed + gitignored runtime log (design spec §5) --------
+DECISIONS_CLASS_NAME = "decisions"
+DECISIONS_SEED_FILENAME = "decisions_seed.json"
+RUNTIME_DIRNAME = "runtime"
+WRITABLE_CLASSES = {DECISIONS_CLASS_NAME}
+
+_runtime_lock = threading.Lock()
+
 
 def _load_classes(data_dir: str) -> dict:
-    """Loads every <class>.json in data_dir (skips *.rejected.json) into memory once."""
+    """Loads every <class>.json in data_dir (skips *.rejected.json) into memory once.
+
+    Deliberately SKIPS decisions_seed.json (loaded separately by _load_decisions_seed and folded
+    into the dynamic "decisions" class, never exposed as a class of its own) and the runtime/
+    subdirectory (never a class source — os.listdir would skip it anyway since it isn't a
+    *.json file, but the check is explicit here because that exclusion is review-mandated, not
+    incidental).
+    """
     classes = {}
     if not os.path.isdir(data_dir):
         print(f"[dataconnect_shim] WARNING: data dir not found: {data_dir} (run dataconnect_export.py first)",
               file=sys.stderr)
         return classes
     for name in sorted(os.listdir(data_dir)):
+        if name == RUNTIME_DIRNAME or name == DECISIONS_SEED_FILENAME:
+            continue
         if not name.endswith(".json") or name.endswith(".rejected.json"):
             continue
         class_name = name[: -len(".json")]
         with open(os.path.join(data_dir, name)) as f:
             classes[class_name] = json.load(f)
     return classes
+
+
+def _load_decisions_seed(data_dir: str) -> list:
+    """Loads the committed, read-only decisions_seed.json once at startup. Never rewritten by
+    the shim — POST /curated-data/update only ever appends to the runtime log (see
+    _append_runtime_decision)."""
+    path = os.path.join(data_dir, DECISIONS_SEED_FILENAME)
+    if not os.path.exists(path):
+        return []
+    with open(path) as f:
+        return json.load(f)
+
+
+def _runtime_decisions_path(data_dir: str) -> str:
+    return os.path.join(data_dir, RUNTIME_DIRNAME, "decisions.json")
+
+
+def _read_runtime_decisions(data_dir: str) -> list:
+    """Reads the runtime log live off disk on every call (not cached) so a write is visible on
+    the very next read, per-process, without restarting the shim."""
+    path = _runtime_decisions_path(data_dir)
+    if not os.path.exists(path):
+        return []
+    with _runtime_lock:
+        with open(path) as f:
+            return json.load(f)
+
+
+def _append_runtime_decision(data_dir: str, record: dict) -> dict:
+    """Appends `record` to runtime/decisions.json (creating the directory/file on first write).
+    Read-modify-write under a lock — fine for this demo shim's write volume."""
+    path = _runtime_decisions_path(data_dir)
+    with _runtime_lock:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        existing = []
+        if os.path.exists(path):
+            with open(path) as f:
+                existing = json.load(f)
+        existing.append(record)
+        with open(path, "w") as f:
+            json.dump(existing, f, indent=2)
+            f.write("\n")
+    return record
+
+
+def _merged_decisions(server) -> list:
+    return [*server.decisions_seed, *_read_runtime_decisions(server.data_dir)]
 
 
 def _b64url(obj: dict) -> str:
@@ -136,6 +214,8 @@ class Handler(BaseHTTPRequestHandler):
                 {"name": name, "recordCount": len(records)}
                 for name, records in sorted(self.server.classes.items())
             ]
+            classes.append({"name": DECISIONS_CLASS_NAME, "recordCount": len(_merged_decisions(self.server))})
+            classes.sort(key=lambda c: c["name"])
             self._send_json(200, {"classes": classes})
             return
         self._send_json(404, {"error": "not found"})
@@ -160,10 +240,13 @@ class Handler(BaseHTTPRequestHandler):
             page_size = max(1, int(body.get("pageSize", 100) or 100))
             filters = body.get("filters") or {}
 
-            records = self.server.classes.get(class_name)
-            if records is None:
-                self._send_json(404, {"error": f"unknown className: {class_name!r}"})
-                return
+            if class_name == DECISIONS_CLASS_NAME:
+                records = _merged_decisions(self.server)
+            else:
+                records = self.server.classes.get(class_name)
+                if records is None:
+                    self._send_json(404, {"error": f"unknown className: {class_name!r}"})
+                    return
 
             matching = [r for r in records if _matches_filters(r, filters)] if filters else records
             start = (page - 1) * page_size
@@ -176,15 +259,37 @@ class Handler(BaseHTTPRequestHandler):
             })
             return
 
+        if path == "/api/data-mgmt/v1/curated-data/update":
+            if not self._authorized():
+                self._read_json_body()  # drain the body so a keep-alive connection stays in sync
+                self._send_json(401, {"error": "unauthorized"})
+                return
+            body = self._read_json_body()
+            class_name = body.get("className")
+            if class_name not in WRITABLE_CLASSES:
+                self._send_json(400, {"error": f"class not writable: {class_name!r}"})
+                return
+            record = body.get("record")
+            if not isinstance(record, dict):
+                self._send_json(400, {"error": "record must be an object"})
+                return
+            saved = _append_runtime_decision(self.server.data_dir, record)
+            self._send_json(200, {"ok": True, "record": saved})
+            return
+
         self._send_json(404, {"error": "not found"})
 
 
 def serve(port: int = DEFAULT_PORT, data_dir: str = DATA_DIR):
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+    server.data_dir = data_dir
     server.classes = _load_classes(data_dir)
+    server.decisions_seed = _load_decisions_seed(data_dir)
     print(f"[dataconnect_shim] serving {len(server.classes)} class(es) from {data_dir}")
     for name, records in sorted(server.classes.items()):
         print(f"[dataconnect_shim]   {name}: {len(records)} records")
+    print(f"[dataconnect_shim]   {DECISIONS_CLASS_NAME}: {len(server.decisions_seed)} seeded "
+          f"+ {len(_read_runtime_decisions(data_dir))} runtime")
     print(f"[dataconnect_shim] listening on http://localhost:{port}")
     try:
         server.serve_forever()
