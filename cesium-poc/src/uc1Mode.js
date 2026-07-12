@@ -162,6 +162,7 @@ export function renderStartupTile(containerEl, { onEnterDemo, onExplore } = {}) 
         <button type="button" class="uc1-startup-btn uc1-startup-btn-primary" id="uc1-startup-enter">Start the 6-minute demo</button>
         <button type="button" class="uc1-startup-btn uc1-startup-btn-secondary" id="uc1-startup-explore">Explore the twin (sandbox)</button>
       </div>
+      <a class="uc1-startup-howitworks" href="../uc1-guide.html" target="_blank" rel="noopener noreferrer">How it works &mdash; presenter's guide</a>
     </div>
   `;
 

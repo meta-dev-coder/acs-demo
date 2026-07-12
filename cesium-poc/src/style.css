@@ -998,6 +998,11 @@ body.uc1-mode .hud-title {
   text-decoration: underline; text-decoration-color: var(--uc1-line); text-underline-offset: 3px;
 }
 .uc1-startup-btn-secondary:hover { background: none; color: var(--uc1-text); transform: none; }
+.uc1-startup-howitworks {
+  display: block; margin-top: 18px; font-size: 12px; color: var(--uc1-muted);
+  text-decoration: underline; text-decoration-color: var(--uc1-line); text-underline-offset: 3px;
+}
+.uc1-startup-howitworks:hover { color: var(--uc1-text); }
 
 /* ---- Stepper bar (uc1Mode.js's renderStepper) — 5 steps pinned to the top edge; "no navigation
    chrome / page transitions between the 5 steps" (design spec §1). ---- */

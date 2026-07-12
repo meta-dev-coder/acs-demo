@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>UC1 · Lane Closure Revenue Optimizer — How it works</title>
+<meta name="description" content="A short presenter's guide to the UC1 Lane Closure Revenue Optimizer demo: what it is, the 5-step walkthrough, the formulas behind the ranking, and why to trust the numbers." />
+<style>
+  :root {
+    --ink: #0E1726;
+    --ink-2: #16233A;
+    --line: #24344F;
+    --text: #E9EEF5;
+    --muted: #8FA1B8;
+    --accent: #E8963C;
+    --risk: #D65A4A;
+    --safe: #4CAF87;
+    --serif: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, monospace;
+  }
+  :root[data-theme="light"] {
+    --ink: #f4f1ea; --ink-2: #ffffff; --line: #ded6c4; --text: #23201a; --muted: #6b6455; --accent: #b3691f;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--ink);
+    color: var(--text);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.55;
+    min-height: 100vh;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --ink: #f4f1ea; --ink-2: #ffffff; --line: #ded6c4; --text: #23201a; --muted: #6b6455; --accent: #b3691f;
+    }
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: clamp(24px, 5vw, 56px) clamp(18px, 5vw, 40px) 64px; }
+
+  a { color: var(--accent); }
+  .back { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); text-decoration: none; }
+  .back:hover { color: var(--accent); }
+
+  .eyebrow {
+    font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+    margin: 22px 0 8px;
+  }
+  h1 {
+    font-family: var(--serif); font-weight: 600; letter-spacing: -0.01em;
+    font-size: clamp(26px, 4.6vw, 38px); line-height: 1.1; margin: 0 0 14px;
+  }
+  .lede { color: var(--muted); font-size: clamp(14.5px, 1.7vw, 16px); max-width: 66ch; margin: 0 0 4px; }
+  .question {
+    font-family: var(--serif); font-style: italic; color: var(--text);
+    border-left: 2px solid var(--accent); padding: 2px 0 2px 16px; margin: 18px 0 0;
+    font-size: 16px;
+  }
+
+  section { margin-top: 40px; }
+  h2 {
+    font-family: var(--serif); font-weight: 600; font-size: 20px; margin: 0 0 14px;
+    display: flex; align-items: baseline; gap: 10px;
+  }
+  h2 .num { font-family: var(--mono); font-size: 12px; color: var(--accent); letter-spacing: .1em; }
+
+  /* ---- how to start ---- */
+  .start-box {
+    background: var(--ink-2); border: 1px solid var(--line); border-radius: 10px;
+    padding: 18px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
+  }
+  .start-box p { margin: 0; color: var(--muted); font-size: 14px; flex: 1 1 320px; }
+  .pill {
+    font-family: var(--sans); font-weight: 600; font-size: 13.5px; color: #1a1200;
+    background: var(--accent); border-radius: 999px; padding: 8px 16px; white-space: nowrap;
+  }
+  .arrow-chip { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+  /* ---- steps ---- */
+  .steps { display: flex; flex-direction: column; gap: 12px; }
+  .step {
+    background: var(--ink-2); border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px 18px; display: grid; grid-template-columns: 34px 1fr; gap: 4px 14px;
+  }
+  .step-n {
+    grid-row: 1 / 3; width: 30px; height: 30px; border-radius: 50%;
+    background: rgba(232,150,60,0.14); color: var(--accent); border: 1px solid var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--serif); font-weight: 600; font-size: 14px;
+  }
+  .step-title { font-weight: 700; font-size: 15px; }
+  .step-body { color: var(--muted); font-size: 13.5px; }
+  .step-body .k { color: var(--text); font-weight: 600; }
+  .step-body .k::before { content: "Click: "; color: var(--muted); font-weight: 400; }
+  .step-body .s { display: block; margin-top: 4px; }
+  .step-body .s::before { content: "See: "; color: var(--muted); }
+
+  /* ---- formulas ---- */
+  .formulas { display: flex; flex-direction: column; gap: 14px; }
+  .formula {
+    background: var(--ink-2); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 18px;
+  }
+  .formula .eq {
+    font-family: var(--serif); font-size: 17px; color: var(--accent);
+    font-variant-numeric: tabular-nums; overflow-x: auto;
+  }
+  .formula .meaning { color: var(--muted); font-size: 13.5px; margin-top: 6px; }
+
+  /* ---- trust ---- */
+  .trust-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  @media (max-width: 620px) { .trust-grid { grid-template-columns: 1fr; } }
+  .trust-card {
+    background: var(--ink-2); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px;
+  }
+  .trust-card h3 { margin: 0 0 6px; font-size: 14px; font-weight: 700; }
+  .trust-card p { margin: 0; color: var(--muted); font-size: 13.5px; }
+  .data-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
+  .data-table th, .data-table td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); }
+  .data-table th { color: var(--muted); font-weight: 600; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+  .tag-real { color: var(--safe); font-weight: 600; }
+  .tag-synth { color: var(--risk); font-weight: 600; }
+
+  /* ---- legend ---- */
+  .legend-list { display: flex; flex-direction: column; gap: 10px; }
+  .legend-row { display: flex; align-items: flex-start; gap: 12px; }
+  .swatch { width: 12px; height: 12px; border-radius: 50%; margin-top: 4px; flex: none; }
+  .legend-row p { margin: 0; font-size: 13.5px; color: var(--muted); }
+  .legend-row .name { color: var(--text); font-weight: 600; }
+
+  footer { margin-top: 46px; border-top: 1px solid var(--line); padding-top: 16px; font-size: 12px; color: var(--muted); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="./index.html">&larr; Back to demo launcher</a>
+
+  <div class="eyebrow">ACS Toll Road &middot; I-595 Express &middot; Bentley Data Connect + SuperDNA SuperSim</div>
+  <h1>How the Lane Closure Revenue Optimizer works</h1>
+  <p class="lede">This demo walks one real maintenance decision from trigger to schedule: a lane has
+  to close for repair work, and the twin ranks the closure windows so the planner can pick the one
+  that loses the least revenue without adding risk.</p>
+  <p class="question">&ldquo;When do we close the lane so it costs the least money, stays inside
+  lane-availability commitments, and doesn&rsquo;t cause the next crash?&rdquo;</p>
+
+  <section>
+    <h2><span class="num">&middot;</span>How to start</h2>
+    <div class="start-box">
+      <p>From the demo launcher, open the <strong>UC1 &middot; Lane Closure Revenue Optimizer</strong>
+      tile. The twin opens on a full-screen startup card &mdash; press the one button to begin.</p>
+      <span class="pill">Start the 6-minute demo</span>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">1&ndash;5</span>The five steps</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-n">1</div>
+        <div class="step-title">Trigger</div>
+        <div class="step-body">
+          <span class="k">the glowing work order on the map</span> &mdash; <strong>WO-900002</strong>,
+          a guardrail repair on the Central Segment.
+          <span class="s">One of 154 open work orders is pulsing to draw the eye &mdash; the queue
+          behind it is real, this is the one the demo follows.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">2</div>
+        <div class="step-title">Context</div>
+        <div class="step-body">
+          <span class="k">the work order, then rows in the 500&nbsp;m panel that opens</span> &mdash;
+          clicking a row flies the camera to that asset.
+          <span class="s">Everything within 500 m of the work order: the linked ticket, failed
+          inspections rated risk 4&ndash;5, and nearby accident history &mdash; assembled live, not
+          looked up by hand.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">3</div>
+        <div class="step-title">Simulate</div>
+        <div class="step-body">
+          <span class="k">up to 3 spots on the week demand curve, or &ldquo;Use suggested windows
+          instead&rdquo;, then Play on each</span>
+          <span class="s">The demand curve for this exact segment, with your candidate windows
+          drawn on it as bands; pressing Play steps a closure through that window while the KPI
+          counters (delay, throughput) advance live.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">4</div>
+        <div class="step-title">Compare</div>
+        <div class="step-body">
+          <span class="k">the &ldquo;&#9432;&rdquo; next to any number in the ranked table</span>
+          <span class="s">A table of your candidate windows ranked by revenue loss, delay,
+          throughput, lane availability and secondary-crash risk &mdash; cheapest safe window
+          highlighted. The &#9432; opens every number's ingredients, so nothing is a black box.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">5</div>
+        <div class="step-title">Decide</div>
+        <div class="step-body">
+          <span class="k">&ldquo;Schedule this window&rdquo; on the winning row</span>
+          <span class="s">The decision is logged with the evidence that produced it, a short SUMO
+          closure animation plays on the twin, and the corridor-level exec KPI strip updates to
+          reflect the new decision.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">&sum;</span>The formulas behind the ranking</h2>
+    <div class="formulas">
+      <div class="formula">
+        <div class="eq">D(<em>s</em>, <em>t</em>) = demand, in vehicles per 15&#8209;minute interval, for segment <em>s</em> at time <em>t</em></div>
+        <div class="meaning">How many drivers want this stretch of road before any closure changes it &mdash; the baseline everything else is measured against.</div>
+      </div>
+      <div class="formula">
+        <div class="eq">C<sub>closed</sub> = 1600 &times; open lanes &times; 0.9 <span style="color:var(--muted); font-size:14px;">(merge friction)</span></div>
+        <div class="meaning">Remaining road capacity once the closure narrows the lanes: 1,600 vehicles/hour per open lane, discounted 10% for the friction of merging around the work zone.</div>
+      </div>
+      <div class="formula">
+        <div class="eq">R(<em>w</em>) = &sum;<sub>t&isin;w</sub> [diverted(<em>t</em>) + suppressed(<em>t</em>)] &times; toll rate</div>
+        <div class="meaning">Dollars of toll revenue this window forfeits &mdash; trips that reroute around the closure, or simply don't happen, valued at the toll.</div>
+      </div>
+      <div class="formula">
+        <div class="eq">E(<em>w</em>) = historical closure&#8209;incident rate &times; exposure in <em>w</em></div>
+        <div class="meaning">Safety exposure for this window: this segment's own crash-during-closure history (blended with corridor-wide history where the segment's own record is thin), scaled by how much traffic sits in that window.</div>
+      </div>
+      <div class="formula">
+        <div class="eq">Score(<em>w</em>) = w<sub>1</sub>&middot;R + w<sub>2</sub>&middot;delay + w<sub>3</sub>&middot;E + w<sub>4</sub>&middot;crew cost</div>
+        <div class="meaning">The single ranking number: a weighted blend of revenue loss, driver delay, safety exposure and crew cost. Lowest score wins &mdash; the "cheapest safe window," not just the cheapest one.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">?</span>Why trust this?</h2>
+    <div class="trust-grid">
+      <div class="trust-card">
+        <h3>Backtest</h3>
+        <p>The model is trained on year 1 of two years of real ACS incident history and asked to
+        predict year 2 blind, then graded against what actually happened &mdash; it never sees the
+        answer before predicting it.</p>
+      </div>
+      <div class="trust-card">
+        <h3>Editable assumptions</h3>
+        <p>Every input behind a run &mdash; demand curve, toll rate, weights &mdash; is visible and
+        editable live. Change a number and the ranked table re-ranks in front of you: a real
+        stress-test, not a canned demo.</p>
+      </div>
+      <div class="trust-card">
+        <h3>Track record</h3>
+        <p>Every scheduled decision is logged and rolled into the corridor-level exec KPI strip,
+        so the system's own accuracy becomes a running scoreboard rather than a one-time claim.</p>
+      </div>
+      <div class="trust-card">
+        <h3>Honest about the line</h3>
+        <p>"You shouldn't trust us &mdash; you should check us." Real data drives the parts that can
+        be checked; the parts that can't yet are labeled plainly, not hidden.</p>
+      </div>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>Input</th><th>Source</th></tr></thead>
+      <tbody>
+        <tr><td>Work orders &amp; tickets</td><td class="tag-real">Real &mdash; ACS Data Connect</td></tr>
+        <tr><td>Inspections &amp; risk ratings</td><td class="tag-real">Real &mdash; ACS Data Connect</td></tr>
+        <tr><td>Incident &amp; accident history</td><td class="tag-real">Real &mdash; 2 years, ACS Data Connect</td></tr>
+        <tr><td>Traffic demand curve</td><td class="tag-synth">Synthetic &mdash; shaped to typical freeway peaks</td></tr>
+        <tr><td>Toll rate</td><td class="tag-synth">Synthetic &mdash; a static placeholder assumption</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2><span class="num">&#8226;</span>What's on the map</h2>
+    <div class="legend-list">
+      <div class="legend-row"><span class="swatch" style="background:#ffb454;"></span>
+        <p><span class="name">Work orders</span> &mdash; open maintenance items waiting on a closure window; the triggering one pulses.</p></div>
+      <div class="legend-row"><span class="swatch" style="background:#D65A4A;"></span>
+        <p><span class="name">Accidents</span> &mdash; geolocated incident history used to price safety exposure.</p></div>
+      <div class="legend-row"><span class="swatch" style="background:#E8963C;"></span>
+        <p><span class="name">Failed inspections</span> &mdash; risk-rated 4&ndash;5 findings, the urgency behind a work order.</p></div>
+      <div class="legend-row"><span class="swatch" style="background:#8FA1B8;"></span>
+        <p><span class="name">Ancillary assets</span> &mdash; other Data Connect assets just off the corridor; off by default, toggle to disclose.</p></div>
+      <div class="legend-row"><span class="swatch" style="background:radial-gradient(circle, #D65A4A, transparent 70%);"></span>
+        <p><span class="name">Heat map</span> &mdash; zoomed-out view of repeat crash / closure clusters along the whole corridor.</p></div>
+      <div class="legend-row"><span class="swatch" style="background:#E8963C; border-radius:2px;"></span>
+        <p><span class="name">Segment ribbon</span> &mdash; the orange strip is the clickable corridor; picking it opens
+        <strong>&ldquo;Lanes to close&rdquo;</strong>, where you choose how many of the segment's lanes come out of service.</p></div>
+    </div>
+  </section>
+
+  <footer>Presenter's guide &middot; UC1 Lane Closure Revenue Optimizer &middot; ACS I-595 Express corridor</footer>
+</div>
+</body>
+</html>

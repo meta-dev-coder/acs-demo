@@ -63,6 +63,7 @@ jobs:
           fi
           rm -rf _site && mkdir -p _site/acs _site/twin
           cp landing/index.html _site/index.html          # launcher = the front door
+          cp landing/uc1-guide.html _site/uc1-guide.html   # UC1 presenter's guide, linked from the launcher tile
           cp -r dist/.          _site/acs/                 # Phase 1 (Bentley iTwin)
           cp -r cesium-poc/dist/. _site/twin/             # Phase 2 (Cesium) + Phase 3 (?renderer=arcgis)
           # Global SPA/OAuth fallback: GitHub Pages serves ONE 404.html for every unmatched path.
