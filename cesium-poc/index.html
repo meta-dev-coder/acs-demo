@@ -141,6 +141,13 @@
           <button id="btn-uc1-demo" class="mini">&#9654; UC1 demo</button>
           <span id="uc1-decisions-status" class="dc-status">decisions: —</span>
         </div>
+        <!-- Ancillary disclosure (storyboard §7 "what should remain"): off-corridor DataConnect
+             rows (uc1Data.js classifyCorridorAssets' `ancillary` bucket) are real FDOT assets that
+             are just legitimately not pavement-mounted — disclosed via a toggle rather than
+             silently dropped or silently rendered as if on the road. -->
+        <div class="ctl-row">
+          <button id="btn-uc1-ancillary" class="mini">— off-corridor assets</button>
+        </div>
         <!-- Exec KPI strip (design spec §4 "Exec KPI strip") — execKpis.js's renderExecKpiStrip(),
              populated on UC1 activation (main.js's loadUc1ExecKpis) and refreshed after every
              scheduled decision. Empty until then (no hidden toggle needed — nothing to show). -->
@@ -158,6 +165,17 @@
       <div id="status" class="status">Loading…</div>
       </div><!-- /panel-body -->
     </div>
+
+    <!-- UC1 startup tile (uc1Mode.js's renderStartupTile) — full-viewport entry overlay, storyboard
+         §5. Suppressed at boot under navigator.webdriver (keeps every other e2e spec's flow
+         unblocked) unless forced via ?uc1=tile; skipped entirely (never shown) when ?uc1=1
+         auto-enters the demo. Starts class="hidden" so there's no flash before main.js decides. -->
+    <div id="uc1-startup-tile" class="hidden"></div>
+
+    <!-- UC1 5-step stepper (uc1Mode.js's renderStepper) — storyboard §1's Trigger/Context/Simulate/
+         Compare/Decide bar, shown only while UC1 demo mode is active (main.js's startUc1Demo/
+         exitUc1DemoMode toggle the hidden class alongside body.uc1-mode). -->
+    <div id="uc1-stepper" class="hidden"></div>
 
     <!-- DataConnect asset info panel (populated on point pick) — separate floating panel so it
          doesn't fight the main HUD's left-side real estate. -->

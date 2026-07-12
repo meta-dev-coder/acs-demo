@@ -19,8 +19,8 @@ import { assetKpis } from "./assetOps.js";
 import { login, fetchClass, writeRecord, onStatus } from "./dataconnect.js";
 import { adaptDataConnectAssets, scoreAssets } from "./scoringA.js";
 import { buildAssetLayer, disposeAssetLayer, pickAsset, installAssetPicking } from "./assetLayer.js";
-import { extractAccidents, openWorkOrders, failedInspections, buildWorkOrderContext, TICKETS_CLASS } from "./uc1Data.js";
-import { buildWorkOrderLayer, buildAccidentLayer, buildInspectionLayer, disposeUc1Layer, pickUc1Point, flyToLonLat } from "./uc1Layers.js";
+import { extractAccidents, openWorkOrders, failedInspections, buildWorkOrderContext, classifyCorridorAssets, TICKETS_CLASS } from "./uc1Data.js";
+import { buildWorkOrderLayer, buildAccidentLayer, buildInspectionLayer, buildAncillaryLayer, buildImpactHeatmap, disposeUc1Layer, pickUc1Point, flyToLonLat } from "./uc1Layers.js";
 import { renderWorkOrderContext } from "./contextPanel.js";
 import { evaluateCandidates } from "./windowAssembly.js";
 import { renderWindowPanel } from "./windowPanel.js";
@@ -28,10 +28,15 @@ import { createDemandModel } from "./demand.js";
 import { runBacktest } from "./backtest.js";
 import { renderTrustPanel, mergeAssumptionDefaults } from "./trustPanel.js";
 import { computeExecKpis, renderExecKpiStrip } from "./execKpis.js";
+import {
+  enterUc1Mode, exitUc1Mode, renderStartupTile, hideStartupTile, renderStepper,
+  advanceUc1Step, resetUc1Step,
+} from "./uc1Mode.js";
 import uc1Demo from "../config/uc1Demo.json" with { type: "json" };
 import uc1Segments from "../config/segments.json" with { type: "json" };
 import uc1WindowConfig from "../config/windowConfig.json" with { type: "json" };
 import uc1BacktestConfig from "../config/backtestConfig.json" with { type: "json" };
+import corridorCenterline from "../config/corridorCenterline.json" with { type: "json" };
 
 const toRad = (deg) => (deg * Math.PI) / 180;
 const ION = import.meta.env.VITE_CESIUM_ION_TOKEN;
@@ -869,6 +874,27 @@ let uc1DecisionQueue = [];      // in-memory queue of decision records that fail
 let uc1Viewer = null;           // the raw viewer, captured once by installUc1() — P5-e's trust/
                                  // exec-kpi/SUMO-run wiring is triggered from event handlers that
                                  // aren't nested inside main(), so it can't close over `viewer`.
+let uc1AncillaryAssets = [];    // pooled off-corridor bucket (WO+accident+inspection) — RENDER-only
+                                 // split (uc1Data.js's classifyCorridorAssets); scoring/context-panel
+                                 // joins keep using the full unfiltered uc1OpenWOs/uc1Accidents/
+                                 // uc1FailedInspections above, per that function's own contract.
+let uc1AncillaryCollection = null, uc1AncillaryOn = false;
+let uc1HeatmapCollection = null; // closure-impact heat map (Mic-Drop 3) — off by default, shown at
+                                 // the demo-mode Step 5 zoom-out coda (scheduleUc1Decision).
+const UC1_CORRIDOR_MAX_M = 500; // wider than uc1Data.js's generic 300 m default: matches the
+                                 // storyboard's own "500 m" context-panel radius language, and
+                                 // comfortably includes config/uc1Demo.json's hero WO (~309 m out).
+
+// ---- Task C: UC1 demo-mode (startup tile + 5-step stepper) — storyboard §1/§5, uc1Mode.js ----
+let uc1DemoActive = false;      // true once the stepper flow has been entered (?uc1=1 or the
+                                 // startup tile's "Start the 6-minute demo" button)
+let uc1Step = 1;                // mirrors uc1Mode.js's pure advanceUc1Step() state
+let uc1StepperCtl = null;       // renderStepper()'s return value ({ setStep(n) })
+const UC1_CORRIDOR_OVERVIEW = (() => {
+  const lons = corridorCenterline.map((p) => p.lon);
+  const lats = corridorCenterline.map((p) => p.lat);
+  return { lon: (Math.min(...lons) + Math.max(...lons)) / 2, lat: (Math.min(...lats) + Math.max(...lats)) / 2 };
+})();
 
 // ---- P5-e: trust panel (backtest cache + live-editable assumptions) — design spec §4 "Trust
 // panel" + Decision 2 (live stress-test moment). ----
@@ -1097,16 +1123,40 @@ function buildUc1(viewer, { assetRegistry, workOrders, tickets, safetyInspection
   // primitive layers are built.
   if (!viewer?.scene?.canvas) return;
 
+  // Render-only corridor split (uc1Data.js's classifyCorridorAssets — a RENDERING split, never a
+  // data drop: uc1OpenWOs/uc1Accidents/uc1FailedInspections above stay the FULL unfiltered arrays
+  // for scoring/context-panel joins; only the map layers below use the split buckets).
+  const woSplit = classifyCorridorAssets(uc1OpenWOs, corridorCenterline, UC1_CORRIDOR_MAX_M);
+  const accSplit = classifyCorridorAssets(uc1Accidents, corridorCenterline, UC1_CORRIDOR_MAX_M);
+  const inspSplit = classifyCorridorAssets(uc1FailedInspections, corridorCenterline, UC1_CORRIDOR_MAX_M);
+  uc1AncillaryAssets = [...woSplit.ancillary, ...accSplit.ancillary, ...inspSplit.ancillary];
+
   const prevWo = uc1WoCollection, prevAcc = uc1AccidentCollection, prevInsp = uc1InspectionCollection;
-  uc1WoCollection = buildWorkOrderLayer(viewer, uc1OpenWOs);
-  uc1AccidentCollection = buildAccidentLayer(viewer, uc1Accidents);
-  uc1InspectionCollection = buildInspectionLayer(viewer, uc1FailedInspections);
+  const prevAncillary = uc1AncillaryCollection, prevHeatmap = uc1HeatmapCollection;
+  uc1WoCollection = buildWorkOrderLayer(viewer, woSplit.onCorridor);
+  uc1AccidentCollection = buildAccidentLayer(viewer, accSplit.onCorridor);
+  uc1InspectionCollection = buildInspectionLayer(viewer, inspSplit.onCorridor);
+  uc1AncillaryCollection = buildAncillaryLayer(viewer, uc1AncillaryAssets); // starts hidden (buildAncillaryLayer default)
+  uc1HeatmapCollection = buildImpactHeatmap(viewer, { accidents: uc1Accidents, incidents: uc1Incidents, segments: uc1Segments });
+  uc1HeatmapCollection.show = false; // shown only at the demo-mode Step 5 zoom-out coda
   uc1WoCollection.show = uc1WoOn;
   uc1AccidentCollection.show = uc1AccidentsOn;
   uc1InspectionCollection.show = uc1InspectionsOn;
+  uc1AncillaryCollection.show = uc1AncillaryOn;
   if (prevWo) disposeUc1Layer(viewer, prevWo);
   if (prevAcc) disposeUc1Layer(viewer, prevAcc);
   if (prevInsp) disposeUc1Layer(viewer, prevInsp);
+  if (prevAncillary) disposeUc1Layer(viewer, prevAncillary);
+  if (prevHeatmap) disposeUc1Layer(viewer, prevHeatmap);
+  renderUc1AncillaryToggle();
+}
+
+/** Updates the "N off-corridor assets" disclosure button's label (storyboard §7's ancillary-
+ * disclosure requirement) — called after every buildUc1() rebuild so the count stays current. */
+function renderUc1AncillaryToggle() {
+  const btn = $("btn-uc1-ancillary");
+  if (!btn) return;
+  btn.textContent = `${uc1AncillaryAssets.length} off-corridor assets`;
 }
 
 /** P5-e item 2: exec KPI strip — fetches the "decisions" class (shim merges committed seed +
@@ -1161,6 +1211,15 @@ function openUc1WorkOrderContext(wo) {
   $("uc1-window-panel")?.classList.add("hidden");
   // Debug hook for headless verification (e2e) — mirrors window.__dcAssets's shape convention.
   window.__uc1Context = { workOrderId: wo?.id ?? null, counts: ctx.counts };
+
+  // Demo-mode Step 1 -> Step 2 (storyboard §1 "Context"): tighten the camera to the ~500 m local
+  // framing the deck's mic-drop moment 1 describes ("everything within 500 m... one glance").
+  if (uc1DemoActive) {
+    uc1Advance("pickWorkOrder");
+    if (uc1Viewer && typeof wo?.lon === "number" && typeof wo?.lat === "number") {
+      flyToLonLat(uc1Viewer, wo.lon, wo.lat, 500);
+    }
+  }
 }
 
 /** Appends "Evaluate closure windows" to the just-rendered context panel. No-ops if the panel
@@ -1193,12 +1252,31 @@ function evaluateUc1Windows(wo) {
     windowConfig: currentUc1WindowConfig(),
     demandModel: currentUc1DemandModel(),
   });
+
+  // Demo-mode Step 2 -> Step 3 (storyboard §1 "Simulate"): run the EXISTING visible-SUMO-run
+  // machinery (Decision 6, triggerUc1VisibleSumoRun) now, for the winning candidate window, so the
+  // "traffic flows, queues build, vehicles divert" beat plays during evaluation — not just later at
+  // schedule time (which still fires its own run for whichever window the planner actually picks).
+  if (uc1DemoActive) {
+    uc1Advance("evaluate");
+    const win = data.windows[data.winnerIdx], result = data.results[data.winnerIdx];
+    if (win && result) triggerUc1VisibleSumoRun(win, result);
+  }
+
   renderWindowPanel($("uc1-window-panel"), { ...data, workOrder: wo }, (win, result, rank) =>
     scheduleUc1Decision(wo, win, result, rank)
   );
   appendUc1TrustButton(wo);
   // Debug hook for headless verification (e2e) — mirrors window.__dcAssets's shape convention.
   window.__uc1Windows = { count: data.results.length, winnerIdx: data.winnerIdx };
+
+  // Demo-mode Step 3 -> Step 4 (storyboard §9 "the money shot"): the ranked table is up — pull the
+  // camera back from the tight sim view to a comparison scale so both the twin and the table read.
+  if (uc1DemoActive) {
+    uc1Advance("resultsRendered");
+    const plaza = uc1PlazaLonLat();
+    if (uc1Viewer && plaza) flyToLonLat(uc1Viewer, plaza.lon, plaza.lat, 900);
+  }
 }
 
 /** Appends "Why trust this?" to the just-rendered window panel (design spec §4 "Trust panel" —
@@ -1328,6 +1406,15 @@ async function scheduleUc1Decision(wo, win, result, rank) {
     // Decision 6: the winning window triggers one visible SUMO run — only on a SUCCESSFUL
     // schedule (an offline/queued decision gets no camera move / closure, per spec).
     triggerUc1VisibleSumoRun(win, result);
+    // Demo-mode Step 4 -> Step 5 (storyboard §1 "Decide" + §8 Mic-Drop 3): the decision-logged toast
+    // is setStatus() above; here, the corridor-scale heat-map zoom-out coda + an exec-KPI-strip
+    // highlight so the "if you did this every time" close (storyboard §6) lands visually.
+    if (uc1DemoActive) {
+      uc1Advance("schedule");
+      if (uc1HeatmapCollection) uc1HeatmapCollection.show = true;
+      flyToCorridorOverview(uc1Viewer);
+      highlightUc1ExecKpiStrip();
+    }
   } catch (err) {
     console.warn("[UC1] decision write failed — queued in memory", err);
     uc1DecisionQueue.push(record);
@@ -1379,6 +1466,87 @@ function reopenUc1AutoClosure() {
   if (uc1Viewer && activeWorkzoneSpec) openLaneHook(uc1Viewer, activeWorkzoneSpec.lane);
 }
 
+/** Shared deferred-load guard (installUc1's layer toggles AND startUc1Demo below both need it):
+ * the first caller of ANY kind triggers the one shared DataConnect fetch. */
+async function ensureUc1DataLoaded(viewer) {
+  if (!uc1Loaded) await loadDcAssets(viewer);
+}
+
+/** Lon/lat of the SUMO plaza's booth line (T.sumoToLonLat), the same point
+ * triggerUc1VisibleSumoRun() flies to — factored out so the demo-mode Step 3->4 camera pull can
+ * reuse it without duplicating the T/META plumbing. Returns null before T is set (never during
+ * normal boot — every site ships a default transform). */
+function uc1PlazaLonLat() {
+  if (!T) return null;
+  const boothX = META ? META.boothX : T.p.sumoRefX;
+  return T.sumoToLonLat(boothX, 0);
+}
+
+/** Fly to the whole I-595 corridor at a glance (storyboard §1 Step 1 + §8 Mic-Drop 3's zoom-out
+ * coda) — the midpoint of config/corridorCenterline.json's bounding box, high enough to see the
+ * full ~23 km span. */
+function flyToCorridorOverview(viewer) {
+  flyToLonLat(viewer, UC1_CORRIDOR_OVERVIEW.lon, UC1_CORRIDOR_OVERVIEW.lat, 24000);
+}
+
+/** Briefly outlines the exec KPI strip (storyboard §1 Step 5 + §3's "standing corridor/quarterly
+ * KPI strip" — the thing left on screen when the demo ends). Plain inline style (no new CSS class)
+ * so this stays a main.js-only change. */
+function highlightUc1ExecKpiStrip() {
+  const el = $("uc1-exec-kpi-strip");
+  if (!el) return;
+  el.style.transition = "box-shadow .3s ease";
+  el.style.boxShadow = "0 0 0 3px rgba(47, 109, 246, 0.55)";
+  setTimeout(() => { el.style.boxShadow = ""; }, 2600);
+}
+
+/** advanceUc1Step (uc1Mode.js, pure) <-> the live stepper DOM + e2e debug hook. No-ops (via the
+ * pure function's own no-op-on-mismatch rule) unless demo mode is active. */
+function uc1Advance(event) {
+  if (!uc1DemoActive) return;
+  uc1Step = advanceUc1Step(uc1Step, event);
+  uc1StepperCtl?.setStep(uc1Step);
+  window.__uc1Step = uc1Step; // debug hook for headless verification (e2e)
+}
+
+/** Enters UC1 demo mode (storyboard §1/§5): hides the generic-twin HUD (uc1Mode.js's
+ * enterUc1Mode(), CSS-only via body.uc1-mode), shows the 5-step stepper at Step 1, flies to the
+ * corridor overview, and — same deferred-load pattern as the layer toggle buttons — loads the
+ * DataConnect data if it hasn't already, then turns the WO layer on (ancillary stays off) so the
+ * "glowing work orders" are visible the moment the twin is ready. */
+async function startUc1Demo(viewer) {
+  uc1DemoActive = true;
+  uc1Step = resetUc1Step();
+  hideStartupTile($("uc1-startup-tile"));
+  enterUc1Mode();
+  const stepperEl = $("uc1-stepper");
+  stepperEl?.classList.remove("hidden");
+  uc1StepperCtl = renderStepper(stepperEl, uc1Step, { onExit: () => exitUc1DemoMode(viewer) });
+  window.__uc1Step = uc1Step;
+  flyToCorridorOverview(viewer);
+  setStatus("UC1 demo — Step 1 Trigger: 154 open work orders queued; one is about to glow.");
+
+  await ensureUc1DataLoaded(viewer);
+  uc1WoOn = true;
+  $("btn-uc1-wo")?.classList.add("on");
+  if (uc1WoCollection) uc1WoCollection.show = true;
+  uc1AncillaryOn = false;
+  $("btn-uc1-ancillary")?.classList.remove("on");
+  if (uc1AncillaryCollection) uc1AncillaryCollection.show = false;
+  window.__uc1DemoReady = true; // debug hook: data loaded + WO layer on, ready for the hero pick
+}
+
+/** Exits UC1 demo mode ("Exit demo" link in the stepper, storyboard §1's design rule doesn't cover
+ * this explicitly, but the startup tile's "Explore" sibling action implies the same restore): shows
+ * the generic-twin HUD again and reframes the plaza — "today's sandbox unchanged". */
+function exitUc1DemoMode(viewer) {
+  uc1DemoActive = false;
+  exitUc1Mode();
+  $("uc1-stepper")?.classList.add("hidden");
+  setStatus("Exited UC1 demo — sandbox controls restored.");
+  frameCamera(viewer);
+}
+
 /** "UC1 demo" hero shortcut (design spec §4, Mic-Drop 1): fly to config/uc1Demo.json's pinned
  * hero work order and open its context panel. No-ops with a console warning if the current
  * dataset doesn't contain that WO id (e.g. a future re-export moves/closes it). */
@@ -1400,7 +1568,8 @@ function installUc1(viewer) {
   uc1Viewer = viewer; // P5-e: captured for the trust-panel/exec-KPI/SUMO-run handlers below, which
                        // fire from DOM callbacks that don't otherwise close over main()'s `viewer`.
   const woBtn = $("btn-uc1-wo"), accBtn = $("btn-uc1-accidents"), inspBtn = $("btn-uc1-inspections"), demoBtn = $("btn-uc1-demo");
-  const ensureUc1Loaded = async () => { if (!uc1Loaded) await loadDcAssets(viewer); };
+  const ancillaryBtn = $("btn-uc1-ancillary");
+  const ensureUc1Loaded = () => ensureUc1DataLoaded(viewer);
 
   if (woBtn) {
     woBtn.onclick = async () => {
@@ -1433,6 +1602,14 @@ function installUc1(viewer) {
       woBtn?.classList.add("on");
       if (uc1WoCollection) uc1WoCollection.show = true;
       openUc1Demo(viewer);
+    };
+  }
+  if (ancillaryBtn) {
+    ancillaryBtn.onclick = async () => {
+      await ensureUc1Loaded();
+      uc1AncillaryOn = !uc1AncillaryOn;
+      ancillaryBtn.classList.toggle("on", uc1AncillaryOn);
+      if (uc1AncillaryCollection) uc1AncillaryCollection.show = uc1AncillaryOn;
     };
   }
 
@@ -1598,6 +1775,22 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
   installExportCalibration();
   installDataConnectAssets(viewer);
   installUc1(viewer);
+
+  // ---- UC1 startup tile / demo-mode entry (Task C, storyboard §5) ----
+  // ?uc1=1 auto-enters the 5-step demo (skips the tile entirely — used by e2e + a "drop straight
+  // into the story" presenter link). ?uc1=tile force-shows the tile regardless of navigator.webdriver
+  // (screenshots/manual QA of the tile itself). Otherwise: show unless navigator.webdriver — every
+  // OTHER existing e2e spec (closure.spec.ts, live.spec.ts, etc.) navigates without ?uc1 and must
+  // see today's sandbox exactly as before, with no overlay blocking their flows.
+  const uc1Param = new URLSearchParams(location.search).get("uc1");
+  if (uc1Param === "1") {
+    startUc1Demo(viewer);
+  } else if (uc1Param === "tile" || !navigator.webdriver) {
+    renderStartupTile($("uc1-startup-tile"), {
+      onEnterDemo: () => startUc1Demo(viewer),
+      onExplore: () => hideStartupTile($("uc1-startup-tile")),
+    });
+  }
 
   // ---- Feature B: work-zone HUD wiring (lane selector + close/reopen button) ----
   const wzLaneSel = $("wz-lane-select");

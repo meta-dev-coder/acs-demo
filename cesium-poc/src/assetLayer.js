@@ -31,6 +31,12 @@ export function bandColor(band) {
  * buildAssetLayer(viewer, scoredAssets) -> PointPrimitiveCollection
  * Bulk-adds one point per scored asset (skipping any without numeric lon/lat), colored by risk
  * band, then attaches the collection to viewer.scene.primitives.
+ *
+ * Accepts whatever pre-filtered list the caller passes — this function does no corridor-relevance
+ * filtering itself (nor should any other renderer's render loop). That split (uc1Data.js's
+ * classifyCorridorAssets()) belongs at the data-assembly call site, once, before either this or the
+ * `ancillary` layer (uc1Layers.js's buildAncillaryLayer()) is built — never inside a per-point loop.
+ * Scoring/KPIs must still run over the FULL unfiltered asset list; only rendering splits.
  */
 export function buildAssetLayer(viewer, scoredAssets) {
   const collection = new PointPrimitiveCollection();

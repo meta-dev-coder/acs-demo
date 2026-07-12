@@ -1,6 +1,6 @@
 /**
- * uc1-flow.spec.ts — UC1 Lane Closure Revenue Optimizer, the decide flow (P4-c).
- * See docs/superpowers/specs/2026-07-11-uc1-lane-closure-revenue-optimizer-design.md ("Testing").
+ * uc1-flow.spec.ts — UC1 Lane Closure Revenue Optimizer, the decide flow (P4-c) + Task C's
+ * demo-mode entry (startup tile / stepper / ?uc1=1 auto-enter — see uc1-ux-storyboard.md §1/§5).
  *
  * Modelled on dataconnect-assets.spec.ts: spawns tools/dataconnect_shim.py itself in `beforeAll`
  * (playwright.config's webServer stays vite-only) and loads the app with `?dc=http://localhost:8787`
@@ -11,10 +11,12 @@
  * DC3 in dataconnect-assets.spec.ts already exercises the real pick path for this DataConnect
  * layer family.
  *
- * Flow: toggle WO layer -> click hero WO (UC1 demo button) -> context panel shows ticket +
- * accidents -> "Evaluate closure windows" -> 3 ranked rows -> "Why trust this?" -> backtest tab
- * honesty line -> Assumptions tab slider -> table re-ranks live -> exec KPI strip (4 tiles +
- * seeded label) -> "Schedule this window" -> decision POSTs to the shim's write endpoint (asserted
+ * Flow: `?uc1=1` auto-enters the 5-step demo (skips the startup tile) -> Step 1 Trigger (WO layer
+ * auto-on) -> click hero WO (UC1 demo button) -> Step 2 Context panel shows ticket + accidents ->
+ * "Evaluate closure windows" -> Step 3 Simulate (visible SUMO run for the winning window) -> Step 4
+ * Compare (3 ranked rows, the money shot) -> "Why trust this?" -> backtest tab honesty line ->
+ * Assumptions tab slider -> table re-ranks live -> exec KPI strip (4 tiles + seeded label) ->
+ * "Schedule this window" -> Step 5 Decide: decision POSTs to the shim's write endpoint (asserted
  * via a direct shim read-back AND the #uc1-decisions-status badge) -> visible SUMO run (P5-e
  * Decision 6, reuses the existing __closeLane/work-zone machinery — asserted via window.__kpi.workzone).
  *
@@ -33,7 +35,8 @@ const REPO_ROOT  = path.join(__dirname, '..', '..'); // cesium-poc/e2e -> cesium
 
 const SHIM_PORT = 8787;
 const SHIM_URL  = `http://localhost:${SHIM_PORT}`;
-const APP_URL   = `/?dc=${SHIM_URL}`;
+// ?uc1=1 auto-enters the demo (Task C, storyboard §5) — skips the startup tile entirely.
+const APP_URL   = `/?dc=${SHIM_URL}&uc1=1`;
 
 // The hero work order pinned in config/uc1Demo.json — kept in sync manually (not imported: this
 // spec runs under ts-node/Playwright, the JSON is a repo fixture whoever changes uc1Demo.json is
@@ -105,10 +108,10 @@ async function decisionsTotal(token: string): Promise<number> {
 // Page helpers
 // ---------------------------------------------------------------------------
 
-async function gotoWithDc(page: Page): Promise<void> {
+async function gotoWithDc(page: Page, url = APP_URL): Promise<void> {
   page.on('console', (msg) => console.log(`[browser:${msg.type()}] ${msg.text()}`));
   page.on('pageerror', (err) => console.log(`[browser:pageerror] ${err.stack || err.message}`));
-  await page.goto(APP_URL);
+  await page.goto(url);
   await page.waitForFunction(() => !!(window as any).__viewer, { timeout: 30_000 });
   await page.waitForFunction(
     () => {
@@ -135,20 +138,49 @@ async function clickUc1Demo(page: Page, timeout = 60_000): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// UC1-FLOW: full decide flow, end to end
+// UC1-STARTUP: the entry tile is suppressed under navigator.webdriver on a plain nav (no ?uc1)
+// (Task C — every OTHER e2e spec in this repo navigates with no ?uc1 param and must see today's
+// sandbox with no overlay in the way).
 // ---------------------------------------------------------------------------
-test('UC1-FLOW: layer toggle -> hero WO context -> evaluate -> 3 ranked windows -> schedule -> decision logged', async ({ page }) => {
+test('UC1-STARTUP: startup tile stays suppressed on a default nav (no ?uc1 param) under navigator.webdriver', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => !!(window as any).__viewer, { timeout: 30_000 });
+  await expect(page.locator('#uc1-startup-tile')).toBeHidden();
+  // Sandbox chrome untouched — no uc1-mode body class, stepper not shown.
+  await expect(page.locator('body')).not.toHaveClass(/uc1-mode/);
+  await expect(page.locator('#uc1-stepper')).toBeHidden();
+});
+
+// ---------------------------------------------------------------------------
+// UC1-FLOW: full decide flow, end to end, driven via ?uc1=1's demo-mode auto-entry
+// ---------------------------------------------------------------------------
+test('UC1-FLOW: ?uc1=1 auto-enters demo -> hero WO context -> evaluate -> 3 ranked windows -> schedule -> decision logged -> stepper reaches Step 5', async ({ page }) => {
   test.setTimeout(120_000); // DataConnect load (7 paginated classes) + evaluate + schedule, on top of swiftshader warmup
 
   await gotoWithDc(page);
 
-  // ---- toggle the WO layer explicitly first (design spec §4 bullet 1) ----
+  // ---- Step 1 (Trigger): ?uc1=1 auto-entered the demo — stepper live, generic HUD suppressed,
+  // the WO layer auto-toggled on (design spec §4 bullet 1, now driven by demo-mode entry rather
+  // than a manual click). ----
+  await page.waitForFunction(() => (window as any).__uc1Step === 1, { timeout: 15_000 });
+  await expect(page.locator('#uc1-stepper')).toBeVisible();
+  await expect(page.locator('body')).toHaveClass(/uc1-mode/);
+
+  // The legacy work-zone/MUTCD HUD stays in the DOM (closure.spec.ts still drives it directly in
+  // default mode) but is CSS-hidden while UC1 demo mode is active (storyboard §7).
+  const wzHud = page.locator('#workzone-hud');
+  await expect(wzHud).toBeAttached();
+  await expect(wzHud).toBeHidden();
+
+  await page.waitForFunction(() => (window as any).__uc1DemoReady === true, { timeout: 60_000 });
   const woBtn = page.locator('#btn-uc1-wo');
-  await woBtn.click();
-  await expect(woBtn).toHaveClass(/on/, { timeout: 60_000 });
+  await expect(woBtn).toHaveClass(/on/);
 
   // ---- drive the hero WO via the UC1 demo button (deterministic — no scene.pick() needed) ----
   await clickUc1Demo(page);
+
+  // Step 1 -> Step 2 (Context).
+  await page.waitForFunction(() => (window as any).__uc1Step === 2, { timeout: 10_000 });
 
   const panel = page.locator('#uc1-context-panel');
   await expect(panel).toBeVisible();
@@ -164,7 +196,8 @@ test('UC1-FLOW: layer toggle -> hero WO context -> evaluate -> 3 ranked windows 
 
   await shoot(page, 'uc1-flow-1-context-panel');
 
-  // ---- Evaluate closure windows -> 3 ranked rows ----
+  // ---- Evaluate closure windows -> Step 2 -> 3 (Simulate, visible SUMO run for the winning
+  // window) -> Step 3 -> 4 (Compare, the ranked table) -> 3 ranked rows ----
   const evalBtn = page.locator('#uc1-evaluate-btn');
   await expect(evalBtn).toBeVisible();
   await evalBtn.click();
@@ -173,6 +206,8 @@ test('UC1-FLOW: layer toggle -> hero WO context -> evaluate -> 3 ranked windows 
     const w = (window as any).__uc1Windows;
     return !!w && w.count === 3;
   }, { timeout: 10_000 });
+
+  await page.waitForFunction(() => (window as any).__uc1Step === 4, { timeout: 10_000 });
 
   const windowPanel = page.locator('#uc1-window-panel');
   await expect(windowPanel).toBeVisible();
@@ -252,6 +287,10 @@ test('UC1-FLOW: layer toggle -> hero WO context -> evaluate -> 3 ranked windows 
   const totalAfter = await decisionsTotal(token);
   expect(totalAfter).toBe(totalBefore + 1);
 
+  // ---- Step 4 -> Step 5 (Decide): a successful schedule advances the stepper to its terminal
+  // step and shows the corridor-scale heat-map zoom-out coda (storyboard §8 Mic-Drop 3). ----
+  await page.waitForFunction(() => (window as any).__uc1Step === 5, { timeout: 10_000 });
+
   // ---- P5-e item 3: a successful schedule reuses the existing closure machinery for a visible
   // SUMO run (offline here -> the same work-zone overlay/RILCA KPIs closeLaneHook always produces). ----
   await page.waitForFunction(() => !!(window as any).__kpi?.workzone, { timeout: 15_000 });
@@ -273,7 +312,7 @@ test('UC1-OFFLINE: scheduling while the shim is down queues the decision and fli
   test.setTimeout(90_000);
 
   await gotoWithDc(page);
-  await page.locator('#btn-uc1-wo').click();
+  await page.waitForFunction(() => (window as any).__uc1DemoReady === true, { timeout: 60_000 }); // ?uc1=1 auto-toggles the WO layer on
   await clickUc1Demo(page);
 
   await page.locator('#uc1-evaluate-btn').click();

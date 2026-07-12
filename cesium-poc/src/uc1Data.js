@@ -287,6 +287,110 @@ export function buildWorkOrderContext(
   };
 }
 
+// ---- corridor-relevance filter (Task A: DataConnect assets vs. the real I-595 corridor) --------
+// See /private/tmp (diagnosis doc, "uc1-coords-diagnosis.md") for the full analysis: 89.4% of
+// asset_registry.json rows sit within 100 m of the real I-595 mainline (median 20.6 m), but
+// assetLayer.js/uc1Layers.js plot every numeric lon/lat verbatim with zero corridor-relevance
+// check, so the ~6.6% (332/5,015) genuinely off-pavement minority (drainage ponds, marina
+// navigation lights, under-bridge logs, a few DMS/Camera/Sign rows on connecting arterials) reads
+// as "scattered over gardens/parks" on screen. Fix is filter-to-corridor (not snap-to-centerline —
+// snapping would misrepresent real, correctly-geocoded off-pavement infrastructure as being on the
+// road). `cesium-poc/config/corridorCenterline.json` (built once, offline, by
+// tools/build_corridor_centerline.py from OSM Overpass — never fetched at runtime) is the ordered
+// [{lon,lat}, ...] polyline these two functions measure against.
+
+/** Perpendicular distance in meters from (lon, lat) to the nearest point on the `centerline`
+ * polyline (array of {lon, lat}, ordered). Point-to-segment distance is computed in a local
+ * equirectangular projection referenced at the query point's own latitude (meters/degree scaled by
+ * cos(lat) for longitude) — the same flat-earth approximation gridBinPoints() above and
+ * haversineMeters() callers already use at corridor scale, accurate to well under a meter of error
+ * over a ~30 km corridor. Beyond the polyline's first/last vertex, distance clamps to that
+ * endpoint (t in [0,1]) rather than extrapolating the line, matching standard point-to-segment
+ * distance semantics.
+ *
+ * Returns null (never throws) when lon/lat aren't both finite numbers or centerline is
+ * empty/missing — "unmeasurable" is a distinct case from "far away" and callers
+ * (classifyCorridorAssets below) treat it that way. Deliberately does NOT use this module's toNum()
+ * coercion here: openWorkOrders()/extractAccidents() etc. already store explicit `lon: null` /
+ * `lat: null` for "no coordinates resolved" (via their own toNum() call upstream), and Number(null)
+ * is 0 — coercing again here would silently treat "no coordinates" as "at (0,0)". A strict
+ * typeof/isFinite check keeps null (and non-numeric junk) correctly unmeasurable. */
+export function distanceToCorridorM(lon, lat, centerline) {
+  if (typeof lon !== "number" || !Number.isFinite(lon)) return null;
+  if (typeof lat !== "number" || !Number.isFinite(lat)) return null;
+  if (!Array.isArray(centerline) || centerline.length === 0) return null;
+
+  const mPerDegLat = (Math.PI / 180) * EARTH_RADIUS_M;
+  const mPerDegLon = mPerDegLat * Math.cos(toRadians(lat)) || mPerDegLat;
+  const toXY = (pLon, pLat) => ({ x: pLon * mPerDegLon, y: pLat * mPerDegLat });
+
+  const p = toXY(lon, lat);
+
+  if (centerline.length === 1) {
+    const a = toXY(centerline[0].lon, centerline[0].lat);
+    return Math.hypot(p.x - a.x, p.y - a.y);
+  }
+
+  let best = Infinity;
+  for (let i = 0; i < centerline.length - 1; i++) {
+    const a = toXY(centerline[i].lon, centerline[i].lat);
+    const b = toXY(centerline[i + 1].lon, centerline[i + 1].lat);
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    let t = len2 < 1e-9 ? 0 : ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    const fx = a.x + t * dx;
+    const fy = a.y + t * dy;
+    const d = Math.hypot(p.x - fx, p.y - fy);
+    if (d < best) best = d;
+  }
+  return best;
+}
+
+const DEFAULT_CORRIDOR_MAX_M = 300;
+
+/**
+ * classifyCorridorAssets(assets, centerline, maxM = 300) -> {onCorridor, ancillary, counts}
+ *
+ * Splits `assets` (any records carrying numeric lon/lat — scoringA.js's adaptDataConnectAssets()/
+ * scoreAssets() rows, extractAccidents() rows, openWorkOrders() rows, etc.) into the assets within
+ * `maxM` meters of `centerline` (onCorridor — the primary map layer) and those beyond it
+ * (ancillary — the diagnosis's recommended §6(b): a separately-toggleable layer, not a silent
+ * drop, since categories like Drainage/Homeless/Nav-Lights are real FDOT assets that are just
+ * legitimately not pavement-mounted). Every surviving row is returned as a shallow copy tagged
+ * with `distanceToCorridorM` (handy for the UI / a tooltip on the ancillary layer).
+ *
+ * Rows without a resolvable numeric lon/lat are dropped from BOTH buckets — assetLayer.js's/
+ * uc1Layers.js's render loops already skip them regardless (same `typeof === "number"` guard), so
+ * they were never going to render either way; counting them as "ancillary" would misrepresent
+ * "no coordinates" as "off-corridor by distance".
+ *
+ * This function is a RENDERING split only — call it once, right before building the map layers, at
+ * the data-assembly call site (main.js's buildUc1(), not touched here). Scoring/KPIs must keep
+ * running over the full unfiltered `assets` array (data honesty — see this task's spec bullet 4);
+ * nothing here mutates or drops rows from whatever list scoring/KPI code consumes.
+ *
+ * `counts: {rendered, ancillary}` is `{onCorridor.length, ancillary.length}` — surfaced so the UI
+ * can disclose e.g. "332 off-corridor assets in Ancillary layer" without recomputing it.
+ */
+export function classifyCorridorAssets(assets, centerline, maxM = DEFAULT_CORRIDOR_MAX_M) {
+  const onCorridor = [];
+  const ancillary = [];
+  for (const asset of assets || []) {
+    const distance = distanceToCorridorM(asset?.lon, asset?.lat, centerline);
+    if (distance == null) continue; // no numeric coords, or no centerline to measure against
+    const tagged = { ...asset, distanceToCorridorM: distance };
+    if (distance <= maxM) onCorridor.push(tagged);
+    else ancillary.push(tagged);
+  }
+  return {
+    onCorridor,
+    ancillary,
+    counts: { rendered: onCorridor.length, ancillary: ancillary.length },
+  };
+}
+
 /** Group records by a (possibly missing) asset-id field into Map<string, T[]>. Duplicated from
  * scoringA.js's private groupByAssetId to keep this module dependency-free (scoringA.js imports
  * FROM here, not the reverse). */

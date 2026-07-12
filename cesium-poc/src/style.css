@@ -587,3 +587,123 @@ html, body, #cesiumContainer, #arcgisContainer {
 #weather-overlay.weather-heavyrain  { background: rgba(60,  90, 160, 0.22); }
 #weather-overlay.weather-fog        { background: rgba(200, 210, 220, 0.38); }
 #weather-overlay.weather-snowice    { background: rgba(220, 235, 255, 0.30); }
+
+/* UC1 mode */
+
+/* ---- Chrome suppression (uc1Mode.js's UC1_HIDDEN_SELECTORS — keep the two lists in sync).
+   CSS-only display:none via body.uc1-mode: every node here stays in the DOM and fully
+   functional, so closure.spec.ts's default-mode #wz-* drive is unaffected. ---- */
+body.uc1-mode #renderer-toggle,
+body.uc1-mode #site-select,
+body.uc1-mode .toggle,
+body.uc1-mode #kpis,
+body.uc1-mode .rev-counter-wrap,
+body.uc1-mode #cash-aet-card,
+body.uc1-mode .legend,
+body.uc1-mode .ctl-row:has(#weather-select),
+body.uc1-mode .ctl-row:has(#speed-seg),
+body.uc1-mode .ctl-row:has(#btn-view),
+body.uc1-mode #gatePanel,
+body.uc1-mode #workzone-hud,
+body.uc1-mode #dc-panel,
+body.uc1-mode #assetops-hud {
+  display: none !important;
+}
+
+/* ---- Keep/elevate (uc1Mode.js's UC1_KEPT_SELECTORS): #uc1-panel becomes the sole primary panel
+   once everything above is hidden; its exec KPI strip pins to the top of the still-scrollable
+   panel body (design spec §3 "front-and-center" — not a small strip below a dozen other panels).
+   The floating context/window/trust panels need no rule here — they're already separate overlays
+   outside the stacked HUD, which is the correct pattern per the storyboard. ---- */
+body.uc1-mode #uc1-panel {
+  background: rgba(47, 109, 246, 0.07);
+  border-color: rgba(111, 177, 255, 0.3);
+  border-radius: 10px;
+}
+body.uc1-mode .uc1-exec-kpi-strip {
+  position: sticky;
+  top: -16px;
+  padding-top: 8px;
+  margin-top: -8px;
+  background: rgba(15, 22, 33, 0.92);
+  z-index: 1;
+}
+
+/* ---- Startup tile (uc1Mode.js's renderStartupTile) — full-screen, dark, minimal,
+   presentation-grade single call-to-action (design spec §5: no scenario picker, no menu). ---- */
+#uc1-startup-tile {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: radial-gradient(circle at 50% 30%, rgba(47, 109, 246, 0.12), transparent 60%), #060a11;
+  color: #f2f5f8;
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+#uc1-startup-tile.hidden { display: none !important; }
+
+.uc1-startup { max-width: 620px; text-align: center; }
+.uc1-startup-eyebrow {
+  font-size: 11px; letter-spacing: 1.6px; text-transform: uppercase; color: #6fb1ff; font-weight: 700;
+  margin-bottom: 18px;
+}
+.uc1-startup-title {
+  font-size: 44px; line-height: 1.12; font-weight: 800; margin: 0 0 20px; letter-spacing: -0.5px;
+}
+.uc1-startup-hook {
+  font-size: 16px; line-height: 1.5; color: #cdd8e6; font-style: italic; margin: 0 0 22px;
+}
+.uc1-startup-meta { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
+.uc1-startup-badge {
+  display: inline-flex; align-items: center; font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
+  padding: 6px 13px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.06); color: #cdd8e6;
+}
+.uc1-startup-badge-queue { border-color: rgba(241, 163, 37, 0.45); background: rgba(241, 163, 37, 0.12); color: #f1c94f; }
+.uc1-startup-tagline { font-size: 13px; color: #8fa3bb; margin: 0 0 30px; }
+.uc1-startup-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.uc1-startup-btn {
+  font: inherit; font-size: 14px; font-weight: 700; padding: 13px 26px; border-radius: 9px;
+  cursor: pointer; border: 1px solid rgba(255,255,255,0.16); transition: transform .12s, background .12s;
+}
+.uc1-startup-btn:hover { transform: translateY(-1px); }
+.uc1-startup-btn-primary { background: #2f6df6; border-color: #2f6df6; color: #fff; }
+.uc1-startup-btn-primary:hover { background: #4c81ff; }
+.uc1-startup-btn-secondary { background: rgba(255,255,255,0.05); color: #cdd8e6; }
+.uc1-startup-btn-secondary:hover { background: rgba(255,255,255,0.12); }
+
+/* ---- Stepper bar (uc1Mode.js's renderStepper) — 5 steps pinned to the top edge; "no navigation
+   chrome / page transitions between the 5 steps" (design spec §1). ---- */
+#uc1-stepper {
+  position: fixed;
+  top: 0; left: 50%; transform: translateX(-50%);
+  z-index: 40;
+  display: flex; align-items: center; gap: 16px;
+  padding: 10px 20px;
+  border-radius: 0 0 12px 12px;
+  background: rgba(15, 22, 33, 0.88);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.08); border-top: none;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.uc1-stepper-track { display: flex; align-items: center; gap: 6px; }
+.uc1-step { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; }
+.uc1-step-num {
+  display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px;
+  border-radius: 50%; font-size: 10px; font-weight: 800; background: rgba(255,255,255,0.1); color: #8fa3bb;
+}
+.uc1-step-label { font-size: 11px; font-weight: 600; color: #8fa3bb; letter-spacing: 0.2px; }
+.uc1-step-active .uc1-step-num { background: #2f6df6; color: #fff; }
+.uc1-step-active .uc1-step-label { color: #f2f5f8; }
+.uc1-step-done .uc1-step-num { background: #43d871; color: #06210f; }
+.uc1-step-done .uc1-step-label { color: #cdd8e6; }
+.uc1-step-sep { width: 14px; height: 1px; background: rgba(255,255,255,0.16); }
+.uc1-exit-link {
+  font: inherit; font-size: 10.5px; font-weight: 600; color: #8fa3bb; background: none; border: none;
+  cursor: pointer; padding: 4px 6px; margin-left: 6px; border-left: 1px solid rgba(255,255,255,0.14);
+  padding-left: 12px;
+}
+.uc1-exit-link:hover { color: #ff6b6b; }

@@ -30,6 +30,15 @@ const ACCIDENT_PIXEL_SIZE = 8;
 const INSPECTION_COLOR = Color.fromCssColorString("#ffb100");
 const INSPECTION_PIXEL_SIZE = 10;
 
+// ---- ancillary: off-corridor DataConnect assets (uc1Data.js classifyCorridorAssets' `ancillary`
+// bucket — genuinely-off-pavement FDOT infrastructure like drainage ponds/marina nav-lights/
+// under-bridge logs, plus a batch of DMS/Camera/Sign rows on connecting arterials; see the corridor
+// filter diagnosis). Rendered small and grey so it visually reads as "context, not the primary
+// asset layer" (assetLayer.js's risk-banded points), and OFF by default (`collection.show = false`)
+// since it's a disclosure/toggle layer, not part of the default view.
+const ANCILLARY_COLOR = Color.fromCssColorString("#8a8a8a");
+const ANCILLARY_PIXEL_SIZE = 5;
+
 /**
  * buildWorkOrderLayer(viewer, openWOs) -> PointPrimitiveCollection
  * One point per open work order with numeric lon/lat (uc1Data.js's openWorkOrders() already
@@ -107,6 +116,38 @@ export function buildInspectionLayer(viewer, failedInspections) {
   return collection;
 }
 
+/**
+ * buildAncillaryLayer(viewer, ancillaryAssets) -> PointPrimitiveCollection
+ *
+ * One small grey point per off-corridor DataConnect asset (uc1Data.js's classifyCorridorAssets()
+ * `ancillary` bucket — already filtered/tagged with distanceToCorridorM at the call site; this
+ * function does no filtering itself, same posture as assetLayer.js's buildAssetLayer() and the
+ * other three builders in this module). The collection starts hidden (`show = false`) — callers
+ * that want to disclose it (e.g. a "332 off-corridor assets" toggle) flip `.show` themselves; the
+ * default UC1 view stays uncluttered by legitimately-off-pavement infrastructure.
+ */
+export function buildAncillaryLayer(viewer, ancillaryAssets) {
+  const collection = new PointPrimitiveCollection();
+  collection.isUc1AncillaryLayer = true;
+
+  for (const asset of ancillaryAssets || []) {
+    if (typeof asset.lon !== "number" || typeof asset.lat !== "number") continue;
+    collection.add({
+      position: Cartesian3.fromDegrees(asset.lon, asset.lat, POINT_HEIGHT_M),
+      pixelSize: ANCILLARY_PIXEL_SIZE,
+      color: ANCILLARY_COLOR,
+      outlineColor: Color.BLACK.withAlpha(0.4),
+      outlineWidth: 1,
+      scaleByDistance: SCALE_BY_DISTANCE,
+      id: asset,
+    });
+  }
+
+  collection.show = false; // off by default — disclosure layer, see docstring above
+  viewer.scene.primitives.add(collection);
+  return collection;
+}
+
 // ---- closure-impact heat map (design spec §4 Decision 5, Mic-Drop Moment 3) ---------------------
 // Corridor-zoom density overlay surfacing repeat crash/closure clusters: grid-bins the accident +
 // located-incident points (gridBinPoints(), uc1Data.js — pure, tested) and renders one translucent
@@ -166,13 +207,13 @@ export function buildImpactHeatmap(viewer, { accidents = [], incidents = [], seg
   return collection;
 }
 
-/** scene.pick() wrapper shared by all three UC1 layers — returns `{kind, record}` under a click
- * (kind is "workOrder" | "accident" | "inspection", record is the source object passed into the
- * matching build*Layer() call), or null if nothing (or something else, e.g. the DataConnect asset
- * layer) was hit. Distinguishes the three layers via the `isUc1*Layer` flags stamped on each
- * collection above (all three point shapes share `lon`/`lat`/`id`-ish fields, so the record alone
- * can't tell them apart). Left-click wiring itself is the caller's responsibility (main.js), same
- * split as assetLayer.js's installAssetPicking()/pickAsset(). */
+/** scene.pick() wrapper shared by the UC1 point layers — returns `{kind, record}` under a click
+ * (kind is "workOrder" | "accident" | "inspection" | "ancillary", record is the source object
+ * passed into the matching build*Layer() call), or null if nothing (or something else, e.g. the
+ * DataConnect asset layer) was hit. Distinguishes the layers via the `isUc1*Layer` flags stamped
+ * on each collection above (the point shapes share `lon`/`lat`/`id`-ish fields, so the record
+ * alone can't tell them apart). Left-click wiring itself is the caller's responsibility (main.js),
+ * same split as assetLayer.js's installAssetPicking()/pickAsset(). */
 export function pickUc1Point(viewer, windowPosition) {
   const picked = viewer.scene.pick(windowPosition);
   if (!picked || !picked.id) return null;
@@ -183,6 +224,8 @@ export function pickUc1Point(viewer, windowPosition) {
     ? "accident"
     : collection?.isUc1InspectionLayer
     ? "inspection"
+    : collection?.isUc1AncillaryLayer
+    ? "ancillary"
     : null;
   return kind ? { kind, record: picked.id } : null;
 }

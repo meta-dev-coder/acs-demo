@@ -18,6 +18,8 @@ import {
   haversineMeters,
   buildWorkOrderContext,
   gridBinPoints,
+  distanceToCorridorM,
+  classifyCorridorAssets,
 } from "../src/uc1Data.js";
 
 // ---- shared fixtures --------------------------------------------------------------------------
@@ -541,4 +543,78 @@ test("buildWorkOrderContext composes cleanly with failedInspections() output (in
   const ctx = buildWorkOrderContext(ctxWo, ctxSources({ inspections: failedInspections(rawInspections) }));
   assert.deepEqual(ctx.inspections.map((r) => r.id), ["SAFE-CTX"]);
   assert.equal(ctx.inspections[0].risk, 5);
+});
+
+// ---- distanceToCorridorM / classifyCorridorAssets (UC1 corridor filter, Task A) ----------------
+// Synthetic straight east-west polyline at lat 26.10, spanning a ~10 km stretch of longitude — real
+// I-595 is roughly east-west too, so this is representative without needing the real (committed)
+// corridorCenterline.json fixture in a unit test.
+const straightCenterline = [
+  { lon: -80.3, lat: 26.1 },
+  { lon: -80.25, lat: 26.1 },
+  { lon: -80.2, lat: 26.1 },
+];
+const M_PER_DEG_LAT = (Math.PI / 180) * 6_371_000; // matches uc1Data.js's EARTH_RADIUS_M
+
+test("distanceToCorridorM returns ~0 for a point sitting on a mid-segment vertex", () => {
+  const d = distanceToCorridorM(-80.25, 26.1, straightCenterline);
+  assert.ok(d < 1, `expected ~0 m, got ${d}`);
+});
+
+test("distanceToCorridorM returns ~100 for a point offset 100m perpendicular from the line", () => {
+  const offsetLat = 26.1 + 100 / M_PER_DEG_LAT;
+  const d = distanceToCorridorM(-80.27, offsetLat, straightCenterline);
+  assert.ok(Math.abs(d - 100) < 5, `expected ~100 m, got ${d}`);
+});
+
+test("distanceToCorridorM clamps to the nearest endpoint beyond the polyline's ends", () => {
+  // A point due west of the line's western end, 200m further west than the endpoint itself.
+  const farLon = -80.3 - 200 / (M_PER_DEG_LAT * Math.cos((26.1 * Math.PI) / 180));
+  const d = distanceToCorridorM(farLon, 26.1, straightCenterline);
+  assert.ok(Math.abs(d - 200) < 5, `expected ~200 m clamped to endpoint, got ${d}`);
+});
+
+test("distanceToCorridorM returns null for non-numeric coords or an empty/missing centerline", () => {
+  assert.equal(distanceToCorridorM(null, 26.1, straightCenterline), null);
+  assert.equal(distanceToCorridorM(-80.25, undefined, straightCenterline), null);
+  assert.equal(distanceToCorridorM(-80.25, 26.1, []), null);
+  assert.equal(distanceToCorridorM(-80.25, 26.1, undefined), null);
+});
+
+test("classifyCorridorAssets buckets assets within/beyond the default 300m threshold", () => {
+  const onAsset = { asset_tag: "ON-1", lon: -80.25, lat: 26.1 };
+  const farLat = 26.1 + 500 / M_PER_DEG_LAT; // ~500 m north — beyond the default 300 m
+  const offAsset = { asset_tag: "OFF-1", lon: -80.25, lat: farLat };
+  const { onCorridor, ancillary, counts } = classifyCorridorAssets([onAsset, offAsset], straightCenterline);
+  assert.deepEqual(onCorridor.map((a) => a.asset_tag), ["ON-1"]);
+  assert.deepEqual(ancillary.map((a) => a.asset_tag), ["OFF-1"]);
+  assert.deepEqual(counts, { rendered: 1, ancillary: 1 });
+});
+
+test("classifyCorridorAssets tags every surviving row with distanceToCorridorM", () => {
+  const onAsset = { asset_tag: "ON-1", lon: -80.25, lat: 26.1 };
+  const { onCorridor } = classifyCorridorAssets([onAsset], straightCenterline);
+  assert.equal(typeof onCorridor[0].distanceToCorridorM, "number");
+  assert.ok(onCorridor[0].distanceToCorridorM < 1);
+});
+
+test("classifyCorridorAssets respects a custom maxM threshold", () => {
+  const midLat = 26.1 + 150 / M_PER_DEG_LAT; // ~150 m offset
+  const asset = { asset_tag: "MID-1", lon: -80.25, lat: midLat };
+  const tight = classifyCorridorAssets([asset], straightCenterline, 50);
+  assert.deepEqual(tight.onCorridor, []);
+  assert.equal(tight.ancillary.length, 1);
+
+  const loose = classifyCorridorAssets([asset], straightCenterline, 500);
+  assert.equal(loose.onCorridor.length, 1);
+  assert.deepEqual(loose.ancillary, []);
+});
+
+test("classifyCorridorAssets drops assets without numeric lon/lat from both buckets", () => {
+  const noCoords = { asset_tag: "NO-COORDS", lon: null, lat: null };
+  const onAsset = { asset_tag: "ON-1", lon: -80.25, lat: 26.1 };
+  const { onCorridor, ancillary, counts } = classifyCorridorAssets([noCoords, onAsset], straightCenterline);
+  assert.deepEqual(onCorridor.map((a) => a.asset_tag), ["ON-1"]);
+  assert.deepEqual(ancillary, []);
+  assert.deepEqual(counts, { rendered: 1, ancillary: 0 });
 });
