@@ -9,17 +9,24 @@ corridor, lon -80.36..-80.17, because it feeds a "is this DataConnect asset
 actually near I-595" check across the full asset_registry.json footprint
 (see the diagnosis: /private/tmp/.../uc1-coords-diagnosis.md).
 
-Source (primary): OSM Overpass, the same query/method the diagnosis used:
-    way["ref"="I 595"]["highway"~"motorway"]
+Source (primary): OSM Overpass, restricted to MAINLINE ONLY:
+    way["ref"="I 595"]["highway"="motorway"]
   in bbox (26.05,-80.40,26.15,-80.15), `out geom;`, 30s Overpass timeout.
-This pulls every I-595-tagged way in the bbox: both directions' mainline
-carriageways AND ramps (the diagnosis confirmed "all ramps tagged with the
-I-595 ref"). We don't need to pick a single carriageway here (unlike the
-plaza-anchor script, which must stay bearing/anchor-disambiguated for a
-short physics-sim clip) — pooling everything and taking a median-per-bin
-spine (same robust-to-noise idea CLAUDE.md documents for scene/place.ts's
-getCenterline()) washes out the dual-carriageway/ramp scatter into one
-clean east-west line, which is all a "distance to corridor" check needs.
+NOTE: the original version of this query used `["highway"~"motorway"]`
+(regex substring match), which also matched `highway=motorway_link` —
+i.e. every interchange ramp tagged with the I-595 ref (the diagnosis
+confirmed "all ramps tagged with the I-595 ref"). Pooling ramps in with
+the mainline dragged the median-per-bin spine off-alignment right where
+ramps fan out (observed near the I-95 interchange), producing a ribbon
+that visibly wanders off the carriageway. The exact match `="motorway"`
+excludes motorway_link ramps, leaving only the two mainline carriageways
+(eastbound + westbound). We still don't need to pick a single carriageway
+(unlike the plaza-anchor script, which must stay bearing/anchor-
+disambiguated for a short physics-sim clip) — pooling just the two
+parallel mainline carriageways and taking a median-per-bin spine (same
+robust-to-noise idea CLAUDE.md documents for scene/place.ts's
+getCenterline()) lands the spine in the median strip, which reads as
+visually on the road at demo zoom, without the ramp-induced wander.
 
 Fallback (if Overpass is unreachable / returns no matching ways): derive a
 ridge line from the asset density itself. asset_registry.json is already
@@ -67,7 +74,10 @@ def fetch_overpass_ways():
     south, west, north, east = BBOX
     query = (
         f"[out:json][timeout:{OVERPASS_TIMEOUT_S}];"
-        f'way["ref"="I 595"]["highway"~"motorway"]'
+        # Exact match on highway=motorway ONLY — excludes motorway_link ramps
+        # (regex `~"motorway"` would also match motorway_link, which is the
+        # interchange-wander bug this query previously had).
+        f'way["ref"="I 595"]["highway"="motorway"]'
         f"({south},{west},{north},{east});"
         f"out geom;"
     )
