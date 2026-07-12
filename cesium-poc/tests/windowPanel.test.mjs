@@ -9,7 +9,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { windowDemandAdapter, evaluateCandidates, throughputVsDemandPct } from "../src/windowAssembly.js";
+import {
+  windowDemandAdapter,
+  evaluateCandidates,
+  throughputVsDemandPct,
+  buildSumoPlaybackPlan,
+} from "../src/windowAssembly.js";
 import { createDemandModel } from "../src/demand.js";
 import segments from "../config/segments.json" with { type: "json" };
 import windowConfig from "../config/windowConfig.json" with { type: "json" };
@@ -162,4 +167,35 @@ test("throughputVsDemandPct: below 100% when a window oversaturates capacity", (
 test("throughputVsDemandPct: 100% (not NaN) when a result has zero arrivals", () => {
   assert.equal(throughputVsDemandPct({ queue: { slices: [] } }), 100);
   assert.equal(throughputVsDemandPct({}), 100);
+});
+
+// ---- 4. buildSumoPlaybackPlan: sequences the 3 windows one-at-a-time (UC1 deck-parity item 1) ---
+
+test("buildSumoPlaybackPlan: returns 3×[closeLane, watch, openLane] in window order, using the supplied lane", () => {
+  const windows = [{ id: "overnight" }, { id: "weekendMorning" }, { id: "weekdayPm" }];
+  const plan = buildSumoPlaybackPlan(windows, { lane: "uc1-ap-1" });
+
+  assert.equal(plan.length, 9);
+  for (let i = 0; i < 3; i++) {
+    const group = plan.slice(i * 3, i * 3 + 3);
+    assert.equal(group[0].kind, "closeLane");
+    assert.equal(group[1].kind, "watch");
+    assert.equal(group[2].kind, "openLane");
+    for (const step of group) {
+      assert.equal(step.window, windows[i]);
+      assert.equal(step.lane, "uc1-ap-1");
+    }
+  }
+});
+
+test("buildSumoPlaybackPlan: watchMsPerWindow defaults to 8000 when not supplied; honored when supplied", () => {
+  const windows = [{ id: "overnight" }];
+
+  const defaulted = buildSumoPlaybackPlan(windows, { lane: "uc1-ap-1" });
+  const watchStepDefault = defaulted.find((s) => s.kind === "watch");
+  assert.equal(watchStepDefault.durationMs, 8000);
+
+  const custom = buildSumoPlaybackPlan(windows, { lane: "uc1-ap-1", watchMsPerWindow: 3000 });
+  const watchStepCustom = custom.find((s) => s.kind === "watch");
+  assert.equal(watchStepCustom.durationMs, 3000);
 });

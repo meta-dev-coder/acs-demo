@@ -253,6 +253,44 @@ test('UC1-FLOW: ?uc1=1 auto-enters demo -> hero WO context -> evaluate -> 3 rank
 
   await shoot(page, 'uc1-flow-2-window-panel');
 
+  // ---- Phase 4 (deck-parity item 1): debug-hook extension — window.__uc1Windows now also
+  // exposes a small sample of the winning window's result.timeseries (Phase 2 data). ----
+  const uc1WindowsDebug = await page.evaluate(() => (window as any).__uc1Windows);
+  expect(uc1WindowsDebug.count).toBe(3);
+  expect(Array.isArray(uc1WindowsDebug.sampleTimeseries)).toBe(true);
+  expect(uc1WindowsDebug.sampleTimeseries.length).toBeGreaterThan(0);
+  expect(typeof uc1WindowsDebug.sampleTimeseries[0].queueVeh).toBe('number');
+  expect(typeof uc1WindowsDebug.sampleTimeseries[0].cumulativeRevenueUsd).toBe('number');
+
+  // ---- Phase 4: per-window SUMO playback — any ranked row can be Played, not just the winner
+  // (the winner's own auto-triggered run at evaluate-time, asserted above via __uc1Step === 4,
+  // stays untouched). Click a NON-winning row's "▶ Play" button and confirm the playback strip
+  // renders and its counters land in a well-formed end state. ----
+  const nonWinnerRow = windowPanel.locator('.uc1-win-row:not(.uc1-win-row-winner)').first();
+  await expect(nonWinnerRow).toBeVisible();
+  await nonWinnerRow.locator('.uc1-win-play-btn').click();
+
+  const playbackStrip = windowPanel.locator('.uc1-win-playback');
+  await expect(playbackStrip).toBeVisible();
+  await expect(playbackStrip).not.toHaveClass(/hidden/);
+
+  // Playback runs over the surrogate duration (config default 8000ms) — wait for the progress
+  // bar to reach the end, then assert the counters landed on a well-formed end state
+  // (deterministic end-state contract per the plan, rather than racing a mid-animation snapshot).
+  await page.waitForFunction(
+    () => {
+      const el = document.querySelector('#uc1-window-panel .uc1-win-playback [data-role="bar"]') as HTMLElement | null;
+      return !!el && el.style.width === '100%';
+    },
+    { timeout: 15_000 },
+  );
+  const revenueAfter = await playbackStrip.locator('[data-role="revenue"]').textContent();
+  expect(revenueAfter).toMatch(/^\$[\d,]+$/);
+  const queueAfter = await playbackStrip.locator('[data-role="queue"]').textContent();
+  expect(queueAfter).toMatch(/^\d+/);
+
+  await shoot(page, 'uc1-flow-2e-playback');
+
   // ---- P5-e item 1: "Why trust this?" -> backtest tab renders the honesty line verbatim ----
   const trustBtn = page.locator('#uc1-trust-btn');
   await expect(trustBtn).toBeVisible();

@@ -16,6 +16,7 @@ import {
   blendedClosureRate,
   revenueAtRisk,
   closedCapacityVph,
+  buildWindowTimeseries,
 } from "../src/windowEval.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -214,6 +215,31 @@ test("revenueAtRisk: zero when demand never exceeds closed capacity", () => {
   assert.equal(r.high, 0);
 });
 
+test("revenueAtRisk: perSlice length matches input slices, and sum(perSlice.revenueUsd) === point", () => {
+  const config = { revenueUncertaintyBand: 0.15 };
+  const capacityVph = 2000;
+  const sliceH = 0.25;
+  const slices = [{ demandVph: 3000 }, { demandVph: 3500 }, { demandVph: 1000 }];
+  const tollRateUsd = 2.5;
+
+  const r = revenueAtRisk(config, slices, sliceH, capacityVph, tollRateUsd);
+
+  assert.equal(r.perSlice.length, slices.length);
+  const sum = r.perSlice.reduce((a, s) => a + s.revenueUsd, 0);
+  assert.ok(Math.abs(sum - r.point) < 1e-9, `sum(perSlice.revenueUsd) ${sum} should equal point ${r.point}`);
+});
+
+test("revenueAtRisk: perSlice entries are zero when demand never exceeds capacity", () => {
+  const config = { revenueUncertaintyBand: 0.15 };
+  const slices = [{ demandVph: 500 }, { demandVph: 900 }];
+  const r = revenueAtRisk(config, slices, 0.25, 2000, 2.5);
+  assert.equal(r.perSlice.length, 2);
+  for (const s of r.perSlice) {
+    assert.equal(s.excessVehicles, 0);
+    assert.equal(s.revenueUsd, 0);
+  }
+});
+
 // ---- candidateWindows heuristic -----------------------------------------------------------------
 
 test("candidateWindows: returns 3 windows on the correct day types, all after fromDate", () => {
@@ -285,4 +311,124 @@ test("evaluateWindow: lane availability % and result shape", () => {
   assert.ok(Number.isFinite(result.score));
   assert.equal(typeof result.revenueAtRiskUsd.point, "number");
   assert.equal(typeof result.secondaryCrashExposure, "number");
+});
+
+// ---- buildWindowTimeseries: per-slice playback data (UC1 deck-parity item 1, Phase 2) -----------
+
+function fixtureSlicesAndRevenue() {
+  const config = { revenueUncertaintyBand: 0.15 };
+  const capacityVph = 2000;
+  const sliceH = 0.25;
+  const demandsVph = [1000, 3000, 3500, 500];
+  const rilca = rilcaSliceQueue(demandsVph, capacityVph, sliceH);
+  const revenue = revenueAtRisk(config, rilca.slices, sliceH, capacityVph, 2.5);
+  return { rilca, revenue };
+}
+
+test("buildWindowTimeseries: one row per slice, in order, sliceIndex 0..n-1", () => {
+  const { rilca, revenue } = fixtureSlicesAndRevenue();
+  const ts = buildWindowTimeseries(rilca.slices, revenue.perSlice);
+  assert.equal(ts.length, rilca.slices.length);
+  ts.forEach((row, i) => assert.equal(row.sliceIndex, i));
+});
+
+test("buildWindowTimeseries: cumulativeRevenueUsd is monotonically non-decreasing, ends === sum of revenueUsd", () => {
+  const { rilca, revenue } = fixtureSlicesAndRevenue();
+  const ts = buildWindowTimeseries(rilca.slices, revenue.perSlice);
+  let prev = -Infinity;
+  let sum = 0;
+  for (const row of ts) {
+    assert.ok(row.cumulativeRevenueUsd >= prev - 1e-9, "cumulativeRevenueUsd must be non-decreasing");
+    prev = row.cumulativeRevenueUsd;
+    sum += row.revenueUsd;
+  }
+  assert.ok(Math.abs(ts[ts.length - 1].cumulativeRevenueUsd - sum) < 1e-9);
+});
+
+test("buildWindowTimeseries: cumulativeDelayVehHours monotonically non-decreasing, ends === rilcaSliceQueue()'s totalDelayVehHours", () => {
+  const { rilca, revenue } = fixtureSlicesAndRevenue();
+  const ts = buildWindowTimeseries(rilca.slices, revenue.perSlice);
+  let prev = -Infinity;
+  for (const row of ts) {
+    assert.ok(row.cumulativeDelayVehHours >= prev - 1e-9, "cumulativeDelayVehHours must be non-decreasing");
+    prev = row.cumulativeDelayVehHours;
+  }
+  assert.ok(Math.abs(ts[ts.length - 1].cumulativeDelayVehHours - rilca.totalDelayVehHours) < 1e-9);
+});
+
+test("buildWindowTimeseries: throughputPct is 100 (not NaN) for a slice with zero arrivals", () => {
+  const config = { revenueUncertaintyBand: 0.15 };
+  const capacityVph = 2000;
+  const sliceH = 0.25;
+  const demandsVph = [0, 3000];
+  const rilca = rilcaSliceQueue(demandsVph, capacityVph, sliceH);
+  const revenue = revenueAtRisk(config, rilca.slices, sliceH, capacityVph, 2.5);
+  const ts = buildWindowTimeseries(rilca.slices, revenue.perSlice);
+  assert.equal(ts[0].throughputPct, 100);
+  assert.ok(Number.isFinite(ts[0].throughputPct));
+});
+
+test("evaluateWindow: result.timeseries present, same length as result.queue.slices, last cumulativeRevenueUsd ≈ result.revenueAtRiskUsd.point", () => {
+  const config = loadConfig();
+  const demandFn = () => [500, 3000, 3500, 900, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500];
+  const evaluator = createWindowEvaluator({ config, segments: SEGMENTS, incidents: [], demandFn });
+  const window = { start: new Date("2026-07-13T23:00:00"), durationHours: 4 };
+  const result = evaluator.evaluateWindow("east", { lanesClosed: 1 }, window);
+
+  assert.ok(Array.isArray(result.timeseries));
+  assert.equal(result.timeseries.length, result.queue.slices.length);
+  const lastCum = result.timeseries[result.timeseries.length - 1].cumulativeRevenueUsd;
+  assert.ok(
+    Math.abs(lastCum - result.revenueAtRiskUsd.point) < 1e-6,
+    `last cumulativeRevenueUsd ${lastCum} should equal revenueAtRiskUsd.point ${result.revenueAtRiskUsd.point}`
+  );
+});
+
+// ---- seed_decisions.mjs: buildDecision() matches a direct evaluateWindow() call ---------------
+// Deck-parity Phase 1 (item 5, "seed revenue $0" fix). Extra imports live down here (rather than
+// the top import block) so this append-only addition can't collide with concurrent edits to this
+// file's existing imports — ES module `import` declarations are hoisted regardless of position.
+
+import { createDemandModel } from "../src/demand.js";
+import { buildDecision } from "../../tools/seed_decisions.mjs";
+
+test("seed_decisions.mjs: buildDecision() output matches evaluateWindow() for a known fixture row", () => {
+  const config = loadConfig();
+  const segments = SEGMENTS;
+  const incidents = [closureIncident("East Segment", "Yes", 4), closureIncident("West Segment", "Yes", 2)];
+
+  const demandModel = createDemandModel(undefined, segments);
+  const demandFn = (segmentId, window) => demandModel.getWindowDemand(segmentId, window.start, window.durationHours);
+  const evaluator = createWindowEvaluator({ config, segments, incidents, demandFn });
+
+  // 08:00 UTC on a weekday lands inside demandProfile.json's AM peak (7-9) — chosen deliberately
+  // so this fixture's revenue-at-risk isn't trivially zero (a regression here would previously
+  // have been masked by the seed-script bug that made everything zero).
+  const row = {
+    incident_id: "INC-TEST-0001",
+    incident_date: "2024-05-27T00:00:00",
+    incident_time: "08:00",
+    Segment: "East Segment",
+    lane_closure_duration_hours: 4,
+    damaged_asset_id: "999",
+  };
+
+  const decision = buildDecision(row, segments, config, evaluator);
+
+  const segment = segments.find((s) => s.name === "East Segment");
+  const window = { start: new Date(Date.UTC(2024, 4, 27, 8, 0, 0)), durationHours: 4 };
+  const direct = evaluator.evaluateWindow(segment.id, { totalLanes: segment.laneCount, openLanes: segment.laneCount - 1 }, window);
+
+  assert.equal(decision.segmentId, direct.segmentId);
+  assert.equal(decision.openLanes, direct.openLanes);
+  assert.equal(decision.totalLanes, direct.totalLanes);
+  assert.equal(decision.closedCapacityVph, direct.closedCapacityVph);
+  assert.ok(Math.abs(decision.revenueAtRiskUsd.point - direct.revenueAtRiskUsd.point) < 0.01);
+  assert.ok(Math.abs(decision.queue.avgDelayMin - direct.queue.avgDelayMin) < 0.01);
+  assert.ok(Math.abs(decision.secondaryCrashExposure - direct.secondaryCrashExposure) < 0.0001);
+  assert.ok(Math.abs(decision.score - direct.score) < 0.0001);
+  assert.ok(decision.revenueAtRiskUsd.point > 0, "fixture chosen to land in a peak window so revenue isn't trivially zero");
+  assert.equal(decision.seeded, true);
+  assert.equal(decision.source, "2024-26 closure history");
+  assert.equal(decision.id, "SEED-DEC-INC-TEST-0001");
 });

@@ -18,8 +18,20 @@
  *   The one derived metric this module needs but doesn't own the math for ("throughput vs
  *   demand") is imported from windowAssembly.js's throughputVsDemandPct() and computed per
  *   result here rather than reimplemented — this module stays a pure renderer.
+ *
+ *   onPlay(window, result, rank) — NEW, additive 4th param (Phase 3, deck-parity item 1). Invoked
+ *   when a row's "▶ Play" button is clicked; left un-called (buttons still render, inert) if
+ *   omitted, same discipline as onSchedule. Independently of onPlay firing, this module owns the
+ *   playback strip's own rAF loop (mirrors main.js's _animateRevCounter) — onPlay is the caller's
+ *   hook for side effects (e.g. driving the real live-SUMO overlay in Phase 4), never required for
+ *   the strip's counters/scrubber to animate.
+ *
+ *   data.isLiveConnected: boolean, read by windowPlayback.js's playbackModeLabel() for the strip's
+ *   honest "Live SUMO" vs. "Surrogate playback" mode badge (design directive: never conflate the
+ *   two — this module never claims "live" unless the caller says so).
  *--------------------------------------------------------------------------------------------*/
 import { throughputVsDemandPct } from "./windowAssembly.js";
+import { computePlaybackFrame, surrogatePlaybackDurationMs, playbackModeLabel, clampProgress } from "./windowPlayback.js";
 
 function esc(v) {
   return String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -84,6 +96,23 @@ const SPARK_W = 300;
 const SPARK_H = 56;
 const SPARK_PAD = 6;
 
+/** Shared hour-of-day -> x-coordinate scale, module-level so the playback scrubber's playhead
+ * (added below the sparkline's own polylines) can position itself on the exact same axis the
+ * sparkline draws on — "the table and the curve read as one instrument" (design directive). */
+function sparkX(hour) {
+  return SPARK_PAD + (hour / 24) * (SPARK_W - 2 * SPARK_PAD);
+}
+
+/** hourOfDay position (0-24, wrapped) for a continuous slice-position within `window` — the
+ * playback analog of sliceHourOfDay() above, but for a fractional (not integer) slice index so
+ * the scrubber can sweep smoothly between slices. */
+function continuousHourOfDay(window, sliceCount, continuousSliceIndex) {
+  if (!sliceCount) return window.start.getHours() + window.start.getMinutes() / 60;
+  const sliceHours = window.durationHours / sliceCount;
+  const startHour = window.start.getHours() + window.start.getMinutes() / 60;
+  return (((startHour + continuousSliceIndex * sliceHours) % 24) + 24) % 24;
+}
+
 /** hourOfDay for slice `i` of `window`, wrapped into [0, 24) — window.start's LOCAL hour is the
  * anchor (matches candidateWindows()'s local wall-clock heuristics; see windowAssembly.js's
  * header on why demand.js's UTC-hour reads are reconciled to that same wall clock). */
@@ -106,7 +135,7 @@ function sparklineSvg(windows, results) {
   const allVph = series.flatMap((s) => s.points.map((p) => p.vph));
   const maxVph = Math.max(1, ...allVph);
 
-  const x = (hour) => SPARK_PAD + (hour / 24) * (SPARK_W - 2 * SPARK_PAD);
+  const x = sparkX;
   const y = (vph) => SPARK_H - SPARK_PAD - (vph / maxVph) * (SPARK_H - 2 * SPARK_PAD);
 
   const polylines = series
@@ -121,11 +150,14 @@ function sparklineSvg(windows, results) {
     .map((s) => `<span class="uc1-win-legend-item"><span class="uc1-win-legend-dot" style="background:${s.color}"></span>${esc(s.id)}</span>`)
     .join("");
 
+  // Playhead: hidden (opacity 0) until playback starts; windowPanel.js's play loop repositions it
+  // via its x1/x2 attrs (never CSS transform, so it stays crisp against the viewBox's own scale).
   return `
     <div class="uc1-win-sparkline">
       <svg viewBox="0 0 ${SPARK_W} ${SPARK_H}" preserveAspectRatio="none" role="img" aria-label="Segment demand by hour of day for the 3 candidate windows">
         <line x1="${SPARK_PAD}" y1="${SPARK_H - SPARK_PAD}" x2="${SPARK_W - SPARK_PAD}" y2="${SPARK_H - SPARK_PAD}" stroke="rgba(255,255,255,0.15)" stroke-width="1" />
         ${polylines}
+        <line class="uc1-win-playhead" x1="${SPARK_PAD}" y1="0" x2="${SPARK_PAD}" y2="${SPARK_H}" stroke="var(--uc1-accent, #e8963c)" stroke-width="1.5" opacity="0" />
       </svg>
       <div class="uc1-win-legend">${legend}</div>
     </div>`;
@@ -147,9 +179,10 @@ function tableRowHtml(window, result, rank, isWinner, allResults, idx) {
       <td>
         <div class="uc1-win-label" style="color:${colorForWindow(window.id)}">${esc(window.label || window.id)}</div>
         <div class="uc1-win-sub">${esc(fmtHourLabel(window.start))} &middot; ${esc(window.durationHours)}h</div>
+        ${isWinner ? `<div class="uc1-win-winner-tag">Cheapest safe window</div>` : ""}
       </td>
       <td class="uc1-win-cell ${relativeBand(revenueVals, idx)}">
-        <div>${fmtUsd(revenue.point)}</div>
+        <div class="${isWinner ? "uc1-win-money-shot" : ""}">${fmtUsd(revenue.point)}</div>
         ${bandPct != null ? `<div class="uc1-win-sub">&plusmn;${bandPct}% ($${Math.round(revenue.low ?? 0).toLocaleString()}&ndash;$${Math.round(revenue.high ?? 0).toLocaleString()})</div>` : ""}
       </td>
       <td class="uc1-win-cell ${relativeBand(delayVals, idx)}">${fmtMin(result.queue?.avgDelayMin)}</td>
@@ -157,22 +190,174 @@ function tableRowHtml(window, result, rank, isWinner, allResults, idx) {
       <td class="uc1-win-cell">${fmtPct(result.laneAvailabilityPct)}</td>
       <td class="uc1-win-cell ${relativeBand(exposureVals, idx)}">${(result.secondaryCrashExposure ?? 0).toFixed(2)}</td>
       <td class="uc1-win-cell uc1-win-score">${fmtScore(result.score)}</td>
-      <td><button type="button" class="uc1-win-schedule-btn" data-window-id="${esc(window.id)}">Schedule this window</button></td>
+      <td class="uc1-win-actions">
+        <button type="button" class="uc1-win-play-btn" data-window-id="${esc(window.id)}" aria-label="Play ${esc(window.label || window.id)}">&#9654; Play</button>
+        <button type="button" class="uc1-win-schedule-btn" data-window-id="${esc(window.id)}">Schedule this window</button>
+      </td>
     </tr>`;
 }
 
+// ---- playback strip: play button per row, scrubber on the sparkline, 3 animated counters ------
+
+function fmtVeh(n) {
+  if (typeof n !== "number" || !Number.isFinite(n)) return "—";
+  return Math.round(n).toLocaleString();
+}
+
+/** Module-level "one playback at a time" handle — stopped whenever a new Play starts or the panel
+ * re-renders (mirrors main.js's single _revRafId discipline, applied to this module's own loop
+ * instead of duplicating rAF-cancellation logic in every caller). */
+let _uc1Playback = null;
+
+function stopUc1Playback() {
+  if (!_uc1Playback) return;
+  if (_uc1Playback.rafId != null) cancelAnimationFrame(_uc1Playback.rafId);
+  if (_uc1Playback.timeoutId != null) clearTimeout(_uc1Playback.timeoutId);
+  _uc1Playback = null;
+}
+
+function prefersReducedMotion() {
+  try {
+    return typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  } catch {
+    return false;
+  }
+}
+
+/** Renders the (initially hidden) playback strip shell — filled in by startUc1Playback() once a
+ * row's Play button is clicked. One shared strip per panel (not one per row) since only one
+ * window plays at a time; it sits directly under the sparkline so scrubber + counters + the
+ * demand curve above read as one instrument (design directive). */
+function playbackStripHtml() {
+  return `
+    <div class="uc1-win-playback hidden" aria-live="polite">
+      <div class="uc1-win-playback-head">
+        <span class="uc1-win-playback-mode"></span>
+        <span class="uc1-win-playback-title"></span>
+        <button type="button" class="uc1-win-playback-stop" aria-label="Stop playback">&times;</button>
+      </div>
+      <div class="uc1-win-playback-counters">
+        <div class="uc1-win-playback-counter">
+          <div class="uc1-win-playback-counter-label">Queue</div>
+          <div class="uc1-win-playback-counter-val" data-role="queue">0</div>
+        </div>
+        <div class="uc1-win-playback-counter">
+          <div class="uc1-win-playback-counter-label">Avg delay so far</div>
+          <div class="uc1-win-playback-counter-val" data-role="delay">0.0 min</div>
+        </div>
+        <div class="uc1-win-playback-counter">
+          <div class="uc1-win-playback-counter-label">Revenue at risk so far</div>
+          <div class="uc1-win-playback-counter-val" data-role="revenue">$0</div>
+        </div>
+      </div>
+      <div class="uc1-win-playback-bar"><div class="uc1-win-playback-bar-fill" data-role="bar"></div></div>
+    </div>`;
+}
+
 /**
- * renderWindowPanel(containerEl, data, onSchedule)
+ * startUc1Playback(containerEl, window, result, config, isLiveConnected, onPlay, rank)
  *
- * data = { workOrder, windows, results, winnerIdx } — windowAssembly.js's evaluateCandidates()
- * shape, unmodified; the "throughput vs demand" column is derived per-row via
+ * Owns the rAF loop (mirrors main.js's _animateRevCounter): advances progressFrac from 0 to 1
+ * over surrogatePlaybackDurationMs(config) ms, calling computePlaybackFrame() each tick and
+ * writing the 3 counters + the sparkline playhead + the progress bar. Stops any in-flight loop
+ * first (one-animation-at-a-time). Falls back to discrete stepped updates (one jump per
+ * timeseries slice, via setTimeout) under prefers-reduced-motion, per design directive.
+ */
+function startUc1Playback(containerEl, window_, result, config, isLiveConnected, onPlay, rank) {
+  stopUc1Playback();
+
+  const strip = containerEl.querySelector(".uc1-win-playback");
+  const svg = containerEl.querySelector(".uc1-win-sparkline svg");
+  if (!strip) return;
+
+  const modeEl = strip.querySelector(".uc1-win-playback-mode");
+  const titleEl = strip.querySelector(".uc1-win-playback-title");
+  const queueEl = strip.querySelector('[data-role="queue"]');
+  const delayEl = strip.querySelector('[data-role="delay"]');
+  const revenueEl = strip.querySelector('[data-role="revenue"]');
+  const barEl = strip.querySelector('[data-role="bar"]');
+  const playhead = svg ? svg.querySelector(".uc1-win-playhead") : null;
+
+  const { mode, label } = playbackModeLabel(!!isLiveConnected);
+  if (modeEl) {
+    modeEl.textContent = mode === "live" ? "LIVE" : "SURROGATE";
+    modeEl.className = `uc1-win-playback-mode uc1-win-playback-mode-${mode}`;
+    modeEl.title = label;
+  }
+  if (titleEl) titleEl.textContent = `Playing: ${window_.label || window_.id}`;
+  strip.classList.remove("hidden");
+
+  const sliceCount = Array.isArray(result?.timeseries) ? result.timeseries.length : 0;
+  const totalMs = surrogatePlaybackDurationMs(config);
+
+  const paint = (progressFrac) => {
+    const frame = computePlaybackFrame(result, progressFrac);
+    if (queueEl) queueEl.textContent = fmtVeh(frame.queueVeh);
+    if (delayEl) delayEl.textContent = fmtMin(frame.avgDelayMinSoFar);
+    if (revenueEl) revenueEl.textContent = fmtUsd(frame.cumulativeRevenueLossUsd);
+    if (barEl) barEl.style.width = `${clampProgress(progressFrac) * 100}%`;
+    if (playhead) {
+      const hour = continuousHourOfDay(window_, sliceCount, clampProgress(progressFrac) * sliceCount);
+      const xPos = sparkX(hour);
+      playhead.setAttribute("x1", xPos.toFixed(1));
+      playhead.setAttribute("x2", xPos.toFixed(1));
+      playhead.setAttribute("opacity", "1");
+    }
+  };
+
+  if (typeof onPlay === "function") onPlay(window_, result, rank);
+
+  if (prefersReducedMotion() && sliceCount > 0) {
+    // Stepped fallback: one discrete jump per slice, no continuous rAF interpolation.
+    let step = 0;
+    const stepMs = Math.max(200, totalMs / sliceCount);
+    const tick = () => {
+      paint(step / sliceCount);
+      step += 1;
+      if (step <= sliceCount) {
+        _uc1Playback = { timeoutId: setTimeout(tick, stepMs) };
+      } else {
+        _uc1Playback = null;
+      }
+    };
+    paint(0);
+    _uc1Playback = { timeoutId: setTimeout(tick, stepMs) };
+    return;
+  }
+
+  const startTs = performance.now();
+  const frame = (now) => {
+    const elapsed = now - startTs;
+    const progressFrac = totalMs > 0 ? elapsed / totalMs : 1;
+    paint(progressFrac);
+    if (progressFrac < 1) {
+      _uc1Playback = { rafId: requestAnimationFrame(frame) };
+    } else {
+      _uc1Playback = null;
+    }
+  };
+  paint(0);
+  _uc1Playback = { rafId: requestAnimationFrame(frame) };
+}
+
+/**
+ * renderWindowPanel(containerEl, data, onSchedule, onPlay)
+ *
+ * data = { workOrder, windows, results, winnerIdx, config, isLiveConnected } —
+ * windowAssembly.js's evaluateCandidates() shape plus two additive fields this phase reads:
+ * `config` (windowConfig.json, for surrogatePlaybackDurationMs()) and `isLiveConnected` (for the
+ * playback strip's honest mode badge). The "throughput vs demand" column is derived per-row via
  * windowAssembly.js's throughputVsDemandPct().
  *
  * No-ops (clears + hides) when containerEl or data is missing/empty, same defensive posture as
  * contextPanel.js's renderWorkOrderContext(). Rows render sorted by score ascending (best first);
  * the lowest-scoring row (data.winnerIdx) is starred and highlighted regardless of table position.
+ *
+ * onPlay(window, result, rank) — optional 4th param, invoked when a row's "▶ Play" button fires
+ * (see module header). Any row can be played, not just the winner; playing never auto-schedules.
  */
-export function renderWindowPanel(containerEl, data, onSchedule) {
+export function renderWindowPanel(containerEl, data, onSchedule, onPlay) {
+  stopUc1Playback();
   if (!containerEl) return;
   const windows = data?.windows || [];
   const results = data?.results || [];
@@ -198,6 +383,7 @@ export function renderWindowPanel(containerEl, data, onSchedule) {
     <div class="dc-panel-h">Lane-closure window options</div>
     <div class="dc-panel-sub">${wo ? `${esc(wo.id)} &middot; ${esc(wo.segment || "Unspecified segment")}` : "3 system-suggested windows"}</div>
     ${sparklineSvg(windows, results)}
+    ${playbackStripHtml()}
     <div class="uc1-win-table-wrap">
       <table class="uc1-win-table">
         <thead>
@@ -220,7 +406,12 @@ export function renderWindowPanel(containerEl, data, onSchedule) {
   `;
 
   const closeBtn = containerEl.querySelector(".dc-panel-close");
-  if (closeBtn) closeBtn.onclick = () => containerEl.classList.add("hidden");
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      stopUc1Playback();
+      containerEl.classList.add("hidden");
+    };
+  }
 
   containerEl.querySelectorAll(".uc1-win-schedule-btn").forEach((btn) => {
     btn.onclick = () => {
@@ -231,4 +422,25 @@ export function renderWindowPanel(containerEl, data, onSchedule) {
       if (typeof onSchedule === "function") onSchedule(windows[idx], results[idx], rank);
     };
   });
+
+  containerEl.querySelectorAll(".uc1-win-play-btn").forEach((btn) => {
+    btn.onclick = () => {
+      const windowId = btn.getAttribute("data-window-id");
+      const idx = windows.findIndex((w) => w.id === windowId);
+      if (idx < 0) return;
+      const rank = order.indexOf(idx) + 1;
+      startUc1Playback(containerEl, windows[idx], results[idx], data.config, data.isLiveConnected, onPlay, rank);
+    };
+  });
+
+  const stopBtn = containerEl.querySelector(".uc1-win-playback-stop");
+  if (stopBtn) {
+    stopBtn.onclick = () => {
+      stopUc1Playback();
+      const strip = containerEl.querySelector(".uc1-win-playback");
+      if (strip) strip.classList.add("hidden");
+      const playhead = containerEl.querySelector(".uc1-win-playhead");
+      if (playhead) playhead.setAttribute("opacity", "0");
+    };
+  }
 }

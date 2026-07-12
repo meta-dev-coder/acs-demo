@@ -7,22 +7,22 @@
     "segmentName": "Central Segment",
     "window": {
       "start": "2024-05-27T04:00:00",
-      "durationHours": 7.0
+      "durationHours": 7
     },
     "openLanes": 2,
     "totalLanes": 3,
-    "closedCapacityVph": 2880.0,
+    "closedCapacityVph": 2880,
     "revenueAtRiskUsd": {
-      "point": 0.0,
-      "low": 0.0,
-      "high": 0.0,
+      "point": 11243.7,
+      "low": 9557.14,
+      "high": 12930.25,
       "band": 0.15
     },
     "queue": {
-      "avgDelayMin": 0.0
+      "avgDelayMin": 40.04
     },
-    "secondaryCrashExposure": 0.3704,
-    "score": 0.1111,
+    "secondaryCrashExposure": 9.5489,
+    "score": 4.256,
     "decidedAt": "2024-05-27T04:00:00",
     "incidentId": "INC-200014",
     "seeded": true,
@@ -36,22 +36,22 @@
     "segmentName": "East Segment",
     "window": {
       "start": "2024-06-24T16:45:00",
-      "durationHours": 7.0
+      "durationHours": 7
     },
     "openLanes": 2,
     "totalLanes": 3,
-    "closedCapacityVph": 2880.0,
+    "closedCapacityVph": 2880,
     "revenueAtRiskUsd": {
-      "point": 0.0,
-      "low": 0.0,
-      "high": 0.0,
+      "point": 15502.5,
+      "low": 13177.13,
+      "high": 17827.88,
       "band": 0.15
     },
     "queue": {
-      "avgDelayMin": 0.0
+      "avgDelayMin": 77.04
     },
-    "secondaryCrashExposure": 0.4116,
-    "score": 0.1235,
+    "secondaryCrashExposure": 8.8992,
+    "score": 4.7336,
     "decidedAt": "2024-06-24T16:45:00",
     "incidentId": "INC-200017",
     "seeded": true,
@@ -65,22 +65,22 @@
     "segmentName": "East Segment",
     "window": {
       "start": "2024-08-03T06:15:00",
-      "durationHours": 5.0
+      "durationHours": 5
     },
     "openLanes": 2,
     "totalLanes": 3,
-    "closedCapacityVph": 2880.0,
+    "closedCapacityVph": 2880,
     "revenueAtRiskUsd": {
-      "point": 0.0,
-      "low": 0.0,
-      "high": 0.0,
+      "point": 199.69,
+      "low": 169.73,
+      "high": 229.64,
       "band": 0.15
     },
     "queue": {
-      "avgDelayMin": 0.0
+      "avgDelayMin": 0.08
     },
-    "secondaryCrashExposure": 0.294,
-    "score": 0.0882,
+    "secondaryCrashExposure": 3.2566,
+    "score": 0.9975,
     "decidedAt": "2024-08-03T06:15:00",
     "incidentId": "INC-200016",
     "seeded": true,
@@ -98,18 +98,18 @@
     },
     "openLanes": 2,
     "totalLanes": 3,
-    "closedCapacityVph": 2880.0,
+    "closedCapacityVph": 2880,
     "revenueAtRiskUsd": {
-      "point": 0.0,
-      "low": 0.0,
-      "high": 0.0,
+      "point": 11243.7,
+      "low": 9557.14,
+      "high": 12930.25,
       "band": 0.15
     },
     "queue": {
-      "avgDelayMin": 0.0
+      "avgDelayMin": 34.76
     },
-    "secondaryCrashExposure": 0.1852,
-    "score": 0.0556,
+    "secondaryCrashExposure": 3.7443,
+    "score": 2.4794,
     "decidedAt": "2024-08-22T06:30:00",
     "incidentId": "INC-200073",
     "seeded": true,
@@ -127,18 +127,18 @@
     },
     "openLanes": 2,
     "totalLanes": 3,
-    "closedCapacityVph": 2880.0,
+    "closedCapacityVph": 2880,
     "revenueAtRiskUsd": {
-      "point": 0.0,
-      "low": 0.0,
-      "high": 0.0,
+      "point": 0,
+      "low": 0,
+      "high": 0,
       "band": 0.15
     },
     "queue": {
-      "avgDelayMin": 0.0
+      "avgDelayMin": 0
     },
-    "secondaryCrashExposure": 0.0294,
-    "score": 0.0088,
+    "secondaryCrashExposure": 0.0406,
+    "score": 0.0122,
     "decidedAt": "2024-10-24T20:00:00",
     "incidentId": "INC-200039",
     "seeded": true,
@@ -156,18 +156,18 @@
     },
     "openLanes": 2,
     "totalLanes": 3,
-    "closedCapacityVph": 2880.0,
+    "closedCapacityVph": 2880,
     "revenueAtRiskUsd": {
-      "point": 0.0,
-      "low": 0.0,
-      "high": 0.0,
+      "point": 0,
+      "low": 0,
+      "high": 0,
       "band": 0.15
     },
     "queue": {
-      "avgDelayMin": 0.0
+      "avgDelayMin": 0
     },
-    "secondaryCrashExposure": 0.0152,
-    "score": 0.0046,
+    "secondaryCrashExposure": 0.0133,
+    "score": 0.004,
     "decidedAt": "2024-11-27T11:30:00",
     "incidentId": "INC-200074",
     "seeded": true,
@@ -185,18 +185,18 @@
     },
     "openLanes": 2,
     "totalLanes": 3,
-    "closedCapacityVph": 2880.0,
+    "closedCapacityVph": 2880,
     "revenueAtRiskUsd": {
-      "point": 0.0,
-      "low": 0.0,
-      "high": 0.0,
+      "point": 6525,
+      "low": 5546.25,
+      "high": 7503.75,
       "band": 0.15
     },
     "queue": {
-      "avgDelayMin": 0.0
+      "avgDelayMin": 16.95
     },
-    "secondaryCrashExposure": 0.0809,
-    "score": 0.0243,
+    "secondaryCrashExposure": 0.5724,
+    "score": 0.9372,
     "decidedAt": "2025-01-03T16:45:00",
     "incidentId": "INC-200056",
     "seeded": true,
@@ -214,18 +214,18 @@
     },
     "openLanes": 2,
     "totalLanes": 3,
-    "closedCapacityVph": 2880.0,
+    "closedCapacityVph": 2880,
     "revenueAtRiskUsd": {
-      "point": 0.0,
-      "low": 0.0,
-      "high": 0.0,
+      "point": 0,
+      "low": 0,
+      "high": 0,
       "band": 0.15
     },
     "queue": {
-      "avgDelayMin": 0.0
+      "avgDelayMin": 0
     },
-    "secondaryCrashExposure": 0.2058,
-    "score": 0.0617,
+    "secondaryCrashExposure": 0.3108,
+    "score": 0.0932,
     "decidedAt": "2025-03-22T01:45:00",
     "incidentId": "INC-200015",
     "seeded": true,
@@ -239,22 +239,22 @@
     "segmentName": "East Segment",
     "window": {
       "start": "2025-04-05T04:30:00",
-      "durationHours": 7.0
+      "durationHours": 7
     },
     "openLanes": 2,
     "totalLanes": 3,
-    "closedCapacityVph": 2880.0,
+    "closedCapacityVph": 2880,
     "revenueAtRiskUsd": {
-      "point": 0.0,
-      "low": 0.0,
-      "high": 0.0,
+      "point": 352.69,
+      "low": 299.78,
+      "high": 405.59,
       "band": 0.15
     },
     "queue": {
-      "avgDelayMin": 0.0
+      "avgDelayMin": 0.21
     },
-    "secondaryCrashExposure": 0.4116,
-    "score": 0.1235,
+    "secondaryCrashExposure": 5.364,
+    "score": 1.6458,
     "decidedAt": "2025-04-05T04:30:00",
     "incidentId": "INC-200045",
     "seeded": true,
@@ -268,22 +268,22 @@
     "segmentName": "East Segment",
     "window": {
       "start": "2025-05-13T18:00:00",
-      "durationHours": 1.0
+      "durationHours": 1
     },
     "openLanes": 2,
     "totalLanes": 3,
-    "closedCapacityVph": 2880.0,
+    "closedCapacityVph": 2880,
     "revenueAtRiskUsd": {
-      "point": 0.0,
-      "low": 0.0,
-      "high": 0.0,
+      "point": 5400,
+      "low": 4590,
+      "high": 6210,
       "band": 0.15
     },
     "queue": {
-      "avgDelayMin": 0.0
+      "avgDelayMin": 12.86
     },
-    "secondaryCrashExposure": 0.0588,
-    "score": 0.0176,
+    "secondaryCrashExposure": 0.3171,
+    "score": 0.7209,
     "decidedAt": "2025-05-13T18:00:00",
     "incidentId": "INC-200040",
     "seeded": true,
@@ -297,22 +297,22 @@
     "segmentName": "West Segment",
     "window": {
       "start": "2025-06-19T23:15:00",
-      "durationHours": 7.0
+      "durationHours": 7
     },
     "openLanes": 2,
     "totalLanes": 3,
-    "closedCapacityVph": 2880.0,
+    "closedCapacityVph": 2880,
     "revenueAtRiskUsd": {
-      "point": 0.0,
-      "low": 0.0,
-      "high": 0.0,
+      "point": 0,
+      "low": 0,
+      "high": 0,
       "band": 0.15
     },
     "queue": {
-      "avgDelayMin": 0.0
+      "avgDelayMin": 0
     },
-    "secondaryCrashExposure": 0.2127,
-    "score": 0.0638,
+    "secondaryCrashExposure": 0.7728,
+    "score": 0.2318,
     "decidedAt": "2025-06-19T23:15:00",
     "incidentId": "INC-200080",
     "seeded": true,
@@ -326,22 +326,22 @@
     "segmentName": "East Segment",
     "window": {
       "start": "2025-07-23T02:45:00",
-      "durationHours": 5.0
+      "durationHours": 5
     },
     "openLanes": 2,
     "totalLanes": 3,
-    "closedCapacityVph": 2880.0,
+    "closedCapacityVph": 2880,
     "revenueAtRiskUsd": {
-      "point": 0.0,
-      "low": 0.0,
-      "high": 0.0,
+      "point": 5643,
+      "low": 4796.55,
+      "high": 6489.45,
       "band": 0.15
     },
     "queue": {
-      "avgDelayMin": 0.0
+      "avgDelayMin": 8.44
     },
-    "secondaryCrashExposure": 0.294,
-    "score": 0.0882,
+    "secondaryCrashExposure": 2.7789,
+    "score": 1.4542,
     "decidedAt": "2025-07-23T02:45:00",
     "incidentId": "INC-200043",
     "seeded": true,
@@ -359,18 +359,18 @@
     },
     "openLanes": 2,
     "totalLanes": 3,
-    "closedCapacityVph": 2880.0,
+    "closedCapacityVph": 2880,
     "revenueAtRiskUsd": {
-      "point": 0.0,
-      "low": 0.0,
-      "high": 0.0,
+      "point": 0,
+      "low": 0,
+      "high": 0,
       "band": 0.15
     },
     "queue": {
-      "avgDelayMin": 0.0
+      "avgDelayMin": 0
     },
-    "secondaryCrashExposure": 0.1852,
-    "score": 0.0556,
+    "secondaryCrashExposure": 0.5224,
+    "score": 0.1567,
     "decidedAt": "2025-08-21T02:45:00",
     "incidentId": "INC-200070",
     "seeded": true,
@@ -384,22 +384,22 @@
     "segmentName": "East Segment",
     "window": {
       "start": "2025-08-27T12:15:00",
-      "durationHours": 2.0
+      "durationHours": 2
     },
     "openLanes": 2,
     "totalLanes": 3,
-    "closedCapacityVph": 2880.0,
+    "closedCapacityVph": 2880,
     "revenueAtRiskUsd": {
-      "point": 0.0,
-      "low": 0.0,
-      "high": 0.0,
+      "point": 0,
+      "low": 0,
+      "high": 0,
       "band": 0.15
     },
     "queue": {
-      "avgDelayMin": 0.0
+      "avgDelayMin": 0
     },
-    "secondaryCrashExposure": 0.1176,
-    "score": 0.0353,
+    "secondaryCrashExposure": 0.444,
+    "score": 0.1332,
     "decidedAt": "2025-08-27T12:15:00",
     "incidentId": "INC-200044",
     "seeded": true,
@@ -417,18 +417,18 @@
     },
     "openLanes": 2,
     "totalLanes": 3,
-    "closedCapacityVph": 2880.0,
+    "closedCapacityVph": 2880,
     "revenueAtRiskUsd": {
-      "point": 0.0,
-      "low": 0.0,
-      "high": 0.0,
+      "point": 6210,
+      "low": 5278.5,
+      "high": 7141.5,
       "band": 0.15
     },
     "queue": {
-      "avgDelayMin": 0.0
+      "avgDelayMin": 16.43
     },
-    "secondaryCrashExposure": 0.0794,
-    "score": 0.0238,
+    "secondaryCrashExposure": 0.7504,
+    "score": 0.9557,
     "decidedAt": "2025-10-15T16:15:00",
     "incidentId": "INC-200013",
     "seeded": true,

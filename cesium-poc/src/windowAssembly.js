@@ -134,3 +134,25 @@ export function throughputVsDemandPct(result) {
   if (totalArrivals <= 0) return 100;
   return (totalDepartures / totalArrivals) * 100;
 }
+
+/**
+ * buildSumoPlaybackPlan(windows, opts) -> flat step list, 3 steps per window (closeLane, watch,
+ * openLane), in window order. UC1 deck-parity item 1 ("per-window SUMO playback"): live_server.py
+ * only has a single shared SIM, so the 3 candidate windows can only be shown one at a time — this
+ * sequences that, it does not attempt simultaneous per-window physics runs (see the plan's
+ * deferred-list note on that scope boundary).
+ *
+ * opts:
+ *   lane            — the AP lane id to close/open (forwarded, not validated here).
+ *   watchMsPerWindow — how long the "watch" step dwells before moving to openLane (ms). Defaults 8000.
+ *   offsetFt/speedMph — forwarded onto the closeLane step for the caller's cone/geometry placement.
+ */
+export function buildSumoPlaybackPlan(windows, { lane, watchMsPerWindow = 8000, offsetFt = 12, speedMph = 60 } = {}) {
+  const plan = [];
+  for (const window of windows || []) {
+    plan.push({ kind: "closeLane", window, lane, offsetFt, speedMph });
+    plan.push({ kind: "watch", window, lane, durationMs: watchMsPerWindow });
+    plan.push({ kind: "openLane", window, lane });
+  }
+  return plan;
+}

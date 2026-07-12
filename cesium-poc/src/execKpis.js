@@ -5,7 +5,7 @@
  * renderer, same split as contextPanel.js/windowPanel.js.
  *
  * Inputs are DECISION RECORDS in either of the two shapes this repo already produces:
- *   - SEED shape (tools/dataconnect-data/decisions_seed.json, tools/seed_decisions.py):
+ *   - SEED shape (tools/dataconnect-data/decisions_seed.json, tools/seed_decisions.mjs):
  *     window.durationHours, revenueAtRiskUsd{point,low,high,band}, queue.avgDelayMin,
  *     secondaryCrashExposure, openLanes/totalLanes, seeded:true, no `rank`.
  *   - LIVE shape (main.js's buildUc1DecisionRecord()): window.durationHours, revenueAtRiskUsd,
@@ -115,9 +115,10 @@ function candidateWorstChosenDelta(entry, decision) {
  * Prefers the exact candidate-set delta when `candidateEntry` is usable. Otherwise falls back to
  * an evidence-only approximation:
  *   - revenue: the evaluator's own recorded uncertainty band (high - point) for the chosen
- *     window. Honestly zero whenever the evaluator itself recorded zero revenue-at-risk (true for
- *     every row in the committed seed file — those closures were all scheduled off-peak, so
- *     demand never exceeded closed capacity).
+ *     window. Honestly zero whenever the evaluator itself recorded zero revenue-at-risk — that's
+ *     a real outcome for closures the evaluator scored as never exceeding closed capacity (mixed
+ *     with non-zero rows in the committed seed file: some historical closures overlapped a peak
+ *     or weekend-midday window, others genuinely didn't; see tools/seed_decisions.mjs).
  *   - delay: not inferable from one window's numbers alone -> 0 (same honesty call as revenue;
  *     matches the trust panel's backtest-tab line that delay/revenue aren't backtested).
  *   - secondary-crash exposure: the share of the recorded exposure attributable to the closed

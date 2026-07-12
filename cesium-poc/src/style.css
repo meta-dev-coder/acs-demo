@@ -496,6 +496,13 @@ html, body, #cesiumContainer, #arcgisContainer {
 .uc1-win-cell.amber { color: #f1a325; }
 .uc1-win-cell.green { color: #43d871; }
 .uc1-win-score { font-weight: 800; color: #f2f5f8; }
+.uc1-win-actions { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.uc1-win-play-btn {
+  font-size: 9px; font-weight: 700; white-space: nowrap; padding: 4px 8px; border-radius: 5px;
+  border: 1px solid rgba(232, 150, 60, 0.4); background: rgba(232, 150, 60, 0.1); color: #e8963c;
+  cursor: pointer;
+}
+.uc1-win-play-btn:hover { background: #e8963c; border-color: #e8963c; color: #141b26; }
 .uc1-win-schedule-btn {
   font-size: 9px; font-weight: 700; white-space: nowrap; padding: 4px 8px; border-radius: 5px;
   border: 1px solid rgba(111, 177, 255, 0.4); background: rgba(111, 177, 255, 0.1); color: #6fb1ff;
@@ -503,6 +510,62 @@ html, body, #cesiumContainer, #arcgisContainer {
 }
 .uc1-win-schedule-btn:hover { background: #2f6df6; border-color: #2f6df6; color: #fff; }
 .uc1-win-note { margin-top: 8px; font-size: 9.5px; font-style: italic; color: #7d8da3; }
+
+/* ---- UC1 mode: "the money shot" (design directive) — the winner row + sparkline are ONE bold
+   element in an otherwise quiet UI. Soft accent wash, 1px accent left rail, serif dollar figure,
+   "cheapest safe window" tag. Everything else in this panel stays as-is (deliberately quiet). ---- */
+body.uc1-mode .uc1-win-row-winner {
+  background: rgba(232, 150, 60, 0.12);
+  box-shadow: inset 2px 0 0 var(--uc1-accent);
+}
+body.uc1-mode .uc1-win-money-shot {
+  font-family: var(--uc1-font-display);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--uc1-accent);
+  font-variant-numeric: tabular-nums;
+}
+body.uc1-mode .uc1-win-winner-tag {
+  margin-top: 2px; font-size: 8px; text-transform: uppercase; letter-spacing: 0.08em;
+  font-weight: 700; color: var(--uc1-accent);
+}
+
+/* ---- Playback strip (windowPlayback.js + windowPanel.js, deck-parity item 1) — THE motion
+   moment (design directive): tabular-nums counters advance as the scrubber sweeps the sparkline
+   above. 150ms ease-out on open, no other motion; prefers-reduced-motion falls back to the JS
+   layer's stepped (non-rAF) updates, so no CSS transition is required here to honor it. ---- */
+.uc1-win-playback {
+  margin: -2px 0 10px; padding: 8px 9px; border-radius: 6px;
+  background: rgba(232, 150, 60, 0.06); border: 1px solid rgba(232, 150, 60, 0.25);
+  animation: uc1-panel-in 150ms ease-out;
+}
+.uc1-win-playback.hidden { display: none; }
+.uc1-win-playback-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.uc1-win-playback-mode {
+  font-size: 8px; font-weight: 800; letter-spacing: 0.08em; padding: 2px 5px; border-radius: 4px;
+  text-transform: uppercase; white-space: nowrap;
+}
+.uc1-win-playback-mode-live { background: rgba(67, 216, 113, 0.18); color: #43d871; }
+.uc1-win-playback-mode-surrogate { background: rgba(143, 161, 184, 0.18); color: #8fa1b8; }
+.uc1-win-playback-title { flex: 1; font-size: 10px; font-weight: 700; color: #e9eef5; }
+.uc1-win-playback-stop {
+  background: none; border: none; color: #8fa1b8; font-size: 14px; line-height: 1; cursor: pointer; padding: 0 2px;
+}
+.uc1-win-playback-stop:hover { color: #e9eef5; }
+.uc1-win-playback-counters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 6px; }
+.uc1-win-playback-counter { text-align: center; }
+.uc1-win-playback-counter-label { font-size: 7.5px; text-transform: uppercase; letter-spacing: 0.06em; color: #8fa1b8; }
+.uc1-win-playback-counter-val {
+  font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  font-weight: 600; font-size: 13px; color: #e9eef5; font-variant-numeric: tabular-nums;
+}
+.uc1-win-playback-bar { height: 3px; border-radius: 2px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.uc1-win-playback-bar-fill { height: 100%; width: 0%; background: #e8963c; }
+
+@keyframes uc1-panel-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .uc1-win-playback { animation: none; }
+}
 
 /* "Evaluate closure windows" — appended to #uc1-context-panel by main.js (contextPanel.js stays a
    pure renderer, see openUc1WorkOrderContext). Reuses .uc1-win-schedule-btn's palette, full width. */
@@ -644,6 +707,24 @@ html, body, #cesiumContainer, #arcgisContainer {
 
 /* UC1 mode */
 
+/* ---- Design tokens (uc1-design-directives.md — binding for all UC1 UI phases). Deck-matched
+   navy/orange palette + type stacks, scoped under body.uc1-mode so sandbox mode is untouched.
+   Phase 3 (playback) is the first UI phase to land these; it applies them to the ranked window
+   table + playback strip (its own files) — other panels (context/trust/exec-strip) are re-toned
+   by whichever later phase owns those files, per this phase's task scope. ---- */
+body.uc1-mode {
+  --uc1-ink: #0e1726;
+  --uc1-ink-2: #16233a;
+  --uc1-line: #24344f;
+  --uc1-text: #e9eef5;
+  --uc1-muted: #8fa1b8;
+  --uc1-accent: #e8963c;
+  --uc1-risk: #d65a4a;
+  --uc1-safe: #4caf87;
+  --uc1-font-display: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --uc1-font-body: -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
 /* ---- Chrome suppression (uc1Mode.js's UC1_HIDDEN_SELECTORS — keep the two lists in sync).
    CSS-only display:none via body.uc1-mode: every node here stays in the DOM and fully
    functional, so closure.spec.ts's default-mode #wz-* drive is unaffected. ---- */
@@ -681,6 +762,36 @@ body.uc1-mode .uc1-exec-kpi-strip {
   margin-top: -8px;
   background: rgba(15, 22, 33, 0.92);
   z-index: 1;
+}
+/* Review note 3: KPI numbers read as the quarterly story, not four grey chips — serif display +
+   tabular-nums (so ticking digits never shift the tile's width), deck-accent color. Hook only —
+   .uc1-exec-kpi .v is execKpis.js's existing value class, no markup change needed there. */
+body.uc1-mode .uc1-exec-kpi .v {
+  font-family: var(--uc1-font-display);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--uc1-accent);
+}
+body.uc1-mode .uc1-exec-kpi .l {
+  font-family: var(--uc1-font-body);
+  letter-spacing: 0.12em;
+  color: var(--uc1-muted);
+}
+body.uc1-mode .uc1-exec-kpi-note {
+  color: var(--uc1-muted);
+  font-style: normal;
+}
+
+/* Review note 5: header swap — sandbox copy is the default view; body.uc1-mode swaps to the
+   deck's own title ("Lane Closure Revenue Optimizer · I-595 Express") via CSS-only visibility, no
+   main.js state tracking (see index.html's .uc1-hud-sandbox/.uc1-hud-uc1 spans). */
+.uc1-hud-uc1 { display: none; }
+body.uc1-mode .uc1-hud-sandbox { display: none; }
+body.uc1-mode .uc1-hud-uc1 { display: inline; }
+body.uc1-mode .hud-title {
+  font-family: var(--uc1-font-display);
+  font-weight: 600;
 }
 
 /* ---- Startup tile (uc1Mode.js's renderStartupTile) — full-screen, dark, minimal,

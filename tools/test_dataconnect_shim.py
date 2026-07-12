@@ -280,7 +280,7 @@ def main():
 
     if not os.path.exists(SEED_PATH):
         sys.exit("tools/dataconnect-data/decisions_seed.json not found — run "
-                 "`python3 tools/seed_decisions.py` first.")
+                 "`node tools/seed_decisions.mjs` first.")
 
     # Fresh runtime state for a deterministic test run — the write tests assert exact counts.
     if os.path.exists(RUNTIME_PATH):

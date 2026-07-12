@@ -1278,12 +1278,22 @@ function evaluateUc1Windows(wo) {
     if (win && result) triggerUc1VisibleSumoRun(win, result);
   }
 
-  renderWindowPanel($("uc1-window-panel"), { ...data, workOrder: wo }, (win, result, rank) =>
-    scheduleUc1Decision(wo, win, result, rank)
+  renderWindowPanel(
+    $("uc1-window-panel"),
+    { ...data, workOrder: wo, config: currentUc1WindowConfig(), isLiveConnected: liveMode && ws?.readyState === WebSocket.OPEN },
+    (win, result, rank) => scheduleUc1Decision(wo, win, result, rank),
+    (win, result, rank) => playUc1Window(win, result, rank)
   );
   appendUc1TrustButton(wo);
   // Debug hook for headless verification (e2e) — mirrors window.__dcAssets's shape convention.
-  window.__uc1Windows = { count: data.results.length, winnerIdx: data.winnerIdx };
+  // sampleTimeseries: Phase 4's cheap debug-hook extension (plan §Phase 4 task 4) — a small sample
+  // of the winning window's result.timeseries (Phase 2's per-slice playback data) so e2e can assert
+  // its shape without reaching into windowPanel.js's private DOM state.
+  window.__uc1Windows = {
+    count: data.results.length,
+    winnerIdx: data.winnerIdx,
+    sampleTimeseries: data.results[data.winnerIdx]?.timeseries?.slice(0, 2) ?? [],
+  };
 
   // Demo-mode Step 3 -> Step 4 (storyboard §9 "the money shot"): the ranked table is up — pull the
   // camera back from the tight sim view to a comparison scale so both the twin and the table read.
@@ -1472,6 +1482,32 @@ function triggerUc1VisibleSumoRun(win, result) {
     uc1AutoCloseTimer = null;
     if (activeWorkzoneSpec?.lane === lane) openLaneHook(viewer, lane);
   }, UC1_AUTO_CLOSE_MS);
+}
+
+/** Deck-parity item 1 Phase 4: windowPanel.js's per-row "▶ Play" button — renderWindowPanel's new
+ * onPlay(window, result, rank) hook (Phase 3). Invokable for ANY ranked row, not just the winner,
+ * and never auto-schedules (schedule stays a separate, explicit button click).
+ *
+ * Lower-risk, reuses-tested-code approach (plan's Phase 4 task 2): delegate to the EXISTING
+ * triggerUc1VisibleSumoRun(win, result) for the real overlay + live-vs-offline branch — it already
+ * calls closeLaneHook, which itself already branches on `liveMode` to forward `closeLane` over the
+ * live websocket (real traci physics + stats.workzone ticks land in window.__kpi.workzone via
+ * onStep -> renderKpis, same path the manual "Close lane" control uses) or apply the offline
+ * schematic RILCA overlay — so no new physics/plumbing is added here, and closeLaneHook/
+ * applyOfflineWorkzoneStats stay untouched per the plan.
+ *
+ * windowPanel.js's own playback strip (started just before this hook fires, see its
+ * startUc1Playback) independently drives the animated queue/delay/revenue counters from
+ * computePlaybackFrame(result, progressFrac) — an analytic replay of Phase 2's timeseries, always
+ * running regardless of live/offline. That strip's mode badge (data.isLiveConnected, set above in
+ * evaluateUc1Windows) already gives the honest "LIVE SUMO physics (generic plaza demo)" vs.
+ * "SURROGATE playback" label per playbackModeLabel() — this function must never claim the plaza-
+ * wide `stats.workzone`/`stats.cumulativeRevenue` numbers ARE `result.revenueAtRiskUsd`; it only
+ * triggers the twin's visible closure, the strip's own labeling stays the single source of truth
+ * for which numbers are live vs. synthetic. */
+function playUc1Window(win, result, rank) {
+  void rank; // reserved — today's overlay/status text only needs the window itself
+  triggerUc1VisibleSumoRun(win, result);
 }
 
 /** Reopens whatever lane triggerUc1VisibleSumoRun auto-closed, cancelling the pending timeout —

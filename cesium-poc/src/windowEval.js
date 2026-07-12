@@ -147,8 +147,11 @@ export function secondaryCrashExposure(config, blended, durationHours, vehicleEx
  */
 export function revenueAtRisk(config, slices, sliceH, capacityVph, tollRateUsd) {
   let excessVehicles = 0;
+  const perSlice = [];
   for (const s of slices) {
-    excessVehicles += Math.max(0, s.demandVph - capacityVph) * sliceH;
+    const sliceExcessVehicles = Math.max(0, s.demandVph - capacityVph) * sliceH;
+    excessVehicles += sliceExcessVehicles;
+    perSlice.push({ excessVehicles: sliceExcessVehicles, revenueUsd: sliceExcessVehicles * tollRateUsd });
   }
   const point = excessVehicles * tollRateUsd;
   const band = config?.revenueUncertaintyBand ?? 0.15;
@@ -157,7 +160,43 @@ export function revenueAtRisk(config, slices, sliceH, capacityVph, tollRateUsd) 
     low: point * (1 - band),
     high: point * (1 + band),
     band,
+    perSlice,
   };
+}
+
+// ---- buildWindowTimeseries: per-slice playback data ------------------------------------------
+
+/**
+ * buildWindowTimeseries(rilcaSlices, revenuePerSlice) -> one row per slice, merging
+ * rilcaSliceQueue()'s per-slice queue/delay shape with revenueAtRisk()'s perSlice revenue,
+ * plus running cumulatives — exactly the shape a playback scrubber needs (queue level, revenue
+ * lost so far, throughput served so far). Pure zip + running-sum, no new math: rilcaSlices and
+ * revenuePerSlice are already positionally aligned (both built from the same demand slices in
+ * evaluateWindow()).
+ */
+export function buildWindowTimeseries(rilcaSlices, revenuePerSlice) {
+  let cumulativeDelayVehHours = 0;
+  let cumulativeRevenueUsd = 0;
+  return (rilcaSlices || []).map((s, sliceIndex) => {
+    const revenueUsd = revenuePerSlice?.[sliceIndex]?.revenueUsd ?? 0;
+    cumulativeDelayVehHours += s.delayVehHours ?? 0;
+    cumulativeRevenueUsd += revenueUsd;
+    const arrivals = s.arrivals ?? 0;
+    const departures = s.departures ?? 0;
+    const throughputPct = arrivals > 0 ? (departures / arrivals) * 100 : 100;
+    return {
+      sliceIndex,
+      demandVph: s.demandVph,
+      arrivals,
+      departures,
+      queueVeh: s.queueEnd ?? 0,
+      delayVehHours: s.delayVehHours ?? 0,
+      cumulativeDelayVehHours,
+      throughputPct,
+      revenueUsd,
+      cumulativeRevenueUsd,
+    };
+  });
 }
 
 // ---- lane availability ---------------------------------------------------------------------------
@@ -289,6 +328,7 @@ export function createWindowEvaluator({ config, segments, incidents, demandFn })
       closureRate: blended,
       score: scored.score,
       scoreComponents: scored.components,
+      timeseries: buildWindowTimeseries(rilca.slices, revenue.perSlice),
     };
   }
 

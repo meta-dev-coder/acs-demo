@@ -29,5 +29,10 @@
     "overnight": { "label": "Overnight (weeknight 23:00)", "hour": 23, "durationHours": 4, "dayType": "weeknight" },
     "weekendMorning": { "label": "Weekend morning (07:00)", "hour": 7, "durationHours": 4, "dayType": "weekend" },
     "weekdayPm": { "label": "Weekday 14:00 (peak-adjacent)", "hour": 14, "durationHours": 4, "dayType": "weekday" }
+  },
+  "playback": {
+    "_comment": "UC1 deck-parity item 1 (per-window SUMO playback). watchMsPerWindow: how long buildSumoPlaybackPlan()'s live-SUMO 'watch' step dwells per window before opening the lane again (Phase 2). surrogateTotalMs (Phase 3): offline/no-live-server animation duration for the analytic timeseries replay, read by windowPlayback.js's surrogatePlaybackDurationMs().",
+    "watchMsPerWindow": 8000,
+    "surrogateTotalMs": 8000
   }
 }
