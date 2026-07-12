@@ -360,8 +360,29 @@ html, body, #cesiumContainer, #arcgisContainer {
 
 /* UC1 work-order context panel — offset below the DataConnect asset panel (same right-edge
    column) so a picked asset panel and a picked WO context panel can both be open without
-   overlapping. */
-#uc1-context-panel { top: 340px; }
+   overlapping.
+   Task F1 bullet 3: the panel is a fixed flex column (head -> scrollable body -> pinned CTA), NOT
+   a single tall overflow-y:auto box any more — that's what buried "Evaluate closure windows"
+   8266px down behind 438 rows (uc1-panel-diagnosis.md #2). `.uc1-ctx-body` (contextPanel.js) is
+   the ONLY thing that scrolls; the head and the caller-appended `.uc1-evaluate-btn` (main.js's
+   appendUc1EvaluateButton, a sibling of `.uc1-ctx-body`, never inside it) stay fixed in place —
+   the CTA is always on screen the instant the panel opens, no scrolling required. */
+#uc1-context-panel {
+  top: 340px;
+  /* box-sizing: border-box (unlike the .panel base class it extends, which is content-box) so
+     max-height bounds the FULL rendered box — padding + border included, not added on top of it.
+     Left as content-box, the 16px/18px .panel padding + 1px border pushed the panel's true bottom
+     edge ~18px past this calc's own budget, which put the pinned CTA 1px below the 900px e2e
+     viewport (Task F1 bullet 3 regression caught by uc1-flow.spec.ts's CTA-in-viewport assertion)
+     — border-box makes the calc's "100vh - 356px" mean what it says. */
+  box-sizing: border-box;
+  max-height: calc(100vh - 356px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.uc1-ctx-head { flex: none; }
+.uc1-ctx-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 2px; }
 .dc-panel-close {
   position: absolute; top: 8px; right: 10px; background: none; border: none;
   color: #9fb0c3; font-size: 18px; line-height: 1; cursor: pointer;
@@ -400,13 +421,37 @@ html, body, #cesiumContainer, #arcgisContainer {
 }
 .uc1-ctx-count { color: #9fb0c3; font-weight: 600; }
 .uc1-ctx-empty { font-size: 10px; color: #7d8da3; font-style: italic; }
-.uc1-ctx-row {
-  display: flex; align-items: center; gap: 6px; font-size: 10px; color: #cdd8e6;
-  padding: 3px 0;
+
+/* Task F1 bullet 3: each section's rows live in their own ~6-row-tall scroll box, independent of
+   the outer `.uc1-ctx-body` scroll — a 374-row "Other nearby assets" section no longer forces the
+   whole panel (or even the whole body) to grow; it just gets its own small internal scrollbar. */
+.uc1-ctx-rows { max-height: 246px; overflow-y: auto; }
+.uc1-ctx-scroll-hint {
+  font-size: 9px; font-style: italic; color: #6fb1ff; margin-top: 3px; text-align: right;
 }
+
+/* Task F1 bullets 1-2: rows now carry asset id/type, a finding snippet, risk badge, date, and
+   distance — laid out as a wrapping meta line + an optional full-width snippet line — and are
+   clickable (cursor, hover/focus affordance, chevron that rotates open). */
+.uc1-ctx-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 10px; color: #cdd8e6;
+  padding: 4px 4px; border-radius: 5px; cursor: pointer;
+}
+.uc1-ctx-row:hover, .uc1-ctx-row:focus-visible { background: rgba(111, 177, 255, 0.08); outline: none; }
+.uc1-ctx-row.expanded { background: rgba(111, 177, 255, 0.12); }
+.uc1-ctx-row-id { font-weight: 700; color: #f2f5f8; }
 .uc1-ctx-row-main { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .uc1-ctx-row-sub { color: #8fa3bb; font-size: 9.5px; }
-.uc1-ctx-row-dist { color: #9fb0c3; font-size: 9.5px; white-space: nowrap; }
+.uc1-ctx-row-date { color: #9fb0c3; font-size: 9.5px; white-space: nowrap; }
+.uc1-ctx-row-dist { color: #9fb0c3; font-size: 9.5px; white-space: nowrap; margin-left: auto; }
+.uc1-ctx-row-snippet {
+  flex: 1 0 100%; color: #9fb0c3; font-size: 9.5px; font-style: italic;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.uc1-ctx-row-chevron {
+  color: #6fb1ff; font-size: 13px; line-height: 1; transition: transform 0.15s ease; flex: none;
+}
+.uc1-ctx-row.expanded .uc1-ctx-row-chevron { transform: rotate(90deg); }
 .uc1-ctx-badge {
   font-size: 8.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.3px;
   padding: 2px 5px; border-radius: 4px; white-space: nowrap;
@@ -414,6 +459,15 @@ html, body, #cesiumContainer, #arcgisContainer {
 .uc1-ctx-badge.red   { background: rgba(214, 51, 46, 0.18);  color: #ff6b6b; }
 .uc1-ctx-badge.amber { background: rgba(241, 163, 37, 0.18); color: #f1a325; }
 .uc1-ctx-badge.green { background: rgba(67, 147, 58, 0.18);  color: #43d871; }
+
+/* Inline expanded detail (Task F1 bullet 2) — the FULL record, plain label/value rows. */
+.uc1-ctx-detail {
+  margin: 0 4px 4px; padding: 6px 8px; border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(111, 177, 255, 0.18);
+}
+.uc1-ctx-detail-row { display: flex; justify-content: space-between; gap: 8px; font-size: 9.5px; padding: 2px 0; }
+.uc1-ctx-detail-row span:first-child { color: #8fa3bb; flex: none; }
+.uc1-ctx-detail-row span:last-child { color: #d6e3f0; font-weight: 600; text-align: right; }
 
 /* UC1 — window panel (windowPanel.js): 3-candidate-window sparkline + ranked table (design spec
    §4 bullet 3). Reuses .dc-panel / .dc-panel-close / .dc-panel-h / .dc-panel-sub from the
@@ -701,6 +755,22 @@ body.uc1-mode .uc1-exec-kpi-strip {
 .uc1-step-done .uc1-step-num { background: #43d871; color: #06210f; }
 .uc1-step-done .uc1-step-label { color: #cdd8e6; }
 .uc1-step-sep { width: 14px; height: 1px; background: rgba(255,255,255,0.16); }
+
+/* Task F1 bullet 4: STEP_HINTS' "Next: ..." guidance (uc1Mode.js's renderStepper) — a small,
+   impossible-to-miss pulsing badge next to the step track. Steps 3/4/5 are only ever reached
+   through the flow itself (by design, storyboard §1), so the hint's only job is to point at the
+   ONE next action while the planner is on a step that has one (Step 2 today). */
+.uc1-stepper-hint {
+  font-size: 10.5px; font-weight: 700; color: #ffe9b0; white-space: nowrap;
+  background: rgba(241, 163, 37, 0.22); border: 1px solid rgba(241, 163, 37, 0.55);
+  border-radius: 999px; padding: 4px 10px; margin-left: 4px;
+  animation: uc1-hint-pulse 1.8s ease-in-out infinite;
+}
+@keyframes uc1-hint-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(241, 163, 37, 0.45); }
+  50% { box-shadow: 0 0 0 6px rgba(241, 163, 37, 0); }
+}
+
 .uc1-exit-link {
   font: inherit; font-size: 10.5px; font-weight: 600; color: #8fa3bb; background: none; border: none;
   cursor: pointer; padding: 4px 6px; margin-left: 6px; border-left: 1px solid rgba(255,255,255,0.14);

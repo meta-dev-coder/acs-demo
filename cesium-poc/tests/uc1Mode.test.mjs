@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import {
   UC1_STEPS,
   STEP_EVENTS,
+  STEP_HINTS,
   advanceUc1Step,
   resetUc1Step,
   UC1_HIDDEN_SELECTORS,
@@ -75,6 +76,21 @@ test("STEP_EVENTS: every event's `from`/`to` are valid 1..5 step numbers and to 
     assert.ok(rule.from >= 1 && rule.from <= 5, `${name}.from out of range`);
     assert.ok(rule.to >= 1 && rule.to <= 5, `${name}.to out of range`);
     assert.equal(rule.to, rule.from + 1, `${name} should advance exactly one step`);
+  }
+});
+
+// ---- STEP_HINTS (Task F1 bullet 4: the "Next: ..." guidance while on Step 2, storyboard §1/§2 —
+// steps 3/4/5 are reached only through the flow, so Step 2 needs an impossible-to-miss nudge
+// toward the one control that advances the demo) ---------------------------------------------
+
+test("STEP_HINTS: step 2 (Context) points the planner at evaluating closure windows", () => {
+  assert.equal(STEP_HINTS[2], "Next: evaluate closure windows");
+});
+
+test("STEP_HINTS: only keyed for step numbers 1..5 (no stray/typo'd keys)", () => {
+  for (const key of Object.keys(STEP_HINTS)) {
+    const n = Number(key);
+    assert.ok(n >= 1 && n <= 5, `STEP_HINTS key ${key} out of range`);
   }
 });
 

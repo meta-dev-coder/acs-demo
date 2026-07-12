@@ -97,13 +97,57 @@ function inspectionCoords(rec) {
   return { lon, lat };
 }
 
+/** Non-empty trimmed string, or null — shared coercion for the free-text fields below (never
+ * coerces `undefined`/`null`/`""` into the literal string "null"/"undefined"). */
+function textOrNull(v) {
+  const s = String(v ?? "").trim();
+  return s ? s : null;
+}
+
+/** Asset type: all three inspection classes spell this the same way (asset_type). Kept as its own
+ * tiny helper for symmetry with findingText()/recommendedAction() below and so a future export
+ * naming split doesn't need touching failedInspections() itself. */
+function inspectionAssetType(rec) {
+  return textOrNull(rec?.asset_type);
+}
+
+/** The human-readable "what did the inspector find" text — the field the diagnosis calls out as
+ * present-but-dropped. Column name drifts per class/export vintage: safety's V6 export favors
+ * safety_issue_description_v3 (falling back to the same record's risk_reason_standardized /
+ * contributing_factors_standardized when the description itself is blank); roadway carries its own
+ * plain issue_description; its spells it text_description_field_if_there_is_an_issue. Checked in
+ * this order since a record should only ever populate the column its own class actually exports. */
+function findingText(rec) {
+  return textOrNull(
+    rec?.safety_issue_description_v3 ??
+      rec?.issue_description ??
+      rec?.text_description_field_if_there_is_an_issue ??
+      rec?.issue_summary ??
+      rec?.risk_reason_standardized ??
+      rec?.risk_reason ??
+      rec?.contributing_factors_standardized ??
+      rec?.contributing_factors
+  );
+}
+
+/** The recommended-action text — safety/roadway's V6 export favors the "_standardized" column;
+ * its (and roadway's own raw column, if the standardized one is blank) uses the plain
+ * recommended_action spelling. */
+function recommendedAction(rec) {
+  return textOrNull(rec?.recommended_action_standardized ?? rec?.recommended_action);
+}
+
 /**
- * failedInspections(records) -> [{id, assetId, risk, date, lon, lat}]
+ * failedInspections(records) ->
+ *   [{id, assetId, assetType, risk, date, findingText, recommendedAction, lon, lat}]
  *
  * High-risk FAILED inspection records (risk >= 4, pass/fail = Fail), pooled across all three
- * inspection classes and normalized to one shape for uc1Layers.js's inspection layer. Records
- * without a positive risk>=4 read, without a Fail result, or without mappable coordinates are
- * dropped.
+ * inspection classes and normalized to one shape for uc1Layers.js's inspection layer AND
+ * contextPanel.js's row detail (design spec Task F1 — assetType/findingText/recommendedAction must
+ * survive normalization, not just assetId, so the click-on-WO context panel can render what the
+ * data actually has). Records without a positive risk>=4 read, without a Fail result, or without
+ * mappable coordinates are dropped. assetType/findingText/recommendedAction are null (never
+ * throw/omit) when a record carries none of the known column spellings for that field.
  */
 export function failedInspections(records = []) {
   const out = [];
@@ -116,8 +160,11 @@ export function failedInspections(records = []) {
     out.push({
       id: String(rec?.record_id ?? rec?.inspection_id ?? ""),
       assetId: rec?.asset_id != null ? String(rec.asset_id) : null,
+      assetType: inspectionAssetType(rec),
       risk,
       date: rec?.date || rec?.inspection_date || null,
+      findingText: findingText(rec),
+      recommendedAction: recommendedAction(rec),
       lon: coords.lon,
       lat: coords.lat,
     });

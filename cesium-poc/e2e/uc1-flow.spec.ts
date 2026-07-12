@@ -33,7 +33,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 const REPO_ROOT  = path.join(__dirname, '..', '..'); // cesium-poc/e2e -> cesium-poc -> repo root
 
-const SHIM_PORT = 8787;
+// Overridable via UC1_E2E_SHIM_PORT for a fully isolated throwaway run (a dev shim may already own
+// the default 8787 outside this spec's control) — defaults to 8787, unchanged for normal CI runs.
+const SHIM_PORT = Number(process.env.UC1_E2E_SHIM_PORT) || 8787;
 const SHIM_URL  = `http://localhost:${SHIM_PORT}`;
 // ?uc1=1 auto-enters the demo (Task C, storyboard §5) — skips the startup tile entirely.
 const APP_URL   = `/?dc=${SHIM_URL}&uc1=1`;
@@ -194,12 +196,43 @@ test('UC1-FLOW: ?uc1=1 auto-enters demo -> hero WO context -> evaluate -> 3 rank
   await expect(panel.locator('.uc1-ctx-section', { hasText: 'Linked ticket' })).not.toContainText('No linked ticket');
   await expect(panel.locator('.uc1-ctx-section', { hasText: 'Accident history' })).toContainText(String(ctx.counts.accidents));
 
+  // ---- Task F1 bullet 1: rows carry real content (asset id/type, finding snippet, risk badge,
+  // date, distance), not just a badge + date (uc1-panel-diagnosis.md #1). ----
+  const firstInspectionRow = panel.locator('.uc1-ctx-section', { hasText: 'Failed inspections' }).locator('.uc1-ctx-row').first();
+  await expect(firstInspectionRow.locator('.uc1-ctx-badge')).toBeVisible();
+  await expect(firstInspectionRow.locator('.uc1-ctx-row-id')).not.toHaveText('');
+
+  // ---- Task F1 bullet 2: rows are clickable -> expand an inline detail block with the full
+  // record, and drive onRowFocus (main.js's focusUc1ContextRow -> flyTo + pulse, asserted via the
+  // window.__uc1LastRowFocus debug hook). ----
+  const firstDetail = firstInspectionRow.locator('xpath=following-sibling::div[1]');
+  await expect(firstDetail).toBeHidden();
+  await firstInspectionRow.click();
+  await expect(firstDetail).toBeVisible();
+  await expect(firstDetail).toContainText('Risk rating');
+  await expect(firstInspectionRow).toHaveClass(/expanded/);
+  await page.waitForFunction(() => (window as any).__uc1LastRowFocus != null, { timeout: 5_000 });
+
+  // Clicking again collapses the detail back.
+  await firstInspectionRow.click();
+  await expect(firstDetail).toBeHidden();
+  await expect(firstInspectionRow).not.toHaveClass(/expanded/);
+
+  // ---- Task F1 bullet 3: the "Evaluate closure windows" CTA is pinned/always-visible — no
+  // scrolling required to reach it the instant the context panel opens (uc1-panel-diagnosis.md #2:
+  // it used to sit 8266px down behind 438 unlabeled rows). ----
+  const evalBtn = page.locator('#uc1-evaluate-btn');
+  await expect(evalBtn).toBeVisible();
+  await expect(evalBtn).toBeInViewport();
+  const [panelBox, btnBox] = await Promise.all([panel.boundingBox(), evalBtn.boundingBox()]);
+  expect(panelBox && btnBox, 'both the panel and the CTA must have a resolvable bounding box').toBeTruthy();
+  expect(btnBox!.y + btnBox!.height, 'CTA must not extend past the panel\'s own bottom edge').toBeLessThanOrEqual(panelBox!.y + panelBox!.height + 1);
+  expect(btnBox!.y + btnBox!.height, 'CTA must be visible within the 900px viewport with no scrolling').toBeLessThanOrEqual(900);
+
   await shoot(page, 'uc1-flow-1-context-panel');
 
   // ---- Evaluate closure windows -> Step 2 -> 3 (Simulate, visible SUMO run for the winning
   // window) -> Step 3 -> 4 (Compare, the ranked table) -> 3 ranked rows ----
-  const evalBtn = page.locator('#uc1-evaluate-btn');
-  await expect(evalBtn).toBeVisible();
   await evalBtn.click();
 
   await page.waitForFunction(() => {

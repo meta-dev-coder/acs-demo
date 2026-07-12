@@ -20,7 +20,7 @@ import { login, fetchClass, writeRecord, onStatus } from "./dataconnect.js";
 import { adaptDataConnectAssets, scoreAssets } from "./scoringA.js";
 import { buildAssetLayer, disposeAssetLayer, pickAsset, installAssetPicking } from "./assetLayer.js";
 import { extractAccidents, openWorkOrders, failedInspections, buildWorkOrderContext, classifyCorridorAssets, TICKETS_CLASS } from "./uc1Data.js";
-import { buildWorkOrderLayer, buildAccidentLayer, buildInspectionLayer, buildAncillaryLayer, buildImpactHeatmap, disposeUc1Layer, pickUc1Point, flyToLonLat } from "./uc1Layers.js";
+import { buildWorkOrderLayer, buildAccidentLayer, buildInspectionLayer, buildAncillaryLayer, buildImpactHeatmap, disposeUc1Layer, pickUc1Point, flyToLonLat, pulseUc1Point } from "./uc1Layers.js";
 import { renderWorkOrderContext } from "./contextPanel.js";
 import { evaluateCandidates } from "./windowAssembly.js";
 import { renderWindowPanel } from "./windowPanel.js";
@@ -1205,7 +1205,7 @@ function openUc1WorkOrderContext(wo) {
   });
   uc1CurrentWo = wo;
   uc1CurrentContext = ctx;
-  renderWorkOrderContext($("uc1-context-panel"), { ...ctx, workOrder: wo });
+  renderWorkOrderContext($("uc1-context-panel"), { ...ctx, workOrder: wo }, { onRowFocus: focusUc1ContextRow });
   appendUc1EvaluateButton(wo);
   // A newly-picked WO invalidates any window table left over from a different WO.
   $("uc1-window-panel")?.classList.add("hidden");
@@ -1220,6 +1220,21 @@ function openUc1WorkOrderContext(wo) {
       flyToLonLat(uc1Viewer, wo.lon, wo.lat, 500);
     }
   }
+}
+
+/** contextPanel.js's onRowFocus callback (Task F1 bullet 2): a picked context-panel row (failed
+ * inspection / accident / nearby asset) flies the camera to that record's own lon/lat and drops a
+ * short pulsing highlight there (uc1Layers.js's pulseUc1Point) — so clicking "risk 5 · S-66136"
+ * actually shows the planner where that asset sits, not just an inline text expansion. Tighter
+ * framing than the 500m WO-context flyTo (openUc1WorkOrderContext) since this is a single point,
+ * not "everything nearby". No-ops (silently) on a record with no resolvable numeric lon/lat (e.g.
+ * a ticket row, which carries none) — same defensive posture as flyToLonLat/pulseUc1Point
+ * themselves. Exposed via a debug hook for headless e2e verification. */
+function focusUc1ContextRow(record) {
+  window.__uc1LastRowFocus = record ? { lon: record.lon, lat: record.lat } : null; // e2e debug hook
+  if (!uc1Viewer || typeof record?.lon !== "number" || typeof record?.lat !== "number") return;
+  flyToLonLat(uc1Viewer, record.lon, record.lat, 180);
+  pulseUc1Point(uc1Viewer, record.lon, record.lat);
 }
 
 /** Appends "Evaluate closure windows" to the just-rendered context panel. No-ops if the panel

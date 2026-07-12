@@ -12,7 +12,7 @@
  * Pure filtering/normalizing/clustering (failed-inspection risk banding, heat-map grid-binning,
  * etc.) lives in uc1Data.js, NOT here — this module owns Cesium primitive construction only.
  */
-import { PointPrimitiveCollection, Color, Cartesian3, NearFarScalar } from "cesium";
+import { PointPrimitiveCollection, Color, Cartesian3, NearFarScalar, CallbackProperty } from "cesium";
 import { gridBinPoints, incidentCoords } from "./uc1Data.js";
 
 const POINT_HEIGHT_M = 3; // matches assetLayer.js / plaza convention.
@@ -236,6 +236,54 @@ export function pickUc1Point(viewer, windowPosition) {
 export function flyToLonLat(viewer, lon, lat, heightM = 350) {
   if (!viewer?.camera || typeof lon !== "number" || typeof lat !== "number") return;
   viewer.camera.flyTo({ destination: Cartesian3.fromDegrees(lon, lat, heightM), duration: 2 });
+}
+
+// ---- row-focus pulse (Task F1 bullet 2: context-panel row click -> flyTo + pulse) --------------
+const PULSE_COLOR = Color.fromCssColorString("#6fb1ff");
+const PULSE_DURATION_MS = 1600;
+const PULSE_MIN_PX = 10;
+const PULSE_MAX_PX = 30;
+
+/**
+ * pulseUc1Point(viewer, lon, lat, durationMs = 1600) -> Entity | null
+ *
+ * A short-lived, self-disposing pulsing point at lon/lat — the visual confirmation main.js fires
+ * (alongside flyToLonLat()) when a contextPanel.js row is clicked, so the planner can see exactly
+ * which inspection/accident/asset the camera just moved to. Uses viewer.entities (not a
+ * PointPrimitiveCollection, unlike the four persistent layers above) since this is one throwaway
+ * entity per click, not a bulk layer rebuilt on data changes — the perf note about batching
+ * primitive-collection adds doesn't apply here. No-ops (returns null) on a missing
+ * viewer/entities collection (e.g. the ArcGIS renderer, which has no Cesium `viewer`) or
+ * non-numeric coords, same defensive posture as flyToLonLat() above.
+ */
+export function pulseUc1Point(viewer, lon, lat, durationMs = PULSE_DURATION_MS) {
+  if (!viewer?.entities || typeof lon !== "number" || typeof lat !== "number") return null;
+
+  const start = Date.now();
+  const entity = viewer.entities.add({
+    position: Cartesian3.fromDegrees(lon, lat, POINT_HEIGHT_M + 2),
+    point: {
+      pixelSize: new CallbackProperty(() => {
+        const t = Math.min(1, (Date.now() - start) / durationMs);
+        // Two quick pulses that damp out as t -> 1, settling near PULSE_MIN_PX.
+        const wave = Math.abs(Math.sin(t * Math.PI * 2.5)) * (1 - t);
+        return PULSE_MIN_PX + wave * (PULSE_MAX_PX - PULSE_MIN_PX);
+      }, false),
+      color: PULSE_COLOR.withAlpha(0.85),
+      outlineColor: Color.WHITE,
+      outlineWidth: 2,
+    },
+  });
+
+  setTimeout(() => {
+    try {
+      viewer.entities.remove(entity);
+    } catch {
+      /* viewer/entity already gone (e.g. panel closed mid-pulse) — nothing to clean up */
+    }
+  }, durationMs);
+
+  return entity;
 }
 
 /** Remove a previously-built layer. Only ever called once a REPLACEMENT layer is ready — a failed

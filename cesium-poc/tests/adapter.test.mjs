@@ -247,9 +247,12 @@ const inspectionFixtures = [
     // safety — Fail, risk 5, coords -> included
     record_id: "SAFE-1",
     asset_id: "A1",
+    asset_type: "Lighting",
     date: "2025-02-01",
     pass_fail: "Fail",
     risk_rating_1_5_v3: 5,
+    safety_issue_description_v3: "Drainage inlets obstructed",
+    recommended_action_standardized: "Schedule WO to repair",
     "x_coordinate (from roadway)": -80.3,
     "y_coordinate (from roadway)": 26.1,
   },
@@ -257,9 +260,12 @@ const inspectionFixtures = [
     // roadway — Fail, risk 4, coords -> included
     inspection_id: "INSP-1",
     asset_id: "A2",
+    asset_type: "Guardrail",
     inspection_date: "2025-02-02",
     pass_fail: "Fail",
     risk_rating_1_5: 4,
+    issue_description: "Guardrail deflected",
+    recommended_action: "Dispatch repair crew",
     x_coordinate: -80.31,
     y_coordinate: 26.11,
   },
@@ -267,9 +273,12 @@ const inspectionFixtures = [
     // its — Fail, risk 4, coords (plural spelling) -> included
     inspection_id: "INSP-2",
     asset_id: "A3",
+    asset_type: "Camera",
     date: "2025-02-03",
     pass_or_fail: "Fail",
     risk_rating_1_5: 4,
+    text_description_field_if_there_is_an_issue: "Housing contamination",
+    recommended_action: "Clean housing",
     x_coordinates: -80.32,
     y_coordinates: 26.12,
   },
@@ -325,6 +334,45 @@ test("failedInspections normalizes risk/coords/date across the three inspection 
   assert.equal(its.risk, 4);
   assert.equal(its.lon, -80.32);
   assert.equal(its.lat, 26.12);
+});
+
+// ---- rich context-panel fields (Task F1: assetType/findingText/recommendedAction must survive
+// normalization, not just assetId — the diagnosis's "two-layer field loss" root cause) ------------
+
+test("failedInspections carries assetType/findingText/recommendedAction through for every inspection class's own column spelling", () => {
+  const out = failedInspections(inspectionFixtures);
+
+  const safe = out.find((r) => r.id === "SAFE-1");
+  assert.equal(safe.assetType, "Lighting");
+  assert.equal(safe.findingText, "Drainage inlets obstructed");
+  assert.equal(safe.recommendedAction, "Schedule WO to repair");
+
+  const roadway = out.find((r) => r.id === "INSP-1");
+  assert.equal(roadway.assetType, "Guardrail");
+  assert.equal(roadway.findingText, "Guardrail deflected");
+  assert.equal(roadway.recommendedAction, "Dispatch repair crew");
+
+  const its = out.find((r) => r.id === "INSP-2");
+  assert.equal(its.assetType, "Camera");
+  assert.equal(its.findingText, "Housing contamination");
+  assert.equal(its.recommendedAction, "Clean housing");
+});
+
+test("failedInspections leaves assetType/findingText/recommendedAction null (not throw) when a record carries none of the known column spellings", () => {
+  const bare = [
+    {
+      inspection_id: "INSP-BARE",
+      asset_id: "A9",
+      pass_fail: "Fail",
+      risk_rating_1_5: 4,
+      x_coordinate: -80.35,
+      y_coordinate: 26.15,
+    },
+  ];
+  const [row] = failedInspections(bare);
+  assert.equal(row.assetType, null);
+  assert.equal(row.findingText, null);
+  assert.equal(row.recommendedAction, null);
 });
 
 test("failedInspections returns [] for empty/undefined input", () => {

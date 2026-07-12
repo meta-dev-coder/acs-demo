@@ -62,6 +62,19 @@ export function resetUc1Step() {
   return 1;
 }
 
+/**
+ * STEP_HINTS — Task F1 bullet 4: while parked on a step, the stepper shows a "Next: ..." nudge
+ * toward the one action that advances the flow (storyboard §1's "steps 3/4/5 are reached ONLY
+ * through the flow, by design" — the hint's job is to make that single next action impossible to
+ * miss, not to offer a menu of options). Only Step 2 (Context) needs one today: it's the step
+ * where the planner is staring at a read-only evidence panel with exactly one way forward
+ * (contextPanel.js's "Evaluate closure windows" button, made sticky/always-visible per bullet 3).
+ * Steps without an entry render no hint (renderStepper below no-ops on a missing key).
+ */
+export const STEP_HINTS = {
+  2: "Next: evaluate closure windows",
+};
+
 // ---- chrome-hide / chrome-keep selector lists (data, storyboard §7) ---------------------------
 
 /**
@@ -198,8 +211,11 @@ export function renderStepper(el, currentStep, { onExit } = {}) {
     </div>`;
   }).join(`<span class="uc1-step-sep" aria-hidden="true"></span>`);
 
+  const hint = STEP_HINTS[currentStep];
+
   el.innerHTML = `
     <div class="uc1-stepper-track">${stepsHtml}</div>
+    ${hint ? `<div class="uc1-stepper-hint" role="status">${hint} &rarr;</div>` : ""}
     <button type="button" class="uc1-exit-link">Exit demo</button>
   `;
 
