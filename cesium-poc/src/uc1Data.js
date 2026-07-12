@@ -438,6 +438,40 @@ export function classifyCorridorAssets(assets, centerline, maxM = DEFAULT_CORRID
   };
 }
 
+/**
+ * segmentCenterlinePoints(centerline, segment) -> [{lon,lat}, ...]
+ *
+ * Filters `centerline` (config/corridorCenterline.json's ordered [{lon,lat}, ...] polyline,
+ * already west->east ascending lon) down to the points whose lon falls INSIDE `segment.lonBand`
+ * (inclusive of both bounds — segments.json's own filter convention, matching classifyCorridor
+ * Assets()'s sibling corridor-filter posture above). The centerline's existing west->east order
+ * is preserved as-is (no re-sort — nothing here assumes lonBand is itself ascending; it's
+ * min/maxed defensively). Behind uc1Layers.js's segment-ribbon layer (item 3 — the click-to-pick
+ * segment highlight): each segment gets its own polyline without maintaining a second geometry
+ * source. Never throws: a missing/malformed centerline or segment (no lonBand, a lonBand with no
+ * overlapping centerline point) yields [], the same "nothing to draw" posture gridBinPoints()/
+ * nearby() use elsewhere in this module.
+ */
+export function segmentCenterlinePoints(centerline, segment) {
+  const band = segment?.lonBand;
+  if (!Array.isArray(band) || band.length !== 2) return [];
+  const a = toNum(band[0]);
+  const b = toNum(band[1]);
+  if (a == null || b == null) return [];
+  const lo = Math.min(a, b);
+  const hi = Math.max(a, b);
+  if (!Array.isArray(centerline)) return [];
+
+  const out = [];
+  for (const p of centerline) {
+    const lon = toNum(p?.lon);
+    const lat = toNum(p?.lat);
+    if (lon == null || lat == null) continue;
+    if (lon >= lo && lon <= hi) out.push({ lon, lat });
+  }
+  return out;
+}
+
 /** Group records by a (possibly missing) asset-id field into Map<string, T[]>. Duplicated from
  * scoringA.js's private groupByAssetId to keep this module dependency-free (scoringA.js imports
  * FROM here, not the reverse). */

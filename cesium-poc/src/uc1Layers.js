@@ -13,7 +13,7 @@
  * etc.) lives in uc1Data.js, NOT here — this module owns Cesium primitive construction only.
  */
 import { PointPrimitiveCollection, Color, Cartesian3, NearFarScalar, CallbackProperty } from "cesium";
-import { gridBinPoints, incidentCoords } from "./uc1Data.js";
+import { gridBinPoints, incidentCoords, segmentCenterlinePoints } from "./uc1Data.js";
 
 const POINT_HEIGHT_M = 3; // matches assetLayer.js / plaza convention.
 const SCALE_BY_DISTANCE = new NearFarScalar(300, 1.6, 20000, 0.3);
@@ -148,6 +148,104 @@ export function buildAncillaryLayer(viewer, ancillaryAssets) {
   return collection;
 }
 
+// ---- segment ribbon (UC1 deck-parity item 3: click-to-pick segment + lane chooser) --------------
+// One polyline per config/segments.json entry, traced along the real corridor centerline via
+// uc1Data.js's segmentCenterlinePoints() (pure, tested) — NOT a fresh geometry source. Built with
+// viewer.entities (workzone.js's convention for line geometry, not a PointPrimitiveCollection —
+// this is a handful of long-lived polylines, not thousands of points needing bulk-buffer perf).
+// Entities are tagged via Cesium's `properties` bag (matching workzone.js's isCone/isWorkzoneRibbon/
+// signText convention) with a DIFFERENT flag name, isUc1SegmentRibbon — deliberately so that
+// closure.spec.ts's entity filters (which look only for isCone/signText) structurally cannot see
+// these, and so pickUc1Point() below can tell a segment-ribbon hit from a workzone hit.
+
+const RIBBON_HEIGHT_M = 1; // sits just under the point layers/heat map so it reads as a base layer.
+const RIBBON_WIDTH_DEFAULT = 4;
+const RIBBON_WIDTH_SELECTED = 8;
+const RIBBON_COLOR_DEFAULT = Color.fromCssColorString("#4a6fa5").withAlpha(0.35); // quiet, per design directives
+const RIBBON_COLOR_HOVER = Color.fromCssColorString("#8fa1b8").withAlpha(0.55); // --uc1-muted-ish
+const RIBBON_COLOR_SELECTED = Color.fromCssColorString("#e8963c").withAlpha(0.85); // --uc1-accent
+
+/**
+ * buildSegmentRibbonLayer(viewer, segments, centerline)
+ *   -> { entities, setSelected(segmentId|null), setHovered(segmentId|null), setVisible(bool) }
+ *
+ * One polyline entity per segment with >=2 centerline points (segments whose lonBand doesn't
+ * overlap the centerline — shouldn't happen with the real config, but never throws — are simply
+ * skipped, same "nothing to draw" posture as the rest of this module). `setSelected`/`setHovered`
+ * repaint every entity's material/width from a single (selectedId, hoveredId) pair of internal
+ * state — selected always wins over hovered when both would apply to the same segment. `setVisible`
+ * toggles every entity's `.show` (there is no primitive-collection-level `.show` here since these
+ * are plain viewer.entities, not a PointPrimitiveCollection). Starts with every entity `show: true`
+ * at build time — callers that want it hidden until Step 2 (main.js, Phase 11) call
+ * `setVisible(false)` themselves right after building, matching buildAncillaryLayer()'s
+ * build-then-toggle convention rather than adding a `visible` build option here.
+ */
+export function buildSegmentRibbonLayer(viewer, segments, centerline) {
+  const rows = []; // [{ entity, segmentId }]
+  let selectedId = null;
+  let hoveredId = null;
+
+  function paint(entity, segmentId) {
+    const isSelected = segmentId === selectedId;
+    const isHovered = !isSelected && segmentId === hoveredId;
+    entity.polyline.width = isSelected ? RIBBON_WIDTH_SELECTED : RIBBON_WIDTH_DEFAULT;
+    entity.polyline.material = isSelected
+      ? RIBBON_COLOR_SELECTED
+      : isHovered
+      ? RIBBON_COLOR_HOVER
+      : RIBBON_COLOR_DEFAULT;
+  }
+
+  function repaint() {
+    for (const { entity, segmentId } of rows) paint(entity, segmentId);
+  }
+
+  for (const segment of segments || []) {
+    const points = segmentCenterlinePoints(centerline, segment);
+    if (points.length < 2) continue;
+    const positions = points.map((p) => Cartesian3.fromDegrees(p.lon, p.lat, RIBBON_HEIGHT_M));
+    const entity = viewer.entities.add({
+      polyline: {
+        positions,
+        width: RIBBON_WIDTH_DEFAULT,
+        material: RIBBON_COLOR_DEFAULT,
+        clampToGround: false,
+      },
+      properties: { isUc1SegmentRibbon: true, segmentId: segment.id },
+    });
+    rows.push({ entity, segmentId: segment.id });
+  }
+
+  function setSelected(segmentId) {
+    selectedId = segmentId ?? null;
+    repaint();
+  }
+  function setHovered(segmentId) {
+    hoveredId = segmentId ?? null;
+    repaint();
+  }
+  function setVisible(visible) {
+    for (const { entity } of rows) entity.show = !!visible;
+  }
+
+  return { entities: rows.map((r) => r.entity), setSelected, setHovered, setVisible };
+}
+
+/** Remove a previously-built segment-ribbon layer's entities (buildSegmentRibbonLayer()'s return
+ * value). Separate from disposeUc1Layer() below since a ribbon is a plain array of viewer.entities
+ * rows, not a scene.primitives collection — only ever called once a REPLACEMENT ribbon is ready,
+ * same keep-previous-on-failure contract as disposeUc1Layer()/disposeAssetLayer(). */
+export function disposeUc1SegmentRibbons(viewer, ribbon) {
+  if (!viewer?.entities || !ribbon?.entities) return;
+  for (const entity of ribbon.entities) {
+    try {
+      viewer.entities.remove(entity);
+    } catch {
+      /* already gone */
+    }
+  }
+}
+
 // ---- closure-impact heat map (design spec §4 Decision 5, Mic-Drop Moment 3) ---------------------
 // Corridor-zoom density overlay surfacing repeat crash/closure clusters: grid-bins the accident +
 // located-incident points (gridBinPoints(), uc1Data.js — pure, tested) and renders one translucent
@@ -208,15 +306,25 @@ export function buildImpactHeatmap(viewer, { accidents = [], incidents = [], seg
 }
 
 /** scene.pick() wrapper shared by the UC1 point layers — returns `{kind, record}` under a click
- * (kind is "workOrder" | "accident" | "inspection" | "ancillary", record is the source object
- * passed into the matching build*Layer() call), or null if nothing (or something else, e.g. the
- * DataConnect asset layer) was hit. Distinguishes the layers via the `isUc1*Layer` flags stamped
- * on each collection above (the point shapes share `lon`/`lat`/`id`-ish fields, so the record
- * alone can't tell them apart). Left-click wiring itself is the caller's responsibility (main.js),
- * same split as assetLayer.js's installAssetPicking()/pickAsset(). */
+ * (kind is "workOrder" | "accident" | "inspection" | "ancillary" | "segment", record is the
+ * source object passed into the matching build*Layer() call — or, for "segment",
+ * `{segmentId}`), or null if nothing (or something else, e.g. the DataConnect asset layer) was
+ * hit. Distinguishes the point layers via the `isUc1*Layer` flags stamped on each primitives
+ * collection above (the point shapes share `lon`/`lat`/`id`-ish fields, so the record alone can't
+ * tell them apart); distinguishes a segment-ribbon hit via the Entity's own `properties` bag
+ * (buildSegmentRibbonLayer() above tags each polyline entity, not a collection — ribbons are
+ * plain viewer.entities, unlike the point layers). Left-click wiring itself is the caller's
+ * responsibility (main.js), same split as assetLayer.js's installAssetPicking()/pickAsset(). */
 export function pickUc1Point(viewer, windowPosition) {
   const picked = viewer.scene.pick(windowPosition);
   if (!picked || !picked.id) return null;
+
+  const entity = picked.id;
+  if (entity?.properties?.isUc1SegmentRibbon?.getValue?.()) {
+    const segmentId = entity.properties.segmentId?.getValue?.() ?? null;
+    return { kind: "segment", record: { segmentId } };
+  }
+
   const collection = picked.primitive && picked.primitive.collection;
   const kind = collection?.isUc1WorkOrderLayer
     ? "workOrder"

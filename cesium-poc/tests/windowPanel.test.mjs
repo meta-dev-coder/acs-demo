@@ -17,6 +17,7 @@ import {
   validateWindowPick,
   weekDemandSeries,
   localWallClockAsUtc,
+  resolveSegmentByName,
 } from "../src/windowAssembly.js";
 import { createDemandModel } from "../src/demand.js";
 import segments from "../config/segments.json" with { type: "json" };
@@ -131,6 +132,83 @@ test("evaluateCandidates: unresolvable segment name still returns 3 windows (seg
   assert.equal(windows.length, 3);
   assert.equal(results.length, 3);
   assert.equal(results[winnerIdx].segmentName, null);
+});
+
+// ---- 2b. resolveSegmentByName (exported, item 3) + evaluateCandidates's segmentIdOverride --------
+
+test("resolveSegmentByName: known name resolves to its segment object; unknown/null -> null", () => {
+  const east = resolveSegmentByName(segments, "East Segment");
+  assert.equal(east?.id, "east");
+  assert.equal(resolveSegmentByName(segments, "Nonexistent Segment"), null);
+  assert.equal(resolveSegmentByName(segments, null), null);
+  assert.equal(resolveSegmentByName(segments, undefined), null);
+});
+
+test("evaluateCandidates: segmentIdOverride (different segment than wo.segment) wins — results reflect the override's laneCount/demandScale", () => {
+  const demandModel = createDemandModel(demandProfile, segments);
+  const wo = { id: "WO-OVR", segment: "East Segment" }; // demandScale 1.2
+
+  const west = resolveSegmentByName(segments, "West Segment"); // demandScale 0.62
+  assert.ok(west, "fixture must resolve West Segment");
+
+  const withOverride = evaluateCandidates(wo, {
+    segments,
+    incidents: [],
+    windowConfig,
+    demandModel,
+    fromDate: new Date("2026-07-13T10:00:00Z"),
+    segmentIdOverride: west.id,
+  });
+  const withoutOverride = evaluateCandidates(wo, {
+    segments,
+    incidents: [],
+    windowConfig,
+    demandModel,
+    fromDate: new Date("2026-07-13T10:00:00Z"),
+  });
+
+  assert.equal(withOverride.results[0].segmentName, "West Segment");
+  assert.equal(withoutOverride.results[0].segmentName, "East Segment");
+
+  // weekdayPm is where the two segments' demandScale (0.62 vs. 1.2) diverges most — the overnight
+  // trough can legitimately score identically (near-zero congestion either way).
+  const pmIdx = withOverride.windows.findIndex((w) => w.id === "weekdayPm");
+  assert.notEqual(withOverride.results[pmIdx].score, withoutOverride.results[pmIdx].score);
+});
+
+test("evaluateCandidates: segmentIdOverride pointing at an absent id falls back to segmentId=null, no throw", () => {
+  const demandModel = createDemandModel(demandProfile, segments);
+  const wo = { id: "WO-OVR2", segment: "East Segment" };
+
+  const { results } = evaluateCandidates(wo, {
+    segments,
+    incidents: [],
+    windowConfig,
+    demandModel,
+    fromDate: new Date("2026-07-13T10:00:00Z"),
+    segmentIdOverride: "no-such-segment-id",
+  });
+
+  assert.equal(results.length, 3);
+  for (const r of results) assert.equal(r.segmentName, null);
+});
+
+test("evaluateCandidates: no segmentIdOverride (omitted) — output unchanged vs. today (regression lock)", () => {
+  const demandModel = createDemandModel(demandProfile, segments);
+  const wo = { id: "WO-OVR3", segment: "East Segment" };
+  const opts = {
+    segments,
+    incidents: [],
+    windowConfig,
+    demandModel,
+    fromDate: new Date("2026-07-13T10:00:00Z"),
+  };
+
+  const a = evaluateCandidates(wo, opts);
+  const b = evaluateCandidates(wo, { ...opts, segmentIdOverride: null });
+
+  assert.deepEqual(a.results.map((r) => r.score), b.results.map((r) => r.score));
+  assert.equal(a.winnerIdx, b.winnerIdx);
 });
 
 // ---- 3. throughputVsDemandPct: windowPanel.js's "throughput vs demand" column -------------------

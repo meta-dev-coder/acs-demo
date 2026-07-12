@@ -329,6 +329,17 @@ export function createWindowEvaluator({ config, segments, incidents, demandFn })
       score: scored.score,
       scoreComponents: scored.components,
       timeseries: buildWindowTimeseries(rilca.slices, revenue.perSlice),
+      // Glass-box provenance (UC1 deck-parity item 6): echoes the config/closureSpec values
+      // ACTUALLY resolved and used above for THIS evaluation — never re-reads the static config
+      // file — so it reflects live assumption-slider edits (two evaluator instances built from
+      // different config objects produce different ingredients here).
+      ingredients: {
+        tollRateUsd,
+        weights: config?.weights || {},
+        mergeFriction: config?.mergeFriction ?? 0.9,
+        workZoneCapacityVphpl: config?.workZoneCapacityVphpl ?? 1600,
+        scoreNormalization: config?.scoreNormalization || {},
+      },
     };
   }
 

@@ -32,6 +32,7 @@
  *--------------------------------------------------------------------------------------------*/
 import { throughputVsDemandPct } from "./windowAssembly.js";
 import { computePlaybackFrame, surrogatePlaybackDurationMs, playbackModeLabel, clampProgress } from "./windowPlayback.js";
+import { windowIngredientLines } from "./glassBox.js";
 
 function esc(v) {
   return String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -165,6 +166,30 @@ function sparklineSvg(windows, results) {
 
 // ---- ranked table ---------------------------------------------------------------------------
 
+/** UC1 deck-parity item 6 ("glass box"): a small "ⓘ" affordance on each numeric cell, toggling an
+ * inline popover of that field's windowIngredientLines(field, result) — same click-to-expand idiom
+ * contextPanel.js's rows already use (a hidden sibling block, toggled by a delegated click
+ * listener in renderWindowPanel() below), applied at cell granularity here instead of row
+ * granularity. Renders nothing (not even the button) when the field has no ingredient lines to
+ * show, so a malformed/missing result degrades to "no affordance" rather than an empty popover. */
+function infoAffordanceHtml(field, result) {
+  const lines = windowIngredientLines(field, result);
+  if (lines.length === 0) return "";
+  const rows = lines
+    .map(
+      (l) => `
+      <div class="uc1-win-ingredient-line">
+        <span class="uc1-win-ingredient-label">${esc(l.label)}</span>
+        <span class="uc1-win-ingredient-value">${esc(l.value)}</span>
+        ${l.badge ? `<span class="uc1-trust-badge uc1-trust-badge-${esc(String(l.badge).toLowerCase())}">${esc(l.badge)}</span>` : ""}
+      </div>`
+    )
+    .join("");
+  return `
+    <button type="button" class="uc1-win-info-btn" data-field="${esc(field)}" aria-label="Why this number?" aria-expanded="false">&#9432;</button>
+    <div class="uc1-win-ingredient-popover" hidden>${rows}</div>`;
+}
+
 function tableRowHtml(window, result, rank, isWinner, allResults, idx) {
   const revenueVals = allResults.map((r) => r.revenueAtRiskUsd?.point ?? 0);
   const delayVals = allResults.map((r) => r.queue?.avgDelayMin ?? 0);
@@ -181,15 +206,16 @@ function tableRowHtml(window, result, rank, isWinner, allResults, idx) {
         <div class="uc1-win-sub">${esc(fmtHourLabel(window.start))} &middot; ${esc(window.durationHours)}h</div>
         ${isWinner ? `<div class="uc1-win-winner-tag">Cheapest safe window</div>` : ""}
       </td>
-      <td class="uc1-win-cell ${relativeBand(revenueVals, idx)}">
+      <td class="uc1-win-cell ${relativeBand(revenueVals, idx)}" data-field="revenue">
         <div class="${isWinner ? "uc1-win-money-shot" : ""}">${fmtUsd(revenue.point)}</div>
         ${bandPct != null ? `<div class="uc1-win-sub">&plusmn;${bandPct}% ($${Math.round(revenue.low ?? 0).toLocaleString()}&ndash;$${Math.round(revenue.high ?? 0).toLocaleString()})</div>` : ""}
+        ${infoAffordanceHtml("revenue", result)}
       </td>
-      <td class="uc1-win-cell ${relativeBand(delayVals, idx)}">${fmtMin(result.queue?.avgDelayMin)}</td>
-      <td class="uc1-win-cell">${fmtPct(throughputVsDemandPct(result))}</td>
-      <td class="uc1-win-cell">${fmtPct(result.laneAvailabilityPct)}</td>
-      <td class="uc1-win-cell ${relativeBand(exposureVals, idx)}">${(result.secondaryCrashExposure ?? 0).toFixed(2)}</td>
-      <td class="uc1-win-cell uc1-win-score">${fmtScore(result.score)}</td>
+      <td class="uc1-win-cell ${relativeBand(delayVals, idx)}" data-field="delay">${fmtMin(result.queue?.avgDelayMin)}${infoAffordanceHtml("delay", result)}</td>
+      <td class="uc1-win-cell" data-field="throughput">${fmtPct(throughputVsDemandPct(result))}${infoAffordanceHtml("throughput", result)}</td>
+      <td class="uc1-win-cell" data-field="laneAvailability">${fmtPct(result.laneAvailabilityPct)}${infoAffordanceHtml("laneAvailability", result)}</td>
+      <td class="uc1-win-cell ${relativeBand(exposureVals, idx)}" data-field="crashRisk">${(result.secondaryCrashExposure ?? 0).toFixed(2)}${infoAffordanceHtml("crashRisk", result)}</td>
+      <td class="uc1-win-cell uc1-win-score" data-field="score">${fmtScore(result.score)}${infoAffordanceHtml("score", result)}</td>
       <td class="uc1-win-actions">
         <button type="button" class="uc1-win-play-btn" data-window-id="${esc(window.id)}" aria-label="Play ${esc(window.label || window.id)}">&#9654; Play</button>
         <button type="button" class="uc1-win-schedule-btn" data-window-id="${esc(window.id)}">Schedule this window</button>
@@ -431,6 +457,20 @@ export function renderWindowPanel(containerEl, data, onSchedule, onPlay) {
       const rank = order.indexOf(idx) + 1;
       startUc1Playback(containerEl, windows[idx], results[idx], data.config, data.isLiveConnected, onPlay, rank);
     };
+  });
+
+  // ---- glass-box popovers (deck-parity item 6): click "ⓘ" -> toggle the sibling ingredient
+  // popover, same click-to-expand idiom contextPanel.js's rows use. ----
+  containerEl.querySelectorAll(".uc1-win-info-btn").forEach((btn) => {
+    btn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const popover = btn.nextElementSibling;
+      if (!popover || !popover.classList.contains("uc1-win-ingredient-popover")) return;
+      const expanding = popover.hasAttribute("hidden");
+      if (expanding) popover.removeAttribute("hidden");
+      else popover.setAttribute("hidden", "");
+      btn.setAttribute("aria-expanded", String(expanding));
+    });
   });
 
   const stopBtn = containerEl.querySelector(".uc1-win-playback-stop");

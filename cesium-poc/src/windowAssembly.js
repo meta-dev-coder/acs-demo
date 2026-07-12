@@ -32,8 +32,11 @@ import { createWindowEvaluator, candidateWindows } from "./windowEval.js";
 
 /** Resolve a segment NAME (as carried on an openWorkOrders() row's `segment` field) to its
  * segments.json entry. Returns null when unresolved (unknown/missing name) — callers must not
- * throw on that, matching the rest of the UC1 pure modules. */
-function resolveSegmentByName(segments, segmentName) {
+ * throw on that, matching the rest of the UC1 pure modules. Exported (item 3, Phase 10) — the
+ * segment ribbon's default-highlight (main.js's openUc1WorkOrderContext(), Phase 11) resolves the
+ * clicked WO's own segment the same way evaluateCandidates() below does, rather than duplicating
+ * this lookup. */
+export function resolveSegmentByName(segments, segmentName) {
   if (segmentName == null) return null;
   return (segments || []).find((s) => s.name === segmentName) ?? null;
 }
@@ -93,14 +96,33 @@ export function windowDemandAdapter(demandModel) {
  * it has exactly 3 entries; any other length (missing/partial/malformed) falls back to
  * candidateWindows() rather than evaluating a short/long list — see the plan's conflict
  * resolution #2 for why the defensive length check wins over an unchecked `?? candidateWindows()`.
- * (A future `segmentIdOverride` key lands on this same options object in a later phase — item 3 —
- * as an independent additive key; not implemented here.)
+ *
+ * `segmentIdOverride` (opts.segmentIdOverride) — UC1 deck-parity item 3 (segment ribbon +
+ * picker): when set (non-null), it wins over `wo.segment` name resolution entirely — the planner
+ * clicked a different segment on the ribbon than the hero WO's own, and that pick governs
+ * laneCount/demandScale for this evaluation. An override pointing at an id absent from `segments`
+ * resolves to segmentId=null (windowEval.js's corridor-wide fallback), not a silent revert to
+ * wo.segment — an explicit-but-stale pick should read as "unresolved", not quietly swap segments
+ * out from under the planner. Omitted (default null) — behavior is unchanged from before this key
+ * existed (regression-locked by windowPanel.test.mjs).
  */
 export function evaluateCandidates(
   wo,
-  { segments = [], incidents = [], windowConfig, demandModel, fromDate, closureSpec, windows } = {}
+  {
+    segments = [],
+    incidents = [],
+    windowConfig,
+    demandModel,
+    fromDate,
+    closureSpec,
+    windows,
+    segmentIdOverride = null,
+  } = {}
 ) {
-  const segment = resolveSegmentByName(segments, wo?.segment);
+  const segment =
+    segmentIdOverride != null
+      ? (segments || []).find((s) => s.id === segmentIdOverride) ?? null
+      : resolveSegmentByName(segments, wo?.segment);
   const segmentId = segment?.id ?? null;
 
   const evaluator = createWindowEvaluator({

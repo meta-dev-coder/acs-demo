@@ -43,7 +43,7 @@ const APP_URL   = `/?dc=${SHIM_URL}&uc1=1`;
 // The hero work order pinned in config/uc1Demo.json — kept in sync manually (not imported: this
 // spec runs under ts-node/Playwright, the JSON is a repo fixture whoever changes uc1Demo.json is
 // expected to update this one string, same posture as ASSET_REGISTRY_PATH in dataconnect-assets).
-const HERO_WORK_ORDER_ID = 'WO-900543';
+const HERO_WORK_ORDER_ID = 'WO-900002';
 
 // ---------------------------------------------------------------------------
 // Shim lifecycle — one process shared by every test in this file.
@@ -193,7 +193,9 @@ test('UC1-FLOW: ?uc1=1 auto-enters demo -> hero WO context -> evaluate -> 3 rank
   await expect(panel).toBeVisible();
 
   // Context panel shows the linked ticket + a non-zero accident count (uc1Demo.json's rationale:
-  // WO-900543 has a linked ticket, a failed inspection, and >=2 accidents within 500m).
+  // WO-900002 has a linked ticket, a failed inspection, and >=2 accidents within 500m — Phase 14
+  // hero, chosen via uc1_hero_scan.py's --prefer-asset-type-substring/--prefer-segment flags for
+  // an "Attenuetors" asset on the Central Segment).
   const ctx = await page.evaluate(() => (window as any).__uc1Context);
   expect(ctx).toBeTruthy();
   expect(ctx.counts.hasTicket).toBe(true);
@@ -252,6 +254,25 @@ test('UC1-FLOW: ?uc1=1 auto-enters demo -> hero WO context -> evaluate -> 3 rank
   await expect(windowPanel.locator('.uc1-win-row')).toHaveCount(3);
 
   await shoot(page, 'uc1-flow-2-window-panel');
+
+  // ---- Phase 13 (deck-parity item 6, "glass box"): the winning row's Revenue-loss cell "ⓘ"
+  // affordance toggles an inline popover of windowIngredientLines("revenue", result) — a toll-rate
+  // line and a work-zone-capacity line, both traceable to the config actually used for this
+  // evaluation (not a re-read of the static default). ----
+  const winnerRow = windowPanel.locator('.uc1-win-row-winner');
+  const revenueInfoBtn = winnerRow.locator('.uc1-win-cell[data-field="revenue"] .uc1-win-info-btn');
+  await expect(revenueInfoBtn).toBeVisible();
+  const revenuePopover = winnerRow.locator('.uc1-win-cell[data-field="revenue"] .uc1-win-ingredient-popover');
+  await expect(revenuePopover).toBeHidden();
+  await revenueInfoBtn.click();
+  await expect(revenuePopover).toBeVisible();
+  await expect(revenuePopover).toContainText('Toll rate');
+  await expect(revenuePopover).toContainText('capacity');
+  // Clicking again collapses it back (same click-to-expand idiom as the context panel's rows).
+  await revenueInfoBtn.click();
+  await expect(revenuePopover).toBeHidden();
+
+  await shoot(page, 'uc1-flow-2g-glassbox-popover');
 
   // ---- Phase 4 (deck-parity item 1): debug-hook extension — window.__uc1Windows now also
   // exposes a small sample of the winning window's result.timeseries (Phase 2 data). ----
@@ -408,6 +429,25 @@ test('UC1-FLOW: ?uc1=1 auto-enters demo -> hero WO context -> evaluate -> 3 rank
   // ---- exec KPI strip refreshed with the just-scheduled decision (Decision 5: live appends to seed) ----
   const execKpisAfterSchedule = await page.evaluate(() => (window as any).__uc1ExecKpis);
   expect(execKpisAfterSchedule.decisionCount).toBeGreaterThan(0);
+
+  // ---- Phase 13 (deck-parity item 6, "glass box"): the exec-KPI strip's "Revenue protected"
+  // tile "ⓘ" affordance toggles a popover listing the per-decision breakdown behind that tile's
+  // total — must include the decision just scheduled above (its decisionId embeds the hero WO id,
+  // main.js's buildUc1DecisionRecord()). #uc1-window-panel and #uc1-panel (the exec-kpi-strip's
+  // host) share the same top:16/left:16 floating-panel slot by pre-existing layout design (the
+  // window panel is meant to be closed to reveal the HUD underneath) — a real click on its own
+  // close button is itself obstructed by the (also pre-existing, unrelated) fixed stepper bar at
+  // this viewport size, so close it the same way its own close-button handler does rather than
+  // fighting that separate layering issue, which is out of this phase's scope.
+  await page.evaluate(() => document.getElementById('uc1-window-panel')?.classList.add('hidden'));
+  await expect(windowPanel).toBeHidden();
+  const revenueProtectedInfoBtn = execStrip.locator('.uc1-exec-kpi-info-btn[data-tile-key="revenueProtected"]');
+  await expect(revenueProtectedInfoBtn).toBeVisible();
+  const revenueProtectedPopover = execStrip.locator('.uc1-exec-kpi-popover').first();
+  await expect(revenueProtectedPopover).toBeHidden();
+  await revenueProtectedInfoBtn.click();
+  await expect(revenueProtectedPopover).toBeVisible();
+  await expect(revenueProtectedPopover).toContainText(HERO_WORK_ORDER_ID);
 
   await shoot(page, 'uc1-flow-3-decision-logged');
 });

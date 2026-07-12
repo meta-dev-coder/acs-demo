@@ -473,7 +473,14 @@ html, body, #cesiumContainer, #arcgisContainer {
    §4 bullet 3). Reuses .dc-panel / .dc-panel-close / .dc-panel-h / .dc-panel-sub from the
    DataConnect asset panel (same HUD visual language); wider than the other right-column panels
    since it hosts a table, so it gets its own width + left-edge placement. */
-#uc1-window-panel { top: 16px; left: 16px; right: auto; width: 420px; }
+/* Design-QA fix: the ranked table's 9 columns (rank/window/revenue/delay/throughput/lanes/
+   crash-risk/score/actions) need ~650px at their natural nowrap width; at the old 420px the
+   `.uc1-win-table-wrap`'s overflow-x:auto silently clipped the table, and clicking ANY row's
+   Play/Schedule button (both on the right edge) auto-scrolled the panel to reveal them — which
+   scrolled the "money shot" (winner wash, rail, serif $ figure, "cheapest safe window" tag, all
+   in the first 3 columns) off-screen to the left. Widened so the whole table fits with no
+   horizontal scroll at all, keeping the signature element visible through every interaction. */
+#uc1-window-panel { top: 16px; left: 16px; right: auto; width: 720px; }
 .uc1-win-sparkline { margin: 6px 0 10px; }
 .uc1-win-sparkline svg { width: 100%; height: 56px; display: block; }
 .uc1-win-legend { display: flex; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
@@ -491,10 +498,41 @@ html, body, #cesiumContainer, #arcgisContainer {
 .uc1-win-rank { font-weight: 800; text-align: center; color: #f1c94f; width: 16px; }
 .uc1-win-label { font-weight: 700; font-size: 10.5px; }
 .uc1-win-sub { font-size: 8.5px; color: #8fa3bb; white-space: nowrap; }
-.uc1-win-cell { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.uc1-win-cell { font-variant-numeric: tabular-nums; white-space: nowrap; position: relative; }
 .uc1-win-cell.red   { color: #ff6b6b; }
 .uc1-win-cell.amber { color: #f1a325; }
 .uc1-win-cell.green { color: #43d871; }
+
+/* ---- glass-box popovers (deck-parity item 6, Phase 13) — the "ⓘ" affordance + its ingredient
+   popover. Quiet by design (design directive: everything except the money-shot table stays
+   disciplined) — a small muted glyph, a small floating card, no accent unless a line is REAL. ---- */
+.uc1-win-info-btn {
+  font-size: 9px; line-height: 1; margin-left: 3px; padding: 0; border: none; background: none;
+  color: #7d8da3; cursor: pointer; vertical-align: middle;
+}
+.uc1-win-info-btn:hover, .uc1-win-info-btn[aria-expanded="true"] { color: #6fb1ff; }
+.uc1-win-ingredient-popover {
+  position: absolute; top: 100%; left: 0; z-index: 30; margin-top: 4px;
+  min-width: 170px; white-space: normal;
+  background: rgba(15, 22, 33, 0.96); border: 1px solid rgba(111, 177, 255, 0.35);
+  border-radius: 6px; padding: 7px 9px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+.uc1-win-ingredient-popover[hidden] { display: none; }
+.uc1-win-ingredient-line {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: 9px; color: #cdd8e6; padding: 2px 0;
+}
+.uc1-win-ingredient-label { color: #9fb0c3; }
+.uc1-win-ingredient-value { font-variant-numeric: tabular-nums; font-weight: 700; }
+
+body.uc1-mode .uc1-win-info-btn { color: var(--uc1-muted); }
+body.uc1-mode .uc1-win-info-btn:hover,
+body.uc1-mode .uc1-win-info-btn[aria-expanded="true"] { color: var(--uc1-accent); }
+body.uc1-mode .uc1-win-ingredient-popover {
+  background: var(--uc1-ink); border-color: var(--uc1-line);
+}
+body.uc1-mode .uc1-win-ingredient-label { color: var(--uc1-muted); }
+body.uc1-mode .uc1-win-ingredient-value { color: var(--uc1-text); font-family: var(--uc1-font-body); }
 .uc1-win-score { font-weight: 800; color: #f2f5f8; }
 .uc1-win-actions { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
 .uc1-win-play-btn {
@@ -579,12 +617,40 @@ body.uc1-mode .uc1-win-winner-tag {
    floating popup panel like the context/window/trust panels above. */
 .uc1-exec-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
 .uc1-exec-kpi {
-  border-radius: 8px; padding: 7px 5px; text-align: center; font-size: 10px;
+  border-radius: 8px; padding: 7px 5px; text-align: center; font-size: 10px; position: relative;
   background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1);
 }
 .uc1-exec-kpi .v { font-size: 13px; font-weight: 800; display: block; color: #f2f5f8; }
 .uc1-exec-kpi .l { font-size: 7.5px; text-transform: uppercase; letter-spacing: 0.2px; opacity: 0.85; color: #9fb0c3; }
 .uc1-exec-kpi-note { font-size: 9px; font-style: italic; color: #7d8da3; margin-top: 6px; }
+
+/* ---- glass-box popovers on the exec-KPI strip (deck-parity item 6, Phase 13) — same quiet "ⓘ"
+   idiom as the window table's per-cell popovers. ---- */
+.uc1-exec-kpi-info-btn {
+  position: absolute; top: 3px; right: 4px; font-size: 8px; line-height: 1; padding: 0;
+  border: none; background: none; color: #7d8da3; cursor: pointer;
+}
+.uc1-exec-kpi-info-btn:hover, .uc1-exec-kpi-info-btn[aria-expanded="true"] { color: #6fb1ff; }
+.uc1-exec-kpi-popover {
+  position: absolute; top: 100%; left: 50%; transform: translateX(-50%); z-index: 30; margin-top: 4px;
+  min-width: 150px; max-width: 220px; text-align: left; white-space: normal;
+  background: rgba(15, 22, 33, 0.96); border: 1px solid rgba(111, 177, 255, 0.35);
+  border-radius: 6px; padding: 7px 9px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+.uc1-exec-kpi-popover[hidden] { display: none; }
+.uc1-exec-kpi-ingredient-line {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: 9px; color: #cdd8e6; padding: 2px 0;
+}
+.uc1-exec-kpi-ingredient-label { color: #9fb0c3; }
+.uc1-exec-kpi-ingredient-value { font-variant-numeric: tabular-nums; font-weight: 700; }
+
+body.uc1-mode .uc1-exec-kpi-info-btn { color: var(--uc1-muted); }
+body.uc1-mode .uc1-exec-kpi-info-btn:hover,
+body.uc1-mode .uc1-exec-kpi-info-btn[aria-expanded="true"] { color: var(--uc1-accent); }
+body.uc1-mode .uc1-exec-kpi-popover { background: var(--uc1-ink); border-color: var(--uc1-line); }
+body.uc1-mode .uc1-exec-kpi-ingredient-label { color: var(--uc1-muted); }
+body.uc1-mode .uc1-exec-kpi-ingredient-value { color: var(--uc1-text); font-family: var(--uc1-font-body); }
 
 /* UC1 trust — trustPanel.js (design spec §4 "Trust panel", two tabs: Backtest / Assumptions).
    Reuses .dc-panel / .dc-panel-close / .dc-panel-h / .dc-panel-sub from the DataConnect panel
@@ -725,6 +791,74 @@ body.uc1-mode {
   --uc1-font-body: -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
+/* ---- Design-QA pass (uc1-design-directives.md) — token-compliance fixes found by screenshotting
+   the built flow against the binding directives. The panels/eyebrows/buttons below were left on
+   the sandbox's rogue blue (#2f6df6/#6fb1ff — not a deck token) or its glassmorphism blur instead
+   of being re-toned per-phase (review note 1); this block closes that gap in one place rather than
+   duplicating a re-tone snippet next to every panel's own rules. Base .panel/.dc-panel/.dc-h/etc.
+   (sandbox-shared classes) are untouched — every rule here is body.uc1-mode-scoped. ---- */
+body.uc1-mode .panel,
+body.uc1-mode .dc-asset-panel {
+  background: rgba(14, 23, 38, 0.92);
+  border-color: var(--uc1-line);
+  border-radius: 8px;
+  backdrop-filter: none;
+  color: var(--uc1-text);
+  font-family: var(--uc1-font-body);
+}
+body.uc1-mode .dc-panel-h {
+  font-family: var(--uc1-font-display);
+  font-weight: 600;
+}
+body.uc1-mode .dc-panel-sub { color: var(--uc1-muted); }
+body.uc1-mode .hud-eyebrow,
+body.uc1-mode .dc-h,
+body.uc1-mode .uc1-ctx-label,
+body.uc1-mode .uc1-picker-eyebrow {
+  color: var(--uc1-muted);
+  letter-spacing: 0.12em;
+}
+/* Review note 6: risk badges were a saturated block; align exactly to the risk/safe tokens at a
+   12% wash (context panel's "RISK 5"/incident chips). Amber stays as the app's existing generic
+   warning color — not one of the 6 deck tokens, left alone. */
+body.uc1-mode .uc1-ctx-badge.red {
+  background: rgba(214, 90, 74, 0.12);
+  color: var(--uc1-risk);
+}
+body.uc1-mode .uc1-ctx-badge.green {
+  background: rgba(76, 175, 135, 0.12);
+  color: var(--uc1-safe);
+}
+/* Trigger-layer toggle buttons (Work orders/Accidents/Failed inspections) — active state used the
+   sandbox's shared blue .on treatment; accent matches the token rule ("--uc1-accent ... CTAs") and
+   the same accent-on-active-pick convention already used by the lane chooser/picker. */
+body.uc1-mode #btn-uc1-wo.on,
+body.uc1-mode #btn-uc1-accidents.on,
+body.uc1-mode #btn-uc1-inspections.on {
+  background: var(--uc1-accent);
+  border-color: var(--uc1-accent);
+  color: var(--uc1-ink);
+}
+/* .uc1-win-schedule-btn is reused for "Evaluate closure windows", "Pick your own windows",
+   "Why trust this?" AND every ranked row's "Schedule this window" — quiet chrome by default
+   (everything but the money shot stays disciplined), accent only in the hover/interaction state,
+   same split already established for the lane chooser's pill buttons. */
+body.uc1-mode .uc1-win-schedule-btn {
+  border-color: var(--uc1-line);
+  background: var(--uc1-ink-2);
+  color: var(--uc1-muted);
+  font-family: var(--uc1-font-body);
+}
+body.uc1-mode .uc1-win-schedule-btn:hover {
+  background: var(--uc1-accent);
+  border-color: var(--uc1-accent);
+  color: var(--uc1-ink);
+}
+body.uc1-mode .uc1-trust-tab.on {
+  color: var(--uc1-accent);
+  border-bottom-color: var(--uc1-accent);
+}
+
 /* ---- Chrome suppression (uc1Mode.js's UC1_HIDDEN_SELECTORS — keep the two lists in sync).
    CSS-only display:none via body.uc1-mode: every node here stays in the DOM and fully
    functional, so closure.spec.ts's default-mode #wz-* drive is unaffected. ---- */
@@ -750,10 +884,12 @@ body.uc1-mode #assetops-hud {
    panel body (design spec §3 "front-and-center" — not a small strip below a dozen other panels).
    The floating context/window/trust panels need no rule here — they're already separate overlays
    outside the stacked HUD, which is the correct pattern per the storyboard. ---- */
+/* Design-QA fix: was tinted with the sandbox's rogue blue (#2f6df6 family), not a deck token —
+   review note 1 ("panels inherit sandbox grey/blue — re-token"). */
 body.uc1-mode #uc1-panel {
-  background: rgba(47, 109, 246, 0.07);
-  border-color: rgba(111, 177, 255, 0.3);
-  border-radius: 10px;
+  background: var(--uc1-ink);
+  border-color: var(--uc1-line);
+  border-radius: 8px;
 }
 body.uc1-mode .uc1-exec-kpi-strip {
   position: sticky;
@@ -797,6 +933,19 @@ body.uc1-mode .hud-title {
 /* ---- Startup tile (uc1Mode.js's renderStartupTile) — full-screen, dark, minimal,
    presentation-grade single call-to-action (design spec §5: no scenario picker, no menu). ---- */
 #uc1-startup-tile {
+  /* Design-QA fix: the tile renders BEFORE body.uc1-mode is set (enterUc1Mode() only fires on
+     "Start the 6-minute demo"/?uc1=1), so it can't rely on the body.uc1-mode-scoped custom
+     properties below (design directives Tokens section) — same 8 tokens, self-scoped here. */
+  --uc1-ink: #0e1726;
+  --uc1-ink-2: #16233a;
+  --uc1-line: #24344f;
+  --uc1-text: #e9eef5;
+  --uc1-muted: #8fa1b8;
+  --uc1-accent: #e8963c;
+  --uc1-risk: #d65a4a;
+  --uc1-safe: #4caf87;
+  --uc1-font-display: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --uc1-font-body: -apple-system, "Segoe UI", Roboto, sans-serif;
   position: fixed;
   inset: 0;
   z-index: 60;
@@ -804,19 +953,20 @@ body.uc1-mode .hud-title {
   align-items: center;
   justify-content: center;
   padding: 32px;
-  background: radial-gradient(circle at 50% 30%, rgba(47, 109, 246, 0.12), transparent 60%), #060a11;
-  color: #f2f5f8;
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: radial-gradient(circle at 50% 30%, rgba(232, 150, 60, 0.10), transparent 60%), #060a11;
+  color: var(--uc1-text);
+  font-family: var(--uc1-font-body);
 }
 #uc1-startup-tile.hidden { display: none !important; }
 
 .uc1-startup { max-width: 620px; text-align: center; }
 .uc1-startup-eyebrow {
-  font-size: 11px; letter-spacing: 1.6px; text-transform: uppercase; color: #6fb1ff; font-weight: 700;
+  font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--uc1-muted); font-weight: 700;
   margin-bottom: 18px;
 }
 .uc1-startup-title {
-  font-size: 44px; line-height: 1.12; font-weight: 800; margin: 0 0 20px; letter-spacing: -0.5px;
+  font-family: var(--uc1-font-display); font-weight: 600;
+  font-size: 44px; line-height: 1.12; margin: 0 0 20px; letter-spacing: -0.5px;
 }
 .uc1-startup-hook {
   font-size: 16px; line-height: 1.5; color: #cdd8e6; font-style: italic; margin: 0 0 22px;
@@ -827,18 +977,27 @@ body.uc1-mode .hud-title {
   padding: 6px 13px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.16);
   background: rgba(255,255,255,0.06); color: #cdd8e6;
 }
-.uc1-startup-badge-queue { border-color: rgba(241, 163, 37, 0.45); background: rgba(241, 163, 37, 0.12); color: #f1c94f; }
-.uc1-startup-tagline { font-size: 13px; color: #8fa3bb; margin: 0 0 30px; }
+.uc1-startup-badge-queue {
+  border-color: color-mix(in srgb, var(--uc1-accent) 45%, transparent);
+  background: color-mix(in srgb, var(--uc1-accent) 12%, transparent);
+  color: var(--uc1-accent);
+}
+.uc1-startup-tagline { font-size: 13px; color: var(--uc1-muted); margin: 0 0 30px; }
 .uc1-startup-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 .uc1-startup-btn {
   font: inherit; font-size: 14px; font-weight: 700; padding: 13px 26px; border-radius: 9px;
   cursor: pointer; border: 1px solid rgba(255,255,255,0.16); transition: transform .12s, background .12s;
 }
 .uc1-startup-btn:hover { transform: translateY(-1px); }
-.uc1-startup-btn-primary { background: #2f6df6; border-color: #2f6df6; color: #fff; }
-.uc1-startup-btn-primary:hover { background: #4c81ff; }
-.uc1-startup-btn-secondary { background: rgba(255,255,255,0.05); color: #cdd8e6; }
-.uc1-startup-btn-secondary:hover { background: rgba(255,255,255,0.12); }
+/* Design directive: "ONE primary button ... (accent)" + "quiet text link" for the secondary
+   action — was a solid blue button + a bordered secondary button (two competing cards). */
+.uc1-startup-btn-primary { background: var(--uc1-accent); border-color: var(--uc1-accent); color: var(--uc1-ink); }
+.uc1-startup-btn-primary:hover { background: color-mix(in srgb, var(--uc1-accent) 85%, white); }
+.uc1-startup-btn-secondary {
+  background: none; border-color: transparent; color: var(--uc1-muted);
+  text-decoration: underline; text-decoration-color: var(--uc1-line); text-underline-offset: 3px;
+}
+.uc1-startup-btn-secondary:hover { background: none; color: var(--uc1-text); transform: none; }
 
 /* ---- Stepper bar (uc1Mode.js's renderStepper) — 5 steps pinned to the top edge; "no navigation
    chrome / page transitions between the 5 steps" (design spec §1). ---- */
@@ -849,9 +1008,9 @@ body.uc1-mode .hud-title {
   display: flex; align-items: center; gap: 16px;
   padding: 10px 20px;
   border-radius: 0 0 12px 12px;
-  background: rgba(15, 22, 33, 0.88);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.08); border-top: none;
+  /* Design directive: "NO glassmorphism blur" — was backdrop-filter: blur(10px). */
+  background: rgba(14, 23, 38, 0.92);
+  border: 1px solid var(--uc1-line, #24344f); border-top: none;
   box-shadow: 0 8px 24px rgba(0,0,0,0.4);
 }
 .uc1-stepper-track { display: flex; align-items: center; gap: 6px; }
@@ -861,9 +1020,9 @@ body.uc1-mode .hud-title {
   border-radius: 50%; font-size: 10px; font-weight: 800; background: rgba(255,255,255,0.1); color: #8fa3bb;
 }
 .uc1-step-label { font-size: 11px; font-weight: 600; color: #8fa3bb; letter-spacing: 0.2px; }
-.uc1-step-active .uc1-step-num { background: #2f6df6; color: #fff; }
+.uc1-step-active .uc1-step-num { background: var(--uc1-accent, #2f6df6); color: #fff; }
 .uc1-step-active .uc1-step-label { color: #f2f5f8; }
-.uc1-step-done .uc1-step-num { background: #43d871; color: #06210f; }
+.uc1-step-done .uc1-step-num { background: var(--uc1-safe, #43d871); color: #06210f; }
 .uc1-step-done .uc1-step-label { color: #cdd8e6; }
 .uc1-step-sep { width: 14px; height: 1px; background: rgba(255,255,255,0.16); }
 
@@ -1010,4 +1169,64 @@ body.uc1-mode .uc1-picker-evaluate-btn:hover:not(:disabled) {
    classes so it can't be read as touching another phase's motion rules. */
 @media (prefers-reduced-motion: reduce) {
   .uc1-picker-svg rect { transition: none !important; }
+}
+
+/* ---- UC1 lane chooser (deck-parity item 3, Phase 11) — laneChooser.js's renderLaneChooser().
+   Small, quiet popup pinned over the selected segment's ribbon by main.js's postRender tracker
+   (positionLaneChooserAt). Per the design directives: this control is NOT the money shot — quiet
+   pill buttons, accent only on the active pick, no shadow/blur drama. ---- */
+.uc1-lane-chooser {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 40;
+  transform: translate(-50%, calc(-100% - 10px));
+  background: rgba(15, 22, 33, 0.92);
+  border: 1px solid rgba(111, 177, 255, 0.35);
+  border-radius: 8px;
+  padding: 8px 10px;
+  pointer-events: auto;
+}
+.uc1-lane-chooser.hidden { display: none; }
+.uc1-lane-chooser-eyebrow {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9fb0c3;
+  margin-bottom: 5px;
+}
+.uc1-lane-chooser-btns { display: flex; gap: 5px; }
+.uc1-lane-btn {
+  font-size: 11px;
+  font-weight: 700;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: 1px solid rgba(111, 177, 255, 0.4);
+  background: rgba(111, 177, 255, 0.1);
+  color: #6fb1ff;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.uc1-lane-btn:hover { background: rgba(111, 177, 255, 0.22); }
+.uc1-lane-btn.on { background: #2f6df6; border-color: #2f6df6; color: #fff; }
+
+/* Deck re-toning under body.uc1-mode (design directive tokens) — same quiet-chrome/accent-on-
+   active-pick split the picker's own re-toning block above uses. */
+body.uc1-mode .uc1-lane-chooser {
+  background: var(--uc1-ink);
+  border-color: var(--uc1-line);
+}
+body.uc1-mode .uc1-lane-chooser-eyebrow { color: var(--uc1-muted); }
+body.uc1-mode .uc1-lane-btn {
+  border-color: var(--uc1-line);
+  background: var(--uc1-ink-2);
+  color: var(--uc1-muted);
+  font-family: var(--uc1-font-body);
+}
+body.uc1-mode .uc1-lane-btn:hover { color: var(--uc1-text); border-color: var(--uc1-muted); }
+body.uc1-mode .uc1-lane-btn.on {
+  background: var(--uc1-accent);
+  border-color: var(--uc1-accent);
+  color: var(--uc1-ink);
 }

@@ -432,3 +432,50 @@ test("seed_decisions.mjs: buildDecision() output matches evaluateWindow() for a 
   assert.equal(decision.source, "2024-26 closure history");
   assert.equal(decision.id, "SEED-DEC-INC-TEST-0001");
 });
+
+// ---- ingredients bundle: glass-box provenance (UC1 deck-parity item 6, Phase 12) ----------------
+// Extra imports live down here (same append-only rationale as the seed_decisions block above).
+
+test("evaluateWindow: ingredients.tollRateUsd matches the toll rate actually used (closureSpec override, not just config default)", () => {
+  const config = loadConfig();
+  assert.notEqual(config.tollRateUsd, 4.75, "fixture override must differ from the config default to be a real test");
+  const demandFn = () => Array(16).fill(1000);
+  const evaluator = createWindowEvaluator({ config, segments: SEGMENTS, incidents: [], demandFn });
+  const window = { start: new Date("2026-07-13T23:00:00"), durationHours: 4 };
+
+  const overridden = evaluator.evaluateWindow("east", { lanesClosed: 1, tollRateUsd: 4.75 }, window);
+  assert.equal(overridden.ingredients.tollRateUsd, 4.75);
+
+  const defaulted = evaluator.evaluateWindow("east", { lanesClosed: 1 }, window);
+  assert.equal(defaulted.ingredients.tollRateUsd, config.tollRateUsd);
+});
+
+test("evaluateWindow: ingredients.weights matches config.weights exactly", () => {
+  const config = loadConfig();
+  const demandFn = () => Array(16).fill(1000);
+  const evaluator = createWindowEvaluator({ config, segments: SEGMENTS, incidents: [], demandFn });
+  const window = { start: new Date("2026-07-13T23:00:00"), durationHours: 4 };
+  const result = evaluator.evaluateWindow("east", { lanesClosed: 1 }, window);
+
+  assert.deepEqual(result.ingredients.weights, config.weights);
+});
+
+test("evaluateWindow: two evaluator instances from DIFFERENT configs (simulating pre/post assumption-slider edit) produce DIFFERENT ingredients.weights/tollRateUsd", () => {
+  const baseConfig = loadConfig();
+  const demandFn = () => Array(16).fill(1000);
+  const window = { start: new Date("2026-07-13T23:00:00"), durationHours: 4 };
+
+  const evaluatorA = createWindowEvaluator({ config: baseConfig, segments: SEGMENTS, incidents: [], demandFn });
+  const resultA = evaluatorA.evaluateWindow("east", { lanesClosed: 1 }, window);
+
+  const editedConfig = {
+    ...baseConfig,
+    tollRateUsd: baseConfig.tollRateUsd + 3,
+    weights: { revenue: 0.1, delay: 0.6, safety: 0.2, crew: 0.1 },
+  };
+  const evaluatorB = createWindowEvaluator({ config: editedConfig, segments: SEGMENTS, incidents: [], demandFn });
+  const resultB = evaluatorB.evaluateWindow("east", { lanesClosed: 1 }, window);
+
+  assert.notEqual(resultA.ingredients.tollRateUsd, resultB.ingredients.tollRateUsd);
+  assert.notDeepEqual(resultA.ingredients.weights, resultB.ingredients.weights);
+});

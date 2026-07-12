@@ -19,16 +19,21 @@ import { assetKpis } from "./assetOps.js";
 import { login, fetchClass, writeRecord, onStatus } from "./dataconnect.js";
 import { adaptDataConnectAssets, scoreAssets } from "./scoringA.js";
 import { buildAssetLayer, disposeAssetLayer, pickAsset, installAssetPicking } from "./assetLayer.js";
-import { extractAccidents, openWorkOrders, failedInspections, buildWorkOrderContext, classifyCorridorAssets, TICKETS_CLASS } from "./uc1Data.js";
-import { buildWorkOrderLayer, buildAccidentLayer, buildInspectionLayer, buildAncillaryLayer, buildImpactHeatmap, disposeUc1Layer, pickUc1Point, flyToLonLat, pulseUc1Point } from "./uc1Layers.js";
+import { extractAccidents, openWorkOrders, failedInspections, buildWorkOrderContext, classifyCorridorAssets, TICKETS_CLASS, segmentCenterlinePoints } from "./uc1Data.js";
+import { buildWorkOrderLayer, buildAccidentLayer, buildInspectionLayer, buildAncillaryLayer, buildImpactHeatmap, buildSegmentRibbonLayer, disposeUc1Layer, disposeUc1SegmentRibbons, pickUc1Point, flyToLonLat, pulseUc1Point } from "./uc1Layers.js";
 import { renderWorkOrderContext } from "./contextPanel.js";
-import { evaluateCandidates, weekDemandSeries } from "./windowAssembly.js";
+import { evaluateCandidates, weekDemandSeries, resolveSegmentByName } from "./windowAssembly.js";
 import { renderWindowPanel } from "./windowPanel.js";
 import { weekStartFor, ghostWindowsFor, renderWindowPicker, hideWindowPicker } from "./windowPicker.js";
+import { laneCloseOptions, renderLaneChooser, hideLaneChooser, positionLaneChooserAt } from "./laneChooser.js";
 import { createDemandModel } from "./demand.js";
 import { runBacktest } from "./backtest.js";
 import { renderTrustPanel, mergeAssumptionDefaults } from "./trustPanel.js";
 import { computeExecKpis, renderExecKpiStrip } from "./execKpis.js";
+import { SceneTransforms, Cartesian3 } from "cesium"; // UC1 deck-parity item 3 (Phase 11): segment
+  // ribbon's lane-chooser postRender screen tracker (SceneTransforms.worldToWindowCoordinates) —
+  // Cesium-only, guarded the same way as the rest of this file's Cesium-specific UC1 wiring
+  // (installUc1's `!viewer?.scene?.canvas` early-out).
 import {
   enterUc1Mode, exitUc1Mode, renderStartupTile, hideStartupTile, renderStepper,
   advanceUc1Step, resetUc1Step,
@@ -950,6 +955,18 @@ const AP_LANE_WIDTH_M = 3.7;          // AASHTO lane width — matches PLAZA_LAN
 const AP_LANE_Y = { ap_0: -AP_LANE_WIDTH_M, ap_1: 0, ap_2: AP_LANE_WIDTH_M };
 const AP_LANE_PICK_TOLERANCE_M = 40;  // click-on-twin tolerance around the lane-pick station.
 
+// ---- UC1 deck-parity item 3: segment ribbon + lane chooser (Phase 11) ----
+let uc1SegmentRibbon = null;             // buildSegmentRibbonLayer()'s return value.
+let uc1SelectedSegmentId = null;         // segment currently selected for the closure spec below —
+                                          // defaults to the picked WO's own segment (openUc1WorkOrderContext),
+                                          // overridable by clicking a different ribbon on the twin.
+let uc1SelectedLanesClosed = 1;          // evaluateCandidates()'s closureSpec.lanesClosed override;
+                                          // reset to 1 on every new WO pick, clamped to the selected
+                                          // segment's laneCloseOptions() whenever the segment changes.
+let uc1LaneChooserPostRenderRemove = null; // viewer.scene.postRender listener handle, stopped
+                                            // whenever the chooser hides so it never leaks a
+                                            // per-frame callback once nothing is tracking it.
+
 const DC_CLASSES = {
   assetRegistry: "asset_registry",
   workOrders: "work_orders",
@@ -1134,12 +1151,18 @@ function buildUc1(viewer, { assetRegistry, workOrders, tickets, safetyInspection
 
   const prevWo = uc1WoCollection, prevAcc = uc1AccidentCollection, prevInsp = uc1InspectionCollection;
   const prevAncillary = uc1AncillaryCollection, prevHeatmap = uc1HeatmapCollection;
+  const prevSegmentRibbon = uc1SegmentRibbon;
   uc1WoCollection = buildWorkOrderLayer(viewer, woSplit.onCorridor);
   uc1AccidentCollection = buildAccidentLayer(viewer, accSplit.onCorridor);
   uc1InspectionCollection = buildInspectionLayer(viewer, inspSplit.onCorridor);
   uc1AncillaryCollection = buildAncillaryLayer(viewer, uc1AncillaryAssets); // starts hidden (buildAncillaryLayer default)
   uc1HeatmapCollection = buildImpactHeatmap(viewer, { accidents: uc1Accidents, incidents: uc1Incidents, segments: uc1Segments });
   uc1HeatmapCollection.show = false; // shown only at the demo-mode Step 5 zoom-out coda
+  // Deck-parity item 3: one polyline per segment, click-to-select — hidden until Step 2 highlights
+  // the hero WO's own segment (openUc1WorkOrderContext), matching buildAncillaryLayer's own
+  // build-then-toggle convention.
+  uc1SegmentRibbon = buildSegmentRibbonLayer(viewer, uc1Segments, corridorCenterline);
+  uc1SegmentRibbon.setVisible(false);
   uc1WoCollection.show = uc1WoOn;
   uc1AccidentCollection.show = uc1AccidentsOn;
   uc1InspectionCollection.show = uc1InspectionsOn;
@@ -1149,6 +1172,7 @@ function buildUc1(viewer, { assetRegistry, workOrders, tickets, safetyInspection
   if (prevInsp) disposeUc1Layer(viewer, prevInsp);
   if (prevAncillary) disposeUc1Layer(viewer, prevAncillary);
   if (prevHeatmap) disposeUc1Layer(viewer, prevHeatmap);
+  if (prevSegmentRibbon) disposeUc1SegmentRibbons(viewer, prevSegmentRibbon);
   renderUc1AncillaryToggle();
 }
 
@@ -1188,7 +1212,10 @@ async function loadUc1ExecKpis() {
  * decision appends to the seeded log"). */
 function renderUc1ExecKpiStrip() {
   const kpis = computeExecKpis(uc1Decisions);
-  renderExecKpiStrip($("uc1-exec-kpi-strip"), kpis);
+  // Deck-parity item 6 (Phase 13): passing `decisions` makes every tile clickable, toggling a
+  // glassBox.js execTileIngredientLines() popover — glassBox.js's own module handles the "no
+  // popover" degrade when a caller omits it, so this is a pure additive one-line change.
+  renderExecKpiStrip($("uc1-exec-kpi-strip"), kpis, { decisions: uc1Decisions });
   window.__uc1ExecKpis = kpis; // debug hook for headless verification (e2e)
 }
 
@@ -1212,6 +1239,21 @@ function openUc1WorkOrderContext(wo) {
   // A newly-picked WO invalidates any window table (or picker) left over from a different WO.
   $("uc1-window-panel")?.classList.add("hidden");
   hideWindowPicker($("uc1-window-picker"));
+
+  // Deck-parity item 3: default-select the WO's own segment on the ribbon — this is what makes the
+  // one-click "Evaluate closure windows" path work with zero new interaction (the picker override
+  // is purely additive). A stale lane chooser from a previously-selected segment is closed rather
+  // than left tracking the old segment's position.
+  const resolvedSegment = resolveSegmentByName(uc1Segments, wo?.segment);
+  uc1SelectedSegmentId = resolvedSegment?.id ?? null;
+  uc1SelectedLanesClosed = 1;
+  closeUc1LaneChooser();
+  if (uc1SegmentRibbon) {
+    uc1SegmentRibbon.setVisible(true);
+    uc1SegmentRibbon.setSelected(uc1SelectedSegmentId);
+  }
+  window.__uc1Segment = { segmentId: uc1SelectedSegmentId, lanesClosed: uc1SelectedLanesClosed };
+
   // Debug hook for headless verification (e2e) — mirrors window.__dcAssets's shape convention.
   window.__uc1Context = { workOrderId: wo?.id ?? null, counts: ctx.counts };
 
@@ -1240,6 +1282,91 @@ function focusUc1ContextRow(record) {
   pulseUc1Point(uc1Viewer, record.lon, record.lat);
 }
 
+// ---- Deck-parity item 3: segment ribbon click -> lane chooser (Phase 11) ------------------------
+
+/** A world-space anchor point for the lane chooser's screen tracker — the middle point of the
+ * segment's own centerline trace (uc1Data.js's segmentCenterlinePoints(), the same pure geometry
+ * buildSegmentRibbonLayer() draws the ribbon from). null when the segment has no overlapping
+ * centerline points (shouldn't happen with the real config; never throws). */
+function uc1SegmentAnchor(seg) {
+  const points = segmentCenterlinePoints(corridorCenterline, seg);
+  if (points.length === 0) return null;
+  const mid = points[Math.floor(points.length / 2)];
+  return Cartesian3.fromDegrees(mid.lon, mid.lat, 1);
+}
+
+/** Stops the lane chooser's postRender screen-position tracker (no-op if nothing is tracking). */
+function stopUc1LaneChooserTracking() {
+  if (uc1LaneChooserPostRenderRemove) {
+    uc1LaneChooserPostRenderRemove();
+    uc1LaneChooserPostRenderRemove = null;
+  }
+}
+
+/** Starts a viewer.scene.postRender listener that keeps #uc1-lane-chooser pinned over `seg`'s
+ * anchor point as the camera moves — SceneTransforms.wgs84ToWindowCoordinates() returns undefined
+ * for a point off-screen/behind the camera, which positionLaneChooserAt() already no-ops on rather
+ * than writing `left: NaNpx`. Stops any previous tracker first (one chooser at a time). */
+function startUc1LaneChooserTracking(seg) {
+  stopUc1LaneChooserTracking();
+  if (!uc1Viewer?.scene) return;
+  const anchor = uc1SegmentAnchor(seg);
+  if (!anchor) return;
+  const el = $("uc1-lane-chooser");
+  const update = () => {
+    const screen = SceneTransforms.worldToWindowCoordinates(uc1Viewer.scene, anchor);
+    positionLaneChooserAt(el, screen ? { x: screen.x, y: screen.y } : {});
+  };
+  update();
+  uc1LaneChooserPostRenderRemove = uc1Viewer.scene.postRender.addEventListener(update);
+}
+
+/** Hides the lane chooser and stops its tracker together — the pairing the design spec's "stopped
+ * when the chooser hides or the panel closes" describes. */
+function closeUc1LaneChooser() {
+  hideLaneChooser($("uc1-lane-chooser"));
+  stopUc1LaneChooserTracking();
+}
+
+/** Renders (or re-renders, on a lane-count change) the lane chooser for `seg` into
+ * #uc1-lane-chooser and starts tracking its screen position. A segment with no legal
+ * laneCloseOptions() (single-lane) closes the chooser instead of showing an empty shell. */
+function openLaneChooserForSegment(seg) {
+  const el = $("uc1-lane-chooser");
+  if (!el) return;
+  if (laneCloseOptions(seg).length === 0) {
+    closeUc1LaneChooser();
+    return;
+  }
+  const draw = () => {
+    renderLaneChooser(el, { segment: seg, lanesClosed: uc1SelectedLanesClosed }, {
+      onChange: (n) => {
+        uc1SelectedLanesClosed = n;
+        window.__uc1Segment = { segmentId: uc1SelectedSegmentId, lanesClosed: uc1SelectedLanesClosed };
+        draw();
+      },
+    });
+  };
+  draw();
+  startUc1LaneChooserTracking(seg);
+}
+
+/** Click-on-twin segment pick (deck-parity item 3): the ribbon-click branch installUc1() wires
+ * into installAssetPicking's callback. Updates the selection, clamps `uc1SelectedLanesClosed` to
+ * the new segment's legal options if it no longer fits, re-highlights the ribbon, and opens the
+ * lane chooser. Exposed for headless e2e verification via window.__uc1SelectSegment. */
+function selectUc1Segment(segmentId) {
+  const seg = uc1Segments.find((s) => s.id === segmentId) ?? null;
+  if (!seg) return;
+  uc1SelectedSegmentId = segmentId;
+  const options = laneCloseOptions(seg);
+  if (!options.includes(uc1SelectedLanesClosed)) uc1SelectedLanesClosed = options[0] ?? 1;
+  if (uc1SegmentRibbon) uc1SegmentRibbon.setSelected(segmentId);
+  openLaneChooserForSegment(seg);
+  setStatus(`Segment selected: ${seg.name} · ${uc1SelectedLanesClosed} lane(s) closed`);
+  window.__uc1Segment = { segmentId: uc1SelectedSegmentId, lanesClosed: uc1SelectedLanesClosed };
+}
+
 /** Appends "Evaluate closure windows" to the just-rendered context panel. No-ops if the panel
  * ended up hidden (renderWorkOrderContext hides+clears on a missing/empty context). */
 function appendUc1EvaluateButton(wo) {
@@ -1255,14 +1382,14 @@ function appendUc1EvaluateButton(wo) {
 }
 
 /** Resolves a work order's segment NAME (wo.segment, openWorkOrders()'s shape) to its
- * segments.json id — same lookup windowAssembly.js's (currently-private) resolveSegmentByName()
- * performs inside evaluateCandidates(). Duplicated here (not imported — that helper isn't exported
- * yet, see Phase 10) only so the picker can pre-resolve a segmentId for weekDemandSeries() before
- * evaluateCandidates() runs; evaluateCandidates() still does its own resolution independently and
- * remains the single source of truth for scoring. Returns null on an unresolved/missing name,
- * never throws — same defensive posture as the rest of the UC1 pure modules. */
+ * segments.json id — thin wrapper over windowAssembly.js's exported resolveSegmentByName() (Phase
+ * 10 exported it; this no longer duplicates the lookup) so the picker can pre-resolve a segmentId
+ * for weekDemandSeries() before evaluateCandidates() runs; evaluateCandidates() still does its own
+ * resolution independently and remains the single source of truth for scoring. Returns null on an
+ * unresolved/missing name, never throws — same defensive posture as the rest of the UC1 pure
+ * modules. */
 function resolveUc1SegmentId(wo) {
-  return uc1Segments.find((s) => s.name === wo?.segment)?.id ?? null;
+  return resolveSegmentByName(uc1Segments, wo?.segment)?.id ?? null;
 }
 
 /** Appends "Pick your own windows" to the just-rendered context panel (deck-parity item 2), next
@@ -1341,6 +1468,8 @@ function evaluateUc1Windows(wo, { windows } = {}) {
     windowConfig: currentUc1WindowConfig(),
     demandModel: currentUc1DemandModel(),
     windows,
+    segmentIdOverride: uc1SelectedSegmentId,
+    closureSpec: { lanesClosed: uc1SelectedLanesClosed },
   });
 
   // Demo-mode Step 2 -> Step 3 (storyboard §1 "Simulate"): run the EXISTING visible-SUMO-run
@@ -1747,11 +1876,16 @@ function installUc1(viewer) {
     };
   }
 
+  // Debug hook for headless verification (e2e) — mirrors window.__uc1SelectSegment's shape
+  // convention, matching the repo's existing deterministic-e2e pattern (e.g. window.__closeLane).
+  window.__uc1SelectSegment = (id) => selectUc1Segment(id);
+
   // Cesium-only pick path (same guard as installDataConnectAssets — no viewer.scene under ArcGIS).
   if (!viewer?.scene?.canvas) return;
   installAssetPicking(viewer, (position) => {
     const picked = pickUc1Point(viewer, position);
     if (picked && picked.kind === "workOrder") openUc1WorkOrderContext(picked.record);
+    else if (picked && picked.kind === "segment") selectUc1Segment(picked.record.segmentId);
   });
   installUc1LanePick(viewer); // P5-e item 4: click-on-twin approach-lane pick
 }

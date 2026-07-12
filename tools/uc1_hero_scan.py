@@ -21,11 +21,20 @@ a perfect match.
 
 Writes cesium-poc/config/uc1Demo.json: {heroWorkOrderId, heroAssetId, rationale, notes}.
 
+Optional preference flags (deck-parity item 7, "hero narrative"): --prefer-asset-type-substring
+and --prefer-segment re-rank candidates WITHIN the existing criteriaMet==3 (perfect-match) tier
+only — a partial match can never be promoted above a perfect one, and when no candidate in that
+tier satisfies the preference, ranking falls back to the same accidentCount/maxNearbyInspectionRisk
+order as when the flags are omitted.
+
 Usage:
   python3 tools/uc1_hero_scan.py
+  python3 tools/uc1_hero_scan.py --prefer-asset-type-substring attenuat --prefer-segment "Central Segment"
 """
 from __future__ import annotations
 
+import argparse
+import difflib
 import json
 import math
 import os
@@ -118,7 +127,61 @@ def nearby(points, lon, lat, radius_m=RADIUS_M):
     return [p for p in points if haversine_m(lon, lat, p[0], p[1]) <= radius_m]
 
 
+# Chosen from a scan of every distinct Asset Type value in the V6 export against "attenuat": only
+# "Attenuetors" (the export's own asset type — note the typo relative to "Attenuators") clears 0.5
+# (ratio 0.737); every other Asset Type in the export scores <= 0.43. 0.6 leaves comfortable margin
+# on both sides without needing to special-case the typo directly.
+FUZZY_MATCH_THRESHOLD = 0.6
+
+
+def fuzzy_substring_match(needle, haystack, threshold=FUZZY_MATCH_THRESHOLD):
+    """Case-insensitive match: a literal substring hit (cheap, exact) OR a difflib similarity
+    ratio >= threshold against the whole haystack. The fuzzy fallback exists because this repo's
+    own V6 export data carries at least one asset-type typo ("Attenuetors" for "Attenuators")
+    that an operator typing the correctly-spelled preference term would otherwise never match —
+    see Phase 14 of docs/superpowers/plans/2026-07-12-uc1-deck-parity-plan.md."""
+    n = (needle or "").strip().lower()
+    h = (haystack or "").strip().lower()
+    if not n or not h:
+        return False
+    if n in h:
+        return True
+    return difflib.SequenceMatcher(None, n, h).ratio() >= threshold
+
+
+def compute_preference_match(candidate, prefer_asset_type_substring, prefer_segment):
+    """True only within the criteriaMet==3 tier (callers must not use this to promote a partial
+    match) AND only when at least one preference flag is set AND every set flag is satisfied."""
+    if candidate["criteriaMet"] != 3:
+        return False
+    if not prefer_asset_type_substring and not prefer_segment:
+        return False
+    asset_ok = not prefer_asset_type_substring or fuzzy_substring_match(
+        prefer_asset_type_substring, candidate["assetType"]
+    )
+    segment_ok = not prefer_segment or candidate["segment"] == prefer_segment
+    return asset_ok and segment_ok
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument(
+        "--prefer-asset-type-substring",
+        default=None,
+        help="Case-insensitive, typo-tolerant Asset Type preference (fuzzy_substring_match) used "
+        "to re-rank WITHIN the existing perfect-match (criteriaMet==3) tier only.",
+    )
+    parser.add_argument(
+        "--prefer-segment",
+        default=None,
+        help="Exact Segment name preference, same criteriaMet==3-only re-rank gate as "
+        "--prefer-asset-type-substring.",
+    )
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
     work_orders = load("work_orders.json")
     tickets = load("tickets.json")
     asset_registry = load("asset_registry.json")
@@ -162,6 +225,7 @@ def main():
             {
                 "workOrderId": wo_id,
                 "assetId": asset_id,
+                "assetType": wo.get("Asset Type"),
                 "segment": wo.get("Segment"),
                 "hasTicket": has_ticket,
                 "relatedTicketId": related_ticket,
@@ -178,8 +242,16 @@ def main():
         print("No open work orders resolved to a location; cannot pick a hero WO.", file=sys.stderr)
         sys.exit(1)
 
+    for c in candidates:
+        c["preferenceMatch"] = compute_preference_match(
+            c, args.prefer_asset_type_substring, args.prefer_segment
+        )
+
+    # preferenceMatch sits AFTER criteriaMet in the sort key, never before — a partial match can
+    # never outrank a perfect one no matter how well it satisfies the preference flags (the
+    # "never relaxes the correctness bar" gate Phase 14's plan section requires).
     candidates.sort(
-        key=lambda c: (c["criteriaMet"], c["accidentCount"], c["maxNearbyInspectionRisk"]),
+        key=lambda c: (c["criteriaMet"], c["preferenceMatch"], c["accidentCount"], c["maxNearbyInspectionRisk"]),
         reverse=True,
     )
     best = candidates[0]

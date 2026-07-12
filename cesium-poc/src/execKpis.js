@@ -32,6 +32,13 @@
  * point of Decision 5's seeded log.
  *--------------------------------------------------------------------------------------------*/
 
+// Deck-parity item 6 (Phase 13): the exec-KPI tiles' glass-box popover reuses glassBox.js's
+// execTileIngredientLines() (imported, not re-invented). This creates a two-module cycle
+// (execKpis.js -> glassBox.js -> execKpis.js's own decisionDeltas()) — safe here because both
+// cross-module references are `export function` declarations (hoisted) called only from inside
+// event handlers at click time, never evaluated at module-top-level during the cycle's own load.
+import { execTileIngredientLines } from "./glassBox.js";
+
 function num(v, fallback = 0) {
   return typeof v === "number" && Number.isFinite(v) ? v : fallback;
 }
@@ -125,8 +132,12 @@ function candidateWorstChosenDelta(entry, decision) {
  *     lane(s) — i.e. what going to a full closure (0% lanes open) would add on top of the actual
  *     partial-closure exposure, approximated by the closed-lane share (1 - laneAvailabilityFrac).
  *     Unknown lane availability -> 0 (no fabricated number).
+ *
+ * Exported (was private) per UC1 deck-parity item 6 (Phase 12): glassBox.js's
+ * execTileIngredientLines() reuses this exact function so the popover's per-decision breakdown
+ * always matches computeExecKpis()'s totals — body unchanged.
  */
-function decisionDeltas(decision, candidateEntry) {
+export function decisionDeltas(decision, candidateEntry) {
   const exact = candidateWorstChosenDelta(candidateEntry, decision);
   if (exact) return exact;
 
@@ -231,25 +242,67 @@ const TILES = [
   { key: "secondaryIncidentsAvoided", label: "Secondary incidents avoided", fmt: fmtIndex },
 ];
 
+function ingredientLineHtml(line) {
+  return `
+    <div class="uc1-exec-kpi-ingredient-line">
+      <span class="uc1-exec-kpi-ingredient-label">${esc(line.label)}</span>
+      <span class="uc1-exec-kpi-ingredient-value">${esc(typeof line.value === "number" ? Math.round(line.value * 100) / 100 : line.value)}</span>
+    </div>`;
+}
+
 /**
- * renderExecKpiStrip(containerEl, kpis, {seededNote})
+ * renderExecKpiStrip(containerEl, kpis, {seededNote, decisions, windowResults})
  *
  * kpis — normally computeExecKpis()'s return value.
  * seededNote — override for whether the "includes seeded ... closure history" honesty label
  *   shows; defaults to kpis.hasSeededData (spec's honesty rule: show it whenever ANY decision in
  *   the strip is seeded). No-ops when containerEl is missing.
+ *
+ * decisions / windowResults — NEW, optional (deck-parity item 6, Phase 13). When `decisions` is
+ * supplied, every tile becomes a click target toggling an inline popover of
+ * glassBox.js's execTileIngredientLines(tileKey, decisions, windowResults) — the same per-decision
+ * numbers that summed produce this tile's own total (tests/glassBox.test.mjs cross-checks that).
+ * Omitting `decisions` renders the tiles exactly as before this param existed — no popover markup,
+ * no click listeners — so every existing caller/test is unaffected.
  */
-export function renderExecKpiStrip(containerEl, kpis, { seededNote } = {}) {
+export function renderExecKpiStrip(containerEl, kpis, { seededNote, decisions, windowResults } = {}) {
   if (!containerEl) return;
   const k = kpis || {};
   const showNote = seededNote ?? k.hasSeededData === true;
+  const clickable = Array.isArray(decisions) && decisions.length > 0;
 
-  const tilesHtml = TILES.map(
-    (t) => `<div class="uc1-exec-kpi"><div class="v">${esc(t.fmt(k[t.key]))}</div><div class="l">${esc(t.label)}</div></div>`
-  ).join("");
+  const tilesHtml = TILES.map((t) => {
+    const popover = clickable
+      ? `<button type="button" class="uc1-exec-kpi-info-btn" data-tile-key="${esc(t.key)}" aria-label="Why this number?" aria-expanded="false">&#9432;</button>
+         <div class="uc1-exec-kpi-popover" hidden></div>`
+      : "";
+    return `<div class="uc1-exec-kpi"><div class="v">${esc(t.fmt(k[t.key]))}</div><div class="l">${esc(t.label)}</div>${popover}</div>`;
+  }).join("");
 
   containerEl.innerHTML = `
     <div class="uc1-exec-kpis">${tilesHtml}</div>
     ${showNote ? `<div class="uc1-exec-kpi-note">Includes seeded 2024-26 closure history</div>` : ""}
   `;
+
+  if (!clickable) return;
+
+  containerEl.querySelectorAll(".uc1-exec-kpi-info-btn").forEach((btn) => {
+    btn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const popover = btn.nextElementSibling;
+      if (!popover || !popover.classList.contains("uc1-exec-kpi-popover")) return;
+      const expanding = popover.hasAttribute("hidden");
+      if (expanding) {
+        const tileKey = btn.getAttribute("data-tile-key");
+        const lines = execTileIngredientLines(tileKey, decisions, windowResults);
+        popover.innerHTML = lines.length > 0
+          ? lines.map(ingredientLineHtml).join("")
+          : `<div class="uc1-exec-kpi-ingredient-line"><span class="uc1-exec-kpi-ingredient-label">No decisions to show</span></div>`;
+        popover.removeAttribute("hidden");
+      } else {
+        popover.setAttribute("hidden", "");
+      }
+      btn.setAttribute("aria-expanded", String(expanding));
+    });
+  });
 }
