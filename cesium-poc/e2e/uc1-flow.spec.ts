@@ -168,6 +168,11 @@ test('UC1-FLOW: ?uc1=1 auto-enters demo -> hero WO context -> evaluate -> 3 rank
   await expect(page.locator('#uc1-stepper')).toBeVisible();
   await expect(page.locator('body')).toHaveClass(/uc1-mode/);
 
+  // Regression: demo mode must force the site to i595 (I-595 Ft Lauderdale, where the UC1
+  // work-order/segment data lives) even though SITES[0] ("dnt") is the app's default — assert via
+  // the hidden #site-select's value (kept in sync with siteId even though it's CSS-hidden in UC1 mode).
+  await expect(page.locator('#site-select')).toHaveValue('i595');
+
   // The legacy work-zone/MUTCD HUD stays in the DOM (closure.spec.ts still drives it directly in
   // default mode) but is CSS-hidden while UC1 demo mode is active (storyboard §7).
   const wzHud = page.locator('#workzone-hud');

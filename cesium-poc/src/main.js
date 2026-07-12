@@ -1531,6 +1531,10 @@ function uc1Advance(event) {
  * "glowing work orders" are visible the moment the twin is ready. */
 async function startUc1Demo(viewer) {
   uc1DemoActive = true;
+  // UC1's data/story is I-595 Ft Lauderdale, regardless of which site a previous visit left active
+  // (e.g. the default "dnt"/Dallas North Tollway) — force it BEFORE any plaza fly/camera work below,
+  // via the same switch routine the #site-select dropdown uses. No-ops if already on i595.
+  await switchSite(viewer, "i595");
   uc1Step = resetUc1Step();
   hideStartupTile($("uc1-startup-tile"));
   enterUc1Mode();
@@ -1556,6 +1560,8 @@ async function startUc1Demo(viewer) {
  * the generic-twin HUD again and reframes the plaza — "today's sandbox unchanged". */
 function exitUc1DemoMode(viewer) {
   uc1DemoActive = false;
+  // Deliberately does NOT switch siteId back to whatever was active before startUc1Demo() forced
+  // i595 — keeping this simple; the sandbox stays on i595 until the user picks a different site.
   exitUc1Mode();
   $("uc1-stepper")?.classList.add("hidden");
   setStatus("Exited UC1 demo — sandbox controls restored.");
@@ -1753,6 +1759,31 @@ function installExportCalibration() {
 }
 async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); startTraffic(viewer); }
 
+/** Switches the active site's transform to `id` and reloads the offline baseline run on the new
+ * corridor — the exact routine the #site-select dropdown's onchange runs (below), factored out so
+ * UC1 demo entry can force site "i595" (the corridor the UC1 data/story is about — see Bug: demo
+ * mode was flying to whatever site was last active, e.g. the default "dnt"/Dallas North Tollway,
+ * while the UC1 work-order/segment data is all I-595 Ft Lauderdale) without duplicating this logic
+ * or drifting from the dropdown's behaviour. No-ops if already on `id`. Keeps the hidden
+ * #site-select's DOM value in sync via $ (not a closure) so it works whether or not the select has
+ * been created yet when this runs. */
+async function switchSite(viewer, id) {
+  if (siteId === id) return;
+  siteId = id;
+  { const s = await loadSite(siteId); setTransform(s.transform); }
+  stopLive(viewer);
+  const bBaseEl = $("btn-baseline"), bIntEl = $("btn-intervention"), bLiveEl = $("btn-live");
+  [bIntEl, bLiveEl].forEach((b) => b?.classList.remove("on")); bBaseEl?.classList.add("on");
+  offlineUrl = asset("/data/baseline.json");
+  trafficStarted = false;
+  await loadRun(viewer, offlineUrl);
+  startTraffic(viewer);
+  frameCamera(viewer);
+  const sel = $("site-select");
+  if (sel) sel.value = siteId;
+  setStatus(`Switched to ${SITES.find((s) => s.id === siteId).name} — same plaza, new corridor.`);
+}
+
 // ============================================================================ boot
 (async function main() {
   // Renderer switch: ?renderer=arcgis selects the ArcGIS adapter (lazy-loaded so the Cesium bundle is
@@ -1914,18 +1945,7 @@ async function reloadAndStart(viewer) { await loadRun(viewer, offlineUrl); start
   if (sel) {
     sel.innerHTML = SITES.map((s) => `<option value="${s.id}">${s.name}</option>`).join("");
     sel.value = siteId;
-    sel.onchange = async () => {
-      siteId = sel.value;
-      { const s = await loadSite(siteId); setTransform(s.transform); }
-      stopLive(viewer);
-      [bInt, bLive].forEach((b) => b.classList.remove("on")); bBase.classList.add("on");
-      offlineUrl = asset("/data/baseline.json");
-      trafficStarted = false;
-      await loadRun(viewer, offlineUrl);
-      startTraffic(viewer);
-      frameCamera(viewer);
-      setStatus(`Switched to ${SITES.find((s) => s.id === siteId).name} — same plaza, new corridor.`);
-    };
+    sel.onchange = () => switchSite(viewer, sel.value);
   }
 
   // Fly to the plaza (never the bare globe).
