@@ -7,6 +7,9 @@
  *--------------------------------------------------------------------------------------------*/
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 
 import {
   HONESTY_LINE,
@@ -19,7 +22,17 @@ import {
   getAssumptionAtPath,
   setAssumptionAtPath,
   mergeAssumptionDefaults,
+  normalizeLedgerDate,
+  buildPredictionLedger,
+  predictionLedgerTrend,
 } from "../src/trustPanel.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const seedPath = path.join(__dirname, "..", "..", "tools", "dataconnect-data", "decisions_seed.json");
+
+function loadSeedDecisions() {
+  return JSON.parse(readFileSync(seedPath, "utf-8"));
+}
 
 // ---- HONESTY_LINE: verbatim slide-10 line -------------------------------------------------------
 
@@ -180,4 +193,113 @@ test("mergeAssumptionDefaults ignores non-finite tollRateUsd/mergeFriction and f
   const merged = mergeAssumptionDefaults({ tollRateUsd: "nope", mergeFriction: NaN });
   assert.equal(merged.tollRateUsd, DEFAULT_ASSUMPTIONS.tollRateUsd);
   assert.equal(merged.mergeFriction, DEFAULT_ASSUMPTIONS.mergeFriction);
+});
+
+// ---- normalizeLedgerDate -------------------------------------------------------------------------
+
+test("normalizeLedgerDate: reads seed shape's decidedAt", () => {
+  const d = normalizeLedgerDate({ decidedAt: "2024-05-27T04:00:00", window: {} });
+  assert.ok(d instanceof Date);
+  assert.equal(d.toISOString(), new Date("2024-05-27T04:00:00").toISOString());
+});
+
+test("normalizeLedgerDate: reads live shape's scheduledAtIso", () => {
+  const d = normalizeLedgerDate({ scheduledAtIso: "2026-01-15T10:00:00.000Z", window: { startIso: "2020-01-01T00:00:00.000Z" } });
+  assert.ok(d instanceof Date);
+  assert.equal(d.toISOString(), "2026-01-15T10:00:00.000Z");
+});
+
+test("normalizeLedgerDate: falls back to window.startIso when both are missing", () => {
+  const d = normalizeLedgerDate({ window: { startIso: "2025-03-01T06:00:00.000Z" } });
+  assert.ok(d instanceof Date);
+  assert.equal(d.toISOString(), "2025-03-01T06:00:00.000Z");
+});
+
+test("normalizeLedgerDate: returns null (not throw) on a fully malformed record", () => {
+  assert.equal(normalizeLedgerDate(null), null);
+  assert.equal(normalizeLedgerDate(undefined), null);
+  assert.equal(normalizeLedgerDate({}), null);
+  assert.equal(normalizeLedgerDate({ window: {} }), null);
+  assert.equal(normalizeLedgerDate({ decidedAt: "not-a-date" }), null);
+});
+
+// ---- buildPredictionLedger ------------------------------------------------------------------------
+
+test("buildPredictionLedger: every row's actual.status is 'pending' (load-bearing honesty guard)", () => {
+  const rows = buildPredictionLedger(loadSeedDecisions());
+  assert.ok(rows.length > 0);
+  for (const row of rows) {
+    assert.equal(row.actual.status, "pending");
+  }
+});
+
+test("buildPredictionLedger: seeded rows get the seed reason; live rows get the live reason", () => {
+  const [seedRow, liveRow] = buildPredictionLedger([
+    { id: "s1", seeded: true, segmentId: "east", window: { durationHours: 4 }, decidedAt: "2024-01-01T00:00:00Z" },
+    {
+      decisionId: "l1",
+      segmentId: "west",
+      window: { id: "w1", label: "AM peak", startIso: "2026-01-01T00:00:00Z", durationHours: 3 },
+      rank: 1,
+      scheduledAtIso: "2026-01-01T01:00:00Z",
+    },
+  ]);
+  assert.equal(seedRow.seeded, true);
+  assert.equal(seedRow.actual.reason, "no independently-observed outcome to grade against");
+  assert.equal(liveRow.seeded, false);
+  assert.equal(liveRow.actual.reason, "no post-closure telemetry feed in this package yet");
+});
+
+test("buildPredictionLedger: on the real committed decisions_seed.json (post-Phase-1 regen), returns 15 rows, all pending, all seeded:true", () => {
+  const rows = buildPredictionLedger(loadSeedDecisions());
+  assert.equal(rows.length, 15);
+  assert.ok(rows.every((r) => r.actual.status === "pending"));
+  assert.ok(rows.every((r) => r.seeded === true));
+});
+
+test("buildPredictionLedger: never throws on malformed/empty input", () => {
+  assert.deepEqual(buildPredictionLedger([]), []);
+  assert.deepEqual(buildPredictionLedger(undefined), []);
+  const rows = buildPredictionLedger([null, {}, { window: {} }]);
+  assert.equal(rows.length, 3);
+  assert.ok(rows.every((r) => r.actual.status === "pending"));
+});
+
+// ---- predictionLedgerTrend ------------------------------------------------------------------------
+
+test("predictionLedgerTrend: empty input -> {n:0, pctOptimalWindow:0, byMonth:[]}", () => {
+  assert.deepEqual(predictionLedgerTrend([]), { n: 0, pctOptimalWindow: 0, byMonth: [] });
+  assert.deepEqual(predictionLedgerTrend(undefined), { n: 0, pctOptimalWindow: 0, byMonth: [] });
+});
+
+test("predictionLedgerTrend: rows missing rank default to rank 1 (counted optimal)", () => {
+  const trend = predictionLedgerTrend([
+    { rank: null, dateIso: "2024-01-15T00:00:00.000Z" },
+    { rank: 2, dateIso: "2024-01-20T00:00:00.000Z" },
+  ]);
+  assert.equal(trend.n, 2);
+  assert.equal(trend.pctOptimalWindow, 50);
+});
+
+test("predictionLedgerTrend: buckets by month key from dateIso; null-date rows excluded from byMonth but counted in top-level n", () => {
+  const trend = predictionLedgerTrend([
+    { rank: 1, dateIso: "2024-03-05T00:00:00.000Z" },
+    { rank: 1, dateIso: "2024-03-20T00:00:00.000Z" },
+    { rank: 2, dateIso: null },
+  ]);
+  assert.equal(trend.n, 3);
+  assert.equal(trend.byMonth.length, 1);
+  assert.equal(trend.byMonth[0].monthKey, "2024-03");
+  assert.equal(trend.byMonth[0].n, 2);
+  assert.equal(trend.byMonth[0].pctOptimalWindow, 100);
+});
+
+test("predictionLedgerTrend: byMonth sorted ascending by monthKey", () => {
+  const trend = predictionLedgerTrend([
+    { rank: 1, dateIso: "2025-06-01T00:00:00.000Z" },
+    { rank: 1, dateIso: "2024-01-01T00:00:00.000Z" },
+    { rank: 1, dateIso: "2024-12-01T00:00:00.000Z" },
+  ]);
+  const keys = trend.byMonth.map((b) => b.monthKey);
+  assert.deepEqual(keys, ["2024-01", "2024-12", "2025-06"]);
 });

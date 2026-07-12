@@ -54,6 +54,7 @@
 // the field.
 export { HONESTY_LINE } from "./backtest.js";
 import { HONESTY_LINE } from "./backtest.js";
+import { normalizeDecisionEvidence } from "./execKpis.js";
 
 // ---- assumptions: defaults, bounds, badges, pure merge/clamp helpers --------------------------
 
@@ -166,6 +167,122 @@ export function mergeAssumptionDefaults(assumptions) {
     mergeFriction: Number.isFinite(a.mergeFriction) ? a.mergeFriction : DEFAULT_ASSUMPTIONS.mergeFriction,
     segmentDemandScale: { ...DEFAULT_ASSUMPTIONS.segmentDemandScale, ...(a.segmentDemandScale || {}) },
     segments: Array.isArray(a.segments) ? a.segments : [],
+  };
+}
+
+// ---- Track Record tab: prediction ledger (design spec §4 "Track record", Item 4) ---------------
+//
+// Honest-design decision (do not weaken): this repo has no post-closure telemetry feed, so there
+// is no independently-observed "actual" to grade a prediction against. Every ledger row's
+// `actual.status` is therefore always "pending", with a reason distinguishing seeded rows (the
+// historical seed log predates this optimizer and was never "predicted" in the first place) from
+// live rows (scheduled in this session, but no feed exists yet to report back what happened). The
+// "accuracy trending" the deck promises is reframed as a real, computable, non-circular measure:
+// the % of decisions scheduled in the optimal (rank 1) window over time — labelled "compliance
+// trend", never "accuracy trend". Tab 1's genuinely-graded backtest is the one place this package
+// actually compares predicted vs. actual; this tab must not duplicate or imitate that grading.
+
+const SEED_PENDING_REASON = "no independently-observed outcome to grade against";
+const LIVE_PENDING_REASON = "no post-closure telemetry feed in this package yet";
+
+function round(n, decimals) {
+  const f = 10 ** decimals;
+  return Math.round((typeof n === "number" && Number.isFinite(n) ? n : 0) * f) / f;
+}
+
+/** Bridges the seed shape's `decidedAt`, the live shape's `scheduledAtIso`, and (as a last
+ * resort) `window.startIso` into one Date — never throws, returns null on anything unparsable. */
+export function normalizeLedgerDate(decision) {
+  const raw = decision?.decidedAt ?? decision?.scheduledAtIso ?? decision?.window?.startIso ?? null;
+  if (!raw) return null;
+  const d = new Date(raw);
+  return Number.isFinite(d.getTime()) ? d : null;
+}
+
+/** Formats a display label for the scheduled window from whatever the record actually stored —
+ * live records carry a human label (win.label, e.g. "AM peak"); seed records carry only a
+ * duration, so this falls back to that rather than fabricating a name. */
+function deriveWindowLabel(decision) {
+  const label = decision?.window?.label;
+  if (typeof label === "string" && label.trim()) return label;
+  const hours = decision?.window?.durationHours;
+  return Number.isFinite(hours) ? `${hours}h window` : "—";
+}
+
+/**
+ * buildPredictionLedger(decisions) -> LedgerRow[]
+ *
+ * One row per decision record (seed or live shape, freely mixed — reuses execKpis.js's
+ * normalizeDecisionEvidence() rather than re-deriving predicted fields). Every row is honestly
+ * "pending" — see the block comment above.
+ */
+export function buildPredictionLedger(decisions) {
+  const rows = Array.isArray(decisions) ? decisions : [];
+  return rows.map((d) => {
+    const ev = normalizeDecisionEvidence(d);
+    return {
+      id: ev.id ?? null,
+      seeded: ev.seeded,
+      sourceLabel: ev.seeded ? "Seeded · 2024-26 closure history" : "Live · this session",
+      dateIso: normalizeLedgerDate(d)?.toISOString() ?? null,
+      segmentName: d?.segmentName ?? d?.segment ?? d?.segmentId ?? "—",
+      windowLabel: deriveWindowLabel(d),
+      rank: ev.rank,
+      predicted: {
+        revenueAtRiskUsd: ev.revenueAtRiskPointUsd,
+        avgDelayMin: ev.avgDelayMin,
+        secondaryCrashExposure: ev.secondaryCrashExposure,
+        durationHours: ev.durationHours,
+      },
+      actual: {
+        status: "pending",
+        reason: ev.seeded ? SEED_PENDING_REASON : LIVE_PENDING_REASON,
+      },
+    };
+  });
+}
+
+/**
+ * predictionLedgerTrend(ledgerRows) -> { n, pctOptimalWindow, byMonth: [{monthKey, n, pctOptimalWindow}] }
+ *
+ * "Optimal window" = rank === 1, with a missing rank defaulting to 1 — parity with
+ * computeExecKpis()'s documented rule (a seeded row predates the optimizer and represents the one
+ * historical outcome that actually happened, so it counts as its own realized choice rather than
+ * being silently dropped). Rows with no resolvable date are excluded from `byMonth` but still
+ * counted in the top-level `n`/`pctOptimalWindow`. `byMonth` is sorted ascending by monthKey.
+ */
+export function predictionLedgerTrend(ledgerRows) {
+  const rows = Array.isArray(ledgerRows) ? ledgerRows : [];
+  const n = rows.length;
+  if (n === 0) return { n: 0, pctOptimalWindow: 0, byMonth: [] };
+
+  let optimalCount = 0;
+  const byMonthMap = new Map();
+
+  rows.forEach((row) => {
+    const isOptimal = (row?.rank ?? 1) === 1;
+    if (isOptimal) optimalCount += 1;
+
+    const dateIso = row?.dateIso;
+    if (!dateIso) return;
+    const d = new Date(dateIso);
+    if (!Number.isFinite(d.getTime())) return;
+
+    const monthKey = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    const bucket = byMonthMap.get(monthKey) || { monthKey, n: 0, optimalCount: 0 };
+    bucket.n += 1;
+    if (isOptimal) bucket.optimalCount += 1;
+    byMonthMap.set(monthKey, bucket);
+  });
+
+  const byMonth = Array.from(byMonthMap.values())
+    .sort((a, b) => (a.monthKey < b.monthKey ? -1 : a.monthKey > b.monthKey ? 1 : 0))
+    .map((b) => ({ monthKey: b.monthKey, n: b.n, pctOptimalWindow: round((b.optimalCount / b.n) * 100, 1) }));
+
+  return {
+    n,
+    pctOptimalWindow: round((optimalCount / n) * 100, 1),
+    byMonth,
   };
 }
 
@@ -320,22 +437,113 @@ function assumptionsTabHtml(assumptions) {
   `;
 }
 
+// ---- Tab 3: Track record --------------------------------------------------------------------------
+
+function fmtUsdShort(n) {
+  if (typeof n !== "number" || !Number.isFinite(n)) return "—";
+  return `$${Math.round(n).toLocaleString("en-US")}`;
+}
+
+function pendingPillHtml(reason) {
+  return `<span class="uc1-trust-pending-pill" title="${esc(reason)}">Pending</span>`;
+}
+
+function ledgerRowHtml(row) {
+  return `
+    <tr class="uc1-trust-row">
+      <td>${esc(row.dateIso ? row.dateIso.slice(0, 10) : "—")}</td>
+      <td>${esc(row.segmentName)}</td>
+      <td>${esc(row.windowLabel)}</td>
+      <td class="uc1-trust-cell">${row.rank != null ? `#${row.rank}` : "—"}</td>
+      <td class="uc1-trust-cell">${fmtUsdShort(row.predicted.revenueAtRiskUsd)}</td>
+      <td>${esc(row.sourceLabel)}</td>
+      <td class="uc1-trust-cell">${pendingPillHtml(row.actual.reason)}</td>
+    </tr>`;
+}
+
+/** Minimal inline sparkline of monthly compliance (% scheduled in the optimal window) — a plain
+ * polyline, no accent color, no fill: the money-shot boldness stays with the window table (design
+ * directive), this tab stays quiet. Renders nothing for 0-1 points (nothing to trend). */
+function trendSparklineHtml(byMonth) {
+  if (!Array.isArray(byMonth) || byMonth.length < 2) return "";
+  const w = 240;
+  const h = 28;
+  const pad = 2;
+  const stepX = (w - pad * 2) / (byMonth.length - 1);
+  const points = byMonth
+    .map((b, i) => {
+      const x = pad + i * stepX;
+      const y = h - pad - (b.pctOptimalWindow / 100) * (h - pad * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  return `<svg class="uc1-trust-trend-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${points}" /></svg>`;
+}
+
+function trackRecordTabHtml(decisions) {
+  const rows = buildPredictionLedger(decisions);
+  const trend = predictionLedgerTrend(rows);
+
+  const tableHtml =
+    rows.length > 0
+      ? `
+    <div class="uc1-trust-table-wrap">
+      <table class="uc1-trust-table uc1-trust-ledger">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Segment</th>
+            <th>Window</th>
+            <th>Rank</th>
+            <th>Predicted revenue at risk</th>
+            <th>Source</th>
+            <th>Actual</th>
+          </tr>
+        </thead>
+        <tbody>${rows.map(ledgerRowHtml).join("")}</tbody>
+      </table>
+    </div>`
+      : `<div class="uc1-trust-empty">No decisions logged yet.</div>`;
+
+  return `
+    <div class="uc1-trust-subhead">Every scheduled closure, with what the optimizer predicted at decision time. No graded "predicted vs. actual" here — see the honest reason on each row.</div>
+    <div class="uc1-trust-trend">
+      <div class="uc1-trust-stat uc1-trust-trend-stat">
+        <div class="uc1-trust-stat-v">${fmtPct(trend.pctOptimalWindow / 100)}</div>
+        <div class="uc1-trust-stat-l">Compliance trend &middot; % scheduled in the optimal (rank&nbsp;1) window (n=${trend.n})</div>
+        ${trendSparklineHtml(trend.byMonth)}
+      </div>
+    </div>
+    ${tableHtml}
+    <div class="uc1-trust-note">Want the graded version? <button type="button" class="uc1-trust-link" data-tab="backtest">See the backtest &rarr;</button></div>
+  `;
+}
+
 // ---- Public entry point -------------------------------------------------------------------------
 
+const TRUST_TABS = ["backtest", "assumptions", "trackrecord"];
+
 /**
- * renderTrustPanel(containerEl, { backtestResult, assumptions, onAssumptionChange })
+ * renderTrustPanel(containerEl, { backtestResult, assumptions, decisions, onAssumptionChange })
  *
  * No-op when containerEl is missing (same defensive posture as windowPanel.js/contextPanel.js).
  * Preserves the active tab across re-renders via containerEl.dataset.uc1TrustTab. Slider inputs
  * update their own numeric readout in place (not a full re-render) so dragging doesn't fight the
  * browser's own slider focus/state, then call onAssumptionChange(newAssumptions) on every 'input'
  * event so the window table can re-rank live (spec's "stress-test moment").
+ *
+ * `decisions` (NEW, optional, additive): decision records (seed and/or live shape) for the 3rd
+ * "Track record" tab's prediction ledger + compliance trend. Absent/empty renders an honest empty
+ * state, never throws.
  */
-export function renderTrustPanel(containerEl, { backtestResult, assumptions, onAssumptionChange } = {}) {
+export function renderTrustPanel(containerEl, { backtestResult, assumptions, decisions, onAssumptionChange } = {}) {
   if (!containerEl) return;
 
-  const activeTab = containerEl.dataset.uc1TrustTab === "assumptions" ? "assumptions" : "backtest";
+  const activeTab = TRUST_TABS.includes(containerEl.dataset.uc1TrustTab) ? containerEl.dataset.uc1TrustTab : "backtest";
   let currentAssumptions = mergeAssumptionDefaults(assumptions);
+
+  const tabLabel = { backtest: "Backtest", assumptions: "Assumptions", trackrecord: "Track record" };
+  const tabBody = { backtest: () => backtestTabHtml(backtestResult), assumptions: () => assumptionsTabHtml(currentAssumptions), trackrecord: () => trackRecordTabHtml(decisions) };
 
   containerEl.classList.remove("hidden");
   containerEl.innerHTML = `
@@ -343,23 +551,32 @@ export function renderTrustPanel(containerEl, { backtestResult, assumptions, onA
     <div class="dc-panel-h">Trust panel</div>
     <div class="dc-panel-sub">How this recommendation was checked, and what's still an assumption.</div>
     <div class="uc1-trust-tabs" role="tablist">
-      <button type="button" class="uc1-trust-tab${activeTab === "backtest" ? " on" : ""}" data-tab="backtest" role="tab" aria-selected="${activeTab === "backtest"}">Backtest</button>
-      <button type="button" class="uc1-trust-tab${activeTab === "assumptions" ? " on" : ""}" data-tab="assumptions" role="tab" aria-selected="${activeTab === "assumptions"}">Assumptions</button>
+      ${TRUST_TABS.map(
+        (tab) =>
+          `<button type="button" class="uc1-trust-tab${activeTab === tab ? " on" : ""}" data-tab="${tab}" role="tab" aria-selected="${activeTab === tab}">${tabLabel[tab]}</button>`
+      ).join("")}
     </div>
     <div class="uc1-trust-body">
-      ${activeTab === "backtest" ? backtestTabHtml(backtestResult) : assumptionsTabHtml(currentAssumptions)}
+      ${tabBody[activeTab]()}
     </div>
   `;
 
   const closeBtn = containerEl.querySelector(".dc-panel-close");
   if (closeBtn) closeBtn.onclick = () => containerEl.classList.add("hidden");
 
+  const goToTab = (tab) => {
+    containerEl.dataset.uc1TrustTab = tab;
+    renderTrustPanel(containerEl, { backtestResult, assumptions: currentAssumptions, decisions, onAssumptionChange });
+  };
+
   containerEl.querySelectorAll(".uc1-trust-tab").forEach((btn) => {
-    btn.onclick = () => {
-      containerEl.dataset.uc1TrustTab = btn.getAttribute("data-tab");
-      renderTrustPanel(containerEl, { backtestResult, assumptions: currentAssumptions, onAssumptionChange });
-    };
+    btn.onclick = () => goToTab(btn.getAttribute("data-tab"));
   });
+
+  // Track-record tab's cross-link to the genuinely-graded backtest (design decision: cross-link,
+  // never duplicate the grading).
+  const backtestLink = containerEl.querySelector(".uc1-trust-link");
+  if (backtestLink) backtestLink.onclick = () => goToTab(backtestLink.getAttribute("data-tab") || "backtest");
 
   containerEl.querySelectorAll(".uc1-trust-slider").forEach((input) => {
     input.oninput = () => {

@@ -196,6 +196,13 @@
          (see openUc1WorkOrderContext) — contextPanel.js itself stays untouched/pure-render. -->
     <div id="uc1-context-panel" class="panel dc-asset-panel hidden"></div>
 
+    <!-- UC1 planner window picker (windowPicker.js's renderWindowPicker() — deck-parity item 2,
+         "pick your own windows"). Week-scale demand strip with 3 dimmed ghost prefills
+         (candidateWindows()) and up to 3 click-placed/drag-adjusted operator picks; "Evaluate
+         these windows" feeds evaluateCandidates()'s `windows` override into the existing
+         uc1-window-panel render path. -->
+    <div id="uc1-window-picker" class="panel dc-asset-panel hidden"></div>
+
     <!-- UC1 window panel (populated by windowPanel.js's renderWindowPanel() after "Evaluate
          closure windows" -> windowAssembly.js's evaluateCandidates(), design spec §4 bullet 3).
          main.js appends "Why trust this?" after windowPanel.js's own render (P5-e), same

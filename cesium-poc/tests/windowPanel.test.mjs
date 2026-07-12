@@ -14,6 +14,9 @@ import {
   evaluateCandidates,
   throughputVsDemandPct,
   buildSumoPlaybackPlan,
+  validateWindowPick,
+  weekDemandSeries,
+  localWallClockAsUtc,
 } from "../src/windowAssembly.js";
 import { createDemandModel } from "../src/demand.js";
 import segments from "../config/segments.json" with { type: "json" };
@@ -198,4 +201,176 @@ test("buildSumoPlaybackPlan: watchMsPerWindow defaults to 8000 when not supplied
   const custom = buildSumoPlaybackPlan(windows, { lane: "uc1-ap-1", watchMsPerWindow: 3000 });
   const watchStepCustom = custom.find((s) => s.kind === "watch");
   assert.equal(watchStepCustom.durationMs, 3000);
+});
+
+// ---- 5. evaluateCandidates: `windows` override (UC1 deck-parity item 2, planner picker) ---------
+
+test("evaluateCandidates: windows override with exactly 3 entries uses them, not candidateWindows()'s trio", () => {
+  const demandModel = createDemandModel(demandProfile, segments);
+  const wo = { id: "WO-5", segment: "East Segment" };
+  const customWindows = [
+    { id: "custom-a", label: "Custom A", start: new Date("2026-07-13T05:00:00Z"), durationHours: 2 },
+    { id: "custom-b", label: "Custom B", start: new Date("2026-07-14T05:00:00Z"), durationHours: 2 },
+    { id: "custom-c", label: "Custom C", start: new Date("2026-07-15T05:00:00Z"), durationHours: 2 },
+  ];
+
+  const { windows, results } = evaluateCandidates(wo, {
+    segments,
+    incidents: [],
+    windowConfig,
+    demandModel,
+    fromDate: new Date("2026-07-13T00:00:00Z"),
+    windows: customWindows,
+  });
+
+  assert.equal(windows, customWindows);
+  assert.equal(results.length, 3);
+  assert.deepEqual(
+    windows.map((w) => w.id),
+    ["custom-a", "custom-b", "custom-c"]
+  );
+});
+
+test("evaluateCandidates: windows override with fewer/more than 3 falls back to candidateWindows()", () => {
+  const demandModel = createDemandModel(demandProfile, segments);
+  const wo = { id: "WO-6", segment: "East Segment" };
+  const fromDate = new Date("2026-07-13T10:00:00Z");
+
+  const tooFew = evaluateCandidates(wo, {
+    segments,
+    incidents: [],
+    windowConfig,
+    demandModel,
+    fromDate,
+    windows: [{ id: "only-one", start: fromDate, durationHours: 1 }],
+  });
+  assert.deepEqual(
+    tooFew.windows.map((w) => w.id),
+    ["overnight", "weekendMorning", "weekdayPm"]
+  );
+
+  const tooMany = evaluateCandidates(wo, {
+    segments,
+    incidents: [],
+    windowConfig,
+    demandModel,
+    fromDate,
+    windows: [1, 2, 3, 4].map((n) => ({ id: `extra-${n}`, start: fromDate, durationHours: 1 })),
+  });
+  assert.deepEqual(
+    tooMany.windows.map((w) => w.id),
+    ["overnight", "weekendMorning", "weekdayPm"]
+  );
+});
+
+// ---- 6. validateWindowPick: planner-typed window bounds checking (UC1 deck-parity item 2) -------
+
+test("validateWindowPick: valid pick returns {valid:true, errors:[]}", () => {
+  const fromDate = new Date("2026-07-13T00:00:00Z");
+  const pick = { start: new Date("2026-07-14T02:00:00Z"), durationHours: 4 };
+  const result = validateWindowPick(pick, windowConfig, fromDate);
+  assert.deepEqual(result, { valid: true, errors: [] });
+});
+
+test("validateWindowPick: durationHours below/above config bounds is invalid with a descriptive error", () => {
+  const fromDate = new Date("2026-07-13T00:00:00Z");
+  const start = new Date("2026-07-14T02:00:00Z");
+
+  const tooShort = validateWindowPick({ start, durationHours: 0.1 }, windowConfig, fromDate);
+  assert.equal(tooShort.valid, false);
+  assert.ok(tooShort.errors.some((e) => /duration/i.test(e)), `expected a duration error, got ${JSON.stringify(tooShort.errors)}`);
+
+  const tooLong = validateWindowPick({ start, durationHours: 20 }, windowConfig, fromDate);
+  assert.equal(tooLong.valid, false);
+  assert.ok(tooLong.errors.some((e) => /duration/i.test(e)), `expected a duration error, got ${JSON.stringify(tooLong.errors)}`);
+});
+
+test("validateWindowPick: start in the past / within minLeadHours is invalid", () => {
+  const fromDate = new Date("2026-07-13T10:00:00Z");
+
+  const past = validateWindowPick({ start: new Date("2026-07-12T10:00:00Z"), durationHours: 4 }, windowConfig, fromDate);
+  assert.equal(past.valid, false);
+  assert.ok(past.errors.length > 0);
+
+  // 15 min lead vs. windowConfig.plannerPick.minLeadHours = 1
+  const tooSoon = validateWindowPick({ start: new Date("2026-07-13T10:15:00Z"), durationHours: 4 }, windowConfig, fromDate);
+  assert.equal(tooSoon.valid, false);
+  assert.ok(tooSoon.errors.length > 0);
+});
+
+test("validateWindowPick: malformed start never throws, returns invalid", () => {
+  const fromDate = new Date("2026-07-13T00:00:00Z");
+  assert.doesNotThrow(() => validateWindowPick({ start: "not-a-date", durationHours: 4 }, windowConfig, fromDate));
+  assert.doesNotThrow(() => validateWindowPick({ start: undefined, durationHours: 4 }, windowConfig, fromDate));
+  assert.doesNotThrow(() => validateWindowPick(null, windowConfig, fromDate));
+  assert.doesNotThrow(() => validateWindowPick(undefined, windowConfig, fromDate));
+
+  assert.equal(validateWindowPick({ start: "not-a-date", durationHours: 4 }, windowConfig, fromDate).valid, false);
+  assert.equal(validateWindowPick(null, windowConfig, fromDate).valid, false);
+});
+
+test("validateWindowPick: missing config falls back to 0.5/12/1 defaults", () => {
+  const fromDate = new Date("2026-07-13T00:00:00Z");
+  const okPick = { start: new Date("2026-07-14T02:00:00Z"), durationHours: 4 }; // 26h lead, 4h duration
+
+  assert.equal(validateWindowPick(okPick, undefined, fromDate).valid, true);
+  assert.equal(validateWindowPick(okPick, null, fromDate).valid, true);
+  assert.equal(validateWindowPick(okPick, {}, fromDate).valid, true);
+
+  const belowDefaultMin = validateWindowPick({ start: new Date("2026-07-14T02:00:00Z"), durationHours: 0.25 }, undefined, fromDate);
+  assert.equal(belowDefaultMin.valid, false); // default minDurationHours = 0.5
+
+  const aboveDefaultMax = validateWindowPick({ start: new Date("2026-07-14T02:00:00Z"), durationHours: 13 }, undefined, fromDate);
+  assert.equal(aboveDefaultMax.valid, false); // default maxDurationHours = 12
+
+  const belowDefaultLead = validateWindowPick({ start: new Date("2026-07-13T00:30:00Z"), durationHours: 4 }, undefined, fromDate);
+  assert.equal(belowDefaultLead.valid, false); // default minLeadHours = 1
+});
+
+// ---- 7. weekDemandSeries: the picker's SVG week strip (UC1 deck-parity item 2) ------------------
+
+test("weekDemandSeries: returns 672 points, monotonic hourOfWeek 0..167.75", () => {
+  const demandModel = createDemandModel(demandProfile, segments);
+  const weekStart = localDate(2026, 7, 13, 0); // Monday 00:00 local
+
+  const series = weekDemandSeries(demandModel, "east", weekStart);
+
+  assert.equal(series.length, 672);
+  assert.equal(series[0].hourOfWeek, 0);
+  assert.equal(series[series.length - 1].hourOfWeek, 167.75);
+  for (let i = 1; i < series.length; i++) {
+    assert.ok(
+      series[i].hourOfWeek > series[i - 1].hourOfWeek,
+      `hourOfWeek must be strictly increasing at index ${i}`
+    );
+    for (const entry of series) assert.equal(typeof entry.vph, "number");
+  }
+});
+
+test("weekDemandSeries: a known local Tuesday-23:00 hour reads the same vph via weekDemandSeries and windowDemandAdapter()'s own reconciliation", () => {
+  const demandModel = createDemandModel(demandProfile, segments);
+  const weekStart = localDate(2026, 7, 13, 0); // Monday 00:00 local (2026-07-13 is a Monday)
+  const series = weekDemandSeries(demandModel, "east", weekStart);
+
+  const hourOfWeek = 47; // Tuesday 23:00 = 1 * 24 + 23
+  const viaWeekSeries = series[hourOfWeek * 4].vph;
+
+  const demandFn = windowDemandAdapter(demandModel);
+  const tuesday2300 = localDate(2026, 7, 14, 23);
+  const viaAdapter = demandFn("east", { start: tuesday2300, durationHours: 0.25 })[0];
+
+  assert.ok(
+    Math.abs(viaWeekSeries - viaAdapter) < 1e-9,
+    `expected weekDemandSeries and windowDemandAdapter to agree: ${viaWeekSeries} vs ${viaAdapter}`
+  );
+});
+
+test("localWallClockAsUtc: is exported and reinterprets local calendar fields as a UTC instant", () => {
+  const local = localDate(2026, 7, 13, 23, 30);
+  const utc = localWallClockAsUtc(local);
+  assert.equal(utc.getUTCFullYear(), local.getFullYear());
+  assert.equal(utc.getUTCMonth(), local.getMonth());
+  assert.equal(utc.getUTCDate(), local.getDate());
+  assert.equal(utc.getUTCHours(), local.getHours());
+  assert.equal(utc.getUTCMinutes(), local.getMinutes());
 });

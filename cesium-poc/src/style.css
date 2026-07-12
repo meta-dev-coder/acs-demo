@@ -888,3 +888,126 @@ body.uc1-mode .hud-title {
   padding-left: 12px;
 }
 .uc1-exit-link:hover { color: #ff6b6b; }
+
+/* ---- Track record tab (Item 4, Phase 8) — the trust panel's 3rd tab: an honest prediction
+   ledger + compliance trend. Design directive: quiet and disciplined — this is NOT the money-shot
+   window table, so no accent wash, no bold rows. Only new classes are re-toned under body.uc1-mode
+   here; the tab's shared .uc1-trust-* scaffolding (table/stat/badge base styles above) is
+   re-toned wholesale by whichever phase owns the rest of the trust panel, per this phase's scope. ---- */
+.uc1-trust-trend { margin: 8px 0 10px; }
+.uc1-trust-trend-stat { padding: 9px 10px 8px; }
+.uc1-trust-trend-spark { display: block; width: 100%; height: 24px; margin-top: 6px; color: #7d8da3; }
+.uc1-trust-trend-spark polyline { fill: none; stroke: currentColor; stroke-width: 1.5; }
+.uc1-trust-ledger th:nth-child(5), .uc1-trust-ledger td:nth-child(5) { text-align: right; }
+.uc1-trust-pending-pill {
+  display: inline-block; font-size: 8.5px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 999px; background: rgba(143, 161, 184, 0.16); color: #8fa3bb;
+  border: 1px solid rgba(143, 161, 184, 0.35); cursor: help;
+}
+.uc1-trust-link {
+  font: inherit; font-size: 9.5px; font-weight: 600; color: #6fb1ff; background: none; border: none;
+  cursor: pointer; padding: 0; text-decoration: underline; text-underline-offset: 2px;
+}
+.uc1-trust-link:hover { color: #9cc9ff; }
+
+body.uc1-mode .uc1-trust-trend-stat {
+  background: var(--uc1-ink-2);
+  border: 1px solid var(--uc1-line);
+}
+body.uc1-mode .uc1-trust-trend-stat .uc1-trust-stat-v {
+  font-family: var(--uc1-font-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--uc1-text);
+}
+body.uc1-mode .uc1-trust-trend-stat .uc1-trust-stat-l {
+  font-family: var(--uc1-font-body);
+  color: var(--uc1-muted);
+}
+body.uc1-mode .uc1-trust-trend-spark { color: var(--uc1-muted); }
+body.uc1-mode .uc1-trust-ledger td,
+body.uc1-mode .uc1-trust-ledger th {
+  font-variant-numeric: tabular-nums;
+}
+body.uc1-mode .uc1-trust-pending-pill {
+  background: rgba(143, 161, 184, 0.14);
+  color: var(--uc1-muted);
+  border-color: var(--uc1-line);
+}
+body.uc1-mode .uc1-trust-link { color: var(--uc1-muted); text-decoration-color: var(--uc1-line); }
+body.uc1-mode .uc1-trust-link:hover { color: var(--uc1-text); }
+
+/* ---- UC1 planner window picker (windowPicker.js, deck-parity item 2 Phase 6). Same floating
+   .dc-asset-panel treatment as the context/window/trust panels, wide enough for the week-scale
+   SVG strip. Design directive: this is where the deck's "week-demand sparkline with the 3
+   candidate windows as translucent bands" lives (windowPanel.js's own sparkline stayed a
+   per-window 0-24h chart for the playback scrubber — see windowPicker.js's header). ---- */
+#uc1-window-picker { top: 16px; left: 16px; right: auto; width: 460px; }
+.uc1-picker-eyebrow { font-size: 10px; letter-spacing: 1.4px; color: #6fb1ff; font-weight: 700; margin-bottom: 4px; }
+.uc1-picker-hint { font-size: 10px; color: #9fb0c3; margin-bottom: 10px; }
+.uc1-picker-week { margin: 6px 0 8px; }
+.uc1-picker-svg { width: 100%; height: 90px; display: block; touch-action: none; }
+.uc1-picker-svg rect[data-kind="ghost"] {
+  fill: rgba(143, 161, 184, 0.22); stroke: rgba(143, 161, 184, 0.5); stroke-width: 1; stroke-dasharray: 3 2;
+  cursor: pointer;
+}
+.uc1-picker-svg rect[data-kind="planner"] {
+  fill: rgba(232, 150, 60, 0.28); stroke: #e8963c; stroke-width: 1.5; cursor: grab;
+}
+.uc1-picker-svg rect[data-kind="planner"]:active { cursor: grabbing; }
+.uc1-picker-svg rect:focus-visible { outline: 2px solid #e8963c; outline-offset: 1px; }
+.uc1-picker-legend { display: flex; gap: 12px; margin-bottom: 8px; }
+.uc1-picker-legend-item { display: inline-flex; align-items: center; gap: 5px; font-size: 9px; color: #9fb0c3; }
+.uc1-picker-legend-swatch { width: 12px; height: 8px; border-radius: 2px; display: inline-block; }
+.uc1-picker-legend-swatch.ghost { background: rgba(143, 161, 184, 0.35); border: 1px dashed rgba(143, 161, 184, 0.6); }
+.uc1-picker-legend-swatch.planner { background: rgba(232, 150, 60, 0.4); border: 1px solid #e8963c; }
+.uc1-picker-status { font-size: 10px; font-weight: 700; color: #cdd8e6; margin-bottom: 8px; font-variant-numeric: tabular-nums; }
+.uc1-picker-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.uc1-picker-prefill-btn {
+  font-size: 10px; font-weight: 700; padding: 6px 10px; border-radius: 6px; cursor: pointer;
+  border: 1px solid rgba(111, 177, 255, 0.4); background: rgba(111, 177, 255, 0.1); color: #6fb1ff;
+}
+.uc1-picker-prefill-btn:hover { background: #2f6df6; border-color: #2f6df6; color: #fff; }
+.uc1-picker-evaluate-btn {
+  font-size: 10px; font-weight: 700; padding: 6px 10px; border-radius: 6px; cursor: pointer;
+  border: 1px solid rgba(232, 150, 60, 0.4); background: rgba(232, 150, 60, 0.14); color: #e8963c;
+}
+.uc1-picker-evaluate-btn:hover:not(:disabled) { background: #e8963c; border-color: #e8963c; color: #141b26; }
+.uc1-picker-evaluate-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Deck re-toning under body.uc1-mode (design directive tokens). Bands keep their fixed
+   ghost/planner semantic colors (muted vs. accent) — only chrome (panel, hint, status, buttons)
+   picks up the serif/tabular deck treatment; the doc explicitly bounds "accent = winner/selected,
+   muted = others" so the band colors already ARE the token system, no swap needed. */
+body.uc1-mode .uc1-picker-hint,
+body.uc1-mode .uc1-picker-legend-item { color: var(--uc1-muted); }
+body.uc1-mode .uc1-picker-status {
+  font-family: var(--uc1-font-display);
+  color: var(--uc1-text);
+  font-variant-numeric: tabular-nums;
+}
+body.uc1-mode .uc1-picker-svg rect[data-kind="ghost"] {
+  fill: color-mix(in srgb, var(--uc1-muted) 22%, transparent);
+  stroke: color-mix(in srgb, var(--uc1-muted) 55%, transparent);
+}
+body.uc1-mode .uc1-picker-svg rect[data-kind="planner"] {
+  fill: color-mix(in srgb, var(--uc1-accent) 28%, transparent);
+  stroke: var(--uc1-accent);
+}
+body.uc1-mode .uc1-picker-prefill-btn {
+  border-color: var(--uc1-line); background: var(--uc1-ink-2); color: var(--uc1-muted);
+}
+body.uc1-mode .uc1-picker-prefill-btn:hover { color: var(--uc1-text); border-color: var(--uc1-muted); }
+body.uc1-mode .uc1-picker-evaluate-btn {
+  border-color: var(--uc1-accent); background: rgba(232, 150, 60, 0.14); color: var(--uc1-accent);
+}
+body.uc1-mode .uc1-picker-evaluate-btn:hover:not(:disabled) {
+  background: var(--uc1-accent); color: var(--uc1-ink);
+}
+
+/* prefers-reduced-motion: no drag-animation niceties (design directive). windowPicker.js already
+   never CSS-transitions band position mid-drag; this only guards the hover-state color/opacity
+   changes any other UC1 phase might add transitions for, scoped defensively to this module's own
+   classes so it can't be read as touching another phase's motion rules. */
+@media (prefers-reduced-motion: reduce) {
+  .uc1-picker-svg rect { transition: none !important; }
+}

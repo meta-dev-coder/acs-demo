@@ -94,23 +94,33 @@ export function createDemandModel(profileConfig = defaultProfile, segments = [])
     return profileConfig.baseVph * multiplier * scale;
   }
 
-  function getWindowDemand(segmentId, startDate, durationHours) {
+  // getWindowDemandSeries(segmentId, startDate, durationHours) -> [{timestamp: Date, vph}]
+  //
+  // One entry per 15-min slice starting at startDate, timestamps advancing by exactly 15 min each
+  // (real elapsed time, not a floored/rebuilt date) — the low-level primitive both getWindowDemand
+  // (below, now a thin delegate) and windowAssembly.js's weekDemandSeries() (UC1 deck-parity item 2
+  // planner picker) build on, per the plan's conflict-resolution #3 ("one primitive, not duplicated").
+  function getWindowDemandSeries(segmentId, startDate, durationHours) {
     const start = toDate(startDate);
-    const startQuarterHour = start.getUTCHours() * 4 + Math.floor(start.getUTCMinutes() / 15);
     const sliceCount = Math.round(durationHours * 4);
     const out = [];
     for (let i = 0; i < sliceCount; i++) {
-      const totalQuarter = startQuarterHour + i;
-      const dayOffset = Math.floor(totalQuarter / QUARTER_HOURS_PER_DAY);
-      const quarterHour = ((totalQuarter % QUARTER_HOURS_PER_DAY) + QUARTER_HOURS_PER_DAY) % QUARTER_HOURS_PER_DAY;
-      const sliceDate = new Date(start.getTime());
-      if (dayOffset !== 0) sliceDate.setUTCDate(sliceDate.getUTCDate() + dayOffset);
-      out.push(getDemand(segmentId, sliceDate, quarterHour));
+      const timestamp = new Date(start.getTime() + i * 15 * 60 * 1000);
+      const quarterHour = timestamp.getUTCHours() * 4 + Math.floor(timestamp.getUTCMinutes() / 15);
+      out.push({ timestamp, vph: getDemand(segmentId, timestamp, quarterHour) });
     }
     return out;
   }
 
-  return { getDemand, getWindowDemand, profileConfig, segments };
+  // getWindowDemand(segmentId, startDate, durationHours) -> vph[] (15-min slices)
+  //
+  // Unchanged signature/behavior — now delegates to getWindowDemandSeries() rather than
+  // re-deriving slice dates itself (regression-guarded by demand.test.mjs's byte-identical test).
+  function getWindowDemand(segmentId, startDate, durationHours) {
+    return getWindowDemandSeries(segmentId, startDate, durationHours).map((s) => s.vph);
+  }
+
+  return { getDemand, getWindowDemand, getWindowDemandSeries, profileConfig, segments };
 }
 
 export default createDemandModel;

@@ -41,7 +41,7 @@ function resolveSegmentByName(segments, segmentName) {
 /** Reinterpret a Date's LOCAL calendar fields (year/month/day/hour/minute/second/ms) as a UTC
  * instant — see this module's header for why. Pure calendar-field copy, no arithmetic on the
  * original instant. */
-function localWallClockAsUtc(date) {
+export function localWallClockAsUtc(date) {
   return new Date(
     Date.UTC(
       date.getFullYear(),
@@ -87,10 +87,18 @@ export function windowDemandAdapter(demandModel) {
  * (overnight, weekendMorning, weekdayPm) — NOT score-sorted, so a caller/renderer can label rows
  * by heuristic identity as well as by rank. `winnerIdx` is the index of the lowest-scoring
  * (best) window in that same order.
+ *
+ * `windows` (opts.windows) — UC1 deck-parity item 2 (planner window picker): a caller-supplied
+ * trio (e.g. two system heuristics + one operator-picked window) replaces the heuristic trio when
+ * it has exactly 3 entries; any other length (missing/partial/malformed) falls back to
+ * candidateWindows() rather than evaluating a short/long list — see the plan's conflict
+ * resolution #2 for why the defensive length check wins over an unchecked `?? candidateWindows()`.
+ * (A future `segmentIdOverride` key lands on this same options object in a later phase — item 3 —
+ * as an independent additive key; not implemented here.)
  */
 export function evaluateCandidates(
   wo,
-  { segments = [], incidents = [], windowConfig, demandModel, fromDate, closureSpec } = {}
+  { segments = [], incidents = [], windowConfig, demandModel, fromDate, closureSpec, windows } = {}
 ) {
   const segment = resolveSegmentByName(segments, wo?.segment);
   const segmentId = segment?.id ?? null;
@@ -102,16 +110,81 @@ export function evaluateCandidates(
     demandFn: windowDemandAdapter(demandModel),
   });
 
-  const windows = candidateWindows(windowConfig, fromDate);
+  const resolvedWindows = Array.isArray(windows) && windows.length === 3 ? windows : candidateWindows(windowConfig, fromDate);
   const spec = { lanesClosed: 1, ...closureSpec };
-  const results = windows.map((window) => evaluator.evaluateWindow(segmentId, spec, window));
+  const results = resolvedWindows.map((window) => evaluator.evaluateWindow(segmentId, spec, window));
 
   let winnerIdx = 0;
   for (let i = 1; i < results.length; i++) {
     if (results[i].score < results[winnerIdx].score) winnerIdx = i;
   }
 
-  return { windows, results, winnerIdx };
+  return { windows: resolvedWindows, results, winnerIdx };
+}
+
+/**
+ * validateWindowPick(pick, config, fromDate = new Date()) -> { valid: boolean, errors: string[] }
+ *
+ * UC1 deck-parity item 2 (planner window picker): bounds-checks an operator-typed
+ * `{ start: Date, durationHours: number }` pick before it's allowed onto evaluateCandidates()'s
+ * `windows` override. Bounds come from config/windowConfig.json's `plannerPick` block
+ * ({minDurationHours, maxDurationHours, minLeadHours}), defaulting to 0.5/12/1 when `config` or
+ * `config.plannerPick` is missing so a picker rendered before config loads still validates
+ * sanely. Never throws — a malformed `pick` (missing/non-Date start, non-numeric duration) is
+ * reported as an error, not an exception, matching this module's keep-going-on-partial-data
+ * posture.
+ */
+export function validateWindowPick(pick, config, fromDate = new Date()) {
+  const bounds = config?.plannerPick || {};
+  const minDurationHours = bounds.minDurationHours ?? 0.5;
+  const maxDurationHours = bounds.maxDurationHours ?? 12;
+  const minLeadHours = bounds.minLeadHours ?? 1;
+
+  const errors = [];
+
+  const rawStart = pick?.start;
+  const start = rawStart instanceof Date ? rawStart : new Date(rawStart);
+  const startValid = !Number.isNaN(start.getTime());
+  if (!startValid) errors.push("Start time is invalid.");
+
+  const durationHours = pick?.durationHours;
+  const durationIsNumber = typeof durationHours === "number" && Number.isFinite(durationHours);
+  if (!durationIsNumber) {
+    errors.push("Duration must be a number.");
+  } else if (durationHours < minDurationHours) {
+    errors.push(`Duration must be at least ${minDurationHours}h.`);
+  } else if (durationHours > maxDurationHours) {
+    errors.push(`Duration must be at most ${maxDurationHours}h.`);
+  }
+
+  if (startValid) {
+    const leadHours = (start.getTime() - fromDate.getTime()) / 3_600_000;
+    if (leadHours < minLeadHours) {
+      errors.push(`Start must be at least ${minLeadHours}h from now.`);
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+/**
+ * weekDemandSeries(demandModel, segmentId, weekStartLocalDate)
+ *   -> [{ hourOfWeek: number, vph: number }]  (672 points, hourOfWeek 0..167.75)
+ *
+ * UC1 deck-parity item 2's picker SVG week strip. Thin wrapper over demand.js's
+ * getWindowDemandSeries() (the one low-level primitive — see this module's header /
+ * plan conflict resolution #3, not duplicated here): reinterprets weekStartLocalDate's local wall
+ * clock as the UTC instant demand.js should read (same reconciliation windowDemandAdapter() does),
+ * pulls a 168h (one week) series, and reprojects each entry's absolute timestamp onto
+ * hours-since-week-start for the picker's x-axis.
+ */
+export function weekDemandSeries(demandModel, segmentId, weekStartLocalDate) {
+  const weekStartUtc = localWallClockAsUtc(weekStartLocalDate);
+  const series = demandModel.getWindowDemandSeries(segmentId, weekStartUtc, 168);
+  return series.map(({ timestamp, vph }) => ({
+    hourOfWeek: (timestamp.getTime() - weekStartUtc.getTime()) / 3_600_000,
+    vph,
+  }));
 }
 
 /**

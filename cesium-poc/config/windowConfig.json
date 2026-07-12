@@ -34,5 +34,12 @@
     "_comment": "UC1 deck-parity item 1 (per-window SUMO playback). watchMsPerWindow: how long buildSumoPlaybackPlan()'s live-SUMO 'watch' step dwells per window before opening the lane again (Phase 2). surrogateTotalMs (Phase 3): offline/no-live-server animation duration for the analytic timeseries replay, read by windowPlayback.js's surrogatePlaybackDurationMs().",
     "watchMsPerWindow": 8000,
     "surrogateTotalMs": 8000
+  },
+  "plannerPick": {
+    "_comment": "UC1 deck-parity item 2 (planner window picker). Merged bounds block (plan conflict resolution #4) read by both validateWindowPick() (windowAssembly.js) and windowPicker.js's clampPlannerWindow(). minLeadHours: how far in the future a typed start must be.",
+    "minDurationHours": 0.5,
+    "maxDurationHours": 12,
+    "minLeadHours": 1,
+    "defaultDurationHours": 4
   }
 }

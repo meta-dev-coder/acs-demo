@@ -22,8 +22,9 @@ import { buildAssetLayer, disposeAssetLayer, pickAsset, installAssetPicking } fr
 import { extractAccidents, openWorkOrders, failedInspections, buildWorkOrderContext, classifyCorridorAssets, TICKETS_CLASS } from "./uc1Data.js";
 import { buildWorkOrderLayer, buildAccidentLayer, buildInspectionLayer, buildAncillaryLayer, buildImpactHeatmap, disposeUc1Layer, pickUc1Point, flyToLonLat, pulseUc1Point } from "./uc1Layers.js";
 import { renderWorkOrderContext } from "./contextPanel.js";
-import { evaluateCandidates } from "./windowAssembly.js";
+import { evaluateCandidates, weekDemandSeries } from "./windowAssembly.js";
 import { renderWindowPanel } from "./windowPanel.js";
+import { weekStartFor, ghostWindowsFor, renderWindowPicker, hideWindowPicker } from "./windowPicker.js";
 import { createDemandModel } from "./demand.js";
 import { runBacktest } from "./backtest.js";
 import { renderTrustPanel, mergeAssumptionDefaults } from "./trustPanel.js";
@@ -1207,8 +1208,10 @@ function openUc1WorkOrderContext(wo) {
   uc1CurrentContext = ctx;
   renderWorkOrderContext($("uc1-context-panel"), { ...ctx, workOrder: wo }, { onRowFocus: focusUc1ContextRow });
   appendUc1EvaluateButton(wo);
-  // A newly-picked WO invalidates any window table left over from a different WO.
+  appendUc1PickWindowsButton(wo);
+  // A newly-picked WO invalidates any window table (or picker) left over from a different WO.
   $("uc1-window-panel")?.classList.add("hidden");
+  hideWindowPicker($("uc1-window-picker"));
   // Debug hook for headless verification (e2e) — mirrors window.__dcAssets's shape convention.
   window.__uc1Context = { workOrderId: wo?.id ?? null, counts: ctx.counts };
 
@@ -1251,6 +1254,72 @@ function appendUc1EvaluateButton(wo) {
   panel.appendChild(btn);
 }
 
+/** Resolves a work order's segment NAME (wo.segment, openWorkOrders()'s shape) to its
+ * segments.json id — same lookup windowAssembly.js's (currently-private) resolveSegmentByName()
+ * performs inside evaluateCandidates(). Duplicated here (not imported — that helper isn't exported
+ * yet, see Phase 10) only so the picker can pre-resolve a segmentId for weekDemandSeries() before
+ * evaluateCandidates() runs; evaluateCandidates() still does its own resolution independently and
+ * remains the single source of truth for scoring. Returns null on an unresolved/missing name,
+ * never throws — same defensive posture as the rest of the UC1 pure modules. */
+function resolveUc1SegmentId(wo) {
+  return uc1Segments.find((s) => s.name === wo?.segment)?.id ?? null;
+}
+
+/** Appends "Pick your own windows" to the just-rendered context panel (deck-parity item 2), next
+ * to "Evaluate closure windows" — same append-after-render split, same no-op-if-hidden guard. */
+function appendUc1PickWindowsButton(wo) {
+  const panel = $("uc1-context-panel");
+  if (!panel || panel.classList.contains("hidden")) return;
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.id = "uc1-pick-windows-btn";
+  btn.className = "uc1-win-schedule-btn uc1-pick-windows-btn";
+  btn.textContent = "Pick your own windows";
+  btn.onclick = () => openUc1WindowPicker(wo);
+  panel.appendChild(btn);
+}
+
+/** "Pick your own windows" -> windowPicker.js's renderWindowPicker() (deck-parity item 2 wiring).
+ * Resolves segmentId the same way the heuristic evaluate path ultimately does (resolveUc1SegmentId,
+ * mirroring windowAssembly.js's resolveSegmentByName), builds the week-scale demand series + the 3
+ * ghost (system-suggested) windows, and renders the picker. "Use suggested windows instead" fills
+ * the 3 planner slots with the ghost windows for a deterministic no-drag path (also what the e2e
+ * spec drives). "Evaluate these windows" routes through the SAME evaluateUc1Windows() the heuristic
+ * "Evaluate closure windows" button uses (task 4: no duplicated stepper-advance logic), just with
+ * the operator's 3 picked windows instead of candidateWindows()'s heuristic ones. */
+function openUc1WindowPicker(wo) {
+  uc1CurrentWo = wo;
+  const panel = $("uc1-window-picker");
+  if (!panel) return;
+
+  const segmentId = resolveUc1SegmentId(wo);
+  const fromDate = new Date();
+  const weekStart = weekStartFor(fromDate);
+  const weekDemand = weekDemandSeries(currentUc1DemandModel(), segmentId, weekStart);
+  const ghostWindows = ghostWindowsFor(currentUc1WindowConfig(), fromDate);
+
+  panel.classList.remove("hidden");
+
+  function draw(plannerWindows) {
+    renderWindowPicker(
+      panel,
+      { segmentId, weekDemand, ghostWindows, plannerWindows, weekStart, config: currentUc1WindowConfig() },
+      {
+        onWindowsChanged: () => {},
+        onUsePrefills: () => draw(ghostWindows.map((w) => ({ ...w }))),
+        onEvaluate: (windows) => {
+          hideWindowPicker(panel);
+          evaluateUc1Windows(wo, { windows });
+        },
+      }
+    );
+  }
+  draw([]);
+
+  // Debug hook for headless verification (e2e) — mirrors window.__uc1Context's shape convention.
+  window.__uc1Picker = { open: true, segmentId, ghostCount: ghostWindows.length };
+}
+
 /** "Evaluate closure windows" -> windowAssembly.js's evaluateCandidates() (P2 demand.js x
  * windowEval.js, pure) -> windowPanel.js's renderWindowPanel(), wired so its "Schedule this
  * window" buttons call scheduleUc1Decision(). Design spec §4 bullet 3.
@@ -1258,14 +1327,20 @@ function appendUc1EvaluateButton(wo) {
  * Uses currentUc1WindowConfig()/currentUc1DemandModel() (not the committed defaults) so the
  * table reflects any live trust-panel assumption edits — this is what re-running evaluateUc1Windows
  * from onAssumptionChange turns into the "stress-test" re-rank (design spec Decision 2, P5-e item 1).
+ *
+ * `windows` (NEW, optional — deck-parity item 2): when the operator picked their own 3 windows via
+ * openUc1WindowPicker(), those are passed straight through to evaluateCandidates()'s own `windows`
+ * param (Phase 5) instead of letting it fall back to candidateWindows()'s heuristic 3. Omitted
+ * (undefined) on the default heuristic path — output unchanged vs. before this param existed.
  */
-function evaluateUc1Windows(wo) {
+function evaluateUc1Windows(wo, { windows } = {}) {
   uc1CurrentWo = wo;
   const data = evaluateCandidates(wo, {
     segments: uc1Segments,
     incidents: uc1Incidents,
     windowConfig: currentUc1WindowConfig(),
     demandModel: currentUc1DemandModel(),
+    windows,
   });
 
   // Demo-mode Step 2 -> Step 3 (storyboard §1 "Simulate"): run the EXISTING visible-SUMO-run
@@ -1332,7 +1407,8 @@ function appendUc1TrustButton(wo) {
 /** "Why trust this?" -> backtest.js's runBacktest() (cached — deterministic, computed once) +
  * trustPanel.js's renderTrustPanel(). onAssumptionChange re-runs evaluateUc1Windows() for the
  * currently-open WO so the window table re-ranks live off the edited assumptions (the slide-11
- * "stress-test" moment — Decision 2). */
+ * "stress-test" moment — Decision 2). `decisions: uc1Decisions` (deck-parity item 4, Phase 9) feeds
+ * the 3rd "Track record" tab's prediction ledger — already-live module state, zero new state. */
 function openUc1TrustPanel(wo) {
   if (!uc1BacktestResult) {
     uc1BacktestResult = runBacktest({ incidents: uc1Incidents, segments: uc1Segments, config: uc1BacktestConfig });
@@ -1340,6 +1416,7 @@ function openUc1TrustPanel(wo) {
   renderTrustPanel($("uc1-trust-panel"), {
     backtestResult: uc1BacktestResult,
     assumptions: ensureUc1Assumptions(),
+    decisions: uc1Decisions,
     onAssumptionChange: (next) => {
       uc1Assumptions = next;
       if (uc1CurrentWo) evaluateUc1Windows(uc1CurrentWo);

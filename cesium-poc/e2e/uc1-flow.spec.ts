@@ -337,6 +337,38 @@ test('UC1-FLOW: ?uc1=1 auto-enters demo -> hero WO context -> evaluate -> 3 rank
 
   await shoot(page, 'uc1-flow-2c-assumptions-rerank');
 
+  // ---- Deck-parity item 4 (Phase 9): "Track record" tab — the prediction ledger + honest
+  // "pending" grading (no fabricated predicted-vs-actual), reusing the already-open trust panel
+  // and already-spawned shim (uc1Decisions module state has ≥1 seeded decision at this point).
+  // Wait for the decisions fetch (fired on UC1 activation, well before this point in the flow) to
+  // have resolved into module state before reading the ledger — window.__uc1ExecKpis is the
+  // existing debug hook that's set unconditionally once uc1Decisions is populated. ----
+  await page.waitForFunction(() => !!(window as any).__uc1ExecKpis, { timeout: 20_000 });
+  await trustPanel.locator('.uc1-trust-tab[data-tab="trackrecord"]').click();
+  const ledgerTable = trustPanel.locator('.uc1-trust-ledger');
+  await expect(ledgerTable).toBeVisible();
+  const ledgerRows = ledgerTable.locator('.uc1-trust-row');
+  await expect(ledgerRows.first()).toBeVisible();
+  expect(await ledgerRows.count()).toBeGreaterThan(0);
+
+  const actualCells = trustPanel.locator('.uc1-trust-pending-pill');
+  await expect(actualCells.first()).toBeVisible();
+  const actualTexts = await actualCells.allTextContents();
+  expect(actualTexts.length).toBeGreaterThan(0);
+  for (const t of actualTexts) expect(t.trim()).toBe('Pending');
+
+  const complianceStat = trustPanel.locator('.uc1-trust-trend-stat .uc1-trust-stat-v');
+  await expect(complianceStat).toBeVisible();
+  const complianceText = (await complianceStat.textContent()) ?? '';
+  expect(complianceText).toMatch(/\d/);
+  expect(complianceText).not.toMatch(/NaN/);
+
+  await shoot(page, 'uc1-flow-2f-track-record');
+
+  // Back to the backtest tab — leave the trust panel in its original tab state for the rest of
+  // the flow (matches how a real operator would return to the money-shot table).
+  await trustPanel.locator('.uc1-trust-tab[data-tab="backtest"]').click();
+
   // ---- P5-e item 2: exec KPI strip — 4 tiles + the seeded-history honesty label ----
   await page.waitForFunction(() => !!(window as any).__uc1ExecKpis, { timeout: 20_000 });
   const execStrip = page.locator('#uc1-exec-kpi-strip');
@@ -378,6 +410,62 @@ test('UC1-FLOW: ?uc1=1 auto-enters demo -> hero WO context -> evaluate -> 3 rank
   expect(execKpisAfterSchedule.decisionCount).toBeGreaterThan(0);
 
   await shoot(page, 'uc1-flow-3-decision-logged');
+});
+
+// ---------------------------------------------------------------------------
+// UC1-PICKER: deck-parity item 2 (Phase 7) — "Pick your own windows" renders the same ranked
+// table shape the heuristic "Evaluate closure windows" path produces. Uses "Use suggested windows
+// instead" (rather than simulated click-to-place drags) for determinism under Playwright, per the
+// plan's own note. Must run before UC1-OFFLINE (below), which kills the shared shim.
+// ---------------------------------------------------------------------------
+test('UC1-PICKER: "Pick your own windows" -> prefill ghost windows -> evaluate -> same ranked-table shape', async ({ page }) => {
+  test.setTimeout(90_000);
+
+  await gotoWithDc(page);
+  await page.waitForFunction(() => (window as any).__uc1DemoReady === true, { timeout: 60_000 });
+  await clickUc1Demo(page);
+
+  await page.waitForFunction(() => (window as any).__uc1Step === 2, { timeout: 10_000 });
+
+  // ---- open the picker: 3 dimmed ghost marks are prefilled from candidateWindows(), 0 planner
+  // windows placed yet. ----
+  const pickBtn = page.locator('#uc1-pick-windows-btn');
+  await expect(pickBtn).toBeVisible();
+  await pickBtn.click();
+
+  const picker = page.locator('#uc1-window-picker');
+  await expect(picker).toBeVisible();
+  await expect(picker.locator('rect[data-kind="ghost"]')).toHaveCount(3);
+  await expect(picker.locator('rect[data-kind="planner"]')).toHaveCount(0);
+  await expect(picker.locator('.uc1-picker-status')).toContainText('0/3 placed');
+  await expect(picker.locator('.uc1-picker-evaluate-btn')).toBeDisabled();
+
+  await shoot(page, 'uc1-flow-picker-1-ghosts');
+
+  // ---- "Use suggested windows instead" -> 3/3 planner windows placed, Evaluate enabled ----
+  await picker.locator('.uc1-picker-prefill-btn').click();
+  await expect(picker.locator('rect[data-kind="planner"]')).toHaveCount(3);
+  await expect(picker.locator('.uc1-picker-status')).toContainText('3/3 placed');
+  await expect(picker.locator('.uc1-picker-evaluate-btn')).toBeEnabled();
+
+  // ---- Evaluate these windows -> routes through the same evaluateUc1Windows() path -> the
+  // picker hides -> the ranked window table renders the same 3-row shape as the heuristic path. ----
+  await picker.locator('.uc1-picker-evaluate-btn').click();
+  await expect(picker).toBeHidden();
+
+  await page.waitForFunction(() => {
+    const w = (window as any).__uc1Windows;
+    return !!w && w.count === 3;
+  }, { timeout: 10_000 });
+
+  const windowPanel = page.locator('#uc1-window-panel');
+  await expect(windowPanel).toBeVisible();
+  await expect(windowPanel.locator('.uc1-win-row')).toHaveCount(3);
+
+  // Same stepper-advance path as the heuristic evaluate flow (no duplicated stepper logic).
+  await page.waitForFunction(() => (window as any).__uc1Step === 4, { timeout: 10_000 });
+
+  await shoot(page, 'uc1-flow-picker-2-ranked-table');
 });
 
 // ---------------------------------------------------------------------------

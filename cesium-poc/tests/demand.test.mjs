@@ -98,3 +98,53 @@ test("demandProfile.json defines a weekday peak strictly greater than the weeken
   const weekendMax = Math.max(...demandProfile.weekendPeaks.map((p) => p.peakMultiplier));
   assert.ok(weekendMax < weekdayMax, "weekend curve must be flatter than weekday peaks");
 });
+
+// ---- getWindowDemandSeries: UC1 deck-parity item 2 (planner picker week demand series) ---------
+
+test("getWindowDemandSeries: one {timestamp, vph} entry per slice, timestamps strictly increasing by 15 min", () => {
+  const m = model();
+  const start = new Date(Date.UTC(2024, 0, 1, 7, 0)); // Monday 07:00
+  const series = m.getWindowDemandSeries("west", start, 2);
+
+  assert.equal(series.length, 8);
+  for (const entry of series) {
+    assert.ok(entry.timestamp instanceof Date);
+    assert.equal(typeof entry.vph, "number");
+  }
+  for (let i = 1; i < series.length; i++) {
+    const deltaMs = series[i].timestamp.getTime() - series[i - 1].timestamp.getTime();
+    assert.equal(deltaMs, 15 * 60 * 1000);
+  }
+});
+
+test("getWindowDemandSeries: vph values match getDemand() called with the same segment/date/quarterHour", () => {
+  const m = model();
+  const start = new Date(Date.UTC(2024, 0, 1, 7, 0)); // Monday 07:00
+  const series = m.getWindowDemandSeries("west", start, 1); // 07:00, 07:15, 07:30, 07:45
+  const expected = [28, 29, 30, 31].map((q) => m.getDemand("west", start, q));
+  assert.deepEqual(series.map((s) => s.vph), expected);
+});
+
+test("getWindowDemand: byte-identical output to getWindowDemandSeries(...).map(s => s.vph)", () => {
+  const m = model();
+  const cases = [
+    { start: new Date(Date.UTC(2024, 0, 1, 7, 0)), hours: 2 },
+    { start: new Date(Date.UTC(2024, 0, 5, 23, 30)), hours: 1 }, // crosses midnight, Fri->Sat
+    { start: new Date(Date.UTC(2024, 0, 1, 7, 0)), hours: 1.5 },
+  ];
+  for (const { start, hours } of cases) {
+    const direct = m.getWindowDemand("west", start, hours);
+    const viaSeries = m.getWindowDemandSeries("west", start, hours).map((s) => s.vph);
+    assert.deepEqual(direct, viaSeries, `mismatch for start=${start.toISOString()} hours=${hours}`);
+  }
+});
+
+test("getWindowDemandSeries: durationHours=168 returns 672 slices spanning weekday and weekend peaks, and they differ", () => {
+  const m = model();
+  const series = m.getWindowDemandSeries("west", MONDAY, 168);
+  assert.equal(series.length, 672);
+
+  const weekdayPeakEntry = series[Q_8AM]; // Monday 08:00
+  const weekendPeakEntry = series[5 * 96 + Q_1PM]; // 5 days later (Saturday) 13:00
+  assert.notEqual(weekdayPeakEntry.vph, weekendPeakEntry.vph);
+});
