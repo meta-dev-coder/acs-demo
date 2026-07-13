@@ -1235,3 +1235,163 @@ body.uc1-mode .uc1-lane-btn.on {
   border-color: var(--uc1-accent);
   color: var(--uc1-ink);
 }
+
+/* UC1 asset browser (Task B: assetBrowser.js's renderAssetBrowser()) — a left-docked, always-on
+   static tab over the ~5k DataConnect asset rows the map layers already plot (assetLayer.js/
+   uc1Layers.js), NOT a triggered/floating popup like the context/window/trust panels above.
+   Docked at the bottom-left corner so it never fights the top-anchored main HUD panel for the
+   same 16px inset; its own internal groups list scrolls (never the page). Sandbox default look
+   mirrors the existing dark HUD chrome (.panel's navy/blur card); body.uc1-mode re-tones it onto
+   the deck's quiet ink-panel tokens per the design directives ("quiet: ink panel, muted counts,
+   accent only on active sub-tab" — this is emphatically NOT the money shot). */
+.uc1-asset-browser {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 8;
+  width: 300px;
+  max-height: 46vh;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 12px 10px;
+  border-radius: 10px;
+  color: #f2f5f8;
+  background: rgba(15, 22, 33, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  font-size: 12.5px;
+}
+.uc1-asset-browser.hidden { display: none; }
+
+.uc1-ab-eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6fb1ff;
+  font-weight: 700;
+  margin-bottom: 8px;
+  flex: none;
+}
+
+.uc1-ab-tabs { display: flex; gap: 4px; margin-bottom: 8px; flex: none; }
+.uc1-ab-tab {
+  flex: 1 1 auto;
+  font: inherit;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  padding: 5px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #cdd8e6;
+  cursor: pointer;
+}
+.uc1-ab-tab:hover { color: #fff; }
+.uc1-ab-tab:focus-visible { outline: 2px solid #6fb1ff; outline-offset: 1px; }
+.uc1-ab-tab-count { opacity: 0.75; }
+.uc1-ab-tab-active { background: #2f6df6; border-color: #2f6df6; color: #fff; }
+.uc1-ab-tab-active .uc1-ab-tab-count { opacity: 0.9; }
+
+.uc1-ab-search {
+  flex: none;
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f2f5f8;
+}
+.uc1-ab-search::placeholder { color: #7d8da3; }
+.uc1-ab-search:focus-visible { outline: 2px solid #6fb1ff; outline-offset: 1px; }
+
+.uc1-ab-groups { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.uc1-ab-empty { color: #8fa3bb; font-size: 11.5px; padding: 6px 2px; }
+
+.uc1-ab-group { border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+.uc1-ab-group:last-child { border-bottom: none; }
+.uc1-ab-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 2px;
+  cursor: pointer;
+}
+.uc1-ab-group-head:focus-visible { outline: 2px solid #6fb1ff; outline-offset: -1px; }
+.uc1-ab-group-chevron { font-size: 9px; color: #8fa3bb; width: 10px; text-align: center; }
+.uc1-ab-group-name { flex: 1 1 auto; font-size: 12px; color: #e6edf5; }
+.uc1-ab-group-count {
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: #9fb0c3;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.uc1-ab-group-body { padding: 0 0 8px 16px; max-height: 200px; overflow-y: auto; }
+.uc1-ab-item {
+  font-size: 11.5px;
+  color: #cdd8e6;
+  padding: 4px 6px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.uc1-ab-item:hover { background: rgba(111, 177, 255, 0.14); color: #fff; }
+.uc1-ab-item:focus-visible { outline: 2px solid #6fb1ff; outline-offset: -1px; }
+.uc1-ab-cap-note {
+  font-size: 10px;
+  color: #7d8da3;
+  padding: 4px 6px 0;
+  font-style: italic;
+}
+
+/* body.uc1-mode re-toning — deck tokens, no glassmorphism blur, quiet chrome throughout; the
+   active sub-tab is the ONLY accent moment (design directive: "accent only on the active
+   sub-tab"). Same ink-panel treatment as #uc1-context-panel/#uc1-window-panel/#uc1-trust-panel
+   above, so this reads as one family of panels, not a bolted-on widget. */
+body.uc1-mode .uc1-asset-browser {
+  background: var(--uc1-ink);
+  border-color: var(--uc1-line);
+  box-shadow: none;
+  color: var(--uc1-text);
+  font-family: var(--uc1-font-body);
+}
+body.uc1-mode .uc1-ab-eyebrow { color: var(--uc1-muted); }
+body.uc1-mode .uc1-ab-tab {
+  border-color: var(--uc1-line);
+  background: var(--uc1-ink-2);
+  color: var(--uc1-muted);
+  font-family: var(--uc1-font-body);
+}
+body.uc1-mode .uc1-ab-tab:hover { color: var(--uc1-text); border-color: var(--uc1-muted); }
+body.uc1-mode .uc1-ab-tab-active {
+  background: var(--uc1-accent);
+  border-color: var(--uc1-accent);
+  color: var(--uc1-ink);
+}
+body.uc1-mode .uc1-ab-search {
+  border-color: var(--uc1-line);
+  background: var(--uc1-ink-2);
+  color: var(--uc1-text);
+  font-family: var(--uc1-font-body);
+}
+body.uc1-mode .uc1-ab-search::placeholder { color: var(--uc1-muted); }
+body.uc1-mode .uc1-ab-empty,
+body.uc1-mode .uc1-ab-cap-note { color: var(--uc1-muted); }
+body.uc1-mode .uc1-ab-group { border-bottom-color: var(--uc1-line); }
+body.uc1-mode .uc1-ab-group-chevron,
+body.uc1-mode .uc1-ab-group-count { color: var(--uc1-muted); }
+body.uc1-mode .uc1-ab-group-name { color: var(--uc1-text); }
+body.uc1-mode .uc1-ab-group-count { background: rgba(255, 255, 255, 0.06); }
+body.uc1-mode .uc1-ab-item { color: var(--uc1-muted); font-family: var(--uc1-font-body); font-variant-numeric: tabular-nums; }
+body.uc1-mode .uc1-ab-item:hover { background: color-mix(in srgb, var(--uc1-accent) 12%, transparent); color: var(--uc1-text); }
+body.uc1-mode .uc1-ab-tab:focus-visible,
+body.uc1-mode .uc1-ab-search:focus-visible,
+body.uc1-mode .uc1-ab-group-head:focus-visible,
+body.uc1-mode .uc1-ab-item:focus-visible {
+  outline-color: var(--uc1-accent);
+}

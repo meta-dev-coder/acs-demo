@@ -219,6 +219,14 @@
          (positionLaneChooserAt) so it follows the selected segment's ribbon as the camera moves. -->
     <div id="uc1-lane-chooser" class="uc1-lane-chooser hidden"></div>
 
+    <!-- UC1 asset browser (assetBrowser.js's renderAssetBrowser()) — left-docked static "ASSET
+         VIEW" tab over the same ~5k DataConnect asset rows the map layers plot, grouped "By
+         type"/"By area" with search. Visible in BOTH sandbox and uc1-mode (uc1Mode.js's
+         UC1_KEPT_SELECTORS) — mounting it with real grouped data + onAssetFocus is a later phase
+         (main.js is intentionally untouched here, matching uc1Mode.js's startup tile/stepper
+         precedent). -->
+    <div id="uc1-asset-browser" class="uc1-asset-browser"></div>
+
     <!-- Full-viewport weather tint overlay (toggled by main.js applyWeatherOverlay) -->
     <div id="weather-overlay" style="display:none"></div>
 

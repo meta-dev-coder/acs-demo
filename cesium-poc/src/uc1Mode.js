@@ -113,6 +113,8 @@ export const UC1_KEPT_SELECTORS = [
   "#uc1-context-panel",
   "#uc1-window-panel",
   "#uc1-trust-panel",
+  "#uc1-asset-browser", // Task B: left-docked "ASSET VIEW" browser (assetBrowser.js) — a static
+                        // tab, not a triggered/floating panel, so it stays visible in uc1-mode too.
 ];
 
 // ---- DOM: mode toggle ----------------------------------------------------------------------------

@@ -19,7 +19,8 @@ import { assetKpis } from "./assetOps.js";
 import { login, fetchClass, writeRecord, onStatus } from "./dataconnect.js";
 import { adaptDataConnectAssets, scoreAssets } from "./scoringA.js";
 import { buildAssetLayer, disposeAssetLayer, pickAsset, installAssetPicking } from "./assetLayer.js";
-import { extractAccidents, openWorkOrders, failedInspections, buildWorkOrderContext, classifyCorridorAssets, TICKETS_CLASS, segmentCenterlinePoints } from "./uc1Data.js";
+import { extractAccidents, openWorkOrders, failedInspections, buildWorkOrderContext, classifyCorridorAssets, TICKETS_CLASS, segmentCenterlinePoints, assetBrowserGroups } from "./uc1Data.js";
+import { renderAssetBrowser } from "./assetBrowser.js";
 import { buildWorkOrderLayer, buildAccidentLayer, buildInspectionLayer, buildAncillaryLayer, buildImpactHeatmap, buildSegmentRibbonLayer, disposeUc1Layer, disposeUc1SegmentRibbons, pickUc1Point, flyToLonLat, pulseUc1Point } from "./uc1Layers.js";
 import { renderWorkOrderContext } from "./contextPanel.js";
 import { evaluateCandidates, weekDemandSeries, resolveSegmentByName } from "./windowAssembly.js";
@@ -1128,6 +1129,7 @@ async function loadDcSnapshot(viewer) {
  * "replaced", never "left half-built").
  */
 function buildUc1(viewer, { assetRegistry, workOrders, tickets, safetyInspections, roadwayInspections, itsInspections, incidents }) {
+  renderUc1AssetBrowser(viewer, assetRegistry);
   uc1Accidents = extractAccidents(assetRegistry);
   uc1OpenWOs = openWorkOrders({ assetRegistry, workOrders, tickets, safetyInspections, roadwayInspections, itsInspections });
   uc1FailedInspections = failedInspections([...(safetyInspections || []), ...(roadwayInspections || []), ...(itsInspections || [])]);
@@ -1265,6 +1267,49 @@ function openUc1WorkOrderContext(wo) {
       flyToLonLat(uc1Viewer, wo.lon, wo.lat, 500);
     }
   }
+}
+
+/** Task C: (re)renders the left-docked "ASSET VIEW" browser (assetBrowser.js) off the SAME raw
+ * `assetRegistry` rows buildUc1() was just handed — assetBrowserGroups() (uc1Data.js) groups the
+ * FULL ~5k-row export "By type"/"By area", never just what got scored/placed on the map. Runs
+ * before the `viewer.scene.canvas` guard below (DOM-only, no Cesium dependency) so the browser
+ * still populates under the ArcGIS renderer. Re-render is idempotent (assetBrowser.js's own
+ * posture) — safe to call again on every buildUc1() rebuild. */
+function renderUc1AssetBrowser(viewer, assetRegistry) {
+  const el = $("uc1-asset-browser");
+  if (!el) return;
+  const groups = assetBrowserGroups(assetRegistry);
+  renderAssetBrowser(el, groups, { onAssetFocus: focusUc1AssetBrowserItem });
+  // Debug hook for headless verification (e2e) — mirrors window.__dcAssets's shape convention.
+  window.__uc1AssetBrowser = {
+    total: (assetRegistry || []).length,
+    byType: groups.byType.map((g) => ({ key: g.key, count: g.count })),
+    byArea: groups.byArea.map((g) => ({ key: g.key, count: g.count })),
+  };
+}
+
+/** assetBrowser.js's onAssetFocus callback (Task C): flies to the picked item's lon/lat + drops
+ * the same short pulse focusUc1ContextRow uses below, then — for a `kind:"asset"` item that
+ * resolves to an already-scored DataConnect asset (matched by asset_tag, the same join key
+ * scoringA.js uses) — opens the existing showDcAssetPanel() detail panel (the SAME panel the
+ * scene-pick path at installDataConnectAssets() opens, not a second one). Ancillary/accident rows
+ * (or an asset with no scored record — e.g. filtered out for a bad lon/lat) have no such panel, so
+ * this just surfaces the item's own fields via the status line (this app's existing lightweight
+ * "toast" — see setStatus()'s other one-shot confirmations, e.g. the decision-logged message). */
+function focusUc1AssetBrowserItem(item) {
+  if (!item) return;
+  window.__uc1LastAssetFocus = { id: item.id, kind: item.kind }; // e2e debug hook
+  if (uc1Viewer && typeof item.lon === "number" && typeof item.lat === "number") {
+    flyToLonLat(uc1Viewer, item.lon, item.lat, 250);
+    pulseUc1Point(uc1Viewer, item.lon, item.lat);
+  }
+
+  const scoredAsset = item.kind === "asset" ? dcScored.find((a) => a.asset_tag === item.id) : null;
+  if (scoredAsset) {
+    showDcAssetPanel(scoredAsset);
+    return;
+  }
+  setStatus(`${item.label} · ${item.category} (Asset ${item.id}) — no detail record on file`);
 }
 
 /** contextPanel.js's onRowFocus callback (Task F1 bullet 2): a picked context-panel row (failed

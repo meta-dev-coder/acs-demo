@@ -472,6 +472,135 @@ export function segmentCenterlinePoints(centerline, segment) {
   return out;
 }
 
+// ---- asset browser grouping (Task A: by-type / by-area group-by for the asset browser) ---------
+// Inspected the real cesium-poc/public/dataconnect-data/asset_registry.json (5,015 rows): the
+// grouping-relevant columns actually present are "Asset Category" (25 distinct values — the most
+// granular real column; there is no separate "Asset Type" column in this export), "System Class"
+// (only 2 coarse values, Roadway/ITS — too coarse to group by), "Location Category" (3 values,
+// also coarse), and "Segment" (the 4 named road segments on Roadway rows, but ITS rows carry
+// zone/mile-marker strings in this same column instead — a real property of the source data, not
+// something normalized away here). So: type = "Asset Category" (kept verbatim, including the
+// export's own "Attenuetors" typo — this module mirrors the source, it doesn't "fix" it), area =
+// "Segment". The current snapshot has no literal "False"/blank placeholder rows, but a future
+// export vintage might (per the task's own diagnosis) — isPlaceholderValue() below buckets those
+// under "Uncategorized"/"Unknown segment" defensively rather than dropping the row, either way.
+
+const UNCATEGORIZED = "Uncategorized";
+const UNKNOWN_SEGMENT = "Unknown segment";
+
+/** True for null/undefined/blank values and known spreadsheet placeholder strings ("False",
+ * "N/A", "None", "null") a V6 export vintage might emit in place of a real category/segment.
+ * Bucketed under Uncategorized/Unknown segment by callers below, never used to drop the row. */
+function isPlaceholderValue(v) {
+  if (v == null) return true;
+  const s = String(v).trim();
+  if (s === "") return true;
+  return /^(false|n\/?a|none|null|undefined)$/i.test(s);
+}
+
+/** Asset-type grouping key: "Asset Category" as exported, verbatim (including the "Attenuetors"
+ * typo) — falsy/placeholder values bucket under "Uncategorized". */
+export function assetTypeLabel(rec) {
+  const v = rec?.["Asset Category"];
+  return isPlaceholderValue(v) ? UNCATEGORIZED : String(v).trim();
+}
+
+/** Area grouping key: "Segment" as exported, verbatim — blank/placeholder values bucket under
+ * "Unknown segment". Not otherwise cleaned: ITS rows' zone/mile-marker strings in this column are
+ * real source data, distinct from the 4 named road segments Roadway rows carry here. */
+export function assetAreaLabel(rec) {
+  const v = rec?.["Segment"];
+  return isPlaceholderValue(v) ? UNKNOWN_SEGMENT : String(v).trim();
+}
+
+/** Display label for a browser item: Description first (String()-coerced — some real rows carry
+ * a bare number, e.g. a sign number, as their description), falling back to Notes, then the
+ * Asset ID itself so an item never renders with an empty label. */
+function browserLabel(rec) {
+  const desc = rec?.["Asset Description"];
+  if (desc != null && desc !== "") return String(desc);
+  const notes = rec?.["Notes"];
+  if (notes != null && notes !== "") return String(notes);
+  return String(rec?.["Asset ID"] ?? "");
+}
+
+/** Reduces one raw Asset Registry row to the asset-browser's item shape. `band` is deliberately
+ * never set here — it comes from scoringA.js's synthetic scoring pass, and this module stays
+ * scoringA-independent (scoringA.js imports FROM uc1Data.js, never the reverse); a caller that has
+ * already scored assets can merge a band onto these items itself. `kind` distinguishes the ~131
+ * Asset Category "Accidents" rows (dated safety events, never scored — see isAccidentCategory()
+ * above) from every other registry row, so the browser can disclose them rather than silently
+ * showing a total short of the full export. */
+function browserItem(rec) {
+  return {
+    id: String(rec?.["Asset ID"] ?? ""),
+    label: browserLabel(rec),
+    lon: toNum(rec?.["X Coordinates"]),
+    lat: toNum(rec?.["Y Coordinates"]),
+    category: assetTypeLabel(rec),
+    kind: isAccidentCategory(rec?.["Asset Category"]) ? "accident" : "asset",
+  };
+}
+
+/**
+ * groupAssetsBy(assets, keyFn) -> [{key, label, count, items}]
+ *
+ * Generic group-by: buckets `assets` (any objects carrying an `id`) by `keyFn(asset)`, sorted
+ * count-desc (ties broken by key ascending, for a stable order), each group's `items` sorted by
+ * `id` ascending. `label` mirrors `key` — callers that want a prettier display label can remap it
+ * themselves. Never throws on missing/empty input.
+ */
+export function groupAssetsBy(assets, keyFn) {
+  const groups = new Map();
+  for (const asset of assets || []) {
+    const key = keyFn(asset);
+    let group = groups.get(key);
+    if (!group) {
+      group = { key, label: key, count: 0, items: [] };
+      groups.set(key, group);
+    }
+    group.count += 1;
+    group.items.push(asset);
+  }
+  const out = [...groups.values()];
+  for (const group of out) {
+    group.items.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  }
+  out.sort((a, b) => b.count - a.count || String(a.key).localeCompare(String(b.key)));
+  return out;
+}
+
+/**
+ * assetBrowserGroups(assets) -> {byType, byArea}
+ *
+ * Groups the FULL Asset Registry export (scored assets, off-corridor ancillary assets, and the
+ * accident-category rows alike — every row, `kind`-flagged, never filtered) by asset type
+ * (assetTypeLabel — "Asset Category") and by area (assetAreaLabel — "Segment"), so the asset
+ * browser can disclose "other assets not shown" instead of only ever listing what got scored and
+ * placed on the map. Each group's `count`/items sum to `assets.length` in both `byType` and
+ * `byArea` — no row is dropped by either grouping.
+ */
+export function assetBrowserGroups(assets) {
+  const records = assets || [];
+  const rows = records.map((rec) => ({
+    id: String(rec?.["Asset ID"] ?? ""),
+    item: browserItem(rec),
+    typeKey: assetTypeLabel(rec),
+    areaKey: assetAreaLabel(rec),
+  }));
+
+  const byType = groupAssetsBy(rows, (r) => r.typeKey).map((g) => ({
+    ...g,
+    items: g.items.map((r) => r.item),
+  }));
+  const byArea = groupAssetsBy(rows, (r) => r.areaKey).map((g) => ({
+    ...g,
+    items: g.items.map((r) => r.item),
+  }));
+
+  return { byType, byArea };
+}
+
 /** Group records by a (possibly missing) asset-id field into Map<string, T[]>. Duplicated from
  * scoringA.js's private groupByAssetId to keep this module dependency-free (scoringA.js imports
  * FROM here, not the reverse). */

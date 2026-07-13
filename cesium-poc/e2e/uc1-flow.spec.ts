@@ -509,6 +509,64 @@ test('UC1-PICKER: "Pick your own windows" -> prefill ghost windows -> evaluate -
 });
 
 // ---------------------------------------------------------------------------
+// UC1-ASSETS: Task C — the left-docked "ASSET VIEW" browser (assetBrowser.js), wired in main.js off
+// the same raw DataConnect asset_registry rows the map layers plot (window.__uc1AssetBrowser is the
+// exposed debug hook, mirroring window.__dcAssets's own convention). Must run before UC1-OFFLINE
+// (below), which kills the shared shim.
+// ---------------------------------------------------------------------------
+test('UC1-ASSETS: browser is visible, "By type" groups sum to the full registry, search narrows, item click does not error', async ({ page }) => {
+  test.setTimeout(90_000);
+
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+
+  await gotoWithDc(page);
+  await page.waitForFunction(() => (window as any).__uc1DemoReady === true, { timeout: 60_000 });
+
+  const browser = page.locator('#uc1-asset-browser');
+  await expect(browser).toBeVisible();
+
+  // "By type" groups' counts sum to the full registry row count (window.__uc1AssetBrowser, set
+  // by main.js's renderUc1AssetBrowser alongside every render — same debug-hook convention as
+  // window.__dcAssets).
+  await page.waitForFunction(() => {
+    const ab = (window as any).__uc1AssetBrowser;
+    return !!ab && ab.total > 5000;
+  }, { timeout: 10_000 });
+  const summary = await page.evaluate(() => (window as any).__uc1AssetBrowser);
+  const byTypeSum = summary.byType.reduce((sum: number, g: { count: number }) => sum + g.count, 0);
+  const byAreaSum = summary.byArea.reduce((sum: number, g: { count: number }) => sum + g.count, 0);
+  expect(byTypeSum).toBe(summary.total);
+  expect(byAreaSum).toBe(summary.total);
+
+  await expect(browser.locator('.uc1-ab-tab-active')).toContainText('By type');
+  const groupCountBefore = await browser.locator('.uc1-ab-group').count();
+  expect(groupCountBefore).toBeGreaterThan(0);
+
+  // Search narrows: a nonsense query drops every group to the "no assets match" empty state.
+  await browser.locator('.uc1-ab-search').fill('zzz-no-such-asset-zzz');
+  await expect(browser.locator('.uc1-ab-empty')).toBeVisible();
+  await expect(browser.locator('.uc1-ab-group')).toHaveCount(0);
+
+  // Clearing the search restores the full group list.
+  await browser.locator('.uc1-ab-search').fill('');
+  await expect(browser.locator('.uc1-ab-group')).toHaveCount(groupCountBefore);
+
+  // Item click (expand the first group, click its first item) doesn't throw — flies the camera +
+  // either opens the existing asset detail panel or posts a status-line toast (main.js's
+  // focusUc1AssetBrowserItem), asserted via the window.__uc1LastAssetFocus debug hook.
+  await browser.locator('.uc1-ab-group-head').first().click();
+  const firstItem = browser.locator('.uc1-ab-item').first();
+  await expect(firstItem).toBeVisible();
+  await firstItem.click();
+  await page.waitForFunction(() => (window as any).__uc1LastAssetFocus != null, { timeout: 5_000 });
+
+  await shoot(page, 'uc1-flow-asset-browser');
+
+  expect(errors, `page errors:\n${errors.join('\n')}`).toEqual([]);
+});
+
+// ---------------------------------------------------------------------------
 // UC1-OFFLINE: schedule while the shim is down -> offline badge + in-memory queue
 // (Runs LAST: it kills the one shim process this whole file shares.)
 // ---------------------------------------------------------------------------
