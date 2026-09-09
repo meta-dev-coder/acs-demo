@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <path d="M10 15
+       Q50 4 90 15
+       L87 55
+       Q82 82 50 94
+       Q18 82 13 55
+       Z" fill="#174a8b" stroke="white" stroke-width="5"></path>
+
+  <path d="M12 16
+       Q50 5 88 16
+       L86 34
+       Q50 25 14 34
+       Z" fill="#c9252d"></path>
+
+  <text x="50" y="68" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-weight="700" font-size="35">
+    595
+  </text>
+</svg>

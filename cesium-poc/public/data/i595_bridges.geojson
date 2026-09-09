@@ -1,0 +1,956 @@
+{
+  "type": "FeatureCollection",
+  "name": "I-595 FDOT Bridges",
+  "metadata": {
+    "roadway": "86095000",
+    "corridor": "I-595",
+    "source": "FDOT RCI Bridges",
+    "feature_count": 23,
+    "crs": "EPSG:4326",
+    "note": "Official FDOT bridge/structure extents for roadway 86095000. ROAD_SIDE values are preserved without inferring EB/WB direction."
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": 2708,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -80.2037246924603,
+            26.085369993325326
+          ],
+          [
+            -80.20348697059015,
+            26.085268730494285
+          ],
+          [
+            -80.20323619734687,
+            26.08516189641464
+          ],
+          [
+            -80.20293928171445,
+            26.085043125921644
+          ]
+        ]
+      },
+      "properties": {
+        "asset_id": "BRIDGE-860419",
+        "asset_type": "bridge",
+        "display_name": "Bridge 860419",
+        "structure_id": "860419",
+        "roadway": "86095000",
+        "road_side": "L",
+        "begin_post": 8.249,
+        "end_post": 8.303,
+        "district": "4",
+        "county": "Broward",
+        "county_dot": "86",
+        "managing_district": "4",
+        "fdot_objectid": 2708,
+        "shape_length_m": 86.49790064040853,
+        "source": "FDOT RCI Bridges",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 2827,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -80.25123520952081,
+            26.098729170650927
+          ],
+          [
+            -80.25066627622684,
+            26.098584680569225
+          ],
+          [
+            -80.25063314896548,
+            26.098576679190604
+          ]
+        ]
+      },
+      "properties": {
+        "asset_id": "BRIDGE-860391",
+        "asset_type": "bridge",
+        "display_name": "Bridge 860391",
+        "structure_id": "860391",
+        "roadway": "86095000",
+        "road_side": "L",
+        "begin_post": 5.13,
+        "end_post": 5.169,
+        "district": "4",
+        "county": "Broward",
+        "county_dot": "86",
+        "managing_district": "4",
+        "fdot_objectid": 2827,
+        "shape_length_m": 62.530764895450325,
+        "source": "FDOT RCI Bridges",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 2944,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -80.28257492833659,
+            26.106906197052936
+          ],
+          [
+            -80.28226346795817,
+            26.10683095282325
+          ],
+          [
+            -80.28196558710074,
+            26.106754725435575
+          ],
+          [
+            -80.28160017544619,
+            26.10666585591405
+          ]
+        ]
+      },
+      "properties": {
+        "asset_id": "BRIDGE-860359",
+        "asset_type": "bridge",
+        "display_name": "Bridge 860359",
+        "structure_id": "860359",
+        "roadway": "86095000",
+        "road_side": "L",
+        "begin_post": 3.095,
+        "end_post": 3.158,
+        "district": "4",
+        "county": "Broward",
+        "county_dot": "86",
+        "managing_district": "4",
+        "fdot_objectid": 2944,
+        "shape_length_m": 101.0402148551053,
+        "source": "FDOT RCI Bridges",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 3023,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -80.25135855518648,
+            26.098760495962306
+          ],
+          [
+            -80.25066627622684,
+            26.098584680569225
+          ],
+          [
+            -80.25063314896548,
+            26.098576679190604
+          ]
+        ]
+      },
+      "properties": {
+        "asset_id": "BRIDGE-860665",
+        "asset_type": "bridge",
+        "display_name": "Bridge 860665",
+        "structure_id": "860665",
+        "roadway": "86095000",
+        "road_side": "R",
+        "begin_post": 5.122,
+        "end_post": 5.169,
+        "district": "4",
+        "county": "Broward",
+        "county_dot": "86",
+        "managing_district": "4",
+        "fdot_objectid": 3023,
+        "shape_length_m": 75.34405182477776,
+        "source": "FDOT RCI Bridges",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 3085,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -80.29817566057044,
+            26.110680868113075
+          ],
+          [
+            -80.29759155050763,
+            26.110539926065115
+          ],
+          [
+            -80.29721512514999,
+            26.110448742380694
+          ]
+        ]
+      },
+      "properties": {
+        "asset_id": "BRIDGE-860370",
+        "asset_type": "bridge",
+        "display_name": "Bridge 860370",
+        "structure_id": "860370",
+        "roadway": "86095000",
+        "road_side": "L",
+        "begin_post": 2.088,
+        "end_post": 2.15,
+        "district": "4",
+        "county": "Broward",
+        "county_dot": "86",
+        "managing_district": "4",
+        "fdot_objectid": 3085,
+        "shape_length_m": 99.42503344130088,
+        "source": "FDOT RCI Bridges",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 3208,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -80.19104760438175,
+            26.083812879276635
+          ],
+          [
+            -80.18611758561966,
+            26.08385677550487
+          ],
+          [
+            -80.18481981497489,
+            26.08383538666183
+          ],
+          [
+            -80.18369358020126,
+            26.08378213375817
+          ],
+          [
+            -80.1823858426864,
+            26.083699717813218
+          ],
+          [
+            -80.1808432841744,
+            26.083499616063847
+          ],
+          [
+            -80.17785700435546,
+            26.08313065012771
+          ],
+          [
+            -80.17661598647105,
+            26.082958329960142
+          ]
+        ]
+      },
+      "properties": {
+        "asset_id": "BRIDGE-860428",
+        "asset_type": "bridge",
+        "display_name": "Bridge 860428",
+        "structure_id": "860428",
+        "roadway": "86095000",
+        "road_side": "R",
+        "begin_post": 9.056,
+        "end_post": 9.96,
+        "district": "4",
+        "county": "Broward",
+        "county_dot": "86",
+        "managing_district": "4",
+        "fdot_objectid": 3208,
+        "shape_length_m": 1449.7199515875475,
+        "source": "FDOT RCI Bridges",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 3294,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -80.19741209017643,
+            26.083847089179255
+          ],
+          [
+            -80.19727446657049,
+            26.08383901086784
+          ],
+          [
+            -80.19684394817256,
+            26.08381374059117
+          ],
+          [
+            -80.19640337473395,
+            26.083806115703755
+          ]
+        ]
+      },
+      "properties": {
+        "asset_id": "BRIDGE-860426",
+        "asset_type": "bridge",
+        "display_name": "Bridge 860426",
+        "structure_id": "860426",
+        "roadway": "86095000",
+        "road_side": "L",
+        "begin_post": 8.659,
+        "end_post": 8.722,
+        "district": "4",
+        "county": "Broward",
+        "county_dot": "86",
+        "managing_district": "4",
+        "fdot_objectid": 3294,
+        "shape_length_m": 101.01415612157372,
+        "source": "FDOT RCI Bridges",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 3326,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -80.28257492833659,
+            26.106906197052936
+          ],
+          [
+            -80.28226346795817,
+            26.10683095282325
+          ],
+          [
+            -80.28196558710074,
+            26.106754725435575
+          ],
+          [
+            -80.28160017544619,
+            26.10666585591405
+          ]
+        ]
+      },
+      "properties": {
+        "asset_id": "BRIDGE-860360",
+        "asset_type": "bridge",
+        "display_name": "Bridge 860360",
+        "structure_id": "860360",
+        "roadway": "86095000",
+        "road_side": "R",
+        "begin_post": 3.095,
+        "end_post": 3.158,
+        "district": "4",
+        "county": "Broward",
+        "county_dot": "86",
+        "managing_district": "4",
+        "fdot_objectid": 3326,
+        "shape_length_m": 101.0402148551053,
+        "source": "FDOT RCI Bridges",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 3372,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -80.2037246924603,
+            26.085369993325326
+          ],
+          [
+            -80.20348697059015,
+            26.085268730494285
+          ],
+          [
+            -80.20323619734687,
+            26.08516189641464
+          ],
+          [
+            -80.20293928171445,
+            26.085043125921644
+          ]
+        ]
+      },
+      "properties": {
+        "asset_id": "BRIDGE-860418",
+        "asset_type": "bridge",
+        "display_name": "Bridge 860418",
+        "structure_id": "860418",
+        "roadway": "86095000",
+        "road_side": "R",
+        "begin_post": 8.249,
+        "end_post": 8.303,
+        "district": "4",
+        "county": "Broward",
+        "county_dot": "86",
+        "managing_district": "4",
+        "fdot_objectid": 3372,
+        "shape_length_m": 86.49790064040853,
+        "source": "FDOT RCI Bridges",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 3433,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -80.31417790180929,
+            26.11456005731073
+          ],
+          [
+            -80.31307889379167,
+            26.11429006853195
+          ]
+        ]
+      },
+      "properties": {
+        "asset_id": "BRIDGE-860369",
+        "asset_type": "bridge",
+        "display_name": "Bridge 860369",
+        "structure_id": "860369",
+        "roadway": "86095000",
+        "road_side": "R",
+        "begin_post": 1.055,
+        "end_post": 1.126,
+        "district": "4",
+        "county": "Broward",
+        "county_dot": "86",
+        "managing_district": "4",
+        "fdot_objectid": 3433,
+        "shape_length_m": 113.88148916743837,
+        "source": "FDOT RCI Bridges",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 3549,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -80.22744378073921,
+            26.09336153238157
+          ],
+          [
+            -80.22710323736146,
+            26.093278304222814
+          ]
+        ]
+      },
+      "properties": {
+        "asset_id": "BRIDGE-860379",
+        "asset_type": "bridge",
+        "display_name": "Bridge 860379",
+        "structure_id": "860379",
+        "roadway": "86095000",
+        "road_side": "R",
+        "begin_post": 6.66,
+        "end_post": 6.682,
+        "district": "4",
+        "county": "Broward",
+        "county_dot": "86",
+        "managing_district": "4",
+        "fdot_objectid": 3549,
+        "shape_length_m": 35.281729429250504,
+        "source": "FDOT RCI Bridges",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 3835,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -80.19843302516122,
+            26.08394454072305
+          ],
+          [
+            -80.19754972679671,
+            26.083855168335038
+          ],
+          [
+            -80.19727446657049,
+            26.08383901086784
+          ],
+          [
+            -80.19725206535456,
+            26.083837696195047
+          ]
+        ]
+      },
+      "properties": {
+        "asset_id": "BRIDGE-860425",
+        "asset_type": "bridge",
+        "display_name": "Bridge 860425",
+        "structure_id": "860425",
+        "roadway": "86095000",
+        "road_side": "R",
+        "begin_post": 8.595,
+        "end_post": 8.669,
+        "district": "4",
+        "county": "Broward",
+        "county_dot": "86",
+        "managing_district": "4",
+        "fdot_objectid": 3835,
+        "shape_length_m": 118.72861991863957,
+        "source": "FDOT RCI Bridges",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 3948,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -80.17188327733666,
+            26.082358590001064
+          ],
+          [
+            -80.17187532051881,
+            26.08235758814754
+          ],
+          [
+            -80.16875132624784,
+            26.081961968949514
+          ],
+          [
+            -80.1682928930832,
+            26.08191289306746
+          ]
+        ]
+      },
+      "properties": {
+        "asset_id": "BRIDGE-860535",
+        "asset_type": "bridge",
+        "display_name": "Bridge 860535",
+        "structure_id": "860535",
+        "roadway": "86095000",
+        "road_side": "L",
+        "begin_post": 10.258,
+        "end_post": 10.484,
+        "district": "4",
+        "county": "Broward",
+        "county_dot": "86",
+        "managing_district": "4",
+        "fdot_objectid": 3948,
+        "shape_length_m": 362.4836084474693,
+        "source": "FDOT RCI Bridges",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 4131,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -80.2661276175219,
+            26.102853769735326
+          ],
+          [
+            -80.26544642904086,
+            26.102687647593203
+          ],
+          [
+            -80.26513692417215,
+            26.102612143683988
+          ]
+        ]
+      },
+      "properties": {
+        "asset_id": "BRIDGE-860648",
+        "asset_type": "bridge",
+        "display_name": "Bridge 860648",
+        "structure_id": "860648",
+        "roadway": "86095000",
+        "road_side": "L",
+        "begin_post": 4.158,
+        "end_post": 4.222,
+        "district": "4",
+        "county": "Broward",
+        "county_dot": "86",
+        "managing_district": "4",
+        "fdot_objectid": 4131,
+        "shape_length_m": 102.61724429165632,
+        "source": "FDOT RCI Bridges",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 4167,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -80.22744378073921,
+            26.09336153238157
+          ],
+          [
+            -80.22710323736146,
+            26.093278304222814
+          ]
+        ]
+      },
+      "properties": {
+        "asset_id": "BRIDGE-860378",
+        "asset_type": "bridge",
+        "display_name": "Bridge 860378",
+        "structure_id": "860378",
+        "roadway": "86095000",
+        "road_side": "L",
+        "begin_post": 6.66,
+        "end_post": 6.682,
+        "district": "4",
+        "county": "Broward",
+        "county_dot": "86",
+        "managing_district": "4",
+        "fdot_objectid": 4167,
+        "shape_length_m": 35.281729429250504,
+        "source": "FDOT RCI Bridges",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 4448,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -80.17188327733666,
+            26.082358590001064
+          ],
+          [
+            -80.17187532051881,
+            26.08235758814754
+          ],
+          [
+            -80.16875132624784,
+            26.081961968949514
+          ],
+          [
+            -80.1682928930832,
+            26.08191289306746
+          ]
+        ]
+      },
+      "properties": {
+        "asset_id": "BRIDGE-860536",
+        "asset_type": "bridge",
+        "display_name": "Bridge 860536",
+        "structure_id": "860536",
+        "roadway": "86095000",
+        "road_side": "R",
+        "begin_post": 10.258,
+        "end_post": 10.484,
+        "district": "4",
+        "county": "Broward",
+        "county_dot": "86",
+        "managing_district": "4",
+        "fdot_objectid": 4448,
+        "shape_length_m": 362.4836084474693,
+        "source": "FDOT RCI Bridges",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 4509,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -80.19104760438175,
+            26.083812879276635
+          ],
+          [
+            -80.18611758561966,
+            26.08385677550487
+          ],
+          [
+            -80.18481981497489,
+            26.08383538666183
+          ],
+          [
+            -80.18369358020126,
+            26.08378213375817
+          ],
+          [
+            -80.1823858426864,
+            26.083699717813218
+          ],
+          [
+            -80.1808432841744,
+            26.083499616063847
+          ],
+          [
+            -80.17785700435546,
+            26.08313065012771
+          ],
+          [
+            -80.17661598647105,
+            26.082958329960142
+          ]
+        ]
+      },
+      "properties": {
+        "asset_id": "BRIDGE-860427",
+        "asset_type": "bridge",
+        "display_name": "Bridge 860427",
+        "structure_id": "860427",
+        "roadway": "86095000",
+        "road_side": "L",
+        "begin_post": 9.056,
+        "end_post": 9.96,
+        "district": "4",
+        "county": "Broward",
+        "county_dot": "86",
+        "managing_district": "4",
+        "fdot_objectid": 4509,
+        "shape_length_m": 1449.7199515875475,
+        "source": "FDOT RCI Bridges",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 4634,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -80.29817566057044,
+            26.110680868113075
+          ],
+          [
+            -80.29759155050763,
+            26.110539926065115
+          ],
+          [
+            -80.29721512514999,
+            26.110448742380694
+          ]
+        ]
+      },
+      "properties": {
+        "asset_id": "BRIDGE-860371",
+        "asset_type": "bridge",
+        "display_name": "Bridge 860371",
+        "structure_id": "860371",
+        "roadway": "86095000",
+        "road_side": "R",
+        "begin_post": 2.088,
+        "end_post": 2.15,
+        "district": "4",
+        "county": "Broward",
+        "county_dot": "86",
+        "managing_district": "4",
+        "fdot_objectid": 4634,
+        "shape_length_m": 99.42503344130088,
+        "source": "FDOT RCI Bridges",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 4754,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -80.33065706431674,
+            26.11817333737686
+          ],
+          [
+            -80.33022515387887,
+            26.11810852333371
+          ],
+          [
+            -80.33007315863796,
+            26.118082602674328
+          ],
+          [
+            -80.3296261212079,
+            26.118005150424644
+          ]
+        ]
+      },
+      "properties": {
+        "asset_id": "BRIDGE-860384",
+        "asset_type": "bridge",
+        "display_name": "Bridge 860384",
+        "structure_id": "860384",
+        "roadway": "86095000",
+        "road_side": "R",
+        "begin_post": 0,
+        "end_post": 0.063,
+        "district": "4",
+        "county": "Broward",
+        "county_dot": "86",
+        "managing_district": "4",
+        "fdot_objectid": 4754,
+        "shape_length_m": 104.75369175159689,
+        "source": "FDOT RCI Bridges",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 4836,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -80.15756673009558,
+            26.081239118834834
+          ],
+          [
+            -80.15668007338927,
+            26.081235379098093
+          ],
+          [
+            -80.15434818148614,
+            26.08126091627147
+          ],
+          [
+            -80.1527683903289,
+            26.081271325054885
+          ],
+          [
+            -80.14247283136935,
+            26.081327118922825
+          ],
+          [
+            -80.14125229729503,
+            26.08130931099609
+          ],
+          [
+            -80.14036201367016,
+            26.081256542175964
+          ],
+          [
+            -80.13991661200407,
+            26.08121746823027
+          ]
+        ]
+      },
+      "properties": {
+        "asset_id": "BRIDGE-860478",
+        "asset_type": "bridge",
+        "display_name": "Bridge 860478",
+        "structure_id": "860478",
+        "roadway": "86095000",
+        "road_side": "C",
+        "begin_post": 11.155,
+        "end_post": 12.256,
+        "district": "4",
+        "county": "Broward",
+        "county_dot": "86",
+        "managing_district": "4",
+        "fdot_objectid": 4836,
+        "shape_length_m": 1765.78094409163,
+        "source": "FDOT RCI Bridges",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 5011,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -80.31417790180929,
+            26.11456005731073
+          ],
+          [
+            -80.31307889379167,
+            26.11429006853195
+          ]
+        ]
+      },
+      "properties": {
+        "asset_id": "BRIDGE-860666",
+        "asset_type": "bridge",
+        "display_name": "Bridge 860666",
+        "structure_id": "860666",
+        "roadway": "86095000",
+        "road_side": "L",
+        "begin_post": 1.055,
+        "end_post": 1.126,
+        "district": "4",
+        "county": "Broward",
+        "county_dot": "86",
+        "managing_district": "4",
+        "fdot_objectid": 5011,
+        "shape_length_m": 113.88148916743837,
+        "source": "FDOT RCI Bridges",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 9805,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -80.33065706431674,
+            26.11817333737686
+          ],
+          [
+            -80.33022515387887,
+            26.11810852333371
+          ],
+          [
+            -80.33007315863796,
+            26.118082602674328
+          ],
+          [
+            -80.3296261212079,
+            26.118005150424644
+          ]
+        ]
+      },
+      "properties": {
+        "asset_id": "BRIDGE-860383",
+        "asset_type": "bridge",
+        "display_name": "Bridge 860383",
+        "structure_id": "860383",
+        "roadway": "86095000",
+        "road_side": "L",
+        "begin_post": 0,
+        "end_post": 0.063,
+        "district": "4",
+        "county": "Broward",
+        "county_dot": "86",
+        "managing_district": "4",
+        "fdot_objectid": 9805,
+        "shape_length_m": 104.75369175159689,
+        "source": "FDOT RCI Bridges",
+        "corridor": "I-595"
+      }
+    }
+  ]
+}

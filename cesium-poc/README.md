@@ -110,3 +110,106 @@ station (the realistic "booth shut — use the next one"). It does **not** `setD
 - Corridor placement / heading: `ANCHOR` and `BEARING` in `sumo/fcd2json.py` (then re-run `build.sh`).
 - Vehicles are colored boxes today; swapping to glTF car models (`Model` / `ModelGraphics`, e.g. the
   CC0 Kenney Car Kit) is the main remaining realism upgrade.
+
+## FL511 live road events (I-595 demo)
+
+`?demo=i595` → **Traffic & ITS → Live Events** shows FL511 incidents and closures that fall within
+250 m of the real I-595 network geometry. Both feeds start hidden, like every other layer here.
+
+**The browser never talks to FL511.** `server/` polls it and serves a normalized view:
+
+```
+GET /api/i595/live-events              # combined; also /incidents and /closures
+```
+
+`npm run dev` mounts that handler inside Vite, so the API is same-origin with no second process.
+For a static deployment run it on its own: `npm run api` (see `.env.example` for every setting).
+
+### FL511 endpoints used
+
+All three are publicly reachable but **undocumented** parts of FL511's own website. No access
+control is bypassed, polling is 60 s by default, and each URL is an environment variable:
+
+| Purpose | Endpoint | Notes |
+| --- | --- | --- |
+| Incidents | `GET /map/mapIcons/Incidents` | statewide markers: `itemId` + `location` only |
+| Closures | `GET /map/mapIcons/Closures` | some carry `secondarylocation` |
+| Marker detail | `GET /tooltip/{layerId}/{id}?lang={lang}` | declared by FL511's map as `data-tooltipbaseurl`; returns an **HTML fragment**, not JSON |
+
+The detail fragment yields a heading, a free-text description and a label/value table (`Severity`,
+`Region`, `Start Time`, `End Time`, `Last Updated`, `Comment`, `Detour`). FL511 publishes **no**
+structured roadway, direction or lanes-blocked value — those exist only inside the prose — so those
+model fields stay undefined rather than being parsed out of a sentence.
+
+### Source data vs. digital-twin association
+
+Proximity is not identity. A live example: FL511 closures sit ~15 m from I-595 ramp geometry while
+FL511 itself attributes them to **95 Express**. So the details panel keeps two blocks:
+
+* **Source data · FL511** — only values FL511 published. A field it omitted produces no row.
+* **Digital twin association** — nearest facility, distance and (only within
+  `I595_LIVE_EVENT_SEGMENT_TOLERANCE_METERS`) the nearest FDOT traffic section. Never written back
+  over a source field.
+
+For closures with two endpoints the connecting line joins FL511's two published points; it is drawn
+dashed and labelled because it is **not** the closed roadway geometry.
+
+### Failure behaviour
+
+`sourceStatus` is `LIVE`, `STALE` (FL511 failed; last successful data still served, with its age) or
+`UNAVAILABLE` (nothing cached yet). An outage never empties the map silently. Live events are
+visualisation only — they do not change speeds, capacity, AADT or the simulation.
+
+## Google Photorealistic 3D Tiles (base environment)
+
+**Map explorer → Map → Base Environment** switches the *world* the corridor is drawn on. It is a
+radio group outside `DataLayer`, because it changes neither which corridor data exists nor what is
+switched on:
+
+```
+Map
+└── Base Environment
+    ○ Satellite / Existing Basemap   (default, unchanged startup behaviour)
+    ○ Google Photorealistic 3D
+```
+
+Uses `createGooglePhotorealistic3DTileset()` from the installed Cesium (1.143.0) — no hand-built
+tile URLs. The tileset is created on first activation only, kept for the life of the viewer, and
+thereafter merely shown or hidden: switching away sets `show = false` and restores
+`scene.globe.show`, it never destroys or re-downloads it. The viewer is never recreated and no data
+source, entity, layer-visibility state or panel selection is touched by a switch.
+
+### Setup
+
+Put a key in `.env` (gitignored) as `VITE_GOOGLE_MAPS_API_KEY` — see `.env.example`. The Google
+Cloud project needs **billing enabled**, the **Map Tiles API enabled**, and an **API key**.
+
+That key ships inside the browser bundle like every `VITE_` variable and **cannot be hidden**, so
+restrict it in Google Cloud: application restriction = **HTTP referrers** for this app's domains
+only, API restriction = **Map Tiles API** only, and use separate dev and production keys.
+
+Google's attribution is rendered by Cesium's credit display and must stay visible — do not hide or
+cover `.cesium-widget-credits`.
+
+### Without a key, or when Google fails
+
+Missing key, invalid key, billing off, Map Tiles API disabled, quota exceeded or network failure all
+behave the same way: a message under the selector, the technical error in the console, the selection
+reverted to Satellite, and the existing basemap left exactly as it was. The globe is hidden *only*
+after a tileset exists.
+
+### Overlay behaviour over 3D tiles — verify with a key
+
+Because the app has no Google key configured, tile rendering itself is **untested**. What each
+overlay type does is unchanged and deliberate:
+
+| Overlay | Rendering | Expectation over Google tiles |
+| --- | --- | --- |
+| CCTV, signals, incidents, closures | billboards, `disableDepthTestDistance: POSITIVE_INFINITY`, existing `scaleByDistance` | draw over the mesh; no change made |
+| Roads, ramps, frontage, FDOT segments, bridges | ground-clamped polylines, Cesium's default `classificationType: BOTH` | **needs checking** — see below |
+
+With `globe.show = false` there is no terrain surface to clamp to, and Google's tiles are not
+classifiable by Cesium's 3D-Tiles classification path, so ground-clamped polylines may not appear in
+3D mode. No workaround was applied, because guessing at one (height offsets, draping) would mean
+inventing elevation. Add a key, switch to 3D and check the road lines; if they are missing, that is
+the one follow-up this feature needs.

@@ -1,0 +1,1345 @@
+{
+  "type": "FeatureCollection",
+  "name": "I-595 Corridor Cameras",
+  "metadata": {
+    "source_record_count": 4953,
+    "filtered_camera_count": 74,
+    "corridor_buffer_m": 1000.0,
+    "filter_method": "Camera point within 1,000 m of mapped I-595 EB/WB, 595 Express, SR 84 frontage roads, or confirmed I-595 ramps/connectors.",
+    "crs": "EPSG:4326"
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.16817,
+          26.0859
+        ]
+      },
+      "properties": {
+        "camera_id": "1837",
+        "title": "",
+        "video_enabled": false,
+        "source_icon": "/Generated/Content/Images/511/map_cameraDarkBlue.svg",
+        "distance_to_i595_network_m": 35.5,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.367867,
+          26.12755
+        ]
+      },
+      "properties": {
+        "camera_id": "1871",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 44.4,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.34875,
+          26.11245
+        ]
+      },
+      "properties": {
+        "camera_id": "2004",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 164.8,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.16838,
+          26.0935
+        ]
+      },
+      "properties": {
+        "camera_id": "2023",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 225.0,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.14708,
+          26.08158
+        ]
+      },
+      "properties": {
+        "camera_id": "2026",
+        "title": "",
+        "video_enabled": false,
+        "source_icon": "/Generated/Content/Images/511/map_cameraDarkBlue.svg",
+        "distance_to_i595_network_m": 7.8,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.167858,
+          26.089101
+        ]
+      },
+      "properties": {
+        "camera_id": "2027",
+        "title": "",
+        "video_enabled": false,
+        "source_icon": "/Generated/Content/Images/511/map_cameraDarkBlue.svg",
+        "distance_to_i595_network_m": 11.0,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.131466,
+          26.080702
+        ]
+      },
+      "properties": {
+        "camera_id": "2034",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 19.4,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.165384,
+          26.068887
+        ]
+      },
+      "properties": {
+        "camera_id": "2061",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 717.4,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.166089,
+          26.070799
+        ]
+      },
+      "properties": {
+        "camera_id": "2062",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 494.8,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.167062,
+          26.071401
+        ]
+      },
+      "properties": {
+        "camera_id": "2063",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 399.8,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.250839,
+          26.085181
+        ]
+      },
+      "properties": {
+        "camera_id": "2104",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 966.6,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.251378,
+          26.090531
+        ]
+      },
+      "properties": {
+        "camera_id": "2105",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 374.3,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.251084,
+          26.097875
+        ]
+      },
+      "properties": {
+        "camera_id": "2106",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 34.7,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.2505,
+          26.100738
+        ]
+      },
+      "properties": {
+        "camera_id": "2107",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 131.7,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.250348,
+          26.105372
+        ]
+      },
+      "properties": {
+        "camera_id": "2109",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 625.6,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.24995,
+          26.10571
+        ]
+      },
+      "properties": {
+        "camera_id": "2110",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 673.4,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.20432,
+          26.081232
+        ]
+      },
+      "properties": {
+        "camera_id": "2120",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 329.2,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.201391,
+          26.088908
+        ]
+      },
+      "properties": {
+        "camera_id": "2121",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 318.4,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.201342,
+          26.095178
+        ]
+      },
+      "properties": {
+        "camera_id": "2122",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 957.7,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.211404,
+          26.086158
+        ]
+      },
+      "properties": {
+        "camera_id": "3389",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 168.8,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.211404,
+          26.086158
+        ]
+      },
+      "properties": {
+        "camera_id": "3539",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 168.8,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.196418,
+          26.083188
+        ]
+      },
+      "properties": {
+        "camera_id": "4267",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 2.0,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.346793,
+          26.118923
+        ]
+      },
+      "properties": {
+        "camera_id": "4270",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 6.4,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.345612,
+          26.120266
+        ]
+      },
+      "properties": {
+        "camera_id": "4271",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 31.3,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.344073,
+          26.11825
+        ]
+      },
+      "properties": {
+        "camera_id": "4272",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 10.7,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.340442,
+          26.118529
+        ]
+      },
+      "properties": {
+        "camera_id": "4273",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 26.7,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.334928,
+          26.118288
+        ]
+      },
+      "properties": {
+        "camera_id": "4274",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 16.2,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.361133,
+          26.124961
+        ]
+      },
+      "properties": {
+        "camera_id": "4275",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 9.2,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.352973,
+          26.12138
+        ]
+      },
+      "properties": {
+        "camera_id": "4276",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 12.2,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.216306,
+          26.090033
+        ]
+      },
+      "properties": {
+        "camera_id": "4282",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 51.9,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.34621,
+          26.119468
+        ]
+      },
+      "properties": {
+        "camera_id": "4577",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 12.3,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.21058,
+          26.089355
+        ]
+      },
+      "properties": {
+        "camera_id": "4578",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 21.0,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.343938,
+          26.119144
+        ]
+      },
+      "properties": {
+        "camera_id": "4580",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 9.5,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.346742,
+          26.116587
+        ]
+      },
+      "properties": {
+        "camera_id": "4581",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 10.8,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.348786,
+          26.116745
+        ]
+      },
+      "properties": {
+        "camera_id": "4582",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 174.7,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.218262,
+          26.098181
+        ]
+      },
+      "properties": {
+        "camera_id": "4584",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 674.9,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.201182,
+          26.084383
+        ]
+      },
+      "properties": {
+        "camera_id": "4942",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 9.6,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.320487,
+          26.116294
+        ]
+      },
+      "properties": {
+        "camera_id": "4943",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 5.4,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.220837,
+          26.091552
+        ]
+      },
+      "properties": {
+        "camera_id": "4944",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 2.6,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.32731,
+          26.118066
+        ]
+      },
+      "properties": {
+        "camera_id": "4945",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 8.1,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.254096,
+          26.099839
+        ]
+      },
+      "properties": {
+        "camera_id": "4946",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 7.9,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.355099,
+          26.122131
+        ]
+      },
+      "properties": {
+        "camera_id": "4947",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 10.3,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.349372,
+          26.119779
+        ]
+      },
+      "properties": {
+        "camera_id": "4948",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 12.0,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.313792,
+          26.114984
+        ]
+      },
+      "properties": {
+        "camera_id": "4976",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 8.6,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.30877,
+          26.113082
+        ]
+      },
+      "properties": {
+        "camera_id": "4977",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 6.7,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.301046,
+          26.111477
+        ]
+      },
+      "properties": {
+        "camera_id": "4978",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 3.9,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.136737,
+          26.090826
+        ]
+      },
+      "properties": {
+        "camera_id": "4983",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 626.4,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.136336,
+          26.090435
+        ]
+      },
+      "properties": {
+        "camera_id": "4988",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 578.5,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.13696,
+          26.09253
+        ]
+      },
+      "properties": {
+        "camera_id": "4989",
+        "title": "",
+        "video_enabled": false,
+        "source_icon": "/Generated/Content/Images/511/map_cameraDarkBlue.svg",
+        "distance_to_i595_network_m": 816.4,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.294437,
+          26.10982
+        ]
+      },
+      "properties": {
+        "camera_id": "5010",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 8.8,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.275006,
+          26.104875
+        ]
+      },
+      "properties": {
+        "camera_id": "5011",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 5.2,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.267872,
+          26.103114
+        ]
+      },
+      "properties": {
+        "camera_id": "5012",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 6.5,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.269246,
+          26.104232
+        ]
+      },
+      "properties": {
+        "camera_id": "5013",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 0.9,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.259976,
+          26.101342
+        ]
+      },
+      "properties": {
+        "camera_id": "5014",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 3.8,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.281434,
+          26.107084
+        ]
+      },
+      "properties": {
+        "camera_id": "5032",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 12.4,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.247359,
+          26.097912
+        ]
+      },
+      "properties": {
+        "camera_id": "5033",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 3.4,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.240106,
+          26.096254
+        ]
+      },
+      "properties": {
+        "camera_id": "5034",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 2.3,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.232338,
+          26.094404
+        ]
+      },
+      "properties": {
+        "camera_id": "5035",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 9.6,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.224554,
+          26.093201
+        ]
+      },
+      "properties": {
+        "camera_id": "5036",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 9.2,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.354558,
+          26.109389
+        ]
+      },
+      "properties": {
+        "camera_id": "5042",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 708.5,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.354909,
+          26.110152
+        ]
+      },
+      "properties": {
+        "camera_id": "5067",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 680.9,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.350749,
+          26.115985
+        ]
+      },
+      "properties": {
+        "camera_id": "5068",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 99.7,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.351125,
+          26.11982
+        ]
+      },
+      "properties": {
+        "camera_id": "5069",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 31.7,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.207276,
+          26.086927
+        ]
+      },
+      "properties": {
+        "camera_id": "5180",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 6.2,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.214565,
+          26.090748
+        ]
+      },
+      "properties": {
+        "camera_id": "5181",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 8.2,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.314092,
+          26.11429
+        ]
+      },
+      "properties": {
+        "camera_id": "5247",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 11.1,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.287442,
+          26.10824
+        ]
+      },
+      "properties": {
+        "camera_id": "5248",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 1.7,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.354568,
+          26.109389
+        ]
+      },
+      "properties": {
+        "camera_id": "5251",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 709.2,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.215988,
+          26.077407
+        ]
+      },
+      "properties": {
+        "camera_id": "5555",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 834.7,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.216331,
+          26.086735
+        ]
+      },
+      "properties": {
+        "camera_id": "5556",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 271.1,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.205501,
+          26.075472
+        ]
+      },
+      "properties": {
+        "camera_id": "5809",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 896.5,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.168392,
+          26.07916
+        ]
+      },
+      "properties": {
+        "camera_id": "5817",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 8.9,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.14027,
+          26.09253
+        ]
+      },
+      "properties": {
+        "camera_id": "5823",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 924.1,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.164778,
+          26.066907
+        ]
+      },
+      "properties": {
+        "camera_id": "5867",
+        "title": "",
+        "video_enabled": true,
+        "source_icon": "/Generated/Content/Images/511/map_cameraStreams.svg",
+        "distance_to_i595_network_m": 943.8,
+        "filter_basis": "within_1000m_of_I595_mainline_express_SR84_or_ramps"
+      }
+    }
+  ]
+}

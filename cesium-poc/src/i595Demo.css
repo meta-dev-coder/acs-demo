@@ -1,0 +1,149 @@
+* { box-sizing: border-box; }
+html, body, #cesiumContainer { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+body { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #eaf3ff; background: #0b1321; }
+button, a, summary, label { -webkit-tap-highlight-color: transparent; }
+button { font: inherit; color: inherit; cursor: pointer; }
+small { font-size: 9px; letter-spacing: .18em; color: #65dfd4; }
+h1 { margin: 4px 0 0; font-size: 20px; letter-spacing: -.03em; }
+.layers { position: absolute; top: 16px; left: 16px; width: 380px; max-height: calc(100dvh - 74px); overflow-y: auto; border: 1px solid #ffffff24; border-radius: 16px; background: #0d1829f2; box-shadow: 0 16px 48px #0005; backdrop-filter: blur(16px); }
+#menu-toggle { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 18px; border: 0; background: transparent; font-weight: 600; }
+#toggle-icon { font-size: 24px; color: #65dfd4; }
+#menu-toggle { position: sticky; top: 0; z-index: 2; background: #0d1829; }
+.mainline-parent { margin: 4px 0 4px 20px; }
+.mainline-parent > summary { display: grid; grid-template-columns: 10px 17px 18px minmax(0, 1fr) auto; align-items: center; gap: 7px; font-size: 12px; padding: 12px 6px; list-style: none; }
+.mainline-parent > summary::-webkit-details-marker { display: none; }
+.mainline-parent > summary::before { content: '›'; color: #92a8c3; font-size: 18px; }
+.mainline-parent[open] > summary::before { transform: rotate(90deg); }
+.segment-list { margin-left: 20px; border-left: 1px solid #ffffff18; padding-left: 6px; }
+.segment-row { display: grid; grid-template-columns: 17px minmax(0, 1fr); align-items: center; gap: 6px; min-height: 34px; padding: 3px 4px; border-radius: 5px; }
+.segment-row:hover, .segment-row:focus-within { background: #ffffff0b; }
+.segment-select { border: 0; background: transparent; padding: 5px 0; text-align: left; font-size: 11px; line-height: 1.4; }
+.segment-count { margin: 7px 0 12px 26px; font-size: 11px; color: #92a8c3; }
+.segment-traffic-status:not([hidden]) { width: 6px; height: 6px; border-radius: 50%; }
+.segment-row:has(.segment-traffic-status:not([hidden])) { grid-template-columns: 17px minmax(0, 1fr) 6px; }
+#layer-content { padding: 0 14px 18px; }
+.intro { margin: 0 4px 20px; font-size: 12px; color: #92a8c3; }
+summary { cursor: pointer; padding: 12px 8px; font-weight: 600; font-size: 14px; }
+.roads { margin-left: 20px; border-left: 1px solid #ffffff18; }
+.mainline-group, #frontage-layer-controls, #ramp-layer-controls, #structure-layer-controls, .its-group { margin-left: 20px; border-left: 1px solid #ffffff18; }
+.mainline-group > label, .frontage-categories, .ramp-categories { margin-left: 20px; }
+.mainline-group > label input, .mainline-group > label .swatch { flex-shrink: 0; }
+.badge { float: right; padding: 2px 7px; border-radius: 5px; color: #92a8c3; background: #ffffff0a; font-size: 11px; }
+label { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 10px 8px; margin: 4px 0; border: 1px solid transparent; border-radius: 8px; font-size: 13px; cursor: pointer; }
+label:hover { background: #ffffff08; }
+label:has(input:checked) { background: #ffffff09; border-color: var(--road); }
+input { width: 17px; height: 17px; margin: 0; accent-color: var(--road); cursor: pointer; }
+.swatch { width: 18px; height: 3px; background: var(--road); border-radius: 3px; }
+#layer-status { font-size: 12px; line-height: 1.6; color: #92a8c3; margin: 18px 4px 0; border-top: 1px solid #ffffff14; padding-top: 14px; }
+.collapsed { width: 68px; }
+.collapsed .menu-title { display: none; }
+#reset-view { position: absolute; right: 16px; bottom: 48px; padding: 12px 16px; background: #0d1829ed; border: 1px solid #ffffff30; border-radius: 10px; }
+:focus-visible { outline: 2px solid #65dfd4; outline-offset: 3px; }
+.zoom-controls { position: absolute; right: 16px; top: 16px; display: flex; flex-direction: column; border: 1px solid #ffffff30; border-radius: 12px; background: #0d1829ed; box-shadow: 0 8px 24px #0004; }
+.zoom-controls button { width: 44px; height: 44px; border: 0; background: transparent; font-size: 26px; border-radius: 12px; }
+.zoom-controls button + button { border-top: 1px solid #ffffff20; }
+.zoom-controls button:hover { background: #ffffff15; color: #65dfd4; }
+.zoom-controls button:disabled { opacity: .4; cursor: wait; }
+@media (max-width: 600px) { .zoom-controls { top: 10px; right: 10px; } .layers:not(.collapsed) { width: min(280px, calc(100vw - 80px)); } }
+@media (max-width: 600px) { .layers { left: 10px; top: 10px; width: min(280px, calc(100vw - 20px)); } .layers.collapsed { width: 68px; } h1 { font-size: 18px; } }
+.ramp-group { margin-top: 10px; border-top: 1px solid #ffffff18; padding-top: 8px; }
+.ramp-group summary { line-height: 1.8; }
+.ramp-group summary input { vertical-align: middle; accent-color: #65dfd4; }
+.ramp-categories label { gap: 7px; font-size: 12px; }
+.ramp-categories input, .ramp-categories .swatch { flex-shrink: 0; }
+.frontage-group { margin-top: 10px; border-top: 1px solid #ffffff18; padding-top: 8px; }
+.frontage-group summary { line-height: 1.8; }
+.frontage-group summary input { vertical-align: middle; accent-color: #55bda8; }
+.frontage-categories label { gap: 7px; font-size: 12px; }
+.frontage-categories input, .frontage-categories .swatch { flex-shrink: 0; }
+.interchange-filter { min-height: auto; padding: 12px 2px 5px; font-size: 12px; color: #92a8c3; }
+#ramp-interchange { width: 100%; padding: 10px 8px; color: #eaf3ff; background: #17263b; border: 1px solid #ffffff30; border-radius: 8px; font: inherit; font-size: 12px; }
+.ramp-status { color: #92a8c3; font-size: 11px; line-height: 1.6; margin: 10px 2px; }
+.ramp-retry { background: #17263b; padding: 8px; border: 1px solid #65dfd4; border-radius: 6px; }
+:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) { position: absolute; right: 16px; top: 220px; width: 310px; max-height: calc(100dvh - 290px); overflow-y: auto; padding: 18px; border: 1px solid #ffffff24; border-radius: 16px; background: #0d1829f5; box-shadow: 0 16px 48px #0005; }
+.ramp-details-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) h2 { font-size: 17px; margin: 0; }
+:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) button { border: 0; background: #ffffff0a; border-radius: 8px; width: 36px; height: 36px; font-size: 24px; }
+:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) dl { display: grid; grid-template-columns: 90px 1fr; gap: 12px; font-size: 12px; line-height: 1.5; }
+:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) dt { color: #92a8c3; }
+:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) dd { margin: 0; overflow-wrap: anywhere; }
+.ramp-tooltip { position: fixed; pointer-events: none; z-index: 10; max-width: min(290px, calc(100vw - 16px)); padding: 10px 13px; border: 1px solid #ffffff35; border-radius: 8px; background: #0b1423f5; color: #eaf3ff; font-size: 12px; line-height: 1.7; white-space: pre-line; box-shadow: 0 6px 20px #0005; }
+@media (max-width: 700px) {
+  :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) { top: auto; bottom: 42px; left: 10px; right: 10px; width: auto; max-height: 40dvh; }
+  body:has(:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details):not([hidden])) .layers { max-height: calc(60dvh - 155px); }
+  body:has(:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details):not([hidden])) #reset-view { bottom: calc(40dvh + 52px); }
+}
+
+.structures-group { margin-top: 10px; border-top: 1px solid #ffffff18; padding-top: 8px; }
+.bridges-group { margin-left: 20px; }
+.bridges-group > summary { display: grid; grid-template-columns: 10px 17px 18px minmax(0,1fr) auto; align-items: center; gap: 7px; font-size: 12px; list-style: none; }
+.bridges-group > summary::-webkit-details-marker { display: none; }
+.bridges-group > summary::before { content: '›'; color: #92a8c3; font-size: 18px; }
+.bridges-group[open] > summary::before { transform: rotate(90deg); }
+.bridge-list { margin-left: 20px; padding-left: 6px; border-left: 1px solid #ffffff18; }
+.bridge-hint { font-size: 11px; line-height: 1.6; margin-left: 20px; color: #92a8c3; }
+.bridge-details dd { white-space: pre-line; }
+.bridge-location-members { border-top: 1px solid #ffffff20; margin-top: 16px; padding-top: 8px; }
+.bridge-location-members p { font-size: 12px; color: #92a8c3; }
+.bridge-location-members button { display: block; width: 100%; height: auto; padding: 10px; margin: 6px 0; text-align: left; font-size: 12px; line-height: 1.5; }
+.bridge-location-members button[aria-pressed="true"] { outline: 1px solid #e7cf96; color: #e7cf96; }
+
+.signals-group { margin: 12px 0 0 20px; border-left: 1px solid rgba(255,255,255,.08); padding-left: 10px; }
+.signals-group > summary { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.signals-group > summary::before { content: '▸'; }
+.signals-group[open] > summary::before { content: '▾'; }
+.signals-group .badge { margin-left: auto; }
+.signals-group .signal-zoom { width: auto; height: auto; padding: 8px 12px; margin: 12px 0; font-size: 12px; }
+.signal-list { padding-left: 16px; }
+.signals-group .signal-zoom, .signals-group .signal-retry { color: #b9f5ec; background: #17383f; border: 1px solid #58d6c866; border-radius: 8px; cursor: pointer; }
+.signals-group .signal-zoom:hover { background: #21505a; }
+.signals-group input { accent-color: #59d9cb; }
+
+/* Matches the Structures group so both siblings sit at the same depth under DataLayer. */
+.its-group { margin-top: 10px; border-top: 1px solid #ffffff18; padding-top: 8px; }
+
+.cameras-group { margin: 12px 0 0 20px; border-left: 1px solid rgba(255,255,255,.08); padding-left: 10px; }
+.cameras-group > summary { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.cameras-group > summary::before { content: '▸'; }
+.cameras-group[open] > summary::before { content: '▾'; }
+.cameras-group .badge { margin-left: auto; }
+.cameras-group .camera-zoom { width: auto; height: auto; padding: 8px 12px; margin: 12px 0; font-size: 12px; }
+.camera-list { padding-left: 16px; }
+.cameras-group .camera-zoom, .cameras-group .camera-retry { color: #b9f5ec; background: #17383f; border: 1px solid #58d6c866; border-radius: 8px; cursor: pointer; }
+.cameras-group .camera-zoom:hover { background: #21505a; }
+.cameras-group input { accent-color: #59d9cb; }
+
+
+.camera-details .camera-stream-action { width: auto; height: auto; padding: 10px 14px; font-size: 13px; }
+.camera-stream-action:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Live Events (FL511) — same group shell as the CCTV/signal layers, with per-feed children. */
+.live-events-group { margin: 12px 0 0 20px; border-left: 1px solid rgba(255,255,255,.08); padding-left: 10px; }
+.live-events-group > summary { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.live-events-group > summary::before { content: '▸'; }
+.live-events-group[open] > summary::before { content: '▾'; }
+.live-events-group > summary .badge { margin-left: auto; }
+.live-events-group input { accent-color: #ffb45c; }
+.live-event-children { padding-left: 16px; }
+.live-event-children .segment-row { grid-template-columns: 17px minmax(0, 1fr) auto; }
+.live-event-children .badge { float: none; }
+/* Source-status notice: stale or unreachable FL511 is stated rather than shown as "no events". */
+.live-event-source { margin: 8px 2px; padding: 8px 10px; border-radius: 6px; border: 1px solid #ffb45c55; background: #ffb45c14; color: #ffd7a6; font-size: 11px; line-height: 1.6; }
+.live-event-retry { background: #17263b; padding: 8px; border: 1px solid #ffb45c; border-radius: 6px; }
+/* Provenance: FL511's own values above, this twin's spatial inference in its own labelled block. */
+.live-event-caption { margin: 0 0 12px; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: #92a8c3; }
+.live-event-association { margin-top: 16px; padding-top: 12px; border-top: 1px solid #ffffff20; }
+.live-event-association h3 { margin: 0 0 10px; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: #92a8c3; }
+.live-event-association p, .live-event-note { margin: 12px 0 0; font-size: 11px; line-height: 1.6; color: #92a8c3; }
+
+/* Base Environment — mutually exclusive world selector, deliberately outside the DataLayer tree. */
+.base-environment { margin-top: 10px; border-top: 1px solid #ffffff18; padding-top: 8px; }
+.base-environment-options { margin: 0 0 0 20px; padding: 0 0 0 10px; border: 0; border-left: 1px solid #ffffff18; }
+.base-environment-options legend { padding: 6px 0; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #92a8c3; }
+/* --road drives the shared label:has(input:checked) highlight; give it the UI accent. */
+.base-environment-options label { --road: #65dfd4; min-height: 40px; font-size: 13px; }
+.base-environment-options input { accent-color: #65dfd4; }
+.base-environment-fly { margin: 6px 0 0 30px; padding: 8px 12px; font-size: 12px; color: #b9f5ec; background: #17383f; border: 1px solid #58d6c866; border-radius: 8px; }
+.base-environment-fly:hover { background: #21505a; }
+.base-environment-status:empty { display: none; }
+.base-environment-status { margin: 8px 2px 2px 30px; font-size: 11px; line-height: 1.6; color: #92a8c3; }
