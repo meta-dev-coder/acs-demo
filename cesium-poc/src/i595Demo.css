@@ -39,12 +39,7 @@ input { width: 17px; height: 17px; margin: 0; accent-color: var(--road); cursor:
 .collapsed .menu-title { display: none; }
 #reset-view { position: absolute; right: 16px; bottom: 48px; padding: 12px 16px; background: #0d1829ed; border: 1px solid #ffffff30; border-radius: 10px; }
 :focus-visible { outline: 2px solid #65dfd4; outline-offset: 3px; }
-.zoom-controls { position: absolute; right: 16px; top: 16px; display: flex; flex-direction: column; border: 1px solid #ffffff30; border-radius: 12px; background: #0d1829ed; box-shadow: 0 8px 24px #0004; }
-.zoom-controls button { width: 44px; height: 44px; border: 0; background: transparent; font-size: 26px; border-radius: 12px; }
-.zoom-controls button + button { border-top: 1px solid #ffffff20; }
-.zoom-controls button:hover { background: #ffffff15; color: #65dfd4; }
-.zoom-controls button:disabled { opacity: .4; cursor: wait; }
-@media (max-width: 600px) { .zoom-controls { top: 10px; right: 10px; } .layers:not(.collapsed) { width: min(280px, calc(100vw - 80px)); } }
+@media (max-width: 600px) { .layers:not(.collapsed) { width: min(280px, calc(100vw - 80px)); } }
 @media (max-width: 600px) { .layers { left: 10px; top: 10px; width: min(280px, calc(100vw - 20px)); } .layers.collapsed { width: 68px; } h1 { font-size: 18px; } }
 .ramp-group { margin-top: 10px; border-top: 1px solid #ffffff18; padding-top: 8px; }
 .ramp-group summary { line-height: 1.8; }
@@ -147,3 +142,48 @@ input { width: 17px; height: 17px; margin: 0; accent-color: var(--road); cursor:
 .base-environment-fly:hover { background: #21505a; }
 .base-environment-status:empty { display: none; }
 .base-environment-status { margin: 8px 2px 2px 30px; font-size: 11px; line-height: 1.6; color: #92a8c3; }
+
+/* Digital-twin status card: identity and real counts, deliberately separate from Map Explorer. */
+.twin-hud { position: absolute; top: 16px; right: 16px; width: 236px; padding: 14px 16px; border: 1px solid #ffffff1f; border-radius: 14px; background: #0b1729cc; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 12px 32px #0006; color: #e8eef6; font-size: 12px; line-height: 1.45; }
+.twin-hud h1 { margin: 0; font-size: 13px; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; }
+.twin-hud-place { margin: 2px 0 0; font-size: 11px; color: #92a8c3; }
+.twin-hud dl { display: grid; gap: 5px; margin: 11px 0 0; padding-top: 10px; border-top: 1px solid #ffffff14; }
+.twin-hud dl > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.twin-hud dt { color: #92a8c3; font-size: 11px; }
+.twin-hud dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 600; }
+/* A quiet corridor is not news: an empty live-event count stays understated. */
+.twin-hud dd[data-quiet="true"] { color: #92a8c3; font-weight: 500; }
+/* The card takes the top-right corner, so the camera controls group with Reset view instead and
+   the details panels step below the card. */
+body:has(.twin-hud) :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) { top: 196px; max-height: calc(100dvh - 266px); }
+@media (max-width: 720px) {
+  .twin-hud { top: 10px; right: 62px; width: 186px; padding: 10px 12px; }
+  body:has(.twin-hud) :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) { top: auto; max-height: 40dvh; }
+}
+
+/* Secondary details, for fields that are rarely the reason you opened the panel. */
+.details-more { margin-top: 12px; border-top: 1px solid #ffffff14; padding-top: 10px; }
+.details-more > summary { font-size: 11px; color: #92a8c3; cursor: pointer; list-style: none; }
+.details-more > summary::-webkit-details-marker { display: none; }
+.details-more > summary::before { content: "▸ "; }
+.details-more[open] > summary::before { content: "▾ "; }
+.details-more > dl { margin-top: 10px; }
+
+/* Compact navigation stack: zoom, orbit, tilt and north-up, under the status card. Reset View is a
+   different action and keeps its own button at the bottom right. */
+.map-nav { position: absolute; right: 16px; top: 16px; display: grid; grid-template-columns: repeat(2, 38px); gap: 1px; padding: 4px; border: 1px solid #ffffff30; border-radius: 12px; background: #0d1829ed; box-shadow: 0 8px 24px #0004; }
+body:has(.twin-hud) .map-nav { top: 172px; }
+.map-nav button { width: 38px; height: 34px; border: 0; background: transparent; color: inherit; font-size: 17px; line-height: 1; border-radius: 8px; }
+.map-nav button:hover:not(:disabled) { background: #ffffff15; color: #65dfd4; }
+.map-nav button:disabled { opacity: .4; cursor: wait; }
+.map-nav .map-nav-zoom, .map-nav .map-nav-north { grid-column: 1 / -1; }
+.map-nav .map-nav-zoom { font-size: 21px; }
+.map-nav .map-nav-north { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; margin-top: 4px; border-top: 1px solid #ffffff20; border-radius: 0 0 8px 8px; }
+.map-nav .map-nav-rotate { margin-top: 4px; border-top: 1px solid #ffffff20; border-radius: 0; }
+/* With the stack on the right edge, details panels sit clear of it rather than under it. */
+body:has(.map-nav) :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) { right: 106px; }
+@media (max-width: 720px) {
+  .map-nav { top: 10px; right: 10px; }
+  body:has(.twin-hud) .map-nav { top: 128px; }
+  body:has(.map-nav) :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) { right: 10px; }
+}

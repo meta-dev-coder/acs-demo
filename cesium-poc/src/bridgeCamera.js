@@ -6,7 +6,12 @@ export function focusBridge(viewer, entity) {
   focusMapPoints(viewer, points, '.bridge-details');
 }
 
-export function focusMapPoints(viewer, points, detailsSelector = '.signal-details') {
+/**
+ * @param {{pitchDeg?: number, minimumHeight?: number}} [framing]  an oblique feature view keeps the
+ *   surroundings in shot; the default straight-down framing is what bridges and cameras still use.
+ */
+export function focusMapPoints(viewer, points, detailsSelector = '.signal-details', framing = {}) {
+  const { pitchDeg = -90, minimumHeight = 350 } = framing;
   if (!points?.length) return;
   // On narrow screens the expanded explorer and details otherwise cover nearly all the map.
   if (innerWidth <= 700 && document.querySelector('#menu-toggle')?.getAttribute('aria-expanded') === 'true') {
@@ -24,15 +29,18 @@ export function focusMapPoints(viewer, points, detailsSelector = '.signal-detail
   const center = Cartographic.fromCartesian(sphere.center);
   const ground = Cartesian3.fromRadians(center.longitude, center.latitude, Math.max(0, center.height));
   const tanHalfFov = Math.tan(viewer.camera.frustum.fovy / 2);
-  const altitude = Math.max(350, sphere.radius * 2.6 * height / (Math.min(usableWidth, usableHeight) * 2 * tanHalfFov));
+  const altitude = Math.max(minimumHeight, sphere.radius * 2.6 * height / (Math.min(usableWidth, usableHeight) * 2 * tanHalfFov));
   const metresPerPixel = altitude * 2 * tanHalfFov / height;
   const desiredX = left + usableWidth / 2, desiredY = top + usableHeight / 2;
   // Shift the camera, not the source geometry, to put the bridge in the unobstructed area.
-  const offset = new Cartesian3((width / 2 - desiredX) * metresPerPixel, (desiredY - height / 2) * metresPerPixel, altitude);
+  // Tilting the camera moves its look-at point forward, so stand back along the view direction by
+  // the tilt's ground reach; the framed feature still lands in the unobstructed area.
+  const standoff = pitchDeg > -90 ? altitude / Math.tan(-pitchDeg * Math.PI / 180) : 0;
+  const offset = new Cartesian3((width / 2 - desiredX) * metresPerPixel, (desiredY - height / 2) * metresPerPixel - standoff, altitude);
   const destination = Matrix4.multiplyByPoint(Transforms.eastNorthUpToFixedFrame(ground), offset, new Cartesian3());
   viewer.camera.cancelFlight();
   viewer.camera.flyTo({
-    destination, orientation: { heading: 0, pitch: CMath.toRadians(-90), roll: 0 },
+    destination, orientation: { heading: 0, pitch: CMath.toRadians(pitchDeg), roll: 0 },
     duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1.3,
   });
 }

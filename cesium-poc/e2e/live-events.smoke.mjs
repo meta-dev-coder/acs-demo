@@ -79,7 +79,7 @@ try {
       .replace('if (import.meta.hot)', 'window.live=liveEventControls; window.cameras=cameraControls; if (import.meta.hot)');
     await route.fulfill({ response, body });
   });
-  await page.goto('http://127.0.0.1:5188/?demo=i595');
+  await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
   await openExplorer(page);
   await page.locator('#live-events-all:not(:disabled)').waitFor({ state: 'attached', timeout: 60000 });
   await page.evaluate(async () => {
@@ -174,10 +174,21 @@ try {
   // Selection was cleared with its event; open the spanning closure to see the endpoint note.
   await page.locator('button.segment-select[data-live-type="CLOSURE"]').click();
   await page.waitForTimeout(2200);
-  const spanningPoint = await page.evaluate(() => {
-    const point = C.SceneTransforms.worldToWindowCoordinates(v.scene, live.entityById.get('FL511-CLOSURE-461840').position.getValue());
-    return point ? { x: point.x, y: point.y - 15 } : null;
+  // Clamped markers are only placed once the 3D tiles beneath them have streamed in, so find a
+  // pixel the closure actually occupies rather than assuming a fixed offset, and poll for it.
+  const findSpanning = () => page.evaluate(() => {
+    const entity = live.entityById.get('FL511-CLOSURE-461840');
+    const point = C.SceneTransforms.worldToWindowCoordinates(v.scene, entity.position.getValue());
+    if (!point) return null;
+    const raw = Object.getPrototypeOf(v.scene).pick;
+    for (let dy = 0; dy >= -40; dy -= 2) for (const dx of [0, -4, 4, -8, 8]) {
+      const pixel = new C.Cartesian2(Math.round(point.x + dx), Math.round(point.y + dy));
+      if (raw.call(v.scene, pixel)?.id === entity) return { x: pixel.x, y: pixel.y };
+    }
+    return null;
   });
+  let spanningPoint = null;
+  for (const deadline = Date.now() + 40000; !spanningPoint && Date.now() < deadline;) spanningPoint = await findSpanning();
   assert.ok(spanningPoint, 'the spanning closure must be on screen after zooming to closures');
   await page.mouse.click(spanningPoint.x, spanningPoint.y);
   await page.locator('.live-event-note').waitFor();

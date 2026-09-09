@@ -4,6 +4,7 @@ import { installLiveEvents } from './liveEvents.js';
 import { BASE_ENVIRONMENTS, createGooglePhotorealistic3DService } from './basePhotorealistic3D.js';
 import { installBaseEnvironmentControls } from './baseEnvironmentControls.js';
 import { Color, GeoJsonDataSource, Cartesian3, Math as CMath, CameraEventType } from "cesium";
+import { MAINLINE_COLORS } from "./i595RoadSegmentData.js";
 import { CesiumRenderer } from "./renderers/cesium.js";
 import corridor from "../config/corridorCenterline.json";
 import { installRampLayerControls } from "./rampLayerControls.js";
@@ -12,8 +13,12 @@ import { createI595RoadSegmentLayer } from "./i595RoadSegmentLayer.js";
 import { installI595SegmentControls } from "./i595SegmentControls.js";
 import { installBridgeStructures } from "./bridgeStructures.js";
 import { installI595ExpressLanes } from "./i595ExpressLanes.js";
+import { createI595StartupSequence, enableLayerCheckbox } from "./i595StartupSequence.js";
+import { installMapNavigationControls } from "./mapNavigationControls.js";
 import { installI595RoadShields } from "./i595RoadShields.js";
-import { corridorOverview, westernGateway } from "./i595CorridorViews.js";
+import { installI595ContextLabels } from "./i595ContextLabels.js";
+import { installI595Hud } from "./i595Hud.js";
+import { corridorOverview, heroView } from "./i595CorridorViews.js";
 import "./i595Demo.css";
 
 document.title = "I-595-DEMO · System-of-record";
@@ -37,10 +42,6 @@ document.body.innerHTML = `
       <p id="layer-status" role="status" aria-live="polite">Select a road to highlight it on the map.</p>
     </div>
   </aside>
-  <div class="zoom-controls" role="group" aria-label="Map zoom">
-    <button id="zoom-in" aria-label="Zoom in" title="Zoom in" disabled>+</button>
-    <button id="zoom-out" aria-label="Zoom out" title="Zoom out" disabled>−</button>
-  </div>
   <button id="reset-view">⌖ <span>Reset view</span></button>`;
 
 const panel = document.querySelector(".layers");
@@ -66,7 +67,13 @@ try {
   viewer.timeline.container.style.display = "none";
   viewer.forceResize();
   const controller = viewer.scene.screenSpaceCameraController;
+  // Manual navigation is always available — the presentation never takes the camera away from the
+  // user, during the intro or after selecting a feature.
+  controller.enableRotate = true;
+  controller.enableTranslate = true;
   controller.enableZoom = true;
+  controller.enableTilt = true;
+  controller.enableLook = true;
   controller.minimumZoomDistance = 20;
   controller.maximumZoomDistance = 20000000;
   // Handle wheel/trackpad deltas consistently, keeping Cesium's drag and pinch zoom.
@@ -83,11 +90,9 @@ try {
     const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewer.canvas.clientHeight : 1);
     zoom(Math.exp(Math.max(-0.4, Math.min(0.4, pixels * 0.002))));
   }, { passive: false });
-  for (const [id, factor] of [["zoom-in", 0.75], ["zoom-out", 1 / 0.75]]) {
-    const button = document.getElementById(id);
-    button.disabled = false;
-    button.onclick = () => zoom(factor);
-  }
+  // Zoom, orbit, tilt and north-up. Reset view stays a separate action on its own button.
+  const navigation = installMapNavigationControls(document.body, viewer, { zoom });
+  navigation.setEnabled(true);
   const lons = corridor.map(p => p.lon), lats = corridor.map(p => p.lat);
   const orientationOf = view => ({ heading: CMath.toRadians(view.headingDeg), pitch: CMath.toRadians(view.pitchDeg), roll: CMath.toRadians(view.rollDeg) });
   // Reset view stays the full corridor extent — deliberately not the close startup view.
@@ -96,11 +101,20 @@ try {
     destination: Cartesian3.fromDegrees(overview.lon, overview.lat, overview.height),
     orientation: orientationOf(overview), duration: 1.2,
   });
-  // Startup opens at the western beginning of I-595 (I-75 / Sawgrass), derived from the centerline.
-  const gateway = westernGateway(corridor);
-  viewer.camera.setView({ destination: Cartesian3.fromDegrees(gateway.lon, gateway.lat, gateway.height), orientation: orientationOf(gateway) });
+  // The opening frame is the corridor overview; the startup sequence flies from here down to the
+  // oblique hero view once the 3D world is up. `?intro=off` skips the choreography entirely.
+  const hero = heroView(corridor);
+  const showIntro = new URLSearchParams(location.search).get("intro") !== "off";
+  viewer.camera.setView(showIntro
+    ? { destination: Cartesian3.fromDegrees(overview.lon, overview.lat, overview.height), orientation: orientationOf(overview) }
+    : { destination: Cartesian3.fromDegrees(hero.lon, hero.lat, hero.height), orientation: orientationOf(hero) });
   document.querySelector("#reset-view").onclick = reset;
   const roadShields = installI595RoadShields(viewer, corridor);
+  const contextLabels = installI595ContextLabels(viewer, corridor);
+  // Shields and context labels are the same layer of meaning, so they arrive together.
+  const corridorMarkers = { setOpacity: alpha => { roadShields.setOpacity(alpha); contextLabels.setOpacity(alpha); } };
+  if (showIntro) corridorMarkers.setOpacity(0);
+  const mainlineColors = new Map(Object.entries(MAINLINE_COLORS).map(([direction, color]) => [direction, Color.fromCssColorString(color)]));
   const rampControls = installRampLayerControls(document.querySelector("#ramp-layer-controls"), viewer);
   const frontageControls = installFrontageRoads(document.querySelector("#frontage-layer-controls"), viewer);
   const mainlineSegments = createI595RoadSegmentLayer(viewer);
@@ -131,8 +145,45 @@ try {
     document.querySelector("#base-environment-controls"), baseEnvironment, { onFlyRequest: view3d });
   // Photorealistic 3D is the default world. On a missing key or a failed load the service reverts to
   // the satellite basemap and says why, so startup degrades instead of failing.
-  void baseEnvironmentControls.set(BASE_ENVIRONMENTS.GOOGLE_PHOTOREALISTIC_3D);
-  if (import.meta.hot) import.meta.hot.dispose(() => { expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
+  const loadBase3D = async () => {
+    await baseEnvironmentControls.set(BASE_ENVIRONMENTS.GOOGLE_PHOTOREALISTIC_3D);
+    const tileset = baseEnvironment.tileset();
+    if (!tileset?.initialTilesLoaded) return;
+    // Wait for the first tiles so the flight below crosses a drawn world, but never hang on a slow
+    // or throttled connection — the intro continues either way.
+    await new Promise(resolve => {
+      const timer = setTimeout(resolve, 8000);
+      const remove = tileset.initialTilesLoaded.addEventListener(() => { clearTimeout(timer); remove(); resolve(); });
+    });
+  };
+  if (!showIntro) void loadBase3D();
+
+  const startupSequence = createI595StartupSequence({
+    base3d: { load: loadBase3D },
+    camera: {
+      // `cancel` also resolves: taking control of the camera mid-flight must not stall the sequence.
+      flyToCorridor: () => new Promise(resolve => viewer.camera.flyTo({
+        destination: Cartesian3.fromDegrees(hero.lon, hero.lat, hero.height),
+        orientation: orientationOf(hero), duration: 3.5, complete: resolve, cancel: resolve,
+      })),
+    },
+    mainline: {
+      enable: () => Promise.all(["#i595_mainline_eb", "#i595_mainline_wb"].map(id => enableLayerCheckbox(document.querySelector(id)))),
+      // The layer's own colour hook, so the fade never touches the segments' stored styling.
+      setOpacity: alpha => mainlineSegments.setColorResolver(
+        alpha >= 1 ? null : segment => mainlineColors.get(segment.direction).withAlpha(alpha)),
+    },
+    express: { enable: () => enableLayerCheckbox(document.querySelector("#express-way")), setOpacity: alpha => expressLanes.setOpacity(alpha) },
+    markers: corridorMarkers,
+    onStage: stage => { document.body.dataset.startup = stage.toLowerCase().replaceAll("_", "-"); },
+  });
+  if (showIntro) void startupSequence.run();
+  else document.body.dataset.startup = "ready";
+  // Identity and real counts, read from layers that have loaded — never from the layers being shown.
+  const hud = installI595Hud(document.body, {
+    cameras: cameraControls.cameraById, signals: signalControls.trafficSignalById, liveEvents: liveEventControls,
+  });
+  if (import.meta.hot) import.meta.hot.dispose(() => { navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
   for (const input of inputs) {
     if (input.id === 'i595_mainline_eb' || input.id === 'i595_mainline_wb' || input.id === 'express-way') continue;
     input.disabled = false;

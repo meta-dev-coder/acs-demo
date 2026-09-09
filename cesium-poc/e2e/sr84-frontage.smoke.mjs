@@ -14,7 +14,7 @@ try {
     const response = await route.fetch();
     await route.fulfill({ response, body: (await response.text()).replace('viewer.animation.container', 'window.frontageTestViewer = viewer; viewer.animation.container') });
   });
-  await page.goto('http://127.0.0.1:5188/?demo=i595');
+  await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
   await openExplorer(page);
   await page.locator('#frontage-all:not(:disabled)').waitFor({ timeout: 60000 });
   await page.waitForTimeout(1600);

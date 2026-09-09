@@ -13,7 +13,7 @@ try {
   const body=(await response.text()).replace('viewer.animation.container','window.v=viewer; viewer.animation.container').replace('if (import.meta.hot)','window.signals=signalControls; if (import.meta.hot)');
   await route.fulfill({response,body});
  });
- await page.goto('http://127.0.0.1:5188/?demo=i595');
+ await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
   await openExplorer(page);
  await page.locator('#signals-all:not(:disabled)').waitFor({state:'attached',timeout:60000});
  await page.evaluate(async()=>{const s=await(await fetch('/src/i595Demo.js')).text();window.C=await import(s.match(/from\s*"([^"]*cesium[^\"]*)"/)[1]);});
@@ -30,7 +30,22 @@ try {
  await page.waitForTimeout(1700);
  assert.ok((await page.locator('.signal-details dt').allTextContents()).includes('FDOT Reference Post'));
  assert.equal(await page.locator('.bridge-details:not([hidden]), .segment-details:not([hidden])').count(),0);
- const point=await page.evaluate(id=>{const e=signals.trafficSignalById.get(id);const p=C.SceneTransforms.worldToWindowCoordinates(v.scene,e.position.getValue());return{x:p.x,y:p.y-15};},id);
+ // The signal head is a compact marker now, so find a pixel it actually occupies rather than
+ // assuming a fixed offset sized for the old clip-art icon. Clamped markers are only placed once
+ // the 3D tiles beneath them have streamed in, so poll rather than guess a fixed wait.
+ const findPoint=()=>page.evaluate(id=>{
+  const e=signals.trafficSignalById.get(id);
+  const p=C.SceneTransforms.worldToWindowCoordinates(v.scene,e.position.getValue());
+  const raw=Object.getPrototypeOf(v.scene).pick;
+  for(let dy=0;dy>=-30;dy-=2)for(const dx of [0,-3,3,-6,6]){
+   const pt=new C.Cartesian2(Math.round(p.x+dx),Math.round(p.y+dy));
+   if(raw.call(v.scene,pt)?.id?.id===id)return{x:pt.x,y:pt.y};
+  }
+  return null;
+ },id);
+ let point=null;
+ for(const deadline=Date.now()+40000;!point&&Date.now()<deadline;)point=await findPoint();
+ assert.ok(point,'the traffic signal must be pickable at its own rendered coordinates');
  await page.mouse.move(point.x,point.y);
  await page.getByRole('tooltip').filter({hasText:/FDOT Signal ID/}).waitFor();
  await page.mouse.click(point.x,point.y);

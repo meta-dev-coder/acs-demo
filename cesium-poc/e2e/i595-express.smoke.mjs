@@ -25,7 +25,7 @@ try {
       .replace('if (import.meta.hot)', 'window.express = expressLanes; if (import.meta.hot)');
     await route.fulfill({ response, body });
   });
-  await page.goto('http://127.0.0.1:5188/?demo=i595');
+  await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
   await openExplorer(page);
   await page.locator('#express-way:not(:disabled)').waitFor({ state: 'attached', timeout: 60000 });
   await page.evaluate(async () => {
@@ -77,17 +77,26 @@ try {
   });
   assert.ok(target, '595 Express must be pickable at its own rendered coordinates');
 
+  await page.evaluate(() => {
+    const material = window.v.dataSources.getByName('595 Express')[0].entities.values[0].polyline.material;
+    window.expressMaterialChanges = 0;
+    material.definitionChanged.addEventListener(() => window.expressMaterialChanges++);
+  });
   await page.mouse.move(target.x, target.y);
   const tooltip = page.getByRole('tooltip');
   await tooltip.filter({ hasText: '595 Express' }).waitFor({ timeout: 10000 });
   assert.match(await tooltip.textContent(), /Reversible · MP 0\.000 – 8\.796/);
   const hoverWidth = await page.evaluate(() => window.v.dataSources.getByName('595 Express')[0]
     .entities.values[0].polyline.width.getValue());
-  assert.equal(hoverWidth, 8, 'hovering must highlight the lanes');
+  assert.equal(hoverWidth, 3.5, 'hovering must preserve the ground-line pick geometry');
+  for (let i = 0; i < 12; i++) {
+    await page.mouse.move(target.x + (i % 2) * 0.1, target.y);
+    await page.waitForTimeout(40);
+    assert.ok(await page.evaluate(p => window.v.scene.pick(p)?.id === window.v.dataSources.getByName('595 Express')[0].entities.values[0], target), 'hover must retain its pick target across frames');
+  }
 
-  // Hover restyles a clamped ground polyline, which rebuilds its primitive asynchronously. Let that
-  // settle before clicking — as a real pointer does — or the pick lands mid-rebuild and finds nothing.
-  await page.waitForTimeout(600);
+  assert.equal(await page.evaluate(() => window.expressMaterialChanges), 0, 'hover must not invalidate the ground material batch');
+  // Clicking needs no extra delay for a hover-triggered geometry rebuild.
   await page.mouse.click(target.x, target.y);
   await page.locator('.express-details:not([hidden])').waitFor({ timeout: 10000 });
   assert.equal(await page.locator('.express-details h2').textContent(), 'Express Lane Details');
@@ -98,7 +107,7 @@ try {
   });
   assert.deepEqual(new Map(rows), expected, 'details must come from the supplied FDOT properties');
   assert.equal(await page.evaluate(() => window.v.dataSources.getByName('595 Express')[0]
-    .entities.values[0].polyline.width.getValue()), 9, 'selection must highlight the lanes');
+    .entities.values[0].polyline.width.getValue()), 3.5, 'selection must preserve the ground-line pick geometry');
 
   // ---- closing, and switching the layer off, clear the selection --------------------------------
   await page.locator('.express-details button').click();

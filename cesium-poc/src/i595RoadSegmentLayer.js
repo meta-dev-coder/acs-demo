@@ -21,12 +21,18 @@ export function createI595RoadSegmentLayer(viewer) {
     title: 'Road Segment Details', className: 'segment-details', details: segment => roadSegmentDetails(segment, segmentsByDirection.get(segment.direction).length),
     tooltipText: roadSegmentTooltip, onClose: () => select(null),
   });
+  // A route overlay, not a GIS trace: thin and part-transparent at rest so the physical roadway
+  // stays visible through it, with brightness and weight reserved for hover and selection.
   function style(entity) {
     if (!entity) return;
     const segment = records.get(entity);
     const base = colorResolver?.(segment, segmentStatus.get(segment.segmentId)) ?? colors.get(segment.direction);
-    entity.polyline.width = entity === selected ? 9 : entity === hovered ? 8 : 6;
-    entity.polyline.material = entity === selected || entity === hovered ? Color.lerp(base, Color.WHITE, 0.45, new Color()) : base;
+    const emphasis = entity === selected ? 'SELECTED' : entity === hovered ? 'HOVERED' : 'RESTING';
+    entity.polyline.width = { SELECTED: 6.5, HOVERED: 5, RESTING: 3.5 }[emphasis];
+    const glow = { SELECTED: 0.35, HOVERED: 0.22, RESTING: 0 }[emphasis];
+    const opacity = { SELECTED: 1, HOVERED: 0.95, RESTING: 0.8 }[emphasis];
+    const color = glow ? Color.lerp(base, Color.WHITE, glow, new Color()) : base;
+    entity.polyline.material = color.withAlpha(color.alpha * opacity);
   }
   function select(entity) {
     const previous = selected; selected = entity; style(previous); style(selected);

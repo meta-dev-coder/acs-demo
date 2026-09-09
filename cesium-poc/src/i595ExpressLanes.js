@@ -6,7 +6,7 @@
  * Reuses the existing viewer, its screen-space handler chain and the shared details panel; the
  * geometry in express-way.geojson is loaded and drawn unchanged.
  */
-import { GeoJsonDataSource, Color, ScreenSpaceEventType } from 'cesium';
+import { GeoJsonDataSource, Color, ColorMaterialProperty, CallbackProperty, ScreenSpaceEventType } from 'cesium';
 import { createMapDetailsPanel } from './mapDetailsPanel.js';
 import { EXPRESS_COLOR, expressDetails, expressFromProperties, expressName, expressTooltip } from './i595ExpressData.js';
 
@@ -17,16 +17,36 @@ import { EXPRESS_COLOR, expressDetails, expressFromProperties, expressName, expr
  */
 export function installI595ExpressLanes(viewer, input, { onVisibilityChange, onStatus } = {}) {
   const records = new Map();
+  const renderColors = new WeakMap();
   const base = Color.fromCssColorString(EXPRESS_COLOR);
-  let source, loading, disposed = false, selected = null, hovered = null;
+  let source, loading, disposed = false, selected = null, hovered = null, opacity = 1;
   const panel = createMapDetailsPanel({
     title: 'Express Lane Details', className: 'express-details',
     details: expressDetails, tooltipText: expressTooltip, onClose: () => select(null),
   });
+  // Matches the mainline treatment: thin and part-transparent at rest, brighter when engaged.
   function style(entity) {
     if (!entity) return;
-    entity.polyline.width = entity === selected ? 9 : entity === hovered ? 8 : 6;
-    entity.polyline.material = entity === selected || entity === hovered ? Color.lerp(base, Color.WHITE, 0.45, new Color()) : base;
+    const emphasis = entity === selected ? 'SELECTED' : entity === hovered ? 'HOVERED' : 'RESTING';
+    // Ground-line width changes rebuild the primitive and briefly remove its pick target.
+    // Keep geometry and the translucent render pass stable through interaction.
+    entity.polyline.width = 3.5;
+    const glow = { SELECTED: 0.35, HOVERED: 0.22, RESTING: 0 }[emphasis];
+    const resting = { SELECTED: 0.99, HOVERED: 0.95, RESTING: 0.8 }[emphasis];
+    const color = glow ? Color.lerp(base, Color.WHITE, glow, new Color()) : base;
+    // Startup fades the layer in; hovering or selecting mid-fade must not snap it to full strength.
+    // Mutate the sampled value, not the material property: definitionChanged would
+    // invalidate Cesium's ground batch and cause a black frame while it rebuilds.
+    let renderColor = renderColors.get(entity);
+    if (!renderColor) {
+      renderColor = new Color();
+      renderColors.set(entity, renderColor);
+      entity.polyline.material = new ColorMaterialProperty(new CallbackProperty(
+        (_time, result) => Color.clone(renderColor, result), false,
+      ));
+    }
+    Color.clone(color, renderColor);
+    renderColor.alpha = color.alpha * resting * opacity;
   }
   function select(entity) {
     const previous = selected; selected = entity; style(previous); style(selected);
@@ -34,7 +54,10 @@ export function installI595ExpressLanes(viewer, input, { onVisibilityChange, onS
     viewer.scene.requestRender();
   }
   function hover(entity, position) {
-    const previous = hovered; hovered = entity; style(previous); style(hovered);
+    if (hovered !== entity) {
+      const previous = hovered; hovered = entity; style(previous); style(hovered);
+      viewer.scene.requestRender();
+    }
     panel.hover(entity ? records.get(entity) : null, position);
     if (entity) viewer.canvas.style.cursor = 'pointer';
   }
@@ -98,6 +121,12 @@ export function installI595ExpressLanes(viewer, input, { onVisibilityChange, onS
   return {
     records, load,
     async setVisible(show) { input.checked = show; await input.onchange(); },
+    /** Startup choreography hook: 0 = invisible, 1 = the layer's own colour. */
+    setOpacity(alpha) {
+      opacity = Math.min(1, Math.max(0, alpha));
+      for (const entity of records.keys()) style(entity);
+      viewer.scene.requestRender();
+    },
     clearSelection() { select(null); },
     destroy() {
       disposed = true;

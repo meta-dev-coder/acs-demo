@@ -18,7 +18,7 @@ try {
       .replace('if (import.meta.hot)','window.bridgeLayer=bridgeControls; window.bridgeMainline=mainlineSegments; if (import.meta.hot)');
     await route.fulfill({response,body});
   });
-  await page.goto('http://127.0.0.1:5188/?demo=i595');
+  await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
   await openExplorer(page);
   await page.locator('#bridges-all:not(:disabled)').waitFor({timeout:60000,state:'attached'});
   await page.evaluate(async () => {

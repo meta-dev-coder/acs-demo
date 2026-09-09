@@ -32,7 +32,7 @@ try {
       .replace('if (import.meta.hot)', 'window.baseEnv=baseEnvironment; window.cameras=cameraControls; if (import.meta.hot)');
     await route.fulfill({ response, body });
   });
-  await page.goto('http://127.0.0.1:5188/?demo=i595');
+  await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
   await openExplorer(page);
   // Every layer that adds a data source asynchronously must be settled before the before/after
   // comparison, or the snapshot races them rather than the base-environment switch.
@@ -141,7 +141,7 @@ try {
       .replace('import.meta.env.VITE_GOOGLE_MAPS_API_KEY', "''");
     await route.fulfill({ response, body });
   });
-  await bare.goto('http://127.0.0.1:5188/?demo=i595');
+  await bare.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
   await openExplorer(bare);
   await bare.locator('#cameras-all:not(:disabled)').waitFor({ state: 'attached', timeout: 60000 });
   // No click needed: 3D is the default, so a keyless load must fall back on its own.

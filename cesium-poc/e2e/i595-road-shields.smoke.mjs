@@ -9,13 +9,13 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
-import { corridorOverview, westernGateway } from '../src/i595CorridorViews.js';
+import { corridorOverview, heroView } from '../src/i595CorridorViews.js';
 import { shieldPlacements } from '../src/i595ShieldData.js';
 import { openExplorer } from './i595Explorer.mjs';
 
 const corridor = JSON.parse(readFileSync(new URL('../config/corridorCenterline.json', import.meta.url)));
 const placements = shieldPlacements(corridor);
-const gateway = westernGateway(corridor), overview = corridorOverview(corridor);
+const hero = heroView(corridor), overview = corridorOverview(corridor);
 const DETAIL_PANELS = ['.ramp-details', '.road-details', '.segment-details', '.bridge-details', '.signal-details', '.camera-details', '.live-event-details'];
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -33,7 +33,7 @@ try {
       .replace('if (import.meta.hot)', 'window.shields = roadShields; window.baseEnv = baseEnvironment; window.mainline = mainlineSegments; if (import.meta.hot)');
     await route.fulfill({ response, body });
   });
-  await page.goto('http://127.0.0.1:5188/?demo=i595');
+  await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
   await openExplorer(page);
   for (const ready of ['#cameras-all', '#signals-all', '#bridges-all', '#live-events-all']) {
     await page.locator(`${ready}:not(:disabled)`).waitFor({ state: 'attached', timeout: 60000 });
@@ -59,25 +59,24 @@ try {
 
   // ---- 1. the app opens at the western beginning of I-595, not the corridor overview -----------
   const start = await page.evaluate(() => window.camera());
-  assert.ok(Math.abs(start.lon - gateway.lon) < 0.002 && Math.abs(start.lat - gateway.lat) < 0.002, `startup at ${start.lon},${start.lat}`);
-  assert.ok(start.height > 1200 && start.height < 2000, `startup height ${start.height}`);
-  assert.ok(start.pitch > -85 && start.pitch < -70, `startup pitch ${start.pitch}`);
-  // North-up, like a conventional roadway map: the corridor is never rotated to run vertically.
-  assert.ok(Math.abs(start.heading) < 0.5 || Math.abs(start.heading - 360) < 0.5, `startup heading ${start.heading}`);
-  // Close enough to read individual carriageways: the corridor cannot fit on screen at this altitude.
+  assert.ok(Math.abs(start.lon - hero.lon) < 0.002 && Math.abs(start.lat - hero.lat) < 0.002, `startup at ${start.lon},${start.lat}`);
+  assert.ok(start.height > 700 && start.height < 1400, `startup height ${start.height}`);
+  assert.ok(start.pitch > -28 && start.pitch < -20, `the hero view must be oblique, got pitch ${start.pitch}`);
+  assert.ok(Math.abs(start.heading - hero.headingDeg) < 1, `startup heading ${start.heading}`);
+  // Close enough to read individual structures: the corridor cannot fit on screen at this altitude.
   assert.ok(start.height < overview.height / 10);
 
-  // The second shield — SW 136th Avenue — sits in the middle of the opening view.
-  const centred = await page.evaluate(() => {
-    const shield = [...window.shields.shieldById.values()][1];
-    const pixel = window.C.SceneTransforms.worldToWindowCoordinates(window.v.scene, shield.position.getValue(window.v.clock.currentTime));
-    return { id: shield.id, dx: pixel.x - window.v.canvas.clientWidth / 2, dy: pixel.y - window.v.canvas.clientHeight / 2 };
-  });
-  assert.equal(centred.id, 'i595-shield-sw-136th-ave');
-  assert.ok(Math.abs(centred.dx) < 20 && Math.abs(centred.dy) < 20, `second shield off centre by ${Math.round(centred.dx)},${Math.round(centred.dy)} px`);
+  // The hero view is built around the I-75 / Sawgrass interchange, and its shield is in frame.
+  const framed = await page.evaluate(() => [...window.shields.shieldById.values()]
+    .map(shield => {
+      const pixel = window.C.SceneTransforms.worldToWindowCoordinates(window.v.scene, shield.position.getValue(window.v.clock.currentTime));
+      return pixel && pixel.x >= 0 && pixel.y >= 0 && pixel.x <= window.v.canvas.clientWidth && pixel.y <= window.v.canvas.clientHeight
+        ? shield.id : null;
+    }).filter(Boolean));
+  assert.ok(framed.includes('i595-shield-i75-sawgrass'), `the hero interchange shield must be in frame, saw ${framed.join(', ')}`);
 
-  // With north up, I-595 runs west-to-east across the screen: the corridor's own vertices in view
-  // must move far further horizontally than vertically.
+  // I-595 crosses the frame rather than pointing straight up it: the corridor's own vertices in
+  // view must move further horizontally than vertically.
   const onScreen = await page.evaluate(() => window.corridor
     .map(p => {
       const pixel = window.C.SceneTransforms.worldToWindowCoordinates(window.v.scene, window.C.Cartesian3.fromDegrees(p.lon, p.lat));
@@ -88,7 +87,9 @@ try {
   assert.ok(onScreen.length > 5, 'the corridor must be on screen at startup');
   const spanX = Math.max(...onScreen.map(p => p.x)) - Math.min(...onScreen.map(p => p.x));
   const spanY = Math.max(...onScreen.map(p => p.y)) - Math.min(...onScreen.map(p => p.y));
-  assert.ok(spanX > spanY * 2, `I-595 must run horizontally on screen, got ${Math.round(spanX)}x${Math.round(spanY)} px`);
+  // Diagonally into the distance, not straight up the middle: an oblique view gives the corridor
+  // vertical extent too, so what matters is that it still crosses the frame rather than climbing it.
+  assert.ok(spanX > spanY, `I-595 must cross the frame, got ${Math.round(spanX)}x${Math.round(spanY)} px`);
   // West is on the left: the western-most vertex draws left of the eastern-most.
   assert.ok(onScreen[0].x < onScreen.at(-1).x, 'west must be on the left of the screen');
 

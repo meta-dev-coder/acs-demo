@@ -18,7 +18,7 @@ try {
       .replace('if (import.meta.hot)', 'window.fdotLayer = mainlineSegments; if (import.meta.hot)');
     await route.fulfill({ response, body });
   });
-  await page.goto('http://127.0.0.1:5188/?demo=i595');
+  await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
   await openExplorer(page);
   await page.locator('#i595_mainline_eb:not(:disabled)').waitFor({ timeout: 60000 });
   assert.equal(await page.locator('.mainline-parent > summary input, .mainline-group > label input').count(), 3);
@@ -40,14 +40,16 @@ try {
   assert.equal((await state()).dynamicCount, 0);
   const actual = await page.evaluate(() => {
     const { Cartographic, Math: CMath } = window.fdotCesium;
-    return [...window.fdotLayer.segmentById].map(([id, e]) => ({ id, properties: e.properties.getValue(), width: e.polyline.width.getValue(), color: e.polyline.material.getValue().color.toCssHexString(),
+    return [...window.fdotLayer.segmentById].map(([id, e]) => ({ id, properties: e.properties.getValue(), width: e.polyline.width.getValue(), color: e.polyline.material.getValue().color.toCssHexString(), alpha: +e.polyline.material.getValue().color.alpha.toFixed(2),
       points: e.polyline.positions.getValue().map(p => { const c = Cartographic.fromCartesian(p); return [CMath.toDegrees(c.longitude), CMath.toDegrees(c.latitude)]; }),
     }));
   });
   for (const feature of data.features) {
     const entity = actual.find(e => e.id === feature.properties.segment_id);
-    assert.equal(entity.width, 6);
-    assert.equal(entity.color, feature.properties.direction === 'EB' ? '#52dcf5' : '#c49aff');
+    assert.equal(entity.width, 3.5);
+    // The route hue is unchanged; only the resting opacity is, so compare the RGB and the alpha.
+    assert.equal(entity.color.slice(0, 7), feature.properties.direction === 'EB' ? '#52dcf5' : '#c49aff');
+    assert.equal(entity.alpha, 0.8, 'the resting overlay is part-transparent so the roadway shows through');
     for (const key of ['segment_id', 'direction', 'begin_post', 'end_post', 'aadt', 'desc_from', 'desc_to']) assert.equal(entity.properties[key], feature.properties[key]);
     assert.equal(entity.points.length, feature.geometry.coordinates.length);
     entity.points.forEach((point, i) => point.forEach((v, axis) => assert.ok(Math.abs(v - feature.geometry.coordinates[i][axis]) < 1e-8)));
@@ -91,7 +93,7 @@ try {
     assert.equal(values[6], feature.properties.desc_to);
     assert.equal(values[7], `${feature.properties.aadt.toLocaleString('en-US')} vehicles/day`);
     assert.equal(values[8], '2025');
-    assert.deepEqual(await page.evaluate(() => [...window.fdotLayer.segmentById.values()].filter(e => e.polyline.width.getValue() === 9).map(e => e.id)), [feature.properties.segment_id]);
+    assert.deepEqual(await page.evaluate(() => [...window.fdotLayer.segmentById.values()].filter(e => e.polyline.width.getValue() === 6.5).map(e => e.id)), [feature.properties.segment_id]);
     await page.mouse.move(950, 110);
   }
   await page.screenshot({ path: '/tmp/i595-fdot-desktop.png' });
@@ -99,7 +101,7 @@ try {
   await page.screenshot({ path: '/tmp/i595-fdot-mobile.png' });
   await page.getByRole('button', { name: 'Close road segment details' }).click();
   assert.equal(await page.locator('.segment-details').isVisible(), false);
-  assert.equal(await page.evaluate(() => [...window.fdotLayer.segmentById.values()].filter(e => e.polyline.width.getValue() === 9).length), 0);
+  assert.equal(await page.evaluate(() => [...window.fdotLayer.segmentById.values()].filter(e => e.polyline.width.getValue() === 6.5).length), 0);
   assert.ok(await page.evaluate(() => window.fdotOriginalEntities.every(e => e === window.fdotLayer.segmentById.get(e.id))));
   assert.equal(combinedRequests, 1);
   assert.equal(oldRequests, 0);
@@ -127,12 +129,12 @@ try {
   assert.equal(await page.evaluate(id => window.fdotLayer.segmentById.get(id).show, id), false);
   await checkbox.check();
   await label.hover();
-  assert.equal(await page.evaluate(id => window.fdotLayer.segmentById.get(id).polyline.width.getValue(), id), 8);
+  assert.equal(await page.evaluate(id => window.fdotLayer.segmentById.get(id).polyline.width.getValue(), id), 5);
   assert.equal(await page.locator('.segment-details').isVisible(), false);
   await label.click();
   await page.locator('.segment-details:not([hidden])').waitFor();
   assert.ok((await page.locator('.segment-details dd').allTextContents()).includes('4 of 8'));
-  assert.deepEqual(await page.evaluate(() => [...window.fdotLayer.segmentById.values()].filter(e => e.polyline.width.getValue()===9).map(e=>e.id)),[id]);
+  assert.deepEqual(await page.evaluate(() => [...window.fdotLayer.segmentById.values()].filter(e => e.polyline.width.getValue()===6.5).map(e=>e.id)),[id]);
   await checkbox.uncheck();
   assert.equal(await page.locator('.segment-details').isVisible(), false);
   await label.click();

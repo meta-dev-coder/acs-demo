@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="256" height="256">
   <path d="M10 15
        Q50 4 90 15
        L87 55
@@ -12,7 +12,7 @@
        Q50 25 14 34
        Z" fill="#c9252d"></path>
 
-  <text x="50" y="68" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-weight="700" font-size="35">
+  <text x="50" y="70" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-weight="700" font-size="40">
     595
   </text>
 </svg>

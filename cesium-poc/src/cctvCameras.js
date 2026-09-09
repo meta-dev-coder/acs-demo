@@ -1,4 +1,4 @@
-import { CustomDataSource, Cartesian3, Color, HeightReference, NearFarScalar, ScreenSpaceEventType, VerticalOrigin } from 'cesium';
+import { CustomDataSource, Cartesian3, Color, DistanceDisplayCondition, HeightReference, NearFarScalar, ScreenSpaceEventType, VerticalOrigin } from 'cesium';
 import { createMapDetailsPanel } from './mapDetailsPanel.js';
 import { focusMapPoints } from './bridgeCamera.js';
 
@@ -102,9 +102,12 @@ export function installCctvCameras(container, viewer) {
         const p = { ...f.properties, latitude: f.geometry.coordinates[1], longitude: f.geometry.coordinates[0] };
         const entity = source.entities.add({ id: String(p.camera_id), name: `Camera ${p.camera_id}`, show: false,
           position: Cartesian3.fromDegrees(...f.geometry.coordinates), properties: p,
-          billboard: { image: p.video_enabled === true ? icons.available : icons.unavailable, width: 44, height: 52, scale: 1, verticalOrigin: VerticalOrigin.BOTTOM,
+          // Deliberately subordinate to the corridor: a small marker up close, shrinking away with
+          // distance and gone entirely at corridor scale, so cameras never dominate the freeway.
+          billboard: { image: p.video_enabled === true ? icons.available : icons.unavailable, width: 24, height: 28, scale: 1, verticalOrigin: VerticalOrigin.BOTTOM,
             heightReference: HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            scaleByDistance: new NearFarScalar(500, 1, 25000, 0.78) } });
+            distanceDisplayCondition: new DistanceDisplayCondition(0, 18000),
+            scaleByDistance: new NearFarScalar(400, 1, 12000, 0.25) } });
         cameraById.set(String(p.camera_id), entity); records.set(entity, p);
         const row = document.createElement('div'); row.className = 'segment-row';
         const input = document.createElement('input'); input.type = 'checkbox'; input.dataset.cameraId = String(p.camera_id);
