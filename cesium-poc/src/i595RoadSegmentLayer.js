@@ -1,4 +1,6 @@
-import { GeoJsonDataSource, Color, ScreenSpaceEventType } from 'cesium';
+import { corridorVisualConfig as config, corridorLOD, getTrafficColor, getFlowAnimationSpeed } from './corridorVisualConfig.js';
+import { TrafficFlowMaterial } from './trafficFlowMaterial.js';
+import { GeoJsonDataSource, Color, Cartographic, ScreenSpaceEventType } from 'cesium';
 import { createMapDetailsPanel } from './mapDetailsPanel.js';
 import { MAINLINE_COLORS, roadSegmentFromProperties, roadSegmentDetails, roadSegmentTooltip, segmentDirectionLabel } from './i595RoadSegmentData.js';
 
@@ -12,7 +14,22 @@ export function createI595RoadSegmentLayer(viewer) {
   const staticSegments = new Map();
   /** @type {Map<string, Readonly<import('./i595RoadSegmentData.js').RoadSegmentStatus>>} */
   const segmentStatus = new Map(); // Intentionally empty: no fabricated traffic observations.
-  const records = new Map();
+  const records = new Map(), materials = new Map();
+  let lod = 'overview', lastDistance = Infinity;
+  function updateLOD() {
+    const distance = viewer.camera.positionCartographic.height / Math.max(.2, Math.sin(-viewer.camera.pitch));
+    if (Math.abs(distance-lastDistance) < lastDistance*config.lod.hysteresis) return;
+    lastDistance=distance; const next=corridorLOD(distance);
+    if(next===lod)return; lod=next;
+    for(const entity of records.keys()) style(entity);
+    viewer.scene.requestRender();
+  }
+  const removeLODChange=viewer.camera.changed.addEventListener(updateLOD);
+  const removeLODEnd=viewer.camera.moveEnd.addEventListener(updateLOD);
+  const animationTimer=setInterval(()=>{
+    if(document.hidden || matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+    if([...materials].some(([e,m])=>e.show && m.arrows))viewer.scene.requestRender();
+  },33);
   const enabled = new Set();
   const visibleSegments = new Set();
   const colors = new Map(Object.entries(MAINLINE_COLORS).map(([direction, color]) => [direction, Color.fromCssColorString(color)]));
@@ -26,13 +43,22 @@ export function createI595RoadSegmentLayer(viewer) {
   function style(entity) {
     if (!entity) return;
     const segment = records.get(entity);
-    const base = colorResolver?.(segment, segmentStatus.get(segment.segmentId)) ?? colors.get(segment.direction);
+    const base = colorResolver?.(segment, segmentStatus.get(segment.segmentId)) ?? Color.fromCssColorString(getTrafficColor(segmentStatus.get(segment.segmentId), segment.direction));
     const emphasis = entity === selected ? 'SELECTED' : entity === hovered ? 'HOVERED' : 'RESTING';
-    entity.polyline.width = { SELECTED: 6.5, HOVERED: 5, RESTING: 3.5 }[emphasis];
+    entity.polyline.width = config.lineWidth[lod] + (config.casing.enabled ? config.casing.pixels : 0);
     const glow = { SELECTED: 0.35, HOVERED: 0.22, RESTING: 0 }[emphasis];
     const opacity = { SELECTED: 1, HOVERED: 0.95, RESTING: 0.8 }[emphasis];
     const color = glow ? Color.lerp(base, Color.WHITE, glow, new Color()) : base;
-    entity.polyline.material = color.withAlpha(color.alpha * opacity);
+    let material=materials.get(entity);
+    if(!material){
+      const points=entity.polyline.positions.getValue(viewer.clock.currentTime);
+      const increasing=Cartographic.fromCartesian(points.at(-1)).longitude >= Cartographic.fromCartesian(points[0]).longitude;
+      material=new TrafficFlowMaterial(increasing === (segment.direction==='EB') ? 1 : -1);
+      materials.set(entity,material);entity.polyline.material=material;
+    }
+    material.tint=color.withAlpha(color.alpha*opacity);material.width=config.lineWidth[lod];
+    material.speed=getFlowAnimationSpeed(segmentStatus.get(segment.segmentId));
+    material.arrows=config.arrow.enabled && lod!=='overview';
   }
   function select(entity) {
     const previous = selected; selected = entity; style(previous); style(selected);
@@ -103,13 +129,15 @@ export function createI595RoadSegmentLayer(viewer) {
       }
       for (const entities of segmentsByDirection.values()) entities.sort((a, b) => records.get(a).travelOrder - records.get(b).travelOrder);
       source = await viewer.dataSources.add(loaded);
-      applyVisibility();
+      updateLOD();applyVisibility();
       return source;
     })().catch(error => { loading = null; throw error; });
     return loading;
   }
   return {
     segmentById, segmentsByDirection, staticSegments, segmentStatus, load,
+    setFlowVisible(show) { config.arrow.enabled=show; for(const e of records.keys())style(e);viewer.scene.requestRender(); },
+    setFocusEnabled(show) { config.casing.enabled=show;for(const e of records.keys())style(e);viewer.scene.requestRender(); },
     async setDirectionVisible(direction, show) {
       if (!segmentsByDirection.has(direction)) throw new Error('Unknown mainline direction.');
       if (show) enabled.add(direction); else enabled.delete(direction);
@@ -155,7 +183,7 @@ export function createI595RoadSegmentLayer(viewer) {
       viewer.scene.requestRender();
     },
     destroy() {
-      disposed = true;
+      disposed = true; clearInterval(animationTimer); removeLODChange(); removeLODEnd();
       removeMove(); viewer.canvas.removeEventListener('mouseleave', leave);
       for (const [event, action] of [[ScreenSpaceEventType.MOUSE_MOVE, oldMove], [ScreenSpaceEventType.LEFT_CLICK, oldClick]]) {
         if (action) handler.setInputAction(action, event); else handler.removeInputAction(event);

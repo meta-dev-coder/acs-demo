@@ -1,3 +1,4 @@
+import { corridorVisualConfig as config } from './corridorVisualConfig.js';
 /**
  * Geographic orientation labels along the corridor — "I-75 / Sawgrass", "Pine Island Rd", and so on.
  *
@@ -11,7 +12,7 @@ import { CONTEXT_LABEL_ASSET_TYPE, contextLabelPlacements } from './i595ShieldDa
 import { registerUiOnlyEntities } from './uiOnlyMapEntities.js';
 
 /** Beyond this the corridor is a line on a map and individual crossings stop being useful. */
-export const LABEL_VISIBLE_TO_M = 14000;
+export const LABEL_VISIBLE_TO_M = config.lod.overviewDistance;
 
 /**
  * @param {import('cesium').Viewer} viewer

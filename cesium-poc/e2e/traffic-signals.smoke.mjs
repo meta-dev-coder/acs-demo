@@ -10,7 +10,7 @@ try {
  page.on('request',r=>{if(r.url().includes('/data/i595_corridor_traffic_signals.geojson'))requests++;});
  await page.route('**/src/i595Demo.js*',async route=>{
   const response=await route.fetch();
-  const body=(await response.text()).replace('viewer.animation.container','window.v=viewer; viewer.animation.container').replace('if (import.meta.hot)','window.signals=signalControls; if (import.meta.hot)');
+  const body=(await response.text()).replace('viewer.animation.container','window.v=viewer; viewer.animation.container').replace('import.meta.hot.dispose(() => {', 'window.signals=signalControls; import.meta.hot.dispose(() => {');
   await route.fulfill({response,body});
  });
  await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');

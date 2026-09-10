@@ -9,13 +9,18 @@ test('the two levels are a small marker and the detailed signal head', () => {
   assert.ok(SIGNAL_LOD.DETAILED.width >= 22 && SIGNAL_LOD.DETAILED.width <= 28);
   assert.ok(SIGNAL_LOD.DETAILED.height >= 45 && SIGNAL_LOD.DETAILED.height <= 55);
   assert.ok(SIGNAL_LOD.DETAILED.width > SIGNAL_LOD.COMPACT.width);
-  // Both are the traffic-light housing, not a pin or a POI dot.
-  for (const level of Object.values(SIGNAL_LOD)) {
+  // Every level is the traffic-light housing, not a pin or a POI dot.
+  for (const [name, level] of Object.entries(SIGNAL_LOD)) {
     const svg = decodeURIComponent(level.image);
-    assert.ok(svg.startsWith('data:image/svg+xml'), 'the marker is a local asset');
-    assert.equal((svg.match(/<circle/g) ?? []).length, 3, 'red, amber and green in a vertical housing');
-    assert.ok(svg.includes('#f44336') && svg.includes('#ffda16') && svg.includes('#07934c'));
+    assert.ok(svg.startsWith('data:image/svg+xml'), `${name} must be a local asset`);
+    assert.ok(svg.includes('#f44336') && svg.includes('#ffda16') && svg.includes('#07934c'),
+      `${name} shows red, amber and green in a vertical housing`);
   }
+  // The selected state is that same housing on a ring, drawn into the icon rather than added as a
+  // second graphic: a clamped point on an entity that also has a billboard hides them both.
+  assert.ok(SIGNAL_LOD.SELECTED.width > SIGNAL_LOD.DETAILED.width, 'the ring widens the selected icon');
+  assert.equal(SIGNAL_LOD.SELECTED.height, SIGNAL_LOD.DETAILED.height);
+  assert.ok(decodeURIComponent(SIGNAL_LOD.SELECTED.image).includes('#67f4e2'), 'the ring uses the accent colour');
 });
 
 test('level of detail switches by distance, with hysteresis across the band', () => {

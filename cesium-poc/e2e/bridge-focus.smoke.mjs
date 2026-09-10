@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
-import { openExplorer } from './i595Explorer.mjs';
+import { openExplorer, revealLayerGroup } from './i595Explorer.mjs';
 const data = JSON.parse(readFileSync(new URL('../public/data/i595_bridges.geojson', import.meta.url)));
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 try {
@@ -11,7 +11,7 @@ try {
   await page.route('**/src/i595Demo.js*', async route => {
     const response = await route.fetch();
     const body = (await response.text()).replace('viewer.animation.container','window.bridgeViewer=viewer; viewer.animation.container')
-      .replace('if (import.meta.hot)','window.bridgeLayer=bridgeControls; window.bridgeMainline=mainlineSegments; if (import.meta.hot)');
+      .replace('import.meta.hot.dispose(() => {', 'window.bridgeLayer=bridgeControls; window.bridgeMainline=mainlineSegments; import.meta.hot.dispose(() => {');
     await route.fulfill({response,body});
   });
   await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
@@ -23,6 +23,7 @@ try {
     window.originalBridges = [...window.bridgeLayer.bridgeById.values()];
   });
   await page.waitForTimeout(1600);
+  await revealLayerGroup(page, '.structures-group');
   await page.locator('.structures-group > summary').click();
   const before = await page.evaluate(()=>window.bridgeViewer.camera.positionCartographic.height);
   await page.locator('#bridges-all').check();

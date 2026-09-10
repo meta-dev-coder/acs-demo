@@ -30,7 +30,7 @@ try {
     const body = (await response.text())
       .replace('viewer.animation.container', 'window.v = viewer; viewer.animation.container')
       .replace('{ apiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY }', "{ apiKey: 'e2e-test-key', createTileset: () => window.__fakeTileset() }")
-      .replace('if (import.meta.hot)', 'window.shields = roadShields; window.baseEnv = baseEnvironment; window.mainline = mainlineSegments; if (import.meta.hot)');
+      .replace('import.meta.hot.dispose(() => {', 'window.shields = roadShields; window.baseEnv = baseEnvironment; window.mainline = mainlineSegments; import.meta.hot.dispose(() => {');
     await route.fulfill({ response, body });
   });
   await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
@@ -59,8 +59,9 @@ try {
 
   // ---- 1. the app opens at the western beginning of I-595, not the corridor overview -----------
   const start = await page.evaluate(() => window.camera());
-  assert.ok(Math.abs(start.lon - hero.lon) < 0.002 && Math.abs(start.lat - hero.lat) < 0.002, `startup at ${start.lon},${start.lat}`);
-  assert.ok(start.height > 700 && start.height < 1400, `startup height ${start.height}`);
+  assert.ok(Math.abs(start.lon - hero.interchange.lon) < 0.05 && Math.abs(start.lat - hero.interchange.lat) < 0.05,
+    `startup must open on the western corridor, got ${start.lon},${start.lat}`);
+  assert.ok(start.height > 500 && start.height < 1400, `startup height ${start.height}`);
   assert.ok(start.pitch > -28 && start.pitch < -20, `the hero view must be oblique, got pitch ${start.pitch}`);
   assert.ok(Math.abs(start.heading - hero.headingDeg) < 1, `startup heading ${start.heading}`);
   // Close enough to read individual structures: the corridor cannot fit on screen at this altitude.

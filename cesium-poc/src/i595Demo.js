@@ -16,6 +16,8 @@ import { installBridgeStructures } from "./bridgeStructures.js";
 import { installI595ExpressLanes } from "./i595ExpressLanes.js";
 import { createI595StartupSequence, enableLayerCheckbox } from "./i595StartupSequence.js";
 import { installMapNavigationControls } from "./mapNavigationControls.js";
+import { installCorridorStatusBar } from "./corridorStatusBar.js";
+import { getTrafficColor } from "./corridorVisualConfig.js";
 import { installI595RoadShields } from "./i595RoadShields.js";
 import { installI595ContextLabels } from "./i595ContextLabels.js";
 import { installI595Hud } from "./i595Hud.js";
@@ -27,17 +29,20 @@ document.body.innerHTML = `
   <div id="cesiumContainer" aria-label="I-595 highway map"></div>
   <aside class="layers" aria-label="Map layers">
     <button id="menu-toggle" aria-expanded="true" aria-controls="layer-content"><span>☷ <span class="menu-title">Map explorer</span></span><span id="toggle-icon">‹</span></button>
-    <div id="layer-content"><details open><summary>DataLayer</summary><details open class="roads"><summary>Roads</summary>
-        <details open class="mainline-group"><summary>Mainline <span class="badge">3</span></summary>
-        <label style="--road:#52dcf5"><input type="checkbox" id="i595_mainline_eb"><span class="swatch"></span><span>I-595 Eastbound</span></label>
-        <label style="--road:#c49aff"><input type="checkbox" id="i595_mainline_wb"><span class="swatch"></span><span>I-595 Westbound</span></label>
+    <div id="layer-content">
+      <details open class="roads"><summary>Traffic</summary>
+        <details open class="mainline-group"><summary>Traffic flow <span class="badge">3</span></summary>
+        <label data-route="EB"><input type="checkbox" id="i595_mainline_eb"><span class="swatch"></span><span>I-595 Eastbound</span></label>
+        <label data-route="WB"><input type="checkbox" id="i595_mainline_wb"><span class="swatch"></span><span>I-595 Westbound</span></label>
         <label style="--road:#ffba62"><input type="checkbox" id="express-way"><span class="swatch"></span><span>595 Express</span></label>
         </details>
+        <label class="layer-option"><input type="checkbox" id="flow-direction" checked><span>Direction of travel</span></label>
+        <div class="incidents-group"></div>
+      </details>
+      <details class="its-group"><summary>Infrastructure</summary>
         <div id="frontage-layer-controls"></div>
         <div id="ramp-layer-controls"></div>
-      </details>
-      <div id="structure-layer-controls"></div>
-      <details class="its-group"><summary>Traffic &amp; ITS</summary></details>
+        <div id="structure-layer-controls"></div>
       </details>
       <div id="base-environment-controls"></div>
       <p id="layer-status" role="status" aria-live="polite">Select a road to highlight it on the map.</p>
@@ -48,6 +53,10 @@ document.body.innerHTML = `
 const weather = installI595Weather();
 if (import.meta.hot) import.meta.hot.dispose(() => weather.destroy());
 
+// Legend swatches come from the same palette the corridor is drawn with.
+for (const label of document.querySelectorAll("label[data-route]")) {
+  label.style.setProperty("--road", getTrafficColor(undefined, label.dataset.route));
+}
 const panel = document.querySelector(".layers");
 const toggle = document.querySelector("#menu-toggle");
 const setExplorerCollapsed = (collapsed) => {
@@ -128,18 +137,21 @@ try {
   const rampControls = installRampLayerControls(document.querySelector("#ramp-layer-controls"), viewer);
   const frontageControls = installFrontageRoads(document.querySelector("#frontage-layer-controls"), viewer);
   const mainlineSegments = createI595RoadSegmentLayer(viewer);
+  const routeInputs = inputs.filter(input => ["i595_mainline_eb", "i595_mainline_wb", "express-way"].includes(input.id));
   const updateMainlineCount = () => {
-    const count = inputs.filter(input => input.checked || input.indeterminate).length;
-    status.textContent = count ? `${count} of ${inputs.length} road layers visible` : "Select a road to highlight it on the map.";
+    const count = routeInputs.filter(input => input.checked || input.indeterminate).length;
+    status.textContent = count ? `${count} of ${routeInputs.length} traffic routes shown` : "Select a route to highlight it on the map.";
   };
   const segmentControls = installI595SegmentControls(mainlineSegments, updateMainlineCount);
+  const flowToggle = document.querySelector("#flow-direction");
+  flowToggle.onchange = () => mainlineSegments.setFlowVisible(flowToggle.checked);
   const expressLanes = installI595ExpressLanes(viewer, document.querySelector("#express-way"), {
     onVisibilityChange: updateMainlineCount, onStatus: message => { status.textContent = message; },
   });
   const bridgeControls = installBridgeStructures(document.querySelector("#structure-layer-controls"), viewer, mainlineSegments);
   const signalControls = installTrafficSignals(document.querySelector(".its-group"), viewer);
   const cameraControls = installCctvCameras(document.querySelector(".its-group"), viewer);
-  const liveEventControls = installLiveEvents(document.querySelector(".its-group"), viewer);
+  const liveEventControls = installLiveEvents(document.querySelector(".incidents-group"), viewer);
   // Base environment: the world the corridor sits on, so it lives outside the DataLayer tree.
   // The oblique 3D view is derived from the same corridor extent as "Reset view" — no new coordinates.
   const corridorSpan = Math.max(...lons) - Math.min(...lons);
@@ -193,7 +205,9 @@ try {
   const hud = installI595Hud(document.body, {
     cameras: cameraControls.cameraById, signals: signalControls.trafficSignalById, liveEvents: liveEventControls,
   });
-  if (import.meta.hot) import.meta.hot.dispose(() => { navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
+  // Operational strip: corridor facts and the live-event feed, with gaps stated rather than filled.
+  const corridorStatus = installCorridorStatusBar(document.body, { mainline: mainlineSegments, liveEvents: liveEventControls });
+  if (import.meta.hot) import.meta.hot.dispose(() => { corridorStatus.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
   for (const input of inputs) {
     if (input.id === 'i595_mainline_eb' || input.id === 'i595_mainline_wb' || input.id === 'express-way') continue;
     input.disabled = false;

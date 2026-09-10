@@ -198,3 +198,33 @@ body .map-nav #reset-view { position: static; width: auto; height: 38px; padding
   body .map-nav #reset-view { padding: 0 8px; margin-left: 2px; }
   body:has(:is(.ramp-details,.road-details,.segment-details,.express-details,.bridge-details,.signal-details,.camera-details,.live-event-details):not([hidden])) .map-nav { bottom: calc(40dvh + 52px); }
 }
+
+/* Compass: a needle that turns with the camera, and a click that brings the view back to north. */
+.map-nav .map-nav-north { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+body .map-nav .map-nav-north { grid-column: auto; margin: 0; border: 0; border-left: 1px solid #ffffff24; border-radius: 0; font-size: 13px; }
+.map-nav-needle { position: absolute; top: 3px; left: 50%; margin-left: -4px; font-size: 9px; line-height: 1; color: #e2685f; transition: transform .25s ease-out; transform-origin: 50% 13px; }
+.map-nav-cardinal { font-size: 11px; font-weight: 700; letter-spacing: .04em; margin-top: 7px; }
+.map-nav .map-nav-north[data-aligned] .map-nav-needle { color: #67f4e2; }
+.map-nav button { transition: background .16s ease, color .16s ease; }
+.map-nav button:active:not(:disabled) { background: #67f4e229; color: #bff7ef; }
+
+/* Corridor status strip: bottom-left, clear of the Cesium credits and the camera toolbar. */
+.corridor-status { position: absolute; left: 16px; bottom: 48px; display: flex; align-items: stretch; max-width: min(620px, calc(100vw - 340px)); border: 1px solid #ffffff1f; border-radius: 12px; background: #0b1729cc; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 12px 32px #0006; color: #e8eef6; font-size: 12px; overflow: hidden; }
+body:has(.layers:not(.collapsed)) .corridor-status { left: 420px; }
+.corridor-status-toggle { flex: none; padding: 0 12px; border: 0; border-right: 1px solid #ffffff14; background: transparent; color: #92a8c3; font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; cursor: pointer; }
+.corridor-status-toggle span { color: #67f4e2; }
+.corridor-status-toggle:hover { background: #ffffff0d; }
+.corridor-status-body { display: flex; align-items: center; gap: 18px; padding: 9px 16px; overflow-x: auto; transition: opacity .18s ease; }
+.corridor-status.collapsed .corridor-status-body { display: none; }
+.corridor-status dl { display: flex; align-items: baseline; gap: 18px; margin: 0; }
+.corridor-status dl > div { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+.corridor-status dt { color: #92a8c3; font-size: 11px; }
+.corridor-status dd { margin: 0; font-weight: 650; font-variant-numeric: tabular-nums; }
+.corridor-status dl > div[data-tone="alert"] dd { color: #ee9148; }
+.corridor-status-note { margin: 0; color: #7f93ac; font-size: 11px; white-space: nowrap; }
+@media (max-width: 1400px) { .corridor-status-note { display: none; } }
+@media (max-width: 900px) { .corridor-status { left: 10px; right: 10px; bottom: 96px; max-width: none; } body:has(.layers:not(.collapsed)) .corridor-status { left: 10px; } }
+
+/* A standalone layer option that is not one of the corridor's routes. */
+.layers .layer-option { display: flex; align-items: center; gap: 9px; margin: 8px 0 4px; padding: 0 2px; font-size: 12px; color: #cfdcea; }
+.layers .layer-option input { margin: 0; }

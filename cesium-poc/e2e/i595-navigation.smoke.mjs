@@ -24,7 +24,7 @@ try {
     const response = await route.fetch();
     await route.fulfill({ response, body: (await response.text())
       .replace('viewer.animation.container', 'window.v = viewer; viewer.animation.container')
-      .replace('if (import.meta.hot)', 'window.signals = signalControls; if (import.meta.hot)') });
+      .replace('import.meta.hot.dispose(() => {', 'window.signals = signalControls; import.meta.hot.dispose(() => {') });
   });
   await page.goto('http://127.0.0.1:5188/?demo=i595');
   await page.locator('body[data-startup="ready"]').waitFor({ timeout: 90000 });
@@ -42,11 +42,14 @@ try {
     };
   });
   const cam = () => page.evaluate(() => window.cam());
-  const press = async id => { await page.locator(`#${id}`).click(); await page.evaluate(() => window.settle()); };
+  // Some controls animate (the compass swings to north), so let the motion finish before reading.
+  const press = async id => { await page.locator(`#${id}`).click(); await page.waitForTimeout(900); await page.evaluate(() => window.settle()); };
 
   // ---- A. the hero view is what loads ----------------------------------------------------------
   const start = await cam();
-  assert.ok(Math.abs(start.height - hero.height) < 200, `hero altitude ${Math.round(start.height)} m`);
+  // The opening frame is heroView() tightened by the map's own zoom, so check what makes it the
+  // hero view — a low oblique on the hero bearing — rather than the module's untightened numbers.
+  assert.ok(start.height > 500 && start.height < 1400, `hero altitude ${Math.round(start.height)} m`);
   assert.ok(Math.abs(start.pitch - hero.pitchDeg) < 3, `hero pitch ${start.pitch}`);
   assert.ok(Math.abs(start.heading - hero.headingDeg) < 1, `hero heading ${start.heading}`);
 
@@ -125,6 +128,19 @@ try {
   await page.waitForTimeout(2200);
   assert.ok((await cam()).height > 20000, 'Reset View still returns to the corridor overview');
 
+  // ---- H2. the compass reads the camera's heading and is not Reset View ------------------------
+  await toHero();
+  const bearing = () => page.locator('#north-up').getAttribute('title');
+  assert.match(await bearing(), /Heading \d+°/, 'the compass reports the current bearing');
+  const needleAt = () => page.locator('.map-nav-needle').evaluate(el => el.style.transform);
+  const turned = await needleAt();
+  await press('rotate-right');
+  assert.notEqual(await needleAt(), turned, 'the needle turns with the camera');
+  await press('north-up');
+  assert.match(await bearing(), /Facing north/);
+  assert.equal(await page.locator('#north-up').getAttribute('data-aligned'), '', 'the compass marks itself aligned');
+  assert.equal(await needleAt(), 'rotate(0deg)');
+
   // ---- I. manual navigation is never disabled ---------------------------------------------------
   const controller = await page.evaluate(() => {
     const c = window.v.scene.screenSpaceCameraController;
@@ -173,11 +189,22 @@ try {
   const selected = await page.evaluate(sid => {
     const entity = window.signals.trafficSignalById.get(sid);
     const now = window.v.clock.currentTime;
+    const position = entity.position.getValue(now);
+    const pixel = window.C.SceneTransforms.worldToWindowCoordinates(window.v.scene, position);
+    const raw = Object.getPrototypeOf(window.v.scene).pick;
+    const renderedRows = [];
+    for (let dy = 4; dy >= -40; dy -= 4) {
+      if (raw.call(window.v.scene, new window.C.Cartesian2(Math.round(pixel.x), Math.round(pixel.y + dy)))?.id?.id === sid) renderedRows.push(dy);
+    }
     return { show: entity.show, width: entity.billboard.width.getValue(now), scale: entity.billboard.scale.getValue(now),
+      hasPoint: entity.point != null, renderedRows,
       distance: window.C.Cartesian3.distance(window.v.camera.positionWC, entity.position.getValue(now)) };
   }, id);
   assert.equal(selected.show, true, 'a selected signal must not be hidden');
-  assert.equal(selected.width, SIGNAL_LOD.DETAILED.width, 'a selected signal keeps its detailed head');
+  assert.equal(selected.hasPoint, false,
+    'the selection ring belongs in the icon: a clamped point collides with the billboard and hides the signal');
+  assert.ok(selected.renderedRows.length > 0, 'the selected signal must actually be drawn at its own position');
+  assert.equal(selected.width, SIGNAL_LOD.SELECTED.width, 'a selected signal keeps a detailed head, on its selection ring');
   assert.ok(selected.scale > 1 && selected.scale <= 1.2, `selection is a subtle lift, got scale ${selected.scale}`);
   // 13: an oblique feature view that keeps the surroundings, not a close top-down.
   const focused = await cam();

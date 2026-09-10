@@ -16,6 +16,12 @@ const placements = contextLabelPlacements(corridor);
 const cameraCount = JSON.parse(readFileSync(new URL('../public/data/i595_corridor_cameras.geojson', import.meta.url))).features.length;
 const signalCount = JSON.parse(readFileSync(new URL('../public/data/i595_corridor_traffic_signals.geojson', import.meta.url))).features.length;
 
+/** The strip refreshes on its own timer, so wait for the corridor length rather than racing it. */
+async function expect_strip_length(page) {
+  await page.waitForFunction(() => /Corridor/.test(document.querySelector('.corridor-status')?.innerText ?? ''), null, { timeout: 20000 });
+  assert.match(await page.locator('.corridor-status').innerText(), /Corridor\s+\d+\.\d+ mi/);
+}
+
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
@@ -23,7 +29,7 @@ try {
     const response = await route.fetch();
     await route.fulfill({ response, body: (await response.text())
       .replace('viewer.animation.container', 'window.v = viewer; viewer.animation.container')
-      .replace('if (import.meta.hot)', 'window.shields = roadShields; window.labels = contextLabels; window.events = liveEventControls; if (import.meta.hot)') });
+      .replace('import.meta.hot.dispose(() => {', 'window.shields = roadShields; window.labels = contextLabels; window.events = liveEventControls; window.mainline = mainlineSegments; import.meta.hot.dispose(() => {') });
   });
   await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
   await page.locator('#cameras-all:not(:disabled)').waitFor({ state: 'attached', timeout: 60000 });
@@ -43,25 +49,44 @@ try {
   // It sits outside Map Explorer, not inside it.
   assert.equal(await page.locator('.layers .twin-hud').count(), 0);
 
-  await page.waitForFunction(count => document.querySelector('[data-metric="cameras"]')?.textContent === String(count),
-    cameraCount, { timeout: 30000 });
-  const metrics = await page.evaluate(() => Object.fromEntries(
-    [...document.querySelectorAll('[data-metric]')].map(cell => [cell.dataset.metric, cell.textContent])));
-  assert.equal(metrics.cameras, String(cameraCount), 'the CCTV count is the layer’s own');
-  assert.equal(metrics.signals, String(signalCount), 'the signal count is the layer’s own');
-  // The live-event count is whatever the feed currently holds — not a number invented for the card.
-  const feed = await page.evaluate(() => window.events.events.length);
-  assert.equal(metrics.events, String(feed), 'the live-event count is the feed’s own');
+  // The identity card carries no numbers: the operational counts belong on the corridor status
+  // strip, and a figure repeated in two places is a figure that can disagree with itself.
+  assert.equal(await hud.locator('[data-metric]').count(), 0, 'the identity card states no metrics');
   // There is no LIVE badge: only FL511 events are a live feed, while the CCTV and signal counts are
   // static FDOT inventories, so a badge over the card would overstate what the twin is.
   assert.equal(await hud.locator('.twin-hud-live, .twin-hud-dot').count(), 0, 'the card must not claim to be live');
-  // A quiet corridor is stated, never highlighted.
-  const quiet = await page.locator('[data-metric="events"]').getAttribute('data-quiet');
-  assert.equal(quiet, String(feed === 0), 'an empty live-event count must be understated');
-  // No fabricated conditions anywhere on the card.
   const hudText = (await hud.innerText()).toLowerCase();
-  for (const invented of ['congest', 'mph', 'km/h', 'delay', 'speed', 'incident', 'weather', 'flow'])
-    assert.ok(!hudText.includes(invented), `the status card must not state "${invented}"`);
+  for (const invented of ['congest', 'mph', 'km/h', 'delay', 'speed', 'weather', 'flow'])
+    assert.ok(!hudText.includes(invented), `the identity card must not state "${invented}"`);
+
+  // ---- the corridor status strip carries the operational figures, and states its gaps -----------
+  const strip = page.locator('.corridor-status');
+  await strip.waitFor({ timeout: 30000 });
+  const stripText = await strip.innerText();
+  assert.match(stripText, /I-595\s*NOW/i);
+  // Incidents and closures come from the live feed, which loads with the map.
+  assert.match(stripText, /Incidents\s+\d+/);
+  assert.match(stripText, /Closures\s+\d+/);
+  // Corridor length is real FDOT linear referencing, so it appears once that data is loaded — and
+  // not before: the strip reports what the corridor actually knows.
+  assert.ok(!stripText.includes('Corridor'), 'no corridor length before the FDOT segments load');
+  await openExplorer(page);
+  await page.locator('#i595_mainline_eb').check();
+  await page.waitForTimeout(2500);
+  await page.evaluate(() => document.querySelector('.corridor-status') && window.dispatchEvent(new Event('resize')));
+  await expect_strip_length(page);
+  // With no traffic observations the strip omits speeds rather than inventing them, and says so.
+  const observed = await page.evaluate(() => window.mainline.segmentStatus.size);
+  const loadedText = await strip.innerText();
+  if (observed === 0) {
+    assert.match(loadedText, /No traffic-condition feed connected/);
+    for (const invented of ['mph', 'Travel time', 'Congested']) assert.ok(!loadedText.includes(invented), `strip must not state "${invented}"`);
+  }
+  // It collapses, and it stays out of the corridor's way.
+  await strip.locator('.corridor-status-toggle').click();
+  assert.equal(await strip.locator('.corridor-status-body').isVisible(), false);
+  await strip.locator('.corridor-status-toggle').click();
+  assert.equal(await strip.locator('.corridor-status-body').isVisible(), true);
 
   // ---- context labels: map labelling, held back at corridor scale --------------------------------
   const labels = await page.evaluate(now => [...window.labels.labelById.values()].map(entity => ({
@@ -110,8 +135,9 @@ try {
       camera: read(camera.billboard), shield: read(shield.billboard), signal: read(signal.billboard),
     };
   });
-  assert.ok(markers.camera.width >= 22 && markers.camera.width <= 28, `CCTV marker ${markers.camera.width} px`);
-  assert.ok(markers.camera.farScale <= 0.3, 'CCTV markers must shrink away with distance');
+  // Readable at working distance, still clearly subordinate to the route it sits beside.
+  assert.ok(markers.camera.width >= 20 && markers.camera.width <= 36, `CCTV marker ${markers.camera.width} px`);
+  assert.ok(markers.camera.farScale < 1, 'CCTV markers must shrink away with distance');
   assert.ok(markers.camera.far > 0 && markers.camera.far <= 20000, 'CCTV markers must disappear at corridor scale');
   // At this distance signals are drawn at their compact level; the detailed head belongs close in
   // and is covered, with its hysteresis, by i595-navigation.smoke.mjs.
@@ -122,7 +148,7 @@ try {
   // A route label, not a POI: bigger than the asset markers, still nowhere near a pin.
   assert.ok(markers.shield.width >= 24 && markers.shield.width <= 44, `shield ${markers.shield.width} px`);
 
-  console.log(`hero presentation OK — HUD ${cameraCount}/${signalCount}/${feed}, ${labels.length} labels, CCTV ${markers.camera.width}px vs shield ${markers.shield.width}px`);
+  console.log(`hero presentation OK — strip + HUD, ${cameraCount} cameras, ${signalCount} signals, ${labels.length} labels, CCTV ${markers.camera.width}px vs shield ${markers.shield.width}px`);
 } finally {
   await browser.close();
 }

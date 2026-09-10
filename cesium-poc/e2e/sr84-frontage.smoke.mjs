@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
-import { openExplorer } from './i595Explorer.mjs';
+import { openExplorer, revealLayerGroup } from './i595Explorer.mjs';
 
 const data = JSON.parse(readFileSync(new URL('../public/data/sr84_frontage_roads.geojson', import.meta.url)));
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -16,6 +16,7 @@ try {
   });
   await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
   await openExplorer(page);
+  await revealLayerGroup(page, '.frontage-group');
   await page.locator('#frontage-all:not(:disabled)').waitFor({ timeout: 60000 });
   await page.waitForTimeout(1600);
   await page.evaluate(async () => {

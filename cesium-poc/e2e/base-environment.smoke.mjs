@@ -29,7 +29,7 @@ try {
     const body = (await response.text())
       .replace('viewer.animation.container', 'window.v=viewer; viewer.animation.container')
       .replace('{ apiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY }', "{ apiKey: 'e2e-test-key', createTileset: () => window.__fakeTileset() }")
-      .replace('if (import.meta.hot)', 'window.baseEnv=baseEnvironment; window.cameras=cameraControls; if (import.meta.hot)');
+      .replace('import.meta.hot.dispose(() => {', 'window.baseEnv=baseEnvironment; window.cameras=cameraControls; import.meta.hot.dispose(() => {');
     await route.fulfill({ response, body });
   });
   await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
@@ -44,8 +44,8 @@ try {
   assert.equal(await page.locator('#base-environment-controls .base-environment').count(), 1);
   assert.equal(await page.locator('details:has(> summary:text-is("DataLayer")) .base-environment').count(), 0,
     'Base Environment must not sit inside the DataLayer tree');
-  assert.deepEqual(await page.locator('#layer-content > details > details > summary').allTextContents(),
-    ['Roads', 'Traffic & ITS'], 'the DataLayer hierarchy is unchanged');
+  assert.deepEqual(await page.locator('#layer-content > details > summary').allTextContents(),
+    ['Traffic', 'Infrastructure'], 'the explorer groups layers by transportation category');
   await page.waitForFunction(() => window.baseEnv.isLoaded(), null, { timeout: 30000 });
   assert.ok(await page.locator('input[value="GOOGLE_PHOTOREALISTIC_3D"]').isChecked(),
     'the default world is reflected in the radio group, not just in the scene');

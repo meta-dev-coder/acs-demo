@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
-import { openExplorer } from './i595Explorer.mjs';
+import { openExplorer, revealLayerGroup } from './i595Explorer.mjs';
 
 const data = JSON.parse(readFileSync(new URL('../public/data/i595_ramps_connectors_classified.geojson', import.meta.url)));
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -17,6 +17,7 @@ try {
   });
   await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
   await openExplorer(page);
+  await revealLayerGroup(page, '.ramp-group');
   await page.locator('#ramps-all:not(:disabled)').waitFor({ timeout: 60000 });
   await page.waitForTimeout(1600);
   // Ramp styling is camera-distance driven (RAMP_INTERACTION_HEIGHT). The app opens close in, at the
@@ -39,7 +40,8 @@ try {
   assert.equal(await page.locator('.ramp-group').getAttribute('open'), null);
   // No layer starts switched on. (Base Environment is a radio group, so one option is always
   // selected — that is its default basemap, not a layer.)
-  assert.equal(await page.locator('input[type="checkbox"]:checked').count(), 0);
+  // "Direction of travel" is a display option that ships on; no data layer starts switched on.
+  assert.equal(await page.locator('input[type="checkbox"]:checked:not(#flow-direction)').count(), 0);
   assert.equal(await page.locator('input[name="base-environment"]:checked').getAttribute('value'), 'GOOGLE_PHOTOREALISTIC_3D',
     'the map opens in Photorealistic 3D; Base Environment is a radio group, not a data layer');
   assert.equal(await page.locator('#ramp-interchange option').count(), 12);
@@ -47,7 +49,7 @@ try {
   // Mainline still loads independently, with original colors and source files.
   for (const [index, name] of ['I-595 Eastbound', 'I-595 Westbound', '595 Express'].entries()) {
     await page.getByRole('checkbox', { name, exact: true }).check();
-    await page.locator('#layer-status').filter({ hasText: `${index + 1} of 3 road layers visible` }).waitFor();
+    await page.locator('#layer-status').filter({ hasText: `${index + 1} of 3 traffic routes shown` }).waitFor();
   }
   for (const name of ['I-595 Eastbound', 'I-595 Westbound', '595 Express']) await page.getByRole('checkbox', { name, exact: true }).uncheck();
   await page.locator('#ramps-all').check();

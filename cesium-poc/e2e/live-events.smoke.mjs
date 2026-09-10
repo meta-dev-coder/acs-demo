@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
-import { openExplorer } from './i595Explorer.mjs';
+import { openExplorer, revealLayerGroup } from './i595Explorer.mjs';
 
 const mainline = JSON.parse(readFileSync(new URL('../public/data/i595_mainline_eb.geojson', import.meta.url)));
 const [onMainlineLon, onMainlineLat] = mainline.features[0].geometry.coordinates[40];
@@ -76,7 +76,7 @@ try {
     const response = await route.fetch();
     const body = (await response.text())
       .replace('viewer.animation.container', 'window.v=viewer; viewer.animation.container')
-      .replace('if (import.meta.hot)', 'window.live=liveEventControls; window.cameras=cameraControls; if (import.meta.hot)');
+      .replace('import.meta.hot.dispose(() => {', 'window.live=liveEventControls; window.cameras=cameraControls; import.meta.hot.dispose(() => {');
     await route.fulfill({ response, body });
   });
   await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
@@ -88,7 +88,8 @@ try {
   });
 
   // ---- layer tree ------------------------------------------------------------------------------
-  await page.locator('.its-group > summary').click();
+  // Incidents and closures now live under Traffic rather than the old Traffic & ITS group.
+  await revealLayerGroup(page, '.live-events-group');
   await page.locator('.live-events-group > summary').click({ position: { x: 5, y: 10 } });
   assert.equal(await page.locator('.live-events-group > summary .badge').textContent(), '2');
   assert.equal(await page.locator('[data-live-count="INCIDENT"]').textContent(), '1');
@@ -118,15 +119,31 @@ try {
   // ---- picking and provenance ------------------------------------------------------------------
   await page.locator('button.segment-select[data-live-type="CLOSURE"]').click();
   await page.waitForTimeout(1800);
-  const marker = await page.evaluate(id => {
-    const point = C.SceneTransforms.worldToWindowCoordinates(v.scene, live.entityById.get(id).position.getValue());
-    return { x: point.x, y: point.y - 15 };
-  }, closure.id);
+  // Clamped markers are only placed once the 3D tiles beneath them have streamed in, so find a
+  // pixel the marker actually occupies rather than assuming a fixed offset, and poll for it.
+  const findMarker = eventId => page.evaluate(id => {
+    const entity = live.entityById.get(id);
+    const point = C.SceneTransforms.worldToWindowCoordinates(v.scene, entity.position.getValue());
+    if (!point) return null;
+    const raw = Object.getPrototypeOf(v.scene).pick;
+    for (let dy = 0; dy >= -44; dy -= 2) for (const dx of [0, -4, 4, -8, 8]) {
+      const pixel = new C.Cartesian2(Math.round(point.x + dx), Math.round(point.y + dy));
+      if (raw.call(v.scene, pixel)?.id === entity) return { x: pixel.x, y: pixel.y };
+    }
+    return null;
+  }, eventId);
+  let marker = null;
+  for (const deadline = Date.now() + 40000; !marker && Date.now() < deadline;) marker = await findMarker(closure.id);
+  assert.ok(marker, 'the closure marker must be pickable at its own rendered coordinates');
   await page.mouse.move(marker.x, marker.y);
   await page.getByRole('tooltip').filter({ hasText: /FL511 Event 845752/ }).waitFor();
   const tooltip = await page.getByRole('tooltip').textContent();
   assert.ok(tooltip.includes('95 Express South'), 'hover shows FL511 words, not our inference');
-  await page.mouse.click(marker.x, marker.y);
+  // Hovering restyles the marker; let that settle, then click a pixel it still occupies.
+  await page.waitForTimeout(600);
+  let clickPoint = null;
+  for (const deadline = Date.now() + 20000; !clickPoint && Date.now() < deadline;) clickPoint = await findMarker(closure.id);
+  await page.mouse.click((clickPoint ?? marker).x, (clickPoint ?? marker).y);
   await page.locator('.live-event-details:not([hidden])').waitFor();
   // Clicking a live event must not leave another layer's panel open.
   assert.equal(await page.locator('.camera-details:not([hidden]), .bridge-details:not([hidden]), .signal-details:not([hidden])').count(), 0);

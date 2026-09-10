@@ -1,3 +1,4 @@
+import { corridorVisualConfig as config } from './corridorVisualConfig.js';
 import { CustomDataSource, Cartesian3, Color, HeightReference, NearFarScalar, ScreenSpaceEventType, VerticalOrigin } from 'cesium';
 import { createMapDetailsPanel } from './mapDetailsPanel.js';
 import { focusMapPoints } from './bridgeCamera.js';
@@ -13,13 +14,18 @@ const compactIcon = `data:image/svg+xml;charset=utf-8,${encodeURIComponent('<svg
  * housing when close enough to read, a compact one at corridor distance. Sized so the marker reads
  * as infrastructure rather than dominating the freeway it sits on.
  */
+// The selected state is the same housing on a soft ring, drawn into the icon itself. A separate
+// halo graphic is not an option: a clamped `point` on an entity that also has a billboard is drawn
+// as a billboard too, the two collide, and the signal you just selected stops rendering.
+const selectedIcon = `data:image/svg+xml;charset=utf-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="56" height="72" viewBox="0 0 56 72"><circle cx="28" cy="58" r="12" fill="#67f4e21f" stroke="#67f4e2" stroke-width="2"/><path d="M26 56h4v9h-4z" fill="#152030" stroke="white"/><rect x="17" y="4" width="22" height="48" rx="6" fill="#111820" stroke="#67f4e2" stroke-width="2.5"/><circle cx="28" cy="14" r="6" fill="#f44336"/><circle cx="28" cy="28" r="6" fill="#ffda16"/><circle cx="28" cy="42" r="6" fill="#07934c"/></svg>')}`;
 export const SIGNAL_LOD = Object.freeze({
   DETAILED: Object.freeze({ image: icon, width: 25, height: 46 }),
   COMPACT: Object.freeze({ image: compactIcon, width: 10, height: 16 }),
+  SELECTED: Object.freeze({ image: selectedIcon, width: 36, height: 46 }),
 });
 /** Hysteresis: switch to detail below the near bound, back to compact above the far bound. */
-export const SIGNAL_DETAIL_NEAR_M = 1500;
-export const SIGNAL_DETAIL_FAR_M = 1800;
+export const SIGNAL_DETAIL_NEAR_M = config.lod.infrastructureDistance;
+export const SIGNAL_DETAIL_FAR_M = config.lod.infrastructureDistance * 1.15;
 
 /**
  * @param {number} distance  camera-to-signal distance in metres
@@ -60,13 +66,15 @@ export function installTrafficSignals(container, viewer) {
     if (!entity) return;
     // A selected signal always keeps its detailed housing, whatever the camera distance — losing
     // sight of what you just selected is worse than showing detail from a little further out.
-    const level = entity === selected ? 'DETAILED' : levels.get(entity) ?? 'COMPACT';
+    const level = entity === selected ? 'SELECTED' : levels.get(entity) ?? 'COMPACT';
     const lod = SIGNAL_LOD[level];
     if (entity.billboard.image?.getValue() !== lod.image) entity.billboard.image = lod.image;
     entity.billboard.width = lod.width;
     entity.billboard.height = lod.height;
     entity.billboard.scale = entity === selected ? 1.15 : entity === hovered ? 1.08 : 1;
-    entity.billboard.color = entity === selected ? Color.fromCssColorString('#fff0a6') : Color.WHITE;
+    // A selected signal stays on the map at any distance — losing sight of what you just clicked is
+    // worse than showing one marker further out than the level of detail would otherwise allow.
+    entity.billboard.show = entity === selected || Cartesian3.distance(viewer.camera.positionWC, entity.position.getValue(viewer.clock.currentTime)) <= config.lod.corridorDistance;
   }
   /**
    * Re-evaluate every signal's level of detail. Driven by the camera's own change and move-end
@@ -80,7 +88,11 @@ export function installTrafficSignals(container, viewer) {
       if (!entity.show) continue;
       const distance = Cartesian3.distance(viewer.camera.positionWC, entity.position.getValue(now));
       const next = signalLodFor(distance, levels.get(entity));
-      if (next === levels.get(entity)) continue;
+      if (next === levels.get(entity)) {
+        const show=entity===selected || distance<=config.lod.corridorDistance;
+        if(entity.billboard.show.getValue()!==show){entity.billboard.show=show;changed=true;}
+        continue;
+      }
       levels.set(entity, next);
       style(entity);
       changed = true;
@@ -112,7 +124,7 @@ export function installTrafficSignals(container, viewer) {
     status.textContent = `${count} of ${trafficSignalById.size} traffic signals visible`;
     if (selected && !selected.show) select(null);
     if (hovered && !hovered.show) hover(null);
-    viewer.scene.requestRender();
+    applyLevelOfDetail();viewer.scene.requestRender();
   }
   parent.onclick = event => event.stopPropagation();
   parent.onchange = () => { for (const entity of trafficSignalById.values()) entity.show = parent.checked; sync(); };

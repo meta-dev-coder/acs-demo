@@ -2,6 +2,12 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
+import { corridorVisualConfig, getTrafficColor } from '../src/corridorVisualConfig.js';
+
+// Road width is a level-of-detail property now: every visible segment carries the width configured
+// for the camera's current level, plus the casing that gives it contrast over imagery.
+const LOD_WIDTHS = Object.values(corridorVisualConfig.lineWidth)
+  .map(width => width + (corridorVisualConfig.casing.enabled ? corridorVisualConfig.casing.pixels : 0));
 import { openExplorer } from './i595Explorer.mjs';
 const data = JSON.parse(readFileSync(new URL('../public/data/i595_fdot_traffic_segments.geojson', import.meta.url)));
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -15,7 +21,7 @@ try {
   await page.route('**/src/i595Demo.js*', async route => {
     const response = await route.fetch();
     const body = (await response.text()).replace('viewer.animation.container', 'window.fdotViewer = viewer; viewer.animation.container')
-      .replace('if (import.meta.hot)', 'window.fdotLayer = mainlineSegments; if (import.meta.hot)');
+      .replace('import.meta.hot.dispose(() => {', 'window.fdotLayer = mainlineSegments; import.meta.hot.dispose(() => {');
     await route.fulfill({ response, body });
   });
   await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
@@ -24,9 +30,9 @@ try {
   assert.equal(await page.locator('.mainline-parent > summary input, .mainline-group > label input').count(), 3);
   assert.equal(await page.locator('.mainline-group input:checked').count(), 0);
   await page.locator('#i595_mainline_eb').check();
-  await page.locator('#layer-status').filter({ hasText: '1 of 3 road layers visible' }).waitFor();
+  await page.locator('#layer-status').filter({ hasText: '1 of 3 traffic routes shown' }).waitFor();
   await page.locator('#i595_mainline_wb').check();
-  await page.locator('#layer-status').filter({ hasText: '2 of 3 road layers visible' }).waitFor();
+  await page.locator('#layer-status').filter({ hasText: '2 of 3 traffic routes shown' }).waitFor();
   await page.evaluate(async () => {
     const text = await (await fetch('/src/i595Demo.js')).text();
     window.fdotCesium = await import(text.match(/from\s*"([^"]*cesium[^\"]*)"/)[1]);
@@ -46,9 +52,10 @@ try {
   });
   for (const feature of data.features) {
     const entity = actual.find(e => e.id === feature.properties.segment_id);
-    assert.equal(entity.width, 3.5);
+    assert.ok(LOD_WIDTHS.includes(entity.width), `segment width ${entity.width} must be one of the configured levels`);
     // The route hue is unchanged; only the resting opacity is, so compare the RGB and the alpha.
-    assert.equal(entity.color.slice(0, 7), feature.properties.direction === 'EB' ? '#52dcf5' : '#c49aff');
+    assert.equal(entity.color.slice(0, 7), getTrafficColor(undefined, feature.properties.direction),
+      'an unobserved segment is drawn in its route colour');
     assert.equal(entity.alpha, 0.8, 'the resting overlay is part-transparent so the roadway shows through');
     for (const key of ['segment_id', 'direction', 'begin_post', 'end_post', 'aadt', 'desc_from', 'desc_to']) assert.equal(entity.properties[key], feature.properties[key]);
     assert.equal(entity.points.length, feature.geometry.coordinates.length);
@@ -83,6 +90,9 @@ try {
     assert.ok(point, `Pickable section: ${feature.properties.segment_id}`);
     await page.mouse.move(point.x, point.y);
     await page.getByRole('tooltip').filter({ hasText: `MP ${beginPost.toFixed(3)}` }).waitFor();
+    // Hovering restyles a clamped ground polyline, which rebuilds its primitive asynchronously.
+    // Let that settle, as a real pointer does, or the click lands mid-rebuild and picks nothing.
+    await page.waitForTimeout(600);
     await page.mouse.click(point.x, point.y);
     await page.getByRole('region', { name: 'Road Segment Details' }).waitFor();
     assert.deepEqual(await page.locator('.segment-details dt').allTextContents(), ['Road', 'Direction', 'FDOT Roadway', 'FDOT Section', 'Milepost', 'From', 'To', 'AADT', 'AADT Year']);
@@ -93,7 +103,7 @@ try {
     assert.equal(values[6], feature.properties.desc_to);
     assert.equal(values[7], `${feature.properties.aadt.toLocaleString('en-US')} vehicles/day`);
     assert.equal(values[8], '2025');
-    assert.deepEqual(await page.evaluate(() => [...window.fdotLayer.segmentById.values()].filter(e => e.polyline.width.getValue() === 6.5).map(e => e.id)), [feature.properties.segment_id]);
+    assert.deepEqual(await page.evaluate(() => [...window.fdotLayer.segmentById.values()].filter(e => e.polyline.material.getValue?.().color?.alpha === 1).map(e => e.id)), [feature.properties.segment_id]);
     await page.mouse.move(950, 110);
   }
   await page.screenshot({ path: '/tmp/i595-fdot-desktop.png' });
@@ -101,7 +111,7 @@ try {
   await page.screenshot({ path: '/tmp/i595-fdot-mobile.png' });
   await page.getByRole('button', { name: 'Close road segment details' }).click();
   assert.equal(await page.locator('.segment-details').isVisible(), false);
-  assert.equal(await page.evaluate(() => [...window.fdotLayer.segmentById.values()].filter(e => e.polyline.width.getValue() === 6.5).length), 0);
+  assert.equal(await page.evaluate(() => [...window.fdotLayer.segmentById.values()].filter(e => e.polyline.material.getValue?.().color?.alpha === 1).length), 0);
   assert.ok(await page.evaluate(() => window.fdotOriginalEntities.every(e => e === window.fdotLayer.segmentById.get(e.id))));
   assert.equal(combinedRequests, 1);
   assert.equal(oldRequests, 0);
@@ -129,12 +139,12 @@ try {
   assert.equal(await page.evaluate(id => window.fdotLayer.segmentById.get(id).show, id), false);
   await checkbox.check();
   await label.hover();
-  assert.equal(await page.evaluate(id => window.fdotLayer.segmentById.get(id).polyline.width.getValue(), id), 5);
+  assert.ok(LOD_WIDTHS.includes(await page.evaluate(id => window.fdotLayer.segmentById.get(id).polyline.width.getValue(), id)));
   assert.equal(await page.locator('.segment-details').isVisible(), false);
   await label.click();
   await page.locator('.segment-details:not([hidden])').waitFor();
   assert.ok((await page.locator('.segment-details dd').allTextContents()).includes('4 of 8'));
-  assert.deepEqual(await page.evaluate(() => [...window.fdotLayer.segmentById.values()].filter(e => e.polyline.width.getValue()===6.5).map(e=>e.id)),[id]);
+  assert.deepEqual(await page.evaluate(() => [...window.fdotLayer.segmentById.values()].filter(e => e.polyline.material.getValue?.().color?.alpha === 1).map(e=>e.id)),[id]);
   await checkbox.uncheck();
   assert.equal(await page.locator('.segment-details').isVisible(), false);
   await label.click();

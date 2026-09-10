@@ -17,6 +17,8 @@ export const TILT_STEP_DEG = 8;
 /** Keeps the camera the right way up: never past straight down, never below the horizon. */
 export const MIN_PITCH_DEG = -85;
 export const MAX_PITCH_DEG = -10;
+/** How long the compass takes to swing the view back to north. */
+export const NORTH_UP_MS = 600;
 
 /** Clamp a proposed pitch into the usable range. */
 export const clampPitchDeg = pitchDeg =>
@@ -32,6 +34,8 @@ const BUTTONS = [
   { id: 'rotate-right', label: 'Rotate right', text: '↻', group: 'rotate' },
   { id: 'tilt-up', label: 'Tilt up', text: '↑', group: 'tilt' },
   { id: 'tilt-down', label: 'Tilt down', text: '↓', group: 'tilt' },
+  // The needle turns with the camera, so the button doubles as a heading readout.
+  { id: 'north-up', label: 'Face north', text: '<span class="map-nav-needle" aria-hidden="true">▲</span><span class="map-nav-cardinal">N</span>', group: 'north' },
 ];
 
 /**
@@ -111,14 +115,44 @@ export function installMapNavigationControls(container, viewer, { zoom } = {}) {
     // Tilting "up" raises the camera's eye towards straight down.
     'tilt-up': () => orbit(0, -TILT_STEP_DEG),
     'tilt-down': () => orbit(0, TILT_STEP_DEG),
-
+    // A compass reset, not Reset View: keep exactly where you are and how steeply you are looking,
+    // and turn to north smoothly rather than snapping.
+    'north-up': () => {
+      camera.cancelFlight();
+      // Clone: `positionWC` is Cesium's own vector, and handing it back as a destination aliases
+      // the value the camera is in the middle of recomputing.
+      const destination = Cartesian3.clone(camera.positionWC, new Cartesian3());
+      const orientation = { heading: 0, pitch: CMath.toRadians(clampPitchDeg(CMath.toDegrees(camera.pitch))), roll: 0 };
+      const duration = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : NORTH_UP_MS / 1000;
+      camera.flyTo({ destination, orientation, duration, complete: syncCompass, cancel: syncCompass });
+      viewer.scene.requestRender();
+    },
   };
+  // Turn the compass needle with the camera. Driven by the camera's own change events, never per
+  // frame, and written straight to the element's style so no framework state churns.
+  const needle = group.querySelector('.map-nav-needle');
+  const compass = group.querySelector('#north-up');
+  let shownHeading = null;
+  function syncCompass() {
+    const headingDeg = Math.round(normalizeHeadingDeg(CMath.toDegrees(camera.heading)));
+    if (headingDeg === shownHeading) return;
+    shownHeading = headingDeg;
+    if (needle) needle.style.transform = `rotate(${-headingDeg}deg)`;
+    compass?.setAttribute('title', headingDeg === 0 ? 'Facing north' : `Heading ${headingDeg}° — click to face north`);
+    compass?.setAttribute('aria-label', headingDeg === 0 ? 'Facing north' : `Heading ${headingDeg} degrees, face north`);
+    compass?.toggleAttribute('data-aligned', headingDeg === 0);
+  }
+  const removeChanged = camera.changed.addEventListener(syncCompass);
+  const removeMoveEnd = camera.moveEnd.addEventListener(syncCompass);
+  syncCompass();
   for (const [id, action] of Object.entries(actions)) group.querySelector(`#${id}`).onclick = action;
 
   return {
     element: group,
+    /** Current compass bearing in degrees, for tests and for anything that mirrors the heading. */
+    get headingDeg() { return shownHeading; },
     /** Exposed so the zoom buttons can be enabled once the viewer is ready. */
     setEnabled(enabled) { for (const button of group.querySelectorAll('button')) button.disabled = !enabled; },
-    destroy() { group.remove(); },
+    destroy() { removeChanged(); removeMoveEnd(); group.remove(); },
   };
 }

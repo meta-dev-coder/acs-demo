@@ -1,3 +1,4 @@
+import { corridorVisualConfig as config } from './corridorVisualConfig.js';
 import { CustomDataSource, Cartesian3, Color, DistanceDisplayCondition, HeightReference, NearFarScalar, ScreenSpaceEventType, VerticalOrigin } from 'cesium';
 import { createMapDetailsPanel } from './mapDetailsPanel.js';
 import { focusMapPoints } from './bridgeCamera.js';
@@ -36,6 +37,7 @@ export function installCctvCameras(container, viewer) {
     tooltipText: p => `CCTV Camera\nCamera ID: ${p.camera_id}\nVideo: ${videoLabel(p)}`, onClose: () => select(null) });
   function style(entity) {
     if (!entity) return;
+    entity.billboard.distanceDisplayCondition = new DistanceDisplayCondition(0, entity===selected ? Number.MAX_VALUE : config.lod.corridorDistance);
     entity.billboard.scale = entity === selected ? 1.18 : entity === hovered ? 1.1 : 1;
     entity.billboard.color = Color.WHITE;
   }
@@ -100,7 +102,7 @@ export function installCctvCameras(container, viewer) {
           // Keep cameras readable at overview distances without overpowering nearby roads.
           billboard: { image: p.video_enabled === true ? icons.available : icons.unavailable, width: 34, height: 40, scale: 1, verticalOrigin: VerticalOrigin.BOTTOM,
             heightReference: HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            distanceDisplayCondition: new DistanceDisplayCondition(0, 18000),
+            distanceDisplayCondition: new DistanceDisplayCondition(0, config.lod.corridorDistance),
             scaleByDistance: new NearFarScalar(400, 1, 12000, 0.7) } });
         cameraById.set(String(p.camera_id), entity); records.set(entity, p);
         const row = document.createElement('div'); row.className = 'segment-row';

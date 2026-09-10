@@ -1,3 +1,4 @@
+import { corridorVisualConfig as config } from './corridorVisualConfig.js';
 import { BoundingSphere, Cartesian3, Cartographic, Math as CMath, Matrix4, Transforms } from 'cesium';
 
 /** Frame the complete supplied extent in the map area left clear by the explorer/details. */
@@ -41,6 +42,6 @@ export function focusMapPoints(viewer, points, detailsSelector = '.signal-detail
   viewer.camera.cancelFlight();
   viewer.camera.flyTo({
     destination, orientation: { heading: 0, pitch: CMath.toRadians(pitchDeg), roll: 0 },
-    duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1.3,
+    duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : config.animation.focusMs / 1000,
   });
 }
