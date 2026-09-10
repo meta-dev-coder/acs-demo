@@ -1,13 +1,12 @@
 /**
- * Compact map navigation: zoom, orbit, tilt and north-up.
+ * Bottom map navigation: zoom, orbit, tilt and Reset View.
  *
  * Every action orbits the point the camera is already looking at, so the view turns around what is
  * on screen instead of swinging the camera on the spot. Each one borrows Cesium's reference frame
  * for the duration of the move and hands it straight back — the camera is never left attached to a
  * transform, so mouse pan, orbit, tilt and wheel zoom stay free afterwards.
  *
- * Reset View is deliberately not part of this group: it is a different action, and it lives on its
- * own button.
+ * Reset View shares the toolbar and retains its full-corridor action.
  */
 import { Cartesian2, Cartesian3, HeadingPitchRange, Math as CMath, Matrix4, Transforms } from 'cesium';
 
@@ -33,7 +32,6 @@ const BUTTONS = [
   { id: 'rotate-right', label: 'Rotate right', text: '↻', group: 'rotate' },
   { id: 'tilt-up', label: 'Tilt up', text: '↑', group: 'tilt' },
   { id: 'tilt-down', label: 'Tilt down', text: '↓', group: 'tilt' },
-  { id: 'north-up', label: 'Face north', text: 'N', group: 'north' },
 ];
 
 /**
@@ -74,6 +72,8 @@ export function installMapNavigationControls(container, viewer, { zoom } = {}) {
   group.setAttribute('aria-label', 'Map navigation');
   group.innerHTML = BUTTONS.map(button =>
     `<button id="${button.id}" class="map-nav-${button.group}" type="button" aria-label="${button.label}" title="${button.label}">${button.text}</button>`).join('');
+  const reset = document.querySelector('#reset-view');
+  if (reset) group.append(reset);
   container.append(group);
 
   const camera = viewer.camera;
@@ -111,14 +111,7 @@ export function installMapNavigationControls(container, viewer, { zoom } = {}) {
     // Tilting "up" raises the camera's eye towards straight down.
     'tilt-up': () => orbit(0, -TILT_STEP_DEG),
     'tilt-down': () => orbit(0, TILT_STEP_DEG),
-    // North-up keeps exactly where you are and how steeply you are looking; only the bearing
-    // changes. Turning on the spot, not orbiting — this is a compass reset, not Reset View.
-    'north-up': () => {
-      camera.cancelFlight();
-      camera.setView({ destination: camera.positionWC,
-        orientation: { heading: 0, pitch: CMath.toRadians(clampPitchDeg(CMath.toDegrees(camera.pitch))), roll: 0 } });
-      viewer.scene.requestRender();
-    },
+
   };
   for (const [id, action] of Object.entries(actions)) group.querySelector(`#${id}`).onclick = action;
 

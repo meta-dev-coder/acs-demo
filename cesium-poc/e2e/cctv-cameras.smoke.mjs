@@ -59,7 +59,8 @@ try {
  await page.screenshot({path:'/tmp/cctv-cameras-desktop.png'});
  await page.locator(`input[data-camera-id="${id}"]`).uncheck();
  assert.ok(await page.locator('#cameras-all').evaluate(e=>e.indeterminate));
- await page.locator('.camera-zoom').click();
+ assert.equal(await page.locator('.camera-zoom').count(),0);
+ await page.locator('#cameras-all').check();
  await page.waitForTimeout(1600);
  assert.equal(await page.evaluate(()=>[...cameras.cameraById.values()].filter(e=>e.show).length),74);
  await page.setViewportSize({width:390,height:844});

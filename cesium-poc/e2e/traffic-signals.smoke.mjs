@@ -53,7 +53,8 @@ try {
  await page.screenshot({path:'/tmp/traffic-signals-desktop.png'});
  await page.locator(`input[data-signal-id="${id}"]`).uncheck();
  assert.ok(await page.locator('#signals-all').evaluate(e=>e.indeterminate));
- await page.locator('.signal-zoom').click();
+ assert.equal(await page.locator('.signal-zoom').count(),0);
+ await page.locator('#signals-all').check();
  await page.waitForTimeout(1600);
  assert.equal(await page.evaluate(()=>[...signals.trafficSignalById.values()].filter(e=>e.show).length),22);
  await page.setViewportSize({width:390,height:844});
@@ -64,5 +65,5 @@ try {
  assert.ok(framed);
  await page.screenshot({path:'/tmp/traffic-signals-mobile.png'});
  assert.equal(requests,1);
- console.log('PASS: all 22 signals, original coordinates, default off, toggles, one fetch, actual picking, details, layer zoom and mobile focus');
+ console.log('PASS: all 22 signals, original coordinates, default off, toggles, one fetch, actual picking, details, removed layer zoom and mobile focus');
 }finally{await browser.close();}

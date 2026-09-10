@@ -172,5 +172,21 @@
     <p class="note">Phase 1 opens the Bentley model and needs a Bentley sign-in. Phases 2–3 run the bundled offline scenarios (baseline &amp; all-electronic); the <code>● LIVE</code> feed needs the local SUMO server and won't connect on the hosted site.</p>
     <footer>SuperDNA 3D Lab · NTTA operations twin</footer>
   </div>
+<script>
+  // The source launcher is served separately from the Cesium Vite server locally.
+  // Deployed launchers keep their relative twin/ links under the deployment base.
+  if (['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
+      && location.pathname === '/landing/index.html') {
+    for (const link of document.querySelectorAll('a[href]')) {
+      const href = link.getAttribute('href');
+      if (/^(\.\/)?twin\//.test(href)) {
+        const destination = new URL(href, location.href);
+        destination.port = '5188';
+        destination.pathname = '/';
+        link.href = destination.href;
+      }
+    }
+  }
+</script>
 </body>
 </html>

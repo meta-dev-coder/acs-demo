@@ -46,9 +46,9 @@ export function signalSecondaryDetails(p) {
 }
 export function installTrafficSignals(container, viewer) {
   const group = document.createElement('details'); group.className = 'signals-group';
-  group.innerHTML = '<summary><input type="checkbox" id="signals-all" aria-label="Traffic Signals" disabled><span>Traffic Signals</span><span class="badge">…</span></summary><button class="signal-zoom" disabled>Zoom to Layer</button><div class="signal-list"></div><p class="ramp-status" role="status">Loading traffic signals…</p><button class="signal-retry" hidden>Retry traffic signals</button>';
+  group.innerHTML = '<summary><input type="checkbox" id="signals-all" aria-label="Traffic Signals" disabled><span>Traffic Signals</span><span class="badge">…</span></summary><div class="signal-list"></div><p class="ramp-status" role="status">Loading traffic signals…</p><button class="signal-retry" hidden>Retry traffic signals</button>';
   container.append(group);
-  const parent = group.querySelector('input'), list = group.querySelector('.signal-list'), status = group.querySelector('[role="status"]'), zoom = group.querySelector('.signal-zoom'), retry = group.querySelector('.signal-retry');
+  const parent = group.querySelector('input'), list = group.querySelector('.signal-list'), status = group.querySelector('[role="status"]'), retry = group.querySelector('.signal-retry');
   const trafficSignalById = new Map(), records = new Map(), rows = new Map();
   const source = new CustomDataSource('I-595 Corridor Traffic Signals');
   let selected, hovered, disposed = false, loading;
@@ -116,11 +116,6 @@ export function installTrafficSignals(container, viewer) {
   }
   parent.onclick = event => event.stopPropagation();
   parent.onchange = () => { for (const entity of trafficSignalById.values()) entity.show = parent.checked; sync(); };
-  zoom.onclick = () => {
-    for (const entity of trafficSignalById.values()) entity.show = true;
-    sync(); select(null);
-    focusMapPoints(viewer, [...trafficSignalById.values()].map(e => e.position.getValue(viewer.clock.currentTime)));
-  };
   const handler = viewer.screenSpaceEventHandler;
   const oldMove = handler.getInputAction(ScreenSpaceEventType.MOUSE_MOVE), oldClick = handler.getInputAction(ScreenSpaceEventType.LEFT_CLICK);
   const pick = position => { const entity = viewer.scene.pick(position)?.id; return records.has(entity) && entity.show ? entity : null; };
@@ -167,7 +162,7 @@ export function installTrafficSignals(container, viewer) {
       await viewer.dataSources.add(source);
       if (disposed) { viewer.dataSources.remove(source, true); return; }
       group.querySelector('.badge').textContent = String(trafficSignalById.size);
-      parent.disabled = false; zoom.disabled = false; sync(); applyLevelOfDetail();
+      parent.disabled = false; sync(); applyLevelOfDetail();
     })().catch(error => { loading = null; if (!disposed) { status.textContent = 'Traffic signals could not load.'; retry.hidden = false; console.error(error); } });
     return loading;
   }

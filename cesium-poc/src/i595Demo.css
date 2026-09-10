@@ -187,3 +187,14 @@ body:has(.map-nav) :is(.ramp-details, .road-details, .segment-details, .express-
   body:has(.twin-hud) .map-nav { top: 128px; }
   body:has(.map-nav) :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) { right: 10px; }
 }
+
+/* Unified navigation dock: clear of the map and Cesium's attribution. */
+body .map-nav, body:has(.twin-hud) .map-nav { top: auto; bottom: 48px; right: 16px; display: flex; align-items: center; gap: 4px; width: auto; padding: 8px; }
+body .map-nav button { width: 38px; height: 38px; margin: 0; border: 0; border-radius: 8px; }
+body .map-nav #reset-view { position: static; width: auto; height: 38px; padding: 0 12px; margin-left: 6px; border: 0; border-left: 1px solid #ffffff24; border-radius: 0 8px 8px 0; background: transparent; font-size: 13px; white-space: nowrap; }
+@media(max-width:720px) {
+  body .map-nav, body:has(.twin-hud) .map-nav { left: 10px; right: 10px; bottom: 42px; justify-content: space-between; gap: 1px; padding: 6px; }
+  body .map-nav button { width: 32px; min-width: 28px; }
+  body .map-nav #reset-view { padding: 0 8px; margin-left: 2px; }
+  body:has(:is(.ramp-details,.road-details,.segment-details,.express-details,.bridge-details,.signal-details,.camera-details,.live-event-details):not([hidden])) .map-nav { bottom: calc(40dvh + 52px); }
+}

@@ -38,7 +38,7 @@ export function installI595Hud(container, { cameras, signals, liveEvents } = {},
   let disposed = false;
 
   function refresh() {
-    if (disposed) return;
+    if (disposed || cells.size === 0) return;
     cells.get('cameras').textContent = formatCount(cameras?.size);
     cells.get('signals').textContent = formatCount(signals?.size);
     const events = liveEvents?.events;

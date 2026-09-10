@@ -1,3 +1,4 @@
+import { installI595Weather } from './i595Weather.js';
 import { installCctvCameras } from './cctvCameras.js';
 import { installTrafficSignals } from './trafficSignals.js';
 import { installLiveEvents } from './liveEvents.js';
@@ -43,6 +44,9 @@ document.body.innerHTML = `
     </div>
   </aside>
   <button id="reset-view">⌖ <span>Reset view</span></button>`;
+
+const weather = installI595Weather();
+if (import.meta.hot) import.meta.hot.dispose(() => weather.destroy());
 
 const panel = document.querySelector(".layers");
 const toggle = document.querySelector("#menu-toggle");
@@ -90,7 +94,7 @@ try {
     const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewer.canvas.clientHeight : 1);
     zoom(Math.exp(Math.max(-0.4, Math.min(0.4, pixels * 0.002))));
   }, { passive: false });
-  // Zoom, orbit, tilt and north-up. Reset view stays a separate action on its own button.
+  // One bottom toolbar for zoom, orbit, tilt and Reset View.
   const navigation = installMapNavigationControls(document.body, viewer, { zoom });
   navigation.setEnabled(true);
   const lons = corridor.map(p => p.lon), lats = corridor.map(p => p.lat);
@@ -104,6 +108,12 @@ try {
   // The opening frame is the corridor overview; the startup sequence flies from here down to the
   // oblique hero view once the 3D world is up. `?intro=off` skips the choreography entirely.
   const hero = heroView(corridor);
+  // Derive the opening destination using exactly three presses of the existing Zoom In.
+  viewer.camera.setView({ destination: Cartesian3.fromDegrees(hero.lon, hero.lat, hero.height), orientation: orientationOf(hero) });
+  for (let step = 0; step < 3; step++) zoom(0.75);
+  const closer = viewer.camera.positionCartographic;
+  Object.assign(hero, { lon: CMath.toDegrees(closer.longitude), lat: CMath.toDegrees(closer.latitude), height: closer.height,
+    headingDeg: CMath.toDegrees(viewer.camera.heading), pitchDeg: CMath.toDegrees(viewer.camera.pitch) });
   const showIntro = new URLSearchParams(location.search).get("intro") !== "off";
   viewer.camera.setView(showIntro
     ? { destination: Cartesian3.fromDegrees(overview.lon, overview.lat, overview.height), orientation: orientationOf(overview) }

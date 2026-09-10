@@ -26,9 +26,9 @@ export function cameraDetails(p) {
 }
 export function installCctvCameras(container, viewer) {
   const group = document.createElement('details'); group.className = 'cameras-group';
-  group.innerHTML = '<summary><input type="checkbox" id="cameras-all" aria-label="CCTV Cameras" disabled><span>CCTV Cameras</span><span class="badge">…</span></summary><button class="camera-zoom" disabled>Zoom to CCTV Cameras</button><div class="camera-list"></div><p class="ramp-status" role="status">Loading cameras…</p><button class="camera-retry" hidden>Retry cameras</button>';
+  group.innerHTML = '<summary><input type="checkbox" id="cameras-all" aria-label="CCTV Cameras" disabled><span>CCTV Cameras</span><span class="badge">…</span></summary><div class="camera-list"></div><p class="ramp-status" role="status">Loading cameras…</p><button class="camera-retry" hidden>Retry cameras</button>';
   container.append(group);
-  const parent = group.querySelector('input'), list = group.querySelector('.camera-list'), status = group.querySelector('[role="status"]'), zoom = group.querySelector('.camera-zoom'), retry = group.querySelector('.camera-retry');
+  const parent = group.querySelector('input'), list = group.querySelector('.camera-list'), status = group.querySelector('[role="status"]'), retry = group.querySelector('.camera-retry');
   const cameraById = new Map(), records = new Map(), rows = new Map();
   const source = new CustomDataSource('I-595 Corridor CCTV Cameras');
   let selected, hovered, disposed = false, loading;
@@ -74,11 +74,6 @@ export function installCctvCameras(container, viewer) {
   }
   parent.onclick = event => event.stopPropagation();
   parent.onchange = () => { for (const entity of cameraById.values()) entity.show = parent.checked; sync(); };
-  zoom.onclick = () => {
-    for (const entity of cameraById.values()) entity.show = true;
-    sync(); select(null);
-    focusMapPoints(viewer, [...cameraById.values()].map(e => e.position.getValue(viewer.clock.currentTime)), '.camera-details');
-  };
   const handler = viewer.screenSpaceEventHandler;
   const oldMove = handler.getInputAction(ScreenSpaceEventType.MOUSE_MOVE), oldClick = handler.getInputAction(ScreenSpaceEventType.LEFT_CLICK);
   const pick = position => { const entity = viewer.scene.pick(position)?.id; return records.has(entity) && entity.show ? entity : null; };
@@ -102,12 +97,11 @@ export function installCctvCameras(container, viewer) {
         const p = { ...f.properties, latitude: f.geometry.coordinates[1], longitude: f.geometry.coordinates[0] };
         const entity = source.entities.add({ id: String(p.camera_id), name: `Camera ${p.camera_id}`, show: false,
           position: Cartesian3.fromDegrees(...f.geometry.coordinates), properties: p,
-          // Deliberately subordinate to the corridor: a small marker up close, shrinking away with
-          // distance and gone entirely at corridor scale, so cameras never dominate the freeway.
-          billboard: { image: p.video_enabled === true ? icons.available : icons.unavailable, width: 24, height: 28, scale: 1, verticalOrigin: VerticalOrigin.BOTTOM,
+          // Keep cameras readable at overview distances without overpowering nearby roads.
+          billboard: { image: p.video_enabled === true ? icons.available : icons.unavailable, width: 34, height: 40, scale: 1, verticalOrigin: VerticalOrigin.BOTTOM,
             heightReference: HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: Number.POSITIVE_INFINITY,
             distanceDisplayCondition: new DistanceDisplayCondition(0, 18000),
-            scaleByDistance: new NearFarScalar(400, 1, 12000, 0.25) } });
+            scaleByDistance: new NearFarScalar(400, 1, 12000, 0.7) } });
         cameraById.set(String(p.camera_id), entity); records.set(entity, p);
         const row = document.createElement('div'); row.className = 'segment-row';
         const input = document.createElement('input'); input.type = 'checkbox'; input.dataset.cameraId = String(p.camera_id);
@@ -121,7 +115,7 @@ export function installCctvCameras(container, viewer) {
       await viewer.dataSources.add(source);
       if (disposed) { viewer.dataSources.remove(source, true); return; }
       group.querySelector('.badge').textContent = String(cameraById.size);
-      parent.disabled = false; zoom.disabled = false; sync();
+      parent.disabled = false; sync();
     })().catch(error => { loading = null; if (!disposed) { status.textContent = 'Cameras could not load.'; retry.hidden = false; console.error(error); } });
     return loading;
   }
