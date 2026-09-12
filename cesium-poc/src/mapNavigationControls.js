@@ -36,6 +36,9 @@ const BUTTONS = [
   { id: 'tilt-down', label: 'Tilt down', text: '↓', group: 'tilt' },
   // The needle turns with the camera, so the button doubles as a heading readout.
   { id: 'north-up', label: 'Face north', text: '<span class="map-nav-needle" aria-hidden="true">▲</span><span class="map-nav-cardinal">N</span>', group: 'north' },
+  // A generic street-level figure: a viewer at eye level, not Google's Pegman.
+  { id: 'street-view', label: 'Street View', group: 'street-view',
+    text: '<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="4.4" r="2.4"/><path d="M6.6 17v-4.2a3.4 3.4 0 0 1 3.4-3.4 3.4 3.4 0 0 1 3.4 3.4V17"/><path d="M8.4 17v-3M11.6 17v-3"/></svg>' },
 ];
 
 /**
@@ -69,7 +72,7 @@ export function cameraPivot(viewer) {
  * @param {import('cesium').Viewer} viewer
  * @param {{zoom?: (factor: number) => void}} [hooks]  reuses the map's own proportional zoom
  */
-export function installMapNavigationControls(container, viewer, { zoom } = {}) {
+export function installMapNavigationControls(container, viewer, { zoom, onStreetView } = {}) {
   const group = document.createElement('div');
   group.className = 'map-nav';
   group.setAttribute('role', 'group');
@@ -115,6 +118,7 @@ export function installMapNavigationControls(container, viewer, { zoom } = {}) {
     // Tilting "up" raises the camera's eye towards straight down.
     'tilt-up': () => orbit(0, -TILT_STEP_DEG),
     'tilt-down': () => orbit(0, TILT_STEP_DEG),
+    'street-view': () => onStreetView?.(),
     // A compass reset, not Reset View: keep exactly where you are and how steeply you are looking,
     // and turn to north smoothly rather than snapping.
     'north-up': () => {
@@ -151,6 +155,12 @@ export function installMapNavigationControls(container, viewer, { zoom } = {}) {
     element: group,
     /** Current compass bearing in degrees, for tests and for anything that mirrors the heading. */
     get headingDeg() { return shownHeading; },
+    /** Reflect placement mode on the toolbar, so the tool reads as on. */
+    setStreetViewActive(on) {
+      const button = group.querySelector('#street-view');
+      button?.setAttribute('aria-pressed', String(!!on));
+      button?.setAttribute('title', on ? 'Cancel Street View placement' : 'Street View');
+    },
     /** Exposed so the zoom buttons can be enabled once the viewer is ready. */
     setEnabled(enabled) { for (const button of group.querySelectorAll('button')) button.disabled = !enabled; },
     destroy() { removeChanged(); removeMoveEnd(); group.remove(); },

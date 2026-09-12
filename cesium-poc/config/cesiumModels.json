@@ -1,0 +1,63 @@
+[
+  {
+    "id": "i595-gantry-1-toll-plaza",
+    "name": "Gantry 1 — Toll Plaza",
+    "type": "GLB_MODEL",
+    "layer": "gantries",
+    "modelUrl": "/models/i595/gantry-1-toll-plaza.glb",
+    "latitude": 26.1153108,
+    "longitude": -80.3168131,
+    "heightOffset": 0,
+    "heading": 11.3,
+    "viewHeading": 101.3,
+    "pitch": 0,
+    "roll": 0,
+    "scale": 1,
+    "enabled": true
+  },
+  {
+    "id": "i595-gantry-2-toll-lane",
+    "name": "Gantry 2 — Toll Lane",
+    "type": "GLB_MODEL",
+    "layer": "gantries",
+    "modelUrl": "/models/i595/gantry-2-toll-lane.glb",
+    "latitude": 26.118961,
+    "longitude": -80.338444,
+    "heightOffset": 0,
+    "heading": 2.1,
+    "pitch": 0,
+    "roll": 0,
+    "scale": 1,
+    "enabled": true
+  },
+  {
+    "id": "i595-gantry-3-toll-lane",
+    "name": "Gantry 3 — Toll Lane",
+    "type": "GLB_MODEL",
+    "layer": "gantries",
+    "modelUrl": "/models/i595/gantry-3-toll-lane.glb",
+    "latitude": 26.118724,
+    "longitude": -80.334469,
+    "heightOffset": 0,
+    "heading": 6.8,
+    "pitch": 0,
+    "roll": 0,
+    "scale": 1,
+    "enabled": true
+  },
+  {
+    "id": "i595-lane-barrier-arm-1",
+    "name": "Lane Barrier Arm 1",
+    "type": "GLB_MODEL",
+    "layer": "lane-barriers",
+    "modelUrl": "/models/i595/lane-barrier-arm-1.glb",
+    "latitude": 26.118864,
+    "longitude": -80.337945,
+    "heightOffset": 0,
+    "heading": 273.5,
+    "pitch": 0,
+    "roll": 0,
+    "scale": 1,
+    "enabled": true
+  }
+]

@@ -44,8 +44,14 @@ try {
   assert.equal(await page.locator('#base-environment-controls .base-environment').count(), 1);
   assert.equal(await page.locator('details:has(> summary:text-is("DataLayer")) .base-environment').count(), 0,
     'Base Environment must not sit inside the DataLayer tree');
-  assert.deepEqual(await page.locator('#layer-content > details > summary').allTextContents(),
-    ['Traffic', 'Infrastructure'], 'the explorer groups layers by transportation category');
+  // The primary interface is categories and quick layers; "DataLayer" is gone from it entirely.
+  // Summaries carry a count of what is on, so compare the category names themselves.
+  assert.deepEqual(await page.locator('#layer-content > .layer-categories > details > summary')
+    .evaluateAll(nodes => nodes.map(node => node.firstChild.textContent.trim())),
+    ['Traffic', 'Roads', 'Infrastructure'], 'the explorer leads with transportation categories');
+  assert.equal(await page.locator('#layer-content > .all-layers > summary').textContent(), 'All layers');
+  assert.equal((await page.locator('#layer-content').innerText()).includes('DataLayer'), false,
+    'DataLayer must not appear in the user-facing interface');
   await page.waitForFunction(() => window.baseEnv.isLoaded(), null, { timeout: 30000 });
   assert.ok(await page.locator('input[value="GOOGLE_PHOTOREALISTIC_3D"]').isChecked(),
     'the default world is reflected in the radio group, not just in the scene');

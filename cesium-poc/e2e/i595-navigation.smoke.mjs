@@ -24,7 +24,7 @@ try {
     const response = await route.fetch();
     await route.fulfill({ response, body: (await response.text())
       .replace('viewer.animation.container', 'window.v = viewer; viewer.animation.container')
-      .replace('import.meta.hot.dispose(() => {', 'window.signals = signalControls; import.meta.hot.dispose(() => {') });
+      .replace('import.meta.hot.dispose(() => {', 'window.signals = signalControls; window.baseEnv = baseEnvironment; import.meta.hot.dispose(() => {') });
   });
   await page.goto('http://127.0.0.1:5188/?demo=i595');
   await page.locator('body[data-startup="ready"]').waitFor({ timeout: 90000 });
@@ -101,6 +101,11 @@ try {
   assert.ok(tiltedDown.pitch > beforeTilt.pitch, 'tilt down must raise the pitch towards the horizon');
   await press('tilt-up');
   assert.ok((await cam()).pitch < tiltedDown.pitch, 'tilt up must lower the pitch towards the ground');
+  // Tilting repeatedly towards the horizon over photorealistic tiles asks Google for a huge slice
+  // of the state and can take the headless GPU process down with it. The clamp is a property of the
+  // control, not of the basemap, so exercise it over the satellite globe.
+  await page.evaluate(() => window.baseEnv.disable());
+  await page.waitForTimeout(600);
   for (let i = 0; i < 20; i++) await press('tilt-down');
   const shallowest = await cam();
   assert.ok(shallowest.pitch <= MAX_PITCH_DEG + 1.5 && shallowest.pitch >= MAX_PITCH_DEG - 1.5,
@@ -110,6 +115,8 @@ try {
   assert.ok(steepest.pitch >= MIN_PITCH_DEG - 1.5 && steepest.pitch <= MIN_PITCH_DEG + 1.5,
     `tilt must clamp at ${MIN_PITCH_DEG}°, reached ${steepest.pitch.toFixed(1)}°`);
   assert.ok(steepest.pitch < 0, 'the camera can never end up upside down');
+  await page.evaluate(() => window.baseEnv.enable());
+  await page.waitForTimeout(800);
 
   // ---- H. north-up turns the view without moving it, and is not Reset View ----------------------
   await toHero();

@@ -5,10 +5,7 @@ button, a, summary, label { -webkit-tap-highlight-color: transparent; }
 button { font: inherit; color: inherit; cursor: pointer; }
 small { font-size: 9px; letter-spacing: .18em; color: #65dfd4; }
 h1 { margin: 4px 0 0; font-size: 20px; letter-spacing: -.03em; }
-.layers { position: absolute; top: 16px; left: 16px; width: 380px; max-height: calc(100dvh - 74px); overflow-y: auto; border: 1px solid #ffffff24; border-radius: 16px; background: #0d1829f2; box-shadow: 0 16px 48px #0005; backdrop-filter: blur(16px); }
-#menu-toggle { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 18px; border: 0; background: transparent; font-weight: 600; }
-#toggle-icon { font-size: 24px; color: #65dfd4; }
-#menu-toggle { position: sticky; top: 0; z-index: 2; background: #0d1829; }
+.layers { position: absolute; top: 16px; left: 16px; width: auto; max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); }
 .mainline-parent { margin: 4px 0 4px 20px; }
 .mainline-parent > summary { display: grid; grid-template-columns: 10px 17px 18px minmax(0, 1fr) auto; align-items: center; gap: 7px; font-size: 12px; padding: 12px 6px; list-style: none; }
 .mainline-parent > summary::-webkit-details-marker { display: none; }
@@ -35,12 +32,11 @@ label:has(input:checked) { background: #ffffff09; border-color: var(--road); }
 input { width: 17px; height: 17px; margin: 0; accent-color: var(--road); cursor: pointer; }
 .swatch { width: 18px; height: 3px; background: var(--road); border-radius: 3px; }
 #layer-status { font-size: 12px; line-height: 1.6; color: #92a8c3; margin: 18px 4px 0; border-top: 1px solid #ffffff14; padding-top: 14px; }
-.collapsed { width: 68px; }
-.collapsed .menu-title { display: none; }
+
 #reset-view { position: absolute; right: 16px; bottom: 48px; padding: 12px 16px; background: #0d1829ed; border: 1px solid #ffffff30; border-radius: 10px; }
 :focus-visible { outline: 2px solid #65dfd4; outline-offset: 3px; }
-@media (max-width: 600px) { .layers:not(.collapsed) { width: min(280px, calc(100vw - 80px)); } }
-@media (max-width: 600px) { .layers { left: 10px; top: 10px; width: min(280px, calc(100vw - 20px)); } .layers.collapsed { width: 68px; } h1 { font-size: 18px; } }
+
+@media (max-width: 600px) { .layers { left: 10px; top: 10px; max-width: calc(100vw - 20px); max-height: calc(100dvh - 20px); } .layers h1 { font-size: 18px; } }
 .ramp-group { margin-top: 10px; border-top: 1px solid #ffffff18; padding-top: 8px; }
 .ramp-group summary { line-height: 1.8; }
 .ramp-group summary input { vertical-align: middle; accent-color: #65dfd4; }
@@ -55,18 +51,18 @@ input { width: 17px; height: 17px; margin: 0; accent-color: var(--road); cursor:
 #ramp-interchange { width: 100%; padding: 10px 8px; color: #eaf3ff; background: #17263b; border: 1px solid #ffffff30; border-radius: 8px; font: inherit; font-size: 12px; }
 .ramp-status { color: #92a8c3; font-size: 11px; line-height: 1.6; margin: 10px 2px; }
 .ramp-retry { background: #17263b; padding: 8px; border: 1px solid #65dfd4; border-radius: 6px; }
-:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) { position: absolute; right: 16px; top: 220px; width: 310px; max-height: calc(100dvh - 290px); overflow-y: auto; padding: 18px; border: 1px solid #ffffff24; border-radius: 16px; background: #0d1829f5; box-shadow: 0 16px 48px #0005; }
+:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details) { position: absolute; right: 16px; top: 220px; width: 310px; max-height: calc(100dvh - 290px); overflow-y: auto; padding: 18px; border: 1px solid #ffffff24; border-radius: 16px; background: #0d1829f5; box-shadow: 0 16px 48px #0005; }
 .ramp-details-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) h2 { font-size: 17px; margin: 0; }
-:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) button { border: 0; background: #ffffff0a; border-radius: 8px; width: 36px; height: 36px; font-size: 24px; }
-:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) dl { display: grid; grid-template-columns: 90px 1fr; gap: 12px; font-size: 12px; line-height: 1.5; }
-:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) dt { color: #92a8c3; }
-:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) dd { margin: 0; overflow-wrap: anywhere; }
+:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details) h2 { font-size: 17px; margin: 0; }
+:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details) button { border: 0; background: #ffffff0a; border-radius: 8px; width: 36px; height: 36px; font-size: 24px; }
+:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details) dl { display: grid; grid-template-columns: 90px 1fr; gap: 12px; font-size: 12px; line-height: 1.5; }
+:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details) dt { color: #92a8c3; }
+:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details) dd { margin: 0; overflow-wrap: anywhere; }
 .ramp-tooltip { position: fixed; pointer-events: none; z-index: 10; max-width: min(290px, calc(100vw - 16px)); padding: 10px 13px; border: 1px solid #ffffff35; border-radius: 8px; background: #0b1423f5; color: #eaf3ff; font-size: 12px; line-height: 1.7; white-space: pre-line; box-shadow: 0 6px 20px #0005; }
 @media (max-width: 700px) {
-  :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) { top: auto; bottom: 42px; left: 10px; right: 10px; width: auto; max-height: 40dvh; }
-  body:has(:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details):not([hidden])) .layers { max-height: calc(60dvh - 155px); }
-  body:has(:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details):not([hidden])) #reset-view { bottom: calc(40dvh + 52px); }
+  :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details) { top: auto; bottom: 42px; left: 10px; right: 10px; width: auto; max-height: 40dvh; }
+  body:has(:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details):not([hidden])) .layers #layer-content { max-height: calc(60dvh - 155px); }
+  body:has(:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details):not([hidden])) #reset-view { bottom: calc(40dvh + 52px); }
 }
 
 .structures-group { margin-top: 10px; border-top: 1px solid #ffffff18; padding-top: 8px; }
@@ -110,6 +106,7 @@ input { width: 17px; height: 17px; margin: 0; accent-color: var(--road); cursor:
 
 
 .camera-details .camera-stream-action { width: auto; height: auto; padding: 10px 14px; font-size: 13px; }
+.camera-details .camera-street-view { width: 100%; height: auto; }
 .camera-stream-action:disabled { opacity: .5; cursor: not-allowed; }
 
 /* Live Events (FL511) — same group shell as the CCTV/signal layers, with per-feed children. */
@@ -155,10 +152,10 @@ input { width: 17px; height: 17px; margin: 0; accent-color: var(--road); cursor:
 .twin-hud dd[data-quiet="true"] { color: #92a8c3; font-weight: 500; }
 /* The card takes the top-right corner, so the camera controls group with Reset view instead and
    the details panels step below the card. */
-body:has(.twin-hud) :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) { top: 196px; max-height: calc(100dvh - 266px); }
+body:has(.twin-hud) :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details) { top: 196px; max-height: calc(100dvh - 266px); }
 @media (max-width: 720px) {
   .twin-hud { top: 10px; right: 62px; width: 186px; padding: 10px 12px; }
-  body:has(.twin-hud) :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) { top: auto; max-height: 40dvh; }
+  body:has(.twin-hud) :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details) { top: auto; max-height: 40dvh; }
 }
 
 /* Secondary details, for fields that are rarely the reason you opened the panel. */
@@ -181,11 +178,11 @@ body:has(.twin-hud) .map-nav { top: 172px; }
 .map-nav .map-nav-north { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; margin-top: 4px; border-top: 1px solid #ffffff20; border-radius: 0 0 8px 8px; }
 .map-nav .map-nav-rotate { margin-top: 4px; border-top: 1px solid #ffffff20; border-radius: 0; }
 /* With the stack on the right edge, details panels sit clear of it rather than under it. */
-body:has(.map-nav) :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) { right: 106px; }
+body:has(.map-nav) :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details) { right: 106px; }
 @media (max-width: 720px) {
   .map-nav { top: 10px; right: 10px; }
   body:has(.twin-hud) .map-nav { top: 128px; }
-  body:has(.map-nav) :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details) { right: 10px; }
+  body:has(.map-nav) :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details) { right: 10px; }
 }
 
 /* Unified navigation dock: clear of the map and Cesium's attribution. */
@@ -228,3 +225,132 @@ body:has(.layers:not(.collapsed)) .corridor-status { left: 420px; }
 /* A standalone layer option that is not one of the corridor's routes. */
 .layers .layer-option { display: flex; align-items: center; gap: 9px; margin: 8px 0 4px; padding: 0 2px; font-size: 12px; color: #cfdcea; }
 .layers .layer-option input { margin: 0; }
+
+/* ── Map Explorer: an operations panel, not a layer tree ─────────────────────────────────────── */
+.layers { display: flex; align-items: flex-start; gap: 8px; min-height: 0; }
+.layers.collapsed { gap: 0; }
+
+/* Level 1 — the quick tool rail, on screen whether or not the panel is open. */
+.quick-rail { position: sticky; top: 0; flex: none; display: flex; flex-direction: column; gap: 2px; width: 52px; padding: 6px; border: 1px solid #ffffff1f; border-radius: 14px; background: #0b1729d9; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 12px 32px #0006; }
+.quick-rail-divider { height: 1px; margin: 4px 6px; background: #ffffff1a; }
+.quick-rail-button { position: relative; display: grid; place-items: center; width: 40px; height: 38px; border: 0; border-radius: 9px; background: transparent; color: #8fa3bd; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.quick-rail-button svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.quick-rail-button:hover:not(:disabled) { background: #ffffff12; color: #d6e4f2; }
+.quick-rail-button:focus-visible { outline: 2px solid #67f4e2; outline-offset: -2px; }
+.quick-rail-button[aria-pressed="true"] { background: #67f4e21f; color: #67f4e2; }
+.quick-rail-button[data-state="partial"] { color: #cfe4f5; background: #ffffff12; }
+.quick-rail-button:disabled { opacity: .35; cursor: default; }
+.quick-rail-explorer { color: #cfdcea; }
+/* Tooltips: quick, but not instant. */
+.quick-rail-tip { position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%); padding: 4px 9px; border: 1px solid #ffffff1f; border-radius: 7px; background: #0b1729f2; color: #e8eef6; font-size: 11.5px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .12s ease .35s; z-index: 5; }
+.quick-rail-button:hover .quick-rail-tip, .quick-rail-button:focus-visible .quick-rail-tip { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .quick-rail-tip { transition: none; } }
+
+/* The panel itself. */
+.layers #layer-content { width: 336px; max-height: calc(100dvh - 44px); overflow-y: auto; overscroll-behavior: contain; padding: 14px 14px 16px; border: 1px solid #ffffff1f; border-radius: 14px; background: #0b1729e0; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 16px 40px #0007; }
+.explorer-header h2 { margin: 0 0 12px; font-size: 13px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; color: #e8eef6; }
+.explorer-eyebrow { margin: 0 0 7px; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #7f93ac; }
+
+/* Level 2 — presets and quick layers, both near the top. */
+.view-presets { margin-bottom: 14px; }
+.view-preset-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.view-preset-buttons button { padding: 5px 10px; border: 1px solid #ffffff1f; border-radius: 999px; background: transparent; color: #a8bed6; font-size: 11.5px; cursor: pointer; transition: background .15s ease, color .15s ease, border-color .15s ease; }
+.view-preset-buttons button:hover { background: #ffffff10; color: #dceaf7; }
+.view-preset-buttons button[aria-pressed="true"] { border-color: #67f4e26b; background: #67f4e21f; color: #67f4e2; }
+.view-preset-buttons button:focus-visible { outline: 2px solid #67f4e2; outline-offset: 1px; }
+.view-preset-custom { font-size: 11px; color: #7f93ac; }
+
+.quick-layers { margin-bottom: 14px; }
+.quick-layer, .layer-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 8px; border: 0; border-radius: 9px; background: transparent; color: #cfdcea; font-size: 12.5px; text-align: left; cursor: pointer; transition: background .15s ease; }
+.quick-layer:hover:not(:disabled), .layer-row:hover:not(:disabled) { background: #ffffff0f; }
+.quick-layer:focus-visible, .layer-row:focus-visible { outline: 2px solid #67f4e2; outline-offset: -2px; }
+.quick-layer:disabled, .layer-row:disabled { opacity: .4; cursor: default; }
+.quick-layer-icon { display: grid; place-items: center; width: 20px; color: #7f93ac; }
+.quick-layer-icon svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.quick-layer[aria-pressed="true"] .quick-layer-icon { color: #67f4e2; }
+.quick-layer-label, .layer-row-label { flex: 1; }
+.quick-layer[aria-pressed="true"] .quick-layer-label, .layer-row[aria-pressed="true"] .layer-row-label { color: #eaf3fb; }
+.quick-layer-count, .layer-row-count { font-size: 11px; color: #7f93ac; font-variant-numeric: tabular-nums; }
+/* State is a shape, never colour alone. */
+.quick-layer-state { flex: none; width: 26px; height: 15px; border: 1px solid #ffffff2e; border-radius: 999px; background: #ffffff0d; position: relative; transition: background .15s ease, border-color .15s ease; }
+.quick-layer-state::after { content: ""; position: absolute; top: 2px; left: 2px; width: 9px; height: 9px; border-radius: 50%; background: #8fa3bd; transition: transform .15s ease, background .15s ease; }
+[aria-pressed="true"] .quick-layer-state { border-color: #67f4e26b; background: #67f4e229; }
+[aria-pressed="true"] .quick-layer-state::after { transform: translateX(11px); background: #67f4e2; }
+[data-state="partial"] .quick-layer-state::after { transform: translateX(5.5px); background: #cfe4f5; }
+
+/* Level 3 — one click to a category's own controls. */
+.layer-categories { display: grid; gap: 2px; margin-bottom: 12px; border-top: 1px solid #ffffff14; padding-top: 12px; }
+.layer-category > summary { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 9px; font-size: 12.5px; color: #cfdcea; cursor: pointer; list-style: none; }
+.layer-category > summary::-webkit-details-marker { display: none; }
+.layer-category > summary::before { content: "›"; display: inline-block; width: 10px; color: #7f93ac; transition: transform .15s ease; }
+.layer-category[open] > summary::before { transform: rotate(90deg); }
+.layer-category > summary:hover { background: #ffffff0f; }
+.layer-category-count { margin-left: auto; font-size: 11px; color: #67f4e2; font-variant-numeric: tabular-nums; }
+.layer-category-items { padding: 2px 0 6px 18px; }
+.layer-row-swatch { flex: none; width: 10px; height: 3px; border-radius: 2px; background: var(--road, #55637a); }
+.layer-row[aria-pressed="false"] .layer-row-swatch { opacity: .35; }
+
+/* Level 4 — the complete hierarchy, unchanged, one disclosure away. */
+.all-layers { border-top: 1px solid #ffffff14; padding-top: 10px; }
+.all-layers > summary { padding: 7px 8px; border-radius: 9px; font-size: 12.5px; color: #a8bed6; cursor: pointer; list-style: none; }
+.all-layers > summary::-webkit-details-marker { display: none; }
+.all-layers > summary::before { content: "›"; display: inline-block; width: 10px; color: #7f93ac; transition: transform .15s ease; }
+.all-layers[open] > summary::before { transform: rotate(90deg); }
+.all-layers > summary:hover { background: #ffffff0f; }
+.all-layers-body { padding-top: 6px; }
+
+@media (max-width: 1400px) { .layers #layer-content { width: 320px; } }
+@media (max-width: 900px) {
+  /* The rail stays a narrow vertical column at every width: a horizontal bar would span most of a
+     small viewport and take the map with it. */
+  .layers { flex-direction: column; }
+  .layers #layer-content { width: min(336px, calc(100vw - 88px)); }
+}
+
+/* ── Street View: a scene mode of the twin, wearing the same clothes ─────────────────────────── */
+.street-view { position: absolute; inset: 0; display: flex; flex-direction: column; pointer-events: none; z-index: 6; }
+/* Setting `display` would otherwise defeat the `hidden` attribute, leaving an invisible overlay
+   swallowing every click on the map behind it. */
+.street-view[hidden] { display: none; }
+/* The panorama is the Cesium scene itself, so only the furniture takes pointer events. */
+.street-view > * { pointer-events: auto; }
+.street-view-bar { display: flex; align-items: center; gap: 16px; margin: 16px; margin-bottom: auto; padding: 10px 12px 10px 16px; border: 1px solid #ffffff1f; border-radius: 14px; background: #0b1729d9; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 12px 32px #0006; color: #e8eef6; }
+.street-view-identity { min-width: 0; }
+.street-view-title { margin: 0; font-size: 12px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; }
+.street-view-context { margin: 2px 0 0; font-size: 11.5px; color: #92a8c3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Historical photography, never a live feed — stated plainly, next to the imagery it describes. */
+.street-view-imagery { margin: 0 0 0 auto; padding: 4px 9px; border: 1px solid #ffffff17; border-radius: 999px; font-size: 10.5px; color: #92a8c3; white-space: nowrap; }
+.street-view-return { flex: none; padding: 8px 14px; border: 1px solid #67f4e26b; border-radius: 9px; background: #67f4e21f; color: #67f4e2; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: background .15s ease; }
+.street-view-return:hover { background: #67f4e233; }
+.street-view-return:focus-visible { outline: 2px solid #67f4e2; outline-offset: 2px; }
+.street-view-status { margin: 0 auto 24px; padding: 8px 14px; border: 1px solid #ffffff1f; border-radius: 999px; background: #0b1729e0; backdrop-filter: blur(14px); color: #cfdcea; font-size: 12px; }
+/* While a panorama is up, the twin's own panels would only get in its way. */
+/* The overlay is appended last, so a sibling combinator would never reach these. */
+body:has(.street-view[data-state="active"]) :is(.layers, .corridor-status, .twin-hud, .map-nav, .weather-launch),
+body:has(.street-view[data-state="active"]) :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details, .ramp-tooltip) { display: none; }
+.camera-street-view { display: block; width: 100%; margin-top: 8px; white-space: nowrap; padding: 8px 12px; border: 1px solid #ffffff24; border-radius: 9px; background: #ffffff0d; color: #cfdcea; font-size: 12.5px; cursor: pointer; transition: background .15s ease; }
+.camera-street-view:hover { background: #ffffff17; color: #eaf3fb; }
+@media (max-width: 900px) {
+  .street-view-bar { flex-wrap: wrap; gap: 10px; margin: 10px; }
+  .street-view-imagery { margin-left: 0; order: 3; }
+}
+
+/* Street View placement: a tool state, announced once and unobtrusively. */
+.street-view-placement { position: absolute; left: 50%; bottom: 110px; transform: translateX(-50%); margin: 0; padding: 9px 16px; border: 1px solid #67f4e23d; border-radius: 999px; background: #0b1729e6; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 12px 32px #0006; color: #cfdcea; font-size: 12.5px; white-space: nowrap; z-index: 5; }
+.street-view-placement[data-state="unavailable"] { border-color: #ee914859; color: #f0c9a6; }
+.street-view-placement[hidden] { display: none; }
+/* The toolbar tool reads as on while a drop is awaited. */
+.map-nav #street-view[aria-pressed="true"] { background: #67f4e229; color: #67f4e2; }
+.map-nav #street-view svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+/* The rail's camera tool carries the same icon weight as the rest of the set. */
+.quick-rail .quick-rail-button svg circle { fill: none; }
+
+/* Toll gantries and lane barriers — the GLB model layers, styled as the other asset groups are. */
+.model-group { margin: 12px 0 0 20px; border-left: 1px solid rgba(255,255,255,.08); padding-left: 10px; }
+.model-group > summary { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.model-group > summary::before { content: '▸'; }
+.model-group[open] > summary::before { content: '▾'; }
+.model-group .badge { margin-left: auto; }
+.model-group input { accent-color: #59d9cb; }
+.model-list { padding-left: 16px; }

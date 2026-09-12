@@ -6,6 +6,9 @@ export async function openExplorer(page) {
   const toggle = page.locator('#menu-toggle');
   await toggle.waitFor({ timeout: 60000 });
   if (await toggle.getAttribute('aria-expanded') === 'false') await toggle.click();
+  // The full layer hierarchy now lives one disclosure deep, under "All layers"; the quick layers,
+  // presets and category views sit above it. Tests that drive the hierarchy want it open.
+  await page.evaluate(() => { const all = document.querySelector('.all-layers'); if (all) all.open = true; });
 }
 
 /**

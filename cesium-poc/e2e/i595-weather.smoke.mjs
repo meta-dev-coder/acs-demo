@@ -2,10 +2,14 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { HOURLY, DAILY, WEATHER_URL, validateForecast, localHour, direction, number } from '../src/i595WeatherData.js';
 const daily={time:[]},hourly={time:[]};for(const k of DAILY)daily[k]=[];for(const k of HOURLY)hourly[k]=[];
+// The forecast is only treated as cached while its first day is today, so the fixture has to start
+// on the current local date — hardcoding one made the test fail the moment the calendar rolled over.
+const firstDay=localHour().slice(0,10);
 for(let d=0;d<8;d++){
- const date=`2026-09-${String(10+d).padStart(2,'0')}`;daily.time.push(date);
- for(const k of DAILY)daily[k].push(k==='sunrise'?`${date}T07:04`:k==='sunset'?`${date}T19:29`:k==='daylight_duration'?44700:k.endsWith('max')?32:25);
- for(let h=0;h<24;h++){hourly.time.push(`${date}T${String(h).padStart(2,'0')}:00`);for(const k of HOURLY)hourly[k].push(k==='temperature_2m'?27+Math.sin(h/24*Math.PI*2)*4:k==='relative_humidity_2m'?78:k==='precipitation'?0.2:k.includes('direction')?135:18.4);}
+ const date=new Date(`${firstDay}T00:00:00Z`);date.setUTCDate(date.getUTCDate()+d);
+ const iso=date.toISOString().slice(0,10);daily.time.push(iso);
+ for(const k of DAILY)daily[k].push(k==='sunrise'?`${iso}T07:04`:k==='sunset'?`${iso}T19:29`:k==='daylight_duration'?44700:k.endsWith('max')?32:25);
+ for(let h=0;h<24;h++){hourly.time.push(`${iso}T${String(h).padStart(2,'0')}:00`);for(const k of HOURLY)hourly[k].push(k==='temperature_2m'?27+Math.sin(h/24*Math.PI*2)*4:k==='relative_humidity_2m'?78:k==='precipitation'?0.2:k.includes('direction')?135:18.4);}
 }
 const fixture={timezone:'America/New_York',daily,hourly};validateForecast(fixture);
 assert.equal(new URL(WEATHER_URL).searchParams.get('forecast_days'),'8');

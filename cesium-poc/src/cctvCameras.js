@@ -25,7 +25,12 @@ export function cameraDetails(p) {
     ['Distance to I-595 Network', valid(p.distance_to_i595_network_m) && Number.isFinite(distance) ? distance < 1000 ? `${Math.round(distance)} m` : `${(distance / 1000).toFixed(1)} km` : null],
     ['Source', 'FDOT / FL511 Camera Feed Data']].filter(([, value]) => valid(value));
 }
-export function installCctvCameras(container, viewer) {
+/**
+ * @param {{onStreetView?: (place: {longitude: number, latitude: number, label: string}) => void}} [hooks]
+ *   When provided, the details panel offers Street View for the camera's own coordinates. Street
+ *   View is Google's street-level photography, not this camera's feed — the panel keeps them apart.
+ */
+export function installCctvCameras(container, viewer, { onStreetView } = {}) {
   const group = document.createElement('details'); group.className = 'cameras-group';
   group.innerHTML = '<summary><input type="checkbox" id="cameras-all" aria-label="CCTV Cameras" disabled><span>CCTV Cameras</span><span class="badge">…</span></summary><div class="camera-list"></div><p class="ramp-status" role="status">Loading cameras…</p><button class="camera-retry" hidden>Retry cameras</button>';
   container.append(group);
@@ -45,6 +50,19 @@ export function installCctvCameras(container, viewer) {
     const old = selected; selected = entity; style(old); style(entity);
     panel.select(entity ? records.get(entity) : null);
     document.querySelector('.camera-stream-action')?.remove();
+    document.querySelector('.camera-street-view')?.remove();
+    if (entity && onStreetView) {
+      const record = records.get(entity);
+      const action = document.createElement('button');
+      action.className = 'camera-street-view';
+      action.textContent = 'Street View';
+      action.title = 'Google street-level imagery near this camera';
+      action.onclick = () => onStreetView({
+        longitude: record.longitude, latitude: record.latitude,
+        label: `CCTV ${record.camera_id}`,
+      });
+      document.querySelector('.camera-details')?.append(action);
+    }
     if (entity && records.get(entity).video_enabled === true) {
       const button = document.createElement('button'); button.className = 'camera-stream-action'; button.textContent = 'View Camera';
       const url = getCameraStreamUrl(entity.id);

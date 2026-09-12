@@ -149,6 +149,11 @@ export function createI595RoadSegmentLayer(viewer) {
         if (!disposed) applyVisibility();
       } catch (error) { enabled.delete(direction); throw error; }
     },
+    /** The carriageway drawn under a screen point, when one is: 'EB', 'WB' or undefined. */
+    directionAt(screenPosition) {
+      const entity = pick(screenPosition);
+      return entity ? records.get(entity)?.direction : undefined;
+    },
     clearSelection() { select(null); },
     setSegmentVisible(id, show) {
       if (!segmentById.has(id)) throw new Error('Unknown FDOT segment.');
