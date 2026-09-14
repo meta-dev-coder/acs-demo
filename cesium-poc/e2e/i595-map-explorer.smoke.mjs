@@ -14,7 +14,7 @@ import { RAIL_LAYER_IDS } from '../src/mapLayerStore.js';
 const signalCount = JSON.parse(readFileSync(new URL('../public/data/i595_corridor_traffic_signals.geojson', import.meta.url))).features.length;
 const cameraCount = JSON.parse(readFileSync(new URL('../public/data/i595_corridor_cameras.geojson', import.meta.url))).features.length;
 /** The control each logical layer ultimately writes to — the module's own checkbox. */
-const CONTROLS = { signals: '#signals-all', cameras: '#cameras-all', incidents: '#live-events-all', direction: '#flow-direction' };
+const CONTROLS = { signals: '#signals-all', cameras: '#cameras-mainline', incidents: '#live-events-all', direction: '#flow-direction' };
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 try {
@@ -28,7 +28,7 @@ try {
   await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
   await page.locator('body[data-startup="ready"]').waitFor({ timeout: 90000 });
   await page.locator('#signals-all:not(:disabled)').waitFor({ state: 'attached', timeout: 60000 });
-  await page.locator('#cameras-all:not(:disabled)').waitFor({ state: 'attached', timeout: 60000 });
+  await page.locator('#cameras-mainline:not(:disabled)').waitFor({ state: 'attached', timeout: 60000 });
 
   /** Every surface's opinion of one layer, plus the underlying control. */
   const opinionsOf = id => page.evaluate(({ layerId, control }) => ({
@@ -70,15 +70,19 @@ try {
   assert.equal(await page.locator('.view-presets, .quick-layers').count(), 0, 'the panel is categories and All layers');
   await page.locator('.layer-category[data-category="infrastructure"] > summary').click();
   assert.equal(await page.locator('.layer-categories [data-count="signals"]').textContent(), String(signalCount));
-  assert.equal(await page.locator('.layer-categories [data-count="cameras"]').textContent(), String(cameraCount));
+  // Cameras fold into express and mainline groups, the way Traffic Flow folds its routes: the
+  // category view lists the two, and the rail keeps one tool for both.
+  assert.equal(await page.locator('.layer-categories [data-layer="cameras-express"]').count(), 1);
+  assert.equal(await page.locator('.layer-categories [data-layer="cameras-mainline"]').count(), 1);
+  assert.equal(await page.locator('.quick-rail [data-layer="cameras"]').count(), 1, 'one camera tool on the rail');
 
   // Toggling from a category reaches the hierarchy, and vice versa.
-  await page.locator('.layer-categories [data-layer="cameras"]').click();
+  await page.locator('.quick-rail [data-layer="cameras"]').click();
   await page.waitForTimeout(2000);
   await agreed('cameras', true);
   // ...and back the other way, from the hierarchy itself.
-  await revealLayerGroup(page, '.cameras-group');
-  await page.locator('#cameras-all').uncheck();
+  await revealLayerGroup(page, '.cameras-mainline-group');
+  await page.locator('#cameras-mainline').uncheck();
   await page.waitForTimeout(900);
   await agreed('cameras', false);
 

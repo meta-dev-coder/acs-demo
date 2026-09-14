@@ -7,8 +7,15 @@
  * and back, rather than starting on the satellite basemap.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { openExplorer } from './i595Explorer.mjs';
+
+// Only cameras within 150 m of the I-595 network are drawn, so the expected count comes from the
+// data rather than from a literal that goes stale when the dataset or the rule changes.
+const drawnCameras = JSON.parse(readFileSync(new URL('../public/data/i595_corridor_cameras.geojson', import.meta.url))).features
+  .filter(f => { const d = Number(f.properties.distance_to_i595_network_m); return Number.isFinite(d) ? d <= 150 : true; }).length;
+
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 try {
@@ -36,7 +43,7 @@ try {
   await openExplorer(page);
   // Every layer that adds a data source asynchronously must be settled before the before/after
   // comparison, or the snapshot races them rather than the base-environment switch.
-  for (const ready of ['#cameras-all', '#signals-all', '#bridges-all', '#live-events-all']) {
+  for (const ready of ['#cameras-mainline', '#signals-all', '#bridges-all', '#live-events-all']) {
     await page.locator(`${ready}:not(:disabled)`).waitFor({ state: 'attached', timeout: 60000 });
   }
 
@@ -66,8 +73,8 @@ try {
 
   // ---- record the corridor state we must not disturb -------------------------------------------
   await page.locator('.its-group > summary').click();
-  await page.locator('.cameras-group > summary').click({ position: { x: 5, y: 10 } });
-  await page.locator('#cameras-all').check();
+  await page.locator('.cameras-mainline-group > summary').click({ position: { x: 5, y: 10 } });
+  for (const group of ['#cameras-express', '#cameras-mainline']) await page.locator(group).check();
   await page.locator('.signals-group > summary').click({ position: { x: 5, y: 10 } });
   await page.locator('#signals-all').check();
   const snapshot = () => page.evaluate(() => ({
@@ -79,7 +86,7 @@ try {
     primitives: v.scene.primitives.length,
   }));
   const before = await snapshot();
-  assert.ok(before.dataSources.some(source => source.name.includes('CCTV') && source.visible === 74));
+  assert.ok(before.dataSources.some(source => source.name.includes('CCTV') && source.visible === drawnCameras));
 
   // ---- leaving 3D for the satellite basemap ----------------------------------------------------
   await page.locator('input[value="SATELLITE"]').check();
@@ -149,7 +156,7 @@ try {
   });
   await bare.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
   await openExplorer(bare);
-  await bare.locator('#cameras-all:not(:disabled)').waitFor({ state: 'attached', timeout: 60000 });
+  await bare.locator('#cameras-mainline:not(:disabled)').waitFor({ state: 'attached', timeout: 60000 });
   // No click needed: 3D is the default, so a keyless load must fall back on its own.
   await bare.locator('.base-environment-status').filter({ hasText: 'VITE_GOOGLE_MAPS_API_KEY' }).waitFor();
   assert.equal(googleCalls.length, 0, 'a missing key must not produce a request to Google');

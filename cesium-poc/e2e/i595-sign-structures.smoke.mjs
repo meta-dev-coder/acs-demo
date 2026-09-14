@@ -180,7 +180,7 @@ try {
   assert.equal(await page.evaluate(name => window.v.dataSources.getByName(name)[0].show,
     `I-595 ${types[1].groupLabel} Sign Structures`), true, 'switching one structure type off must not touch another');
 
-  for (const control of ['#bridges-all', '#cameras-all', '#signals-all']) {
+  for (const control of ['#bridges-all', '#cameras-mainline', '#signals-all']) {
     assert.equal(await page.locator(control).count(), 1, `${control} must survive`);
   }
 

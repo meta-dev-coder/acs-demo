@@ -47,7 +47,14 @@ export function installI595Weather() {
   }
   trigger.onclick=()=>{dialog.showModal();void load();};
   dialog.querySelector('.weather-close').onclick=()=>dialog.close();
-  dialog.addEventListener('close',()=>trigger.focus());
+  // Return focus to whatever opened the dialog. The launcher is hidden in the map-focused view, and
+  // focusing a display:none element strands the keyboard on <body>, so fall back to the rail tool.
+  const returnFocus = () => {
+    const target = [trigger, document.querySelector('.quick-rail [data-action="weather"]')]
+      .find(el => el && el.offsetParent !== null);
+    target?.focus();
+  };
+  dialog.addEventListener('close', returnFocus);
   refresh.onclick=()=>void load(true);
   const interval=setInterval(()=>{if(dialog.open)void load();},900000);
   return {destroy(){disposed=true;controller?.abort();clearInterval(interval);dialog.remove();trigger.remove();}};

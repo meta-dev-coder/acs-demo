@@ -1,0 +1,150 @@
+{
+  "type": "FeatureCollection",
+  "name": "I-595 Express Gantries",
+  "metadata": {
+    "description": "595 Express reversible median lane access nodes and Open Road Tolling mainline gantries.",
+    "crs": "EPSG:4326"
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-80.3978, 26.1105] },
+      "properties": {
+        "gantry_id": "GNT-W01",
+        "type": "access_node",
+        "name": "I-75 / SR-7 Western Access",
+        "milepost": 0.3,
+        "direction": "reversible",
+        "lane_count": 3,
+        "status": "open",
+        "dms_text": "595 EXPRESS OPEN · 55 MPH"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-80.3800, 26.1100] },
+      "properties": {
+        "gantry_id": "GNT-M01",
+        "type": "ort_mainline",
+        "name": "ORT Gantry — MP 1.0",
+        "milepost": 1.0,
+        "direction": "EB/WB",
+        "lane_count": null,
+        "status": "open",
+        "dms_text": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-80.3520, 26.1092] },
+      "properties": {
+        "gantry_id": "GNT-FL",
+        "type": "access_node",
+        "name": "Flamingo Road Express Ramp",
+        "milepost": 2.1,
+        "direction": "reversible",
+        "lane_count": 3,
+        "status": "open",
+        "dms_text": "595 EXPRESS OPEN · 55 MPH"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-80.3406, 26.1095] },
+      "properties": {
+        "gantry_id": "GNT-M02",
+        "type": "ort_mainline",
+        "name": "ORT Gantry — MP 2.7",
+        "milepost": 2.7,
+        "direction": "EB/WB",
+        "lane_count": null,
+        "status": "open",
+        "dms_text": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-80.3083, 26.1103] },
+      "properties": {
+        "gantry_id": "GNT-M03",
+        "type": "ort_mainline",
+        "name": "ORT Gantry — MP 4.4",
+        "milepost": 4.4,
+        "direction": "EB/WB",
+        "lane_count": null,
+        "status": "open",
+        "dms_text": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-80.2759, 26.1112] },
+      "properties": {
+        "gantry_id": "GNT-M04",
+        "type": "ort_mainline",
+        "name": "ORT Gantry — MP 6.1",
+        "milepost": 6.1,
+        "direction": "EB/WB",
+        "lane_count": null,
+        "status": "open",
+        "dms_text": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-80.2512, 26.1118] },
+      "properties": {
+        "gantry_id": "GNT-TP",
+        "type": "access_node",
+        "name": "Florida Turnpike S Connector",
+        "milepost": 7.4,
+        "direction": "reversible",
+        "lane_count": 3,
+        "status": "open",
+        "dms_text": "595 EXPRESS OPEN · 55 MPH"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-80.2362, 26.1114] },
+      "properties": {
+        "gantry_id": "GNT-M05",
+        "type": "ort_mainline",
+        "name": "ORT Gantry — MP 7.8",
+        "milepost": 7.8,
+        "direction": "EB/WB",
+        "lane_count": null,
+        "status": "open",
+        "dms_text": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-80.1725, 26.1095] },
+      "properties": {
+        "gantry_id": "GNT-M06",
+        "type": "ort_mainline",
+        "name": "ORT Gantry — MP 9.5",
+        "milepost": 9.5,
+        "direction": "EB/WB",
+        "lane_count": null,
+        "status": "open",
+        "dms_text": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-80.1350, 26.1084] },
+      "properties": {
+        "gantry_id": "GNT-E01",
+        "type": "access_node",
+        "name": "I-95 / Eastern Terminus",
+        "milepost": 10.5,
+        "direction": "reversible",
+        "lane_count": 3,
+        "status": "open",
+        "dms_text": "595 EXPRESS OPEN · 55 MPH"
+      }
+    }
+  ]
+}

@@ -51,18 +51,18 @@ input { width: 17px; height: 17px; margin: 0; accent-color: var(--road); cursor:
 #ramp-interchange { width: 100%; padding: 10px 8px; color: #eaf3ff; background: #17263b; border: 1px solid #ffffff30; border-radius: 8px; font: inherit; font-size: 12px; }
 .ramp-status { color: #92a8c3; font-size: 11px; line-height: 1.6; margin: 10px 2px; }
 .ramp-retry { background: #17263b; padding: 8px; border: 1px solid #65dfd4; border-radius: 6px; }
-:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details, .structure-details) { position: absolute; right: 16px; top: 220px; width: 310px; max-height: calc(100dvh - 290px); overflow-y: auto; padding: 18px; border: 1px solid #ffffff24; border-radius: 16px; background: #0d1829f5; box-shadow: 0 16px 48px #0005; }
+:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .gantry-details, .live-event-details, .model-details, .structure-details) { position: absolute; right: 16px; top: 220px; width: 310px; max-height: calc(100dvh - 290px); overflow-y: auto; padding: 18px; border: 1px solid #ffffff24; border-radius: 16px; background: #0d1829f5; box-shadow: 0 16px 48px #0005; }
 .ramp-details-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details, .structure-details) h2 { font-size: 17px; margin: 0; }
-:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details, .structure-details) button { border: 0; background: #ffffff0a; border-radius: 8px; width: 36px; height: 36px; font-size: 24px; }
-:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details, .structure-details) dl { display: grid; grid-template-columns: 90px 1fr; gap: 12px; font-size: 12px; line-height: 1.5; }
-:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details, .structure-details) dt { color: #92a8c3; }
-:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details, .structure-details) dd { margin: 0; overflow-wrap: anywhere; }
+:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .gantry-details, .live-event-details, .model-details, .structure-details) h2 { font-size: 17px; margin: 0; }
+:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .gantry-details, .live-event-details, .model-details, .structure-details) button { border: 0; background: #ffffff0a; border-radius: 8px; width: 36px; height: 36px; font-size: 24px; }
+:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .gantry-details, .live-event-details, .model-details, .structure-details) dl { display: grid; grid-template-columns: 90px 1fr; gap: 12px; font-size: 12px; line-height: 1.5; }
+:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .gantry-details, .live-event-details, .model-details, .structure-details) dt { color: #92a8c3; }
+:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .gantry-details, .live-event-details, .model-details, .structure-details) dd { margin: 0; overflow-wrap: anywhere; }
 .ramp-tooltip { position: fixed; pointer-events: none; z-index: 10; max-width: min(290px, calc(100vw - 16px)); padding: 10px 13px; border: 1px solid #ffffff35; border-radius: 8px; background: #0b1423f5; color: #eaf3ff; font-size: 12px; line-height: 1.7; white-space: pre-line; box-shadow: 0 6px 20px #0005; }
 @media (max-width: 700px) {
-  :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details, .structure-details) { top: auto; bottom: 42px; left: 10px; right: 10px; width: auto; max-height: 40dvh; }
-  body:has(:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details, .structure-details):not([hidden])) .layers #layer-content { max-height: calc(60dvh - 155px); }
-  body:has(:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details, .structure-details):not([hidden])) #reset-view { bottom: calc(40dvh + 52px); }
+  :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .gantry-details, .live-event-details, .model-details, .structure-details) { top: auto; bottom: 42px; left: 10px; right: 10px; width: auto; max-height: 40dvh; }
+  body:has(:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .gantry-details, .live-event-details, .model-details, .structure-details):not([hidden])) .layers #layer-content { max-height: calc(60dvh - 155px); }
+  body:has(:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .gantry-details, .live-event-details, .model-details, .structure-details):not([hidden])) #reset-view { bottom: calc(40dvh + 52px); }
 }
 
 .structures-group { margin-top: 10px; border-top: 1px solid #ffffff18; padding-top: 8px; }
@@ -99,15 +99,34 @@ input { width: 17px; height: 17px; margin: 0; accent-color: var(--road); cursor:
 .cameras-group[open] > summary::before { content: '▾'; }
 .cameras-group .badge { margin-left: auto; }
 .cameras-group .camera-zoom { width: auto; height: auto; padding: 8px 12px; margin: 12px 0; font-size: 12px; }
+/* Express lane group: amber left accent to distinguish from mainline */
+.cameras-express-group { border-left-color: #F4A72566; }
+.cameras-express-group > summary { color: #fcd970; }
 .camera-list { padding-left: 16px; }
 .cameras-group .camera-zoom, .cameras-group .camera-retry { color: #b9f5ec; background: #17383f; border: 1px solid #58d6c866; border-radius: 8px; cursor: pointer; }
 .cameras-group .camera-zoom:hover { background: #21505a; }
 .cameras-group input { accent-color: #59d9cb; }
 
+/* Camera group headings (Express / EB Mainline / WB Mainline) */
+.camera-group-heading { font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  color: #64829e; margin: 10px 0 4px; padding-bottom: 3px; border-bottom: 1px solid #ffffff12; }
+
+/* Camera rows — no checkbox, just a feed-status dot + location label */
+.camera-row { display: flex; align-items: center; gap: 6px; }
+.camera-row .camera-select { flex: 1; text-align: left; white-space: normal; line-height: 1.35; font-size: 11.5px; padding: 4px 6px; height: auto; }
+.camera-row--hidden .camera-select { opacity: .35; }
+
+/* Feed-status dot: green = live DIVAS snapshot, amber = video-enabled no feed, gray = no video */
+.camera-feed-dot { flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.camera-feed-dot.feed-live    { background: #4ade80; box-shadow: 0 0 4px #4ade8088; }
+.camera-feed-dot.feed-enabled { background: #fbbf24; box-shadow: 0 0 4px #fbbf2488; }
+.camera-feed-dot.feed-none    { background: #4a5568; }
+
 
 .camera-details .camera-stream-action { width: auto; height: auto; padding: 10px 14px; font-size: 13px; }
 .camera-details .camera-street-view { width: 100%; height: auto; }
 .camera-stream-action:disabled { opacity: .5; cursor: not-allowed; }
+.camera-no-feed-note { font-size: 11.5px; color: #64829e; line-height: 1.5; margin: 8px 0 0; padding: 8px 10px; background: #0d1829; border-radius: 6px; border: 1px solid #ffffff14; }
 
 /* Live Events (FL511) — same group shell as the CCTV/signal layers, with per-feed children. */
 .live-events-group { margin: 12px 0 0 20px; border-left: 1px solid rgba(255,255,255,.08); padding-left: 10px; }
@@ -363,3 +382,100 @@ body:has(.street-view[data-state="active"]) :is(.ramp-details, .road-details, .s
 .structure-group[open] > summary::before { transform: rotate(90deg); }
 .structure-list { margin-left: 20px; padding-left: 6px; border-left: 1px solid #ffffff18; max-height: 260px; overflow-y: auto; }
 .structure-group .structure-retry { width: auto; height: auto; padding: 8px 12px; margin: 8px 0; font-size: 12px; color: #b9f5ec; background: #17383f; border: 1px solid #58d6c866; border-radius: 8px; cursor: pointer; }
+
+/* ── Ask the Twin ────────────────────────────────────────────────────────── */
+.ask-twin-btn { position: absolute; bottom: 56px; right: 120px; display: flex; align-items: center; gap: 7px; padding: 9px 16px; background: #0d1e2e; border: 1px solid #38c9bf55; border-radius: 22px; color: #38c9bf; font-size: 12px; font-weight: 600; letter-spacing: 0.03em; box-shadow: 0 4px 16px #0009; cursor: pointer; z-index: 20; transition: background 0.15s, border-color 0.15s, box-shadow 0.15s; }
+.ask-twin-btn:hover { background: #132636; border-color: #38c9bf99; box-shadow: 0 4px 20px #38c9bf22; }
+.ask-twin-btn.active { background: #0f3040; border-color: #38c9bf; }
+@media (max-width: 700px) { .ask-twin-btn { right: 16px; bottom: 110px; } }
+
+.ask-twin-panel { position: absolute; bottom: 108px; right: 16px; width: min(380px, calc(100vw - 32px)); max-height: 500px; display: flex; flex-direction: column; background: #0a1525f8; border: 1px solid #38c9bf30; border-radius: 14px; box-shadow: 0 20px 60px #0009, 0 0 0 1px #38c9bf10; z-index: 21; overflow: hidden; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+.ask-twin-panel--minimised { max-height: none; }
+@media (max-width: 700px) { .ask-twin-panel { left: 16px; right: 16px; bottom: 160px; width: auto; } }
+
+/* Header — drag handle */
+.ask-twin-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 10px 14px; border-bottom: 1px solid #ffffff14; flex-shrink: 0; cursor: grab; user-select: none; background: #0d1e2e; }
+.ask-twin-header:active { cursor: grabbing; }
+.ask-twin-panel--minimised .ask-twin-header { border-bottom: none; }
+.ask-twin-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ask-twin-indicator { width: 7px; height: 7px; border-radius: 50%; background: #38c9bf; box-shadow: 0 0 6px #38c9bf; flex-shrink: 0; animation: ask-pulse 2.4s ease-in-out infinite; }
+@keyframes ask-pulse { 0%,100%{opacity:1;box-shadow:0 0 6px #38c9bf} 50%{opacity:.5;box-shadow:0 0 2px #38c9bf} }
+.ask-twin-title > span:first-of-type ~ .ask-twin-subtitle { display: none; }
+.ask-twin-title { font-size: 12px; font-weight: 700; color: #e8eef6; letter-spacing: 0.05em; text-transform: uppercase; }
+.ask-twin-subtitle { font-size: 10px; font-weight: 400; color: #4d6a85; letter-spacing: 0; text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ask-twin-controls { display: flex; gap: 2px; flex-shrink: 0; }
+.ask-twin-icon-btn { background: none; border: none; color: #4d6a85; font-size: 13px; cursor: pointer; padding: 3px 7px; border-radius: 6px; line-height: 1; transition: color 0.12s, background 0.12s; }
+.ask-twin-icon-btn:hover { color: #e8eef6; background: #ffffff12; }
+
+/* Body */
+.ask-twin-body { display: flex; flex-direction: column; overflow: hidden; }
+.ask-twin-body[hidden] { display: none; }
+
+.ask-twin-messages { flex: 1; overflow-y: auto; padding: 12px 12px 8px; display: flex; flex-direction: column; gap: 10px; min-height: 60px; max-height: 300px; }
+.ask-twin-msg { display: flex; flex-direction: column; gap: 5px; }
+.ask-twin-msg--user { align-items: flex-end; }
+.ask-twin-msg--assistant { align-items: flex-start; }
+.ask-twin-bubble { padding: 8px 11px; border-radius: 11px; font-size: 12.5px; line-height: 1.6; max-width: 92%; }
+.ask-twin-msg--user .ask-twin-bubble { background: #0e3348; border: 1px solid #38c9bf35; color: #d8f3f0; border-bottom-right-radius: 3px; }
+.ask-twin-msg--assistant .ask-twin-bubble { background: #111d2e; border: 1px solid #ffffff12; color: #c8d9ea; border-bottom-left-radius: 3px; }
+
+/* Thinking state */
+.ask-twin-thinking { display: flex; align-items: center; gap: 8px; min-width: 80px; }
+.ask-twin-step-label { font-size: 11px; color: #4d6a85; font-style: italic; }
+.ask-twin-dots { display: inline-flex; gap: 3px; align-items: center; flex-shrink: 0; }
+.ask-twin-dots span { width: 5px; height: 5px; background: #38c9bf; border-radius: 50%; animation: ask-dot 1.2s infinite ease-in-out; }
+.ask-twin-dots span:nth-child(2) { animation-delay: .2s; }
+.ask-twin-dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes ask-dot { 0%,80%,100%{transform:scale(.6);opacity:.4} 40%{transform:scale(1);opacity:1} }
+
+/* Meta row: sources + confidence */
+.ask-twin-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ask-twin-sources { font-size: 10px; color: #4d6a85; }
+.ask-twin-confidence { font-size: 10px; padding: 1px 6px; border-radius: 8px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.ask-twin-confidence--high   { background: #0b2e18; color: #4ade80; border: 1px solid #4ade8033; }
+.ask-twin-confidence--medium { background: #2e2408; color: #fbbf24; border: 1px solid #fbbf2433; }
+.ask-twin-confidence--low    { background: #2e0f0f; color: #f87171; border: 1px solid #f8717133; }
+
+/* Fly-to button */
+.ask-twin-fly-btn { display: inline-flex; align-items: center; gap: 5px; background: #0a2535; border: 1px solid #38c9bf44; border-radius: 8px; color: #38c9bf; font-size: 11px; padding: 4px 10px; cursor: pointer; transition: background 0.12s; }
+.ask-twin-fly-btn:hover:not(:disabled) { background: #0f3a4e; border-color: #38c9bf88; }
+.ask-twin-fly-btn:disabled { color: #4ade80; border-color: #4ade8033; cursor: default; }
+
+/* Suggestion chips */
+.ask-twin-suggestions { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 12px; border-top: 1px solid #ffffff0a; }
+.ask-twin-suggestions[hidden] { display: none; }
+.ask-twin-chip { background: #0d1829; border: 1px solid #ffffff14; border-radius: 16px; color: #6b8aa8; font-size: 11px; padding: 4px 10px; cursor: pointer; transition: all 0.12s; }
+.ask-twin-chip:hover { background: #142032; color: #c8d9ea; border-color: #38c9bf44; }
+
+/* Input form */
+.ask-twin-form { display: flex; gap: 7px; padding: 9px 10px; border-top: 1px solid #ffffff12; flex-shrink: 0; }
+.ask-twin-input { flex: 1; background: #0c1825; border: 1px solid #ffffff18; border-radius: 9px; color: #e8eef6; font-size: 12.5px; padding: 8px 11px; outline: none; transition: border-color 0.15s; }
+.ask-twin-input:focus { border-color: #38c9bf50; }
+.ask-twin-input:disabled { opacity: 0.5; }
+.ask-twin-input::placeholder { color: #3d5570; }
+.ask-twin-send { background: #0e3040; border: 1px solid #38c9bf55; border-radius: 9px; color: #38c9bf; padding: 8px 11px; cursor: pointer; display: flex; align-items: center; flex-shrink: 0; transition: background 0.12s; }
+.ask-twin-send:hover:not(:disabled) { background: #174d60; }
+.ask-twin-send:disabled { opacity: 0.35; cursor: default; }
+
+/* Keep map controls in the upper-right control zone; Ask the Twin remains the bottom action. */
+body .map-nav, body:has(.twin-hud) .map-nav { top: 120px; bottom: auto; right: 16px; }
+body:has(.map-nav) :is(.ramp-details,.road-details,.segment-details,.express-details,.bridge-details,.signal-details,.camera-details,.live-event-details,.model-details,.structure-details) { right: 106px; }
+@media (max-width:720px) {
+  body .map-nav, body:has(.twin-hud) .map-nav { top: 116px; bottom: auto; left: auto; right: 10px; width: auto; }
+  body:has(:is(.ramp-details,.road-details,.segment-details,.express-details,.bridge-details,.signal-details,.camera-details,.live-event-details,.structure-details):not([hidden])) .map-nav { top: 116px; bottom: auto; }
+}
+
+/* Keep navigation glyphs lightweight, matching the Street View control treatment. */
+body .map-nav button,
+body .map-nav #reset-view { background: transparent !important; box-shadow: none; }
+body .map-nav button:hover:not(:disabled),
+body .map-nav button:active:not(:disabled) { background: #ffffff0d !important; }
+/* The compact header actions are intentionally omitted from this map-focused view. */
+body .weather-launch,
+body .twin-hud { display: none !important; }
+
+/* With the header cards removed, place the map controls directly at the top-right. */
+body .map-nav, body:has(.twin-hud) .map-nav { top: 16px; bottom: auto; right: 16px; }
+@media (max-width:720px) {
+  body .map-nav, body:has(.twin-hud) .map-nav { top: 10px; right: 10px; bottom: auto; left: auto; }
+}

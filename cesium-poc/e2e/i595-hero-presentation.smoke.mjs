@@ -41,7 +41,7 @@ try {
       .replace('import.meta.hot.dispose(() => {', 'window.shields = roadShields; window.labels = contextLabels; window.events = liveEventControls; window.mainline = mainlineSegments; import.meta.hot.dispose(() => {') });
   });
   await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
-  await page.locator('#cameras-all:not(:disabled)').waitFor({ state: 'attached', timeout: 60000 });
+  await page.locator('#cameras-mainline:not(:disabled)').waitFor({ state: 'attached', timeout: 60000 });
   await page.locator('#signals-all:not(:disabled)').waitFor({ state: 'attached', timeout: 60000 });
   await page.evaluate(async () => {
     const text = await (await fetch('/src/i595Demo.js')).text();
@@ -49,12 +49,12 @@ try {
   });
 
   // ---- the status card carries real counts, and nothing else -----------------------------------
+  // The map-focused view hides the identity card with CSS, so it is asserted as built rather than
+  // as displayed: what it says must still be true wherever it is shown.
   const hud = page.locator('.twin-hud');
-  await hud.waitFor({ timeout: 30000 });
+  await hud.waitFor({ state: 'attached', timeout: 30000 });
   assert.equal(await hud.locator('h1').textContent(), 'I-595 Digital Twin');
   assert.equal(await hud.locator('.twin-hud-place').textContent(), 'Broward County, Florida');
-  const width = (await hud.boundingBox()).width;
-  assert.ok(width >= 220 && width <= 260, `status card must stay compact, was ${Math.round(width)} px`);
   // It sits outside Map Explorer, not inside it.
   assert.equal(await page.locator('.layers .twin-hud').count(), 0);
 
@@ -64,7 +64,8 @@ try {
   // There is no LIVE badge: only FL511 events are a live feed, while the CCTV and signal counts are
   // static FDOT inventories, so a badge over the card would overstate what the twin is.
   assert.equal(await hud.locator('.twin-hud-live, .twin-hud-dot').count(), 0, 'the card must not claim to be live');
-  const hudText = (await hud.innerText()).toLowerCase();
+  // textContent, not innerText: the card is hidden, and innerText of a hidden node is empty.
+  const hudText = (await hud.textContent()).toLowerCase();
   for (const invented of ['congest', 'mph', 'km/h', 'delay', 'speed', 'weather', 'flow'])
     assert.ok(!hudText.includes(invented), `the identity card must not state "${invented}"`);
 
@@ -128,8 +129,8 @@ try {
   // ---- infrastructure markers stay subordinate to the corridor ----------------------------------
   await openExplorer(page);
   await page.locator('.its-group > summary').click();
-  await page.locator('.cameras-group > summary').click({ position: { x: 5, y: 10 } });
-  await page.locator('#cameras-all').check();
+  await page.locator('.cameras-mainline-group > summary').click({ position: { x: 5, y: 10 } });
+  for (const group of ['#cameras-express', '#cameras-mainline']) await page.locator(group).check();
   await page.locator('.signals-group > summary').click({ position: { x: 5, y: 10 } });
   await page.locator('#signals-all').check();
   await page.waitForTimeout(1200);

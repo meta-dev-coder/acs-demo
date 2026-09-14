@@ -40,7 +40,7 @@ try {
   });
   await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
   await page.locator('body[data-startup="ready"]').waitFor({ timeout: 90000 });
-  await page.locator('#cameras-all:not(:disabled)').waitFor({ state: 'attached', timeout: 60000 });
+  await page.locator('#cameras-mainline:not(:disabled)').waitFor({ state: 'attached', timeout: 60000 });
   await page.evaluate(async () => {
     const text = await (await fetch('/src/i595Demo.js')).text();
     window.C = await import(text.match(/from\s*"([^"]*cesium[^"]*)"/)[1]);
@@ -62,7 +62,7 @@ try {
   });
 
   // ---- the primary way in: the toolbar tool, with no layer switched on ---------------------------
-  assert.equal(await page.locator('#cameras-all').isChecked(), false, 'Street View must not need CCTV');
+  assert.equal(await page.locator('#cameras-mainline').isChecked(), false, 'Street View must not need CCTV');
   assert.equal(await page.locator('#street-view').count(), 1, 'the toolbar carries a permanent Street View tool');
   assert.equal(await page.locator('#street-view').getAttribute('title'), 'Street View');
 
@@ -133,8 +133,8 @@ try {
   await openExplorer(page);
   await page.locator('.quick-rail [data-layer="cameras"]').click();
   await page.waitForTimeout(2500);
-  await revealLayerGroup(page, '.cameras-group');
-  await page.locator('.cameras-group > summary').click({ position: { x: 5, y: 10 } });
+  await revealLayerGroup(page, '.cameras-mainline-group');
+  await page.locator('.cameras-mainline-group > summary').click({ position: { x: 5, y: 10 } });
   const id = await page.evaluate(() => [...window.cams.cameraById.keys()][0]);
   await page.locator(`button[data-camera-id="${id}"]`).click();
   await page.locator('.camera-details:not([hidden])').waitFor({ timeout: 20000 });
@@ -186,7 +186,7 @@ try {
   assert.equal(sceneAfter.tilesetShown, sceneBefore.tilesetShown, 'the 3D tileset is restored');
   assert.equal(sceneAfter.dataSourcesShown, sceneBefore.dataSourcesShown, 'every layer is restored');
   assert.equal(sceneAfter.rotate, true, 'map navigation works again');
-  assert.equal(await page.locator('#cameras-all').isChecked(), true, 'layer visibility is untouched');
+  assert.equal(await page.locator('#cameras-mainline').isChecked(), true, 'layer visibility is untouched');
   assert.equal(await page.evaluate(() => window.sv.mode), 'digital-twin');
 
   // ---- Escape closes it too ----------------------------------------------------------------------

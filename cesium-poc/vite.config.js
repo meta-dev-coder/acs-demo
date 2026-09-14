@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import cesium from "vite-plugin-cesium";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
-import { createLiveEventsApi } from "./server/api.mjs";
+import { createLiveEventsApi, createSnapshotApi } from "./server/api.mjs";
 
 const cesiumBuildRootPath = join(dirname(createRequire(import.meta.url).resolve("cesium/package.json")), "Build");
 
@@ -21,6 +21,16 @@ const liveEventsApi = () => {
   };
 };
 
+// CCTV snapshot proxy — pipes DIVAS JPEG bytes through same-origin to avoid CORS issues.
+const snapshotApi = () => {
+  const api = createSnapshotApi();
+  return {
+    name: "i595-snapshot-api",
+    configureServer(server) { server.middlewares.use(api.middleware); },
+    configurePreviewServer(server) { server.middlewares.use(api.middleware); },
+  };
+};
+
 // vite-plugin-cesium wires up CESIUM_BASE_URL + static asset copying for us.
 export default defineConfig({
   // Under GitHub Pages the toll twin is served from a sub-path (/acs-demo/twin/). The deploy
@@ -28,7 +38,7 @@ export default defineConfig({
   // leaves both unset → "/" so npm start and the Playwright e2e suite are unaffected. All runtime
   // asset URLs resolve against import.meta.env.BASE_URL so data/ and models/ load under either base.
   base: process.env.CESIUM_BASE_PATH || process.env.POC_BASE_PATH || "/",
-  plugins: [cesium({ cesiumBuildRootPath, cesiumBuildPath: join(cesiumBuildRootPath, "Cesium") }), liveEventsApi()],
+  plugins: [cesium({ cesiumBuildRootPath, cesiumBuildPath: join(cesiumBuildRootPath, "Cesium") }), liveEventsApi(), snapshotApi()],
   // Port 5188 (not the default 5180) keeps this NTTA worktree isolated from a sibling session's
   // dev server sharing localhost. Disable auto-open under headless e2e.
   server: { port: 5188, open: false, strictPort: true },

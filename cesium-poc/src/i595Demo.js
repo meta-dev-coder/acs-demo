@@ -1,6 +1,7 @@
 import { installI595Weather } from './i595Weather.js';
 import { installCctvCameras } from './cctvCameras.js';
 import { installTrafficSignals } from './trafficSignals.js';
+import { installExpressGantries } from './expressGantries.js';
 import { installLiveEvents } from './liveEvents.js';
 import { BASE_ENVIRONMENTS, createGooglePhotorealistic3DService } from './basePhotorealistic3D.js';
 import { installBaseEnvironmentControls } from './baseEnvironmentControls.js';
@@ -32,6 +33,7 @@ import { installI595ContextLabels } from "./i595ContextLabels.js";
 import { installI595Hud } from "./i595Hud.js";
 import { createCesiumModelService } from "./cesiumModelService.js";
 import { installCorridorModelLayers } from "./corridorModelLayers.js";
+import { installAskTheTwin } from "./askTheTwin.js";
 import { corridorOverview, heroView } from "./i595CorridorViews.js";
 import "./i595Demo.css";
 
@@ -55,6 +57,7 @@ document.body.innerHTML = `
       </details>
       <details class="its-group"><summary>Infrastructure</summary>
         <div id="structure-layer-controls"></div>
+        <div id="gantry-layer-controls"></div>
       </details>
       <div id="base-environment-controls"></div>
       <p id="layer-status" role="status" aria-live="polite">Select a road to highlight it on the map.</p>
@@ -209,6 +212,7 @@ try {
   // Escape leaves placement without entering anything.
   const onPlacementKey = event => { if (event.key === "Escape") streetViewPlacement.stop(); };
   document.addEventListener("keydown", onPlacementKey);
+  const gantryControls = installExpressGantries(document.querySelector("#gantry-layer-controls"), viewer);
   const liveEventControls = installLiveEvents(document.querySelector(".incidents-group"), viewer);
   // Base environment: the world the corridor sits on, so it lives outside the DataLayer tree.
   // The oblique 3D view is derived from the same corridor extent as "Reset view" — no new coordinates.
@@ -315,7 +319,8 @@ try {
 
   // Operational strip: corridor facts and the live-event feed, with gaps stated rather than filled.
   const corridorStatus = installCorridorStatusBar(document.body, { mainline: mainlineSegments, liveEvents: liveEventControls });
-  if (import.meta.hot) import.meta.hot.dispose(() => { document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
+  const askTwin = installAskTheTwin(viewer, { cameraControls });
+  if (import.meta.hot) import.meta.hot.dispose(() => { document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
   for (const input of inputs) {
     // Layers with their own loader, plus display options that are not data layers at all: this loop
     // fetches `data/<id>.geojson`, and "flow-direction" has no such file — being swept up here

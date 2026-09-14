@@ -5,17 +5,21 @@
  */
 import { createServer } from 'node:http';
 import { loadConfig } from './config.mjs';
-import { API_BASE, createLiveEventsApi } from './api.mjs';
+import { API_BASE, createLiveEventsApi, createSnapshotApi } from './api.mjs';
 
 const config = loadConfig();
 const api = createLiveEventsApi({ config });
+const snapshotApi = createSnapshotApi();
 
 const server = createServer((request, response) => {
   api.handle(request, response).then(handled => {
     if (handled) return;
+    return snapshotApi.handle(request, response);
+  }).then(handled => {
+    if (handled) return;
     response.writeHead(404, { 'content-type': 'application/json' });
     response.end(JSON.stringify({ error: `Not found. Try GET ${API_BASE}` }));
-  }, error => {
+  }).catch(error => {
     console.error('Unhandled request failure', error);
     response.writeHead(500, { 'content-type': 'application/json' });
     response.end(JSON.stringify({ error: 'Internal error' }));

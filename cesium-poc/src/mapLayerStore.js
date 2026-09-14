@@ -38,7 +38,11 @@ export const CORRIDOR_LAYERS = Object.freeze([
   Object.freeze({ id: 'direction', label: 'Direction', category: 'traffic', icon: 'direction', control: '#flow-direction' }),
   Object.freeze({ id: 'incidents', label: 'Incidents', category: 'traffic', icon: 'incident', control: '#live-events-all', count: 'incidents' }),
   Object.freeze({ id: 'signals', label: 'Traffic Signals', category: 'infrastructure', icon: 'signal', control: '#signals-all', count: 'signals' }),
-  Object.freeze({ id: 'cameras', label: 'Traffic Cameras', category: 'infrastructure', icon: 'camera', control: '#cameras-all', count: 'cameras' }),
+  // CCTV is two groups on the corridor — express-lane cameras on the gantries, and the mainline —
+  // so the single tool folds them the way Traffic Flow folds its three routes.
+  Object.freeze({ id: 'cameras-express', label: 'Express Lane Cameras', short: 'Express', category: 'infrastructure', control: '#cameras-express' }),
+  Object.freeze({ id: 'cameras-mainline', label: 'Mainline Cameras', short: 'Mainline', category: 'infrastructure', control: '#cameras-mainline' }),
+  Object.freeze({ id: 'cameras', label: 'Traffic Cameras', category: 'infrastructure', icon: 'camera', count: 'cameras', members: ['cameras-express', 'cameras-mainline'] }),
   Object.freeze({ id: 'structures', label: 'Bridges', category: 'infrastructure', icon: 'bridge', control: '#bridges-all', count: 'structures' }),
   Object.freeze({ id: 'gantries', label: 'Toll Gantries', category: 'infrastructure', icon: 'gantry', control: '#gantries-all', count: 'gantries' }),
   // A barrier arm is a different asset from an overhead gantry, so it is its own layer rather than

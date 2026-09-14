@@ -20,16 +20,21 @@ try{
  const page=await browser.newPage({viewport:{width:1440,height:1000}});let requests=0,fail=false;
  await page.route('https://api.open-meteo.com/**',route=>{requests++;return fail?route.fulfill({status:503,body:'Unavailable'}):route.fulfill({json:fixture});});
  await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
- await page.locator('.weather-launch').click();await page.locator('.weather-days button').first().waitFor();
+ // The launcher is hidden in the map-focused view; the rail's weather tool is how it opens now.
+ await page.locator('.quick-rail [data-action="weather"]').click();
+ await page.locator('.weather-days button').first().waitFor();
  assert.equal(await page.locator('.weather-days button').count(),8);assert.equal(await page.locator('.weather-wind article').count(),4);
  await page.locator('[data-day="7"]').click();assert.equal(await page.locator('select[aria-label="Forecast hour"] option').count(),24);
  await page.locator('select[aria-label="Forecast hour"]').selectOption('180');assert.ok((await page.locator('.weather-hero').textContent()).includes('12:00'));
  await page.locator('[data-day="0"]').click();await page.screenshot({path:'/tmp/i595-weather-desktop.png'});
- await page.locator('.weather-close').click();await page.locator('.weather-launch').click();assert.equal(requests,1);
+ await page.locator('.weather-close').click();await page.locator('.quick-rail [data-action="weather"]').click();assert.equal(requests,1);
  fail=true;await page.locator('.weather-refresh').click();await page.getByRole('status').filter({hasText:'Update failed'}).waitFor();assert.equal(await page.locator('.weather-days button').count(),8);
  fail=false;fixture.hourly.wind_speed_180m.fill(null);await page.locator('.weather-refresh').click();await page.getByRole('status').filter({hasText:/Updated/}).waitFor();assert.ok((await page.locator('.weather-wind article').last().textContent()).includes('—'));
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:'/tmp/i595-weather-mobile.png'});
  assert.ok(await page.locator('.weather-dialog').evaluate(e=>e.scrollWidth<=e.clientWidth+1));
- await page.keyboard.press('Escape');assert.equal(await page.locator('.weather-dialog').evaluate(e=>e.open),false);assert.ok(await page.locator('.weather-launch').evaluate(e=>e===document.activeElement));
+ await page.keyboard.press('Escape');assert.equal(await page.locator('.weather-dialog').evaluate(e=>e.open),false);// Focus comes back to whichever control is actually on screen — the launcher, or the rail tool
+ // that replaces it in the map-focused view. It must never be left on <body>.
+ assert.ok(await page.evaluate(()=>{const a=document.activeElement;return a && a!==document.body &&
+   (a.classList.contains('weather-launch') || a.dataset.action==='weather');}), 'focus returns to a visible control');
  console.log('PASS: eight days, 24 hours per day, four wind heights, timezone, missing values, cache, refresh failure, mobile, keyboard close');
 }finally{await browser.close();}
