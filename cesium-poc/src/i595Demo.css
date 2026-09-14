@@ -391,6 +391,8 @@ body:has(.street-view[data-state="active"]) :is(.ramp-details, .road-details, .s
 
 .ask-twin-panel { position: absolute; bottom: 108px; right: 16px; width: min(380px, calc(100vw - 32px)); max-height: 500px; display: flex; flex-direction: column; background: #0a1525f8; border: 1px solid #38c9bf30; border-radius: 14px; box-shadow: 0 20px 60px #0009, 0 0 0 1px #38c9bf10; z-index: 21; overflow: hidden; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
 .ask-twin-panel--minimised { max-height: none; }
+/* `display: flex` above defeats the hidden attribute, so closing the panel left it on screen. */
+.ask-twin-panel[hidden] { display: none; }
 @media (max-width: 700px) { .ask-twin-panel { left: 16px; right: 16px; bottom: 160px; width: auto; } }
 
 /* Header — drag handle */
@@ -456,6 +458,12 @@ body:has(.street-view[data-state="active"]) :is(.ramp-details, .road-details, .s
 .ask-twin-send { background: #0e3040; border: 1px solid #38c9bf55; border-radius: 9px; color: #38c9bf; padding: 8px 11px; cursor: pointer; display: flex; align-items: center; flex-shrink: 0; transition: background 0.12s; }
 .ask-twin-send:hover:not(:disabled) { background: #174d60; }
 .ask-twin-send:disabled { opacity: 0.35; cursor: default; }
+
+/* Floating panels: the heading is the grab handle, and a dragged panel lifts above its neighbours. */
+.panel-drag-handle { cursor: grab; user-select: none; touch-action: none; }
+.panel-drag-handle:active { cursor: grabbing; }
+.is-dragging { z-index: 40; box-shadow: 0 26px 70px #000a; }
+@media (max-width: 700px) { .panel-drag-handle { cursor: default; } }
 
 /* Keep map controls in the upper-right control zone; Ask the Twin remains the bottom action. */
 body .map-nav, body:has(.twin-hud) .map-nav { top: 120px; bottom: auto; right: 16px; }
