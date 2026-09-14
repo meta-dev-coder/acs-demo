@@ -8,6 +8,7 @@ export default defineConfig({
   // leaves both unset → "/" so npm start and the Playwright e2e suite are unaffected. All runtime
   // asset URLs resolve against import.meta.env.BASE_URL so data/ and models/ load under either base.
   base: process.env.CESIUM_BASE_PATH || process.env.POC_BASE_PATH || "/",
+  build: { target: 'esnext' },
   plugins: [cesium()],
   // Port 5188 (not the default 5180) keeps this NTTA worktree isolated from a sibling session's
   // dev server sharing localhost. Disable auto-open under headless e2e.
