@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [master]
+    branches: [master, demo]
   workflow_dispatch:
 
 permissions:
@@ -19,6 +19,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: master
+      - uses: actions/checkout@v4
+        with:
+          ref: demo
+          path: demo-branch
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -45,6 +51,22 @@ jobs:
         env:
           CESIUM_BASE_PATH: /acs-demo/twin/
 
+      # ---------- Phase 4: demo branch (I-595 Digital Twin) → /acs-demo/demo/ ----------
+      - name: Install demo branch deps
+        run: npm install
+        working-directory: demo-branch/cesium-poc
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+      - name: Build demo branch (I-595)
+        run: npm run build
+        working-directory: demo-branch/cesium-poc
+        env:
+          CESIUM_BASE_PATH: /acs-demo/demo/
+          VITE_SNAPSHOT_BASE: https://d3syo4sqvwi009.cloudfront.net/api/i595/camera
+          VITE_ASK_THE_TWIN_API: https://d3syo4sqvwi009.cloudfront.net/api/i595/ask
+          VITE_CESIUM_ION_TOKEN: ${{ secrets.VITE_CESIUM_ION_TOKEN }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
+
       # ---------- Assemble the multi-demo site under one Pages root ----------
       - name: Assemble _site (launcher + acs/ + twin/)
         run: |
@@ -70,6 +92,14 @@ jobs:
           # Point it at the ACS app's index so the Bentley redirect (/acs-demo/acs/signin-callback)
           # boots the iTwin SPA and completes the token exchange.
           cp _site/acs/index.html _site/404.html
+
+          # Phase 4: demo branch I-595 Digital Twin → _site/demo/
+          mkdir -p _site/demo
+          if [ -d demo-branch/cesium-poc/dist/acs-demo/demo/cesium ]; then
+            mv demo-branch/cesium-poc/dist/acs-demo/demo/cesium demo-branch/cesium-poc/dist/cesium
+            rm -rf demo-branch/cesium-poc/dist/acs-demo
+          fi
+          cp -r demo-branch/cesium-poc/dist/. _site/demo/
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
