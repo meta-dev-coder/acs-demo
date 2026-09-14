@@ -64,7 +64,8 @@ jobs:
           CESIUM_BASE_PATH: /acs-demo/demo/
           VITE_SNAPSHOT_BASE: https://d3syo4sqvwi009.cloudfront.net/api/i595/camera
           VITE_ASK_THE_TWIN_API: https://d3syo4sqvwi009.cloudfront.net/api/i595/ask
-          VITE_CESIUM_ION_TOKEN: ${{ secrets.VITE_CESIUM_ION_TOKEN }}
+          VITE_LIVE_EVENTS_API: https://d3syo4sqvwi009.cloudfront.net/api/i595/live-events
+          VITE_WS_ENDPOINT: wss://b0wqexsnpk.execute-api.us-east-1.amazonaws.com/prod
           VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
 
       # ---------- Assemble the multi-demo site under one Pages root ----------
