@@ -1,0 +1,1 @@
+{"app":"npx ts-node bin/i595-infra.ts","watch":{"include":["**"],"exclude":["README.md","cdk*.json","**/*.js","tsconfig.json","package*.json","**/*.d.ts"]},"context":{"@aws-cdk/aws-apigateway:usagePlanKeyOrderInsensitiveLookup":true,"@aws-cdk/core:stackRelativeExports":true}}

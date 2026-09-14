@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "e2e": "playwright test",
+    "api": "node server/index.mjs",
     "test:unit": "node --test tests/**/*.test.mjs"
   },
   "dependencies": {

@@ -1,0 +1,762 @@
+{
+  "type": "FeatureCollection",
+  "name": "I-595 Corridor FDOT Traffic Signals",
+  "metadata": {
+    "source": "FDOT RCI Traffic Signals",
+    "source_feature_count": 120,
+    "filtered_feature_count": 22,
+    "filter_method": "Retain FDOT signal points within 150 m of mapped SR 84 frontage-road geometry or confirmed I-595 ramp/connector geometry.",
+    "crs": "EPSG:4326",
+    "note": "These are corridor-relevant signals, not signals on I-595 mainline roadway 86095000 itself."
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": 5579,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.25119917905441,
+          26.09308538282535
+        ]
+      },
+      "properties": {
+        "asset_id": "FDOT-SIGNAL-5579",
+        "asset_type": "traffic_signal",
+        "signal_type_code": "02",
+        "signal_type": "Traffic Signal",
+        "signal_id": "3391",
+        "roadway_id": "86220000",
+        "road_side": "C",
+        "cross_street": "S 2300 BLOCK",
+        "begin_post": 8.404,
+        "effective_date": "24-OCT-1989",
+        "section_status": "ON",
+        "signal_structure": "01",
+        "district": "4",
+        "county": "Broward",
+        "fdot_objectid": 5579,
+        "distance_to_sr84_m": 543.6,
+        "distance_to_i595_ramps_m": 90.8,
+        "distance_to_i595_mainline_m": 596.8,
+        "corridor_relevance_basis": "I595_RAMP_CONNECTOR",
+        "source": "FDOT RCI Traffic Signals",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 1457,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.36868732342217,
+          26.1272894897669
+        ]
+      },
+      "properties": {
+        "asset_id": "FDOT-SIGNAL-1457",
+        "asset_type": "traffic_signal",
+        "signal_type_code": "02",
+        "signal_type": "Traffic Signal",
+        "signal_id": "2306",
+        "roadway_id": "86080500",
+        "road_side": "C",
+        "cross_street": "BONAVENTURE BLVD",
+        "begin_post": 3.271,
+        "effective_date": "01-SEP-1982",
+        "section_status": "ON",
+        "signal_structure": "03",
+        "district": "4",
+        "county": "Broward",
+        "fdot_objectid": 1457,
+        "distance_to_sr84_m": 0.6,
+        "distance_to_i595_ramps_m": 1118.1,
+        "distance_to_i595_mainline_m": 431.4,
+        "corridor_relevance_basis": "SR84_FRONTAGE_ROAD",
+        "source": "FDOT RCI Traffic Signals",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 9043,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.1688697451505,
+          26.088188858795437
+        ]
+      },
+      "properties": {
+        "asset_id": "FDOT-SIGNAL-9043",
+        "asset_type": "traffic_signal",
+        "signal_type_code": "02",
+        "signal_type": "Traffic Signal",
+        "signal_id": "2226",
+        "roadway_id": "86080000",
+        "road_side": "C",
+        "cross_street": "SB I 95 - EB 84",
+        "begin_post": 17.671,
+        "effective_date": "07-FEB-1991",
+        "section_status": "ON",
+        "signal_structure": "03",
+        "district": "4",
+        "county": "Broward",
+        "fdot_objectid": 9043,
+        "distance_to_sr84_m": 759.5,
+        "distance_to_i595_ramps_m": 38.2,
+        "distance_to_i595_mainline_m": 649.7,
+        "corridor_relevance_basis": "I595_RAMP_CONNECTOR",
+        "source": "FDOT RCI Traffic Signals",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 6893,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.25026020413766,
+          26.099850389827164
+        ]
+      },
+      "properties": {
+        "asset_id": "FDOT-SIGNAL-6893",
+        "asset_type": "traffic_signal",
+        "signal_type_code": "02",
+        "signal_type": "Traffic Signal",
+        "signal_id": "2034",
+        "roadway_id": "86220000",
+        "road_side": "C",
+        "cross_street": "SR 84 WB",
+        "begin_post": 8.876,
+        "effective_date": "01-APR-1969",
+        "section_status": "ON",
+        "signal_structure": "01",
+        "district": "4",
+        "county": "Broward",
+        "fdot_objectid": 6893,
+        "distance_to_sr84_m": 47.8,
+        "distance_to_i595_ramps_m": 80.1,
+        "distance_to_i595_mainline_m": 102.9,
+        "corridor_relevance_basis": "SR84_FRONTAGE_ROAD",
+        "source": "FDOT RCI Traffic Signals",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 8267,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.31347537386901,
+          26.11507416696014
+        ]
+      },
+      "properties": {
+        "asset_id": "FDOT-SIGNAL-8267",
+        "asset_type": "traffic_signal",
+        "signal_type_code": "02",
+        "signal_type": "Traffic Signal",
+        "signal_id": "2253",
+        "roadway_id": "86190000",
+        "road_side": "C",
+        "cross_street": "SR 84 WB",
+        "begin_post": 10.897,
+        "effective_date": "12-APR-1983",
+        "section_status": "ON",
+        "signal_structure": "03",
+        "district": "4",
+        "county": "Broward",
+        "fdot_objectid": 8267,
+        "distance_to_sr84_m": 9.6,
+        "distance_to_i595_ramps_m": 134.1,
+        "distance_to_i595_mainline_m": 32.7,
+        "corridor_relevance_basis": "SR84_FRONTAGE_ROAD",
+        "source": "FDOT RCI Traffic Signals",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 5004,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.29752764145618,
+          26.110160364896167
+        ]
+      },
+      "properties": {
+        "asset_id": "FDOT-SIGNAL-5004",
+        "asset_type": "traffic_signal",
+        "signal_type_code": "02",
+        "signal_type": "Traffic Signal",
+        "signal_id": "2305",
+        "roadway_id": "86080500",
+        "road_side": "C",
+        "cross_street": "HIATUS RD",
+        "begin_post": 7.895,
+        "effective_date": "12-APR-1983",
+        "section_status": "ON",
+        "signal_structure": "01",
+        "district": "4",
+        "county": "Broward",
+        "fdot_objectid": 5004,
+        "distance_to_sr84_m": 0.2,
+        "distance_to_i595_ramps_m": 18.7,
+        "distance_to_i595_mainline_m": 35.1,
+        "corridor_relevance_basis": "SR84_FRONTAGE_ROAD",
+        "source": "FDOT RCI Traffic Signals",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 10454,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.36035241194767,
+          26.12615886408876
+        ]
+      },
+      "properties": {
+        "asset_id": "FDOT-SIGNAL-10454",
+        "asset_type": "traffic_signal",
+        "signal_type_code": "02",
+        "signal_type": "Traffic Signal",
+        "signal_id": "3366",
+        "roadway_id": "86080550",
+        "road_side": "C",
+        "cross_street": "WESTON RD",
+        "begin_post": 8.596,
+        "effective_date": "14-MAY-1987",
+        "section_status": "ON",
+        "signal_structure": "03",
+        "district": "4",
+        "county": "Broward",
+        "fdot_objectid": 10454,
+        "distance_to_sr84_m": 0.1,
+        "distance_to_i595_ramps_m": 311.1,
+        "distance_to_i595_mainline_m": 132.2,
+        "corridor_relevance_basis": "SR84_FRONTAGE_ROAD",
+        "source": "FDOT RCI Traffic Signals",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 3309,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.26551084479517,
+          26.102355341610814
+        ]
+      },
+      "properties": {
+        "asset_id": "FDOT-SIGNAL-3309",
+        "asset_type": "traffic_signal",
+        "signal_type_code": "02",
+        "signal_type": "Traffic Signal",
+        "signal_id": "N/A",
+        "roadway_id": "86080500",
+        "road_side": "C",
+        "cross_street": "PINE ISLAND RD",
+        "begin_post": 9.956,
+        "effective_date": "N/A",
+        "section_status": "ON",
+        "signal_structure": "03",
+        "district": "4",
+        "county": "Broward",
+        "fdot_objectid": 3309,
+        "distance_to_sr84_m": 0.7,
+        "distance_to_i595_ramps_m": 13.2,
+        "distance_to_i595_mainline_m": 31.7,
+        "corridor_relevance_basis": "SR84_FRONTAGE_ROAD",
+        "source": "FDOT RCI Traffic Signals",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 10036,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.22674471021445,
+          26.09380302675476
+        ]
+      },
+      "properties": {
+        "asset_id": "FDOT-SIGNAL-10036",
+        "asset_type": "traffic_signal",
+        "signal_type_code": "02",
+        "signal_type": "Traffic Signal",
+        "signal_id": "2029",
+        "roadway_id": "86080550",
+        "road_side": "C",
+        "cross_street": "DAVIE RD",
+        "begin_post": 0,
+        "effective_date": "01-JUN-1963",
+        "section_status": "ON",
+        "signal_structure": "01",
+        "district": "4",
+        "county": "Broward",
+        "fdot_objectid": 10036,
+        "distance_to_sr84_m": 4.4,
+        "distance_to_i595_ramps_m": 166.8,
+        "distance_to_i595_mainline_m": 26.1,
+        "corridor_relevance_basis": "SR84_FRONTAGE_ROAD",
+        "source": "FDOT RCI Traffic Signals",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 8571,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.33012558053824,
+          26.11888108457252
+        ]
+      },
+      "properties": {
+        "asset_id": "FDOT-SIGNAL-8571",
+        "asset_type": "traffic_signal",
+        "signal_type_code": "02",
+        "signal_type": "Traffic Signal",
+        "signal_id": "2321",
+        "roadway_id": "86080550",
+        "road_side": "C",
+        "cross_street": "SW 136 AVE",
+        "begin_post": 6.653,
+        "effective_date": "01-JUN-1985",
+        "section_status": "ON",
+        "signal_structure": "03",
+        "district": "4",
+        "county": "Broward",
+        "fdot_objectid": 8571,
+        "distance_to_sr84_m": 0.1,
+        "distance_to_i595_ramps_m": 176.9,
+        "distance_to_i595_mainline_m": 44.1,
+        "corridor_relevance_basis": "SR84_FRONTAGE_ROAD",
+        "source": "FDOT RCI Traffic Signals",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 4627,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.2654397702761,
+          26.10322984971809
+        ]
+      },
+      "properties": {
+        "asset_id": "FDOT-SIGNAL-4627",
+        "asset_type": "traffic_signal",
+        "signal_type_code": "02",
+        "signal_type": "Traffic Signal",
+        "signal_id": "N/A",
+        "roadway_id": "86080550",
+        "road_side": "C",
+        "cross_street": "PINE ISLAND RD",
+        "begin_post": 2.491,
+        "effective_date": "N/A",
+        "section_status": "ON",
+        "signal_structure": "03",
+        "district": "4",
+        "county": "Broward",
+        "fdot_objectid": 4627,
+        "distance_to_sr84_m": 4.3,
+        "distance_to_i595_ramps_m": 13.1,
+        "distance_to_i595_mainline_m": 24.4,
+        "corridor_relevance_basis": "SR84_FRONTAGE_ROAD",
+        "source": "FDOT RCI Traffic Signals",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 9533,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.25095435048745,
+          26.097239548765128
+        ]
+      },
+      "properties": {
+        "asset_id": "FDOT-SIGNAL-9533",
+        "asset_type": "traffic_signal",
+        "signal_type_code": "02",
+        "signal_type": "Traffic Signal",
+        "signal_id": "3384",
+        "roadway_id": "86220000",
+        "road_side": "C",
+        "cross_street": "S 1900 BLOCK",
+        "begin_post": 8.691,
+        "effective_date": "15-FEB-1990",
+        "section_status": "ON",
+        "signal_structure": "01",
+        "district": "4",
+        "county": "Broward",
+        "fdot_objectid": 9533,
+        "distance_to_sr84_m": 96.9,
+        "distance_to_i595_ramps_m": 37.5,
+        "distance_to_i595_mainline_m": 144.4,
+        "corridor_relevance_basis": "I595_RAMP_CONNECTOR",
+        "source": "FDOT RCI Traffic Signals",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 7758,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.18068365547268,
+          26.0855235221648
+        ]
+      },
+      "properties": {
+        "asset_id": "FDOT-SIGNAL-7758",
+        "asset_type": "traffic_signal",
+        "signal_type_code": "02",
+        "signal_type": "Traffic Signal",
+        "signal_id": "2276",
+        "roadway_id": "86080000",
+        "road_side": "C",
+        "cross_street": "SW 29 AVE",
+        "begin_post": 16.914,
+        "effective_date": "16-OCT-1991",
+        "section_status": "ON",
+        "signal_structure": "03",
+        "district": "4",
+        "county": "Broward",
+        "fdot_objectid": 7758,
+        "distance_to_sr84_m": 1.3,
+        "distance_to_i595_ramps_m": 188.0,
+        "distance_to_i595_mainline_m": 193.1,
+        "corridor_relevance_basis": "SR84_FRONTAGE_ROAD",
+        "source": "FDOT RCI Traffic Signals",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 9479,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.28200482400729,
+          26.10734207487753
+        ]
+      },
+      "properties": {
+        "asset_id": "FDOT-SIGNAL-9479",
+        "asset_type": "traffic_signal",
+        "signal_type_code": "02",
+        "signal_type": "Traffic Signal",
+        "signal_id": "2341",
+        "roadway_id": "86080550",
+        "road_side": "C",
+        "cross_street": "NOB HILL RD",
+        "begin_post": 3.559,
+        "effective_date": "17-JAN-1989",
+        "section_status": "ON",
+        "signal_structure": "03",
+        "district": "4",
+        "county": "Broward",
+        "fdot_objectid": 9479,
+        "distance_to_sr84_m": 0.3,
+        "distance_to_i595_ramps_m": 156.5,
+        "distance_to_i595_mainline_m": 25.4,
+        "corridor_relevance_basis": "SR84_FRONTAGE_ROAD",
+        "source": "FDOT RCI Traffic Signals",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 1708,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.29763123863644,
+          26.11119150255288
+        ]
+      },
+      "properties": {
+        "asset_id": "FDOT-SIGNAL-1708",
+        "asset_type": "traffic_signal",
+        "signal_type_code": "02",
+        "signal_type": "Traffic Signal",
+        "signal_id": "2305",
+        "roadway_id": "86080550",
+        "road_side": "C",
+        "cross_street": "HIATUS RD",
+        "begin_post": 4.566,
+        "effective_date": "12-APR-1983",
+        "section_status": "ON",
+        "signal_structure": "01",
+        "district": "4",
+        "county": "Broward",
+        "fdot_objectid": 1708,
+        "distance_to_sr84_m": 0.2,
+        "distance_to_i595_ramps_m": 89.1,
+        "distance_to_i595_mainline_m": 33.1,
+        "corridor_relevance_basis": "SR84_FRONTAGE_ROAD",
+        "source": "FDOT RCI Traffic Signals",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 10229,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.2818181544982,
+          26.10639519518225
+        ]
+      },
+      "properties": {
+        "asset_id": "FDOT-SIGNAL-10229",
+        "asset_type": "traffic_signal",
+        "signal_type_code": "02",
+        "signal_type": "Traffic Signal",
+        "signal_id": "2341",
+        "roadway_id": "86080500",
+        "road_side": "C",
+        "cross_street": "NOB HILL RD",
+        "begin_post": 8.905,
+        "effective_date": "17-JAN-1989",
+        "section_status": "ON",
+        "signal_structure": "03",
+        "district": "4",
+        "county": "Broward",
+        "fdot_objectid": 10229,
+        "distance_to_sr84_m": 2.5,
+        "distance_to_i595_ramps_m": 102.2,
+        "distance_to_i595_mainline_m": 31.3,
+        "corridor_relevance_basis": "SR84_FRONTAGE_ROAD",
+        "source": "FDOT RCI Traffic Signals",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 2438,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.22670475683752,
+          26.092866253902304
+        ]
+      },
+      "properties": {
+        "asset_id": "FDOT-SIGNAL-2438",
+        "asset_type": "traffic_signal",
+        "signal_type_code": "02",
+        "signal_type": "Traffic Signal",
+        "signal_id": "2029",
+        "roadway_id": "86080500",
+        "road_side": "C",
+        "cross_street": "DAVIE RD",
+        "begin_post": 12.46,
+        "effective_date": "01-JUN-1963",
+        "section_status": "ON",
+        "signal_structure": "03",
+        "district": "4",
+        "county": "Broward",
+        "fdot_objectid": 2438,
+        "distance_to_sr84_m": 0.3,
+        "distance_to_i595_ramps_m": 168.5,
+        "distance_to_i595_mainline_m": 24.3,
+        "corridor_relevance_basis": "SR84_FRONTAGE_ROAD",
+        "source": "FDOT RCI Traffic Signals",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 5071,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.31347493267783,
+          26.113910937412843
+        ]
+      },
+      "properties": {
+        "asset_id": "FDOT-SIGNAL-5071",
+        "asset_type": "traffic_signal",
+        "signal_type_code": "02",
+        "signal_type": "Traffic Signal",
+        "signal_id": "2253",
+        "roadway_id": "86190000",
+        "road_side": "C",
+        "cross_street": "SR 84 EB",
+        "begin_post": 10.817,
+        "effective_date": "12-APR-1983",
+        "section_status": "ON",
+        "signal_structure": "03",
+        "district": "4",
+        "county": "Broward",
+        "fdot_objectid": 5071,
+        "distance_to_sr84_m": 14.5,
+        "distance_to_i595_ramps_m": 187.2,
+        "distance_to_i595_mainline_m": 46.6,
+        "corridor_relevance_basis": "SR84_FRONTAGE_ROAD",
+        "source": "FDOT RCI Traffic Signals",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 7576,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.25064894652836,
+          26.098516192966226
+        ]
+      },
+      "properties": {
+        "asset_id": "FDOT-SIGNAL-7576",
+        "asset_type": "traffic_signal",
+        "signal_type_code": "02",
+        "signal_type": "Traffic Signal",
+        "signal_id": "2034",
+        "roadway_id": "86220000",
+        "road_side": "C",
+        "cross_street": "SR 84 EB",
+        "begin_post": 8.781,
+        "effective_date": "01-APR-1969",
+        "section_status": "ON",
+        "signal_structure": "01",
+        "district": "4",
+        "county": "Broward",
+        "fdot_objectid": 7576,
+        "distance_to_sr84_m": 46.9,
+        "distance_to_i595_ramps_m": 1.0,
+        "distance_to_i595_mainline_m": 0.0,
+        "corridor_relevance_basis": "I595_RAMP_CONNECTOR",
+        "source": "FDOT RCI Traffic Signals",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 77,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.36054406330827,
+          26.124586701629735
+        ]
+      },
+      "properties": {
+        "asset_id": "FDOT-SIGNAL-77",
+        "asset_type": "traffic_signal",
+        "signal_type_code": "02",
+        "signal_type": "Traffic Signal",
+        "signal_id": "3366",
+        "roadway_id": "86080500",
+        "road_side": "C",
+        "cross_street": "WESTON RD",
+        "begin_post": 3.812,
+        "effective_date": "14-MAY-1987",
+        "section_status": "ON",
+        "signal_structure": "03",
+        "district": "4",
+        "county": "Broward",
+        "fdot_objectid": 77,
+        "distance_to_sr84_m": 0.2,
+        "distance_to_i595_ramps_m": 250.7,
+        "distance_to_i595_mainline_m": 33.6,
+        "corridor_relevance_basis": "SR84_FRONTAGE_ROAD",
+        "source": "FDOT RCI Traffic Signals",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 2765,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.32998759944269,
+          26.117619122970265
+        ]
+      },
+      "properties": {
+        "asset_id": "FDOT-SIGNAL-2765",
+        "asset_type": "traffic_signal",
+        "signal_type_code": "02",
+        "signal_type": "Traffic Signal",
+        "signal_id": "2321",
+        "roadway_id": "86080500",
+        "road_side": "C",
+        "cross_street": "SW 136 AVE",
+        "begin_post": 5.813,
+        "effective_date": "01-JUN-1985",
+        "section_status": "ON",
+        "signal_structure": "03",
+        "district": "4",
+        "county": "Broward",
+        "fdot_objectid": 2765,
+        "distance_to_sr84_m": 0.2,
+        "distance_to_i595_ramps_m": 76.9,
+        "distance_to_i595_mainline_m": 46.5,
+        "corridor_relevance_basis": "SR84_FRONTAGE_ROAD",
+        "source": "FDOT RCI Traffic Signals",
+        "corridor": "I-595"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 3300,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.17654347064538,
+          26.08637777003067
+        ]
+      },
+      "properties": {
+        "asset_id": "FDOT-SIGNAL-3300",
+        "asset_type": "traffic_signal",
+        "signal_type_code": "02",
+        "signal_type": "Traffic Signal",
+        "signal_id": "2307",
+        "roadway_id": "86080000",
+        "road_side": "C",
+        "cross_street": "SW 26 TERR",
+        "begin_post": 17.178,
+        "effective_date": "07-JAN-1984",
+        "section_status": "ON",
+        "signal_structure": "01",
+        "district": "4",
+        "county": "Broward",
+        "fdot_objectid": 3300,
+        "distance_to_sr84_m": 3.8,
+        "distance_to_i595_ramps_m": 322.3,
+        "distance_to_i595_mainline_m": 336.0,
+        "corridor_relevance_basis": "SR84_FRONTAGE_ROAD",
+        "source": "FDOT RCI Traffic Signals",
+        "corridor": "I-595"
+      }
+    }
+  ]
+}

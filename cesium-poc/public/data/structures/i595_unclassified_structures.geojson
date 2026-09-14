@@ -1,0 +1,1672 @@
+{
+  "type": "FeatureCollection",
+  "name": "I595_Unclassified_Structures",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_001",
+        "fdot_objectid": 219061,
+        "hlid": "154596",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86075046",
+        "section": "075",
+        "subsection": "046",
+        "milepost": 1,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 1,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.35063387399998,
+        "latitude": 26.120247177000067,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.35063387399998,
+          26.120247177000067
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_002",
+        "fdot_objectid": 219055,
+        "hlid": "154590",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86075045",
+        "section": "075",
+        "subsection": "045",
+        "milepost": 1,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 1,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.33211230999996,
+        "latitude": 26.11861304000007,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.33211230999996,
+          26.11861304000007
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_003",
+        "fdot_objectid": 219060,
+        "hlid": "154595",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86075046",
+        "section": "075",
+        "subsection": "046",
+        "milepost": 1,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 1,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.35424150599994,
+        "latitude": 26.12173167900005,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.35424150599994,
+          26.12173167900005
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_004",
+        "fdot_objectid": 219062,
+        "hlid": "154597",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86075046",
+        "section": "075",
+        "subsection": "046",
+        "milepost": 1,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 1,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.34766634899995,
+        "latitude": 26.119600124000044,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.34766634899995,
+          26.119600124000044
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_005",
+        "fdot_objectid": 219089,
+        "hlid": "154718",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 2,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.31091669999995,
+        "latitude": 26.113583300000073,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.31091669999995,
+          26.113583300000073
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_006",
+        "fdot_objectid": 219096,
+        "hlid": "154725",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86080500",
+        "section": "080",
+        "subsection": "500",
+        "milepost": 7,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 1,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.31565200999995,
+        "latitude": 26.11468375000004,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.31565200999995,
+          26.11468375000004
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_007",
+        "fdot_objectid": 219451,
+        "hlid": "154717",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 2,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.31256999999994,
+        "latitude": 26.114692000000048,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.31256999999994,
+          26.114692000000048
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_008",
+        "fdot_objectid": 219416,
+        "hlid": "155633",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 7,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.22719999999998,
+        "latitude": 26.093796000000054,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.22719999999998,
+          26.093796000000054
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_009",
+        "fdot_objectid": 219125,
+        "hlid": "154835",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 3,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.29939699999994,
+        "latitude": 26.111039000000062,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.29939699999994,
+          26.111039000000062
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_010",
+        "fdot_objectid": 219143,
+        "hlid": "154950",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 3,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.28617046999994,
+        "latitude": 26.10799523000003,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.28617046999994,
+          26.10799523000003
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_011",
+        "fdot_objectid": 219410,
+        "hlid": "155527",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 7,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.23249642999997,
+        "latitude": 26.094428390000076,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.23249642999997,
+          26.094428390000076
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_012",
+        "fdot_objectid": 219404,
+        "hlid": "155501",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 6,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 1,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.24707857999994,
+        "latitude": 26.097696110000072,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.24707857999994,
+          26.097696110000072
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_013",
+        "fdot_objectid": 219127,
+        "hlid": "154837",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 3,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.29673686999996,
+        "latitude": 26.110403930000075,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.29673686999996,
+          26.110403930000075
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_014",
+        "fdot_objectid": 219368,
+        "hlid": "155368",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 5,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 1,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.26542399999994,
+        "latitude": 26.103833000000066,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.26542399999994,
+          26.103833000000066
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_015",
+        "fdot_objectid": 219415,
+        "hlid": "155632",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 7,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.22599552999998,
+        "latitude": 26.093745520000027,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.22599552999998,
+          26.093745520000027
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_016",
+        "fdot_objectid": 219367,
+        "hlid": "155367",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 5,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 1,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.26266669999995,
+        "latitude": 26.101861100000065,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.26266669999995,
+          26.101861100000065
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_017",
+        "fdot_objectid": 219124,
+        "hlid": "154834",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 2,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.30312999999995,
+        "latitude": 26.11229000000003,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.30312999999995,
+          26.11229000000003
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_018",
+        "fdot_objectid": 219056,
+        "hlid": "154591",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 1,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.32930463899999,
+        "latitude": 26.118096724000054,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.32930463899999,
+          26.118096724000054
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_019",
+        "fdot_objectid": 219067,
+        "hlid": "154602",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 1,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.32898974999995,
+        "latitude": 26.117608330000053,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.32898974999995,
+          26.117608330000053
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_020",
+        "fdot_objectid": 219068,
+        "hlid": "154603",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 1,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.32844738999995,
+        "latitude": 26.117626190000067,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.32844738999995,
+          26.117626190000067
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_021",
+        "fdot_objectid": 219086,
+        "hlid": "154714",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 2,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.30465059099998,
+        "latitude": 26.112713556000074,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.30465059099998,
+          26.112713556000074
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_022",
+        "fdot_objectid": 219088,
+        "hlid": "154716",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 2,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.31392943999998,
+        "latitude": 26.11434151000003,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.31392943999998,
+          26.11434151000003
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_023",
+        "fdot_objectid": 219090,
+        "hlid": "154719",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 2,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.30752779999995,
+        "latitude": 26.113388900000075,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.30752779999995,
+          26.113388900000075
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_024",
+        "fdot_objectid": 219091,
+        "hlid": "154720",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 2,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.30733661999994,
+        "latitude": 26.113111240000023,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.30733661999994,
+          26.113111240000023
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_025",
+        "fdot_objectid": 219092,
+        "hlid": "154721",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 2,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.30724329999998,
+        "latitude": 26.112699020000036,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.30724329999998,
+          26.112699020000036
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_026",
+        "fdot_objectid": 219093,
+        "hlid": "154722",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 2,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.31359499999996,
+        "latitude": 26.113775000000032,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.31359499999996,
+          26.113775000000032
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_027",
+        "fdot_objectid": 219094,
+        "hlid": "154723",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 2,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.31333999999998,
+        "latitude": 26.113748000000044,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.31333999999998,
+          26.113748000000044
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_028",
+        "fdot_objectid": 219101,
+        "hlid": "154730",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 2,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.31492734999995,
+        "latitude": 26.11501382000006,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.31492734999995,
+          26.11501382000006
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_029",
+        "fdot_objectid": 219164,
+        "hlid": "155000",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 7,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.22231883099994,
+        "latitude": 26.09237691800007,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.22231883099994,
+          26.09237691800007
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_030",
+        "fdot_objectid": 219401,
+        "hlid": "155498",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 5,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 1,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.25517176999995,
+        "latitude": 26.09974778000003,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.25517176999995,
+          26.09974778000003
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_031",
+        "fdot_objectid": 219414,
+        "hlid": "155631",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 7,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.22694439999998,
+        "latitude": 26.092583300000058,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.22694439999998,
+          26.092583300000058
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_032",
+        "fdot_objectid": 219417,
+        "hlid": "155634",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 7,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.22582808999994,
+        "latitude": 26.093229060000056,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.22582808999994,
+          26.093229060000056
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_033",
+        "fdot_objectid": 219418,
+        "hlid": "155635",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 7,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.22412580999998,
+        "latitude": 26.092337910000026,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.22412580999998,
+          26.092337910000026
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_034",
+        "fdot_objectid": 219407,
+        "hlid": "155524",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 6,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 1,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.23932836999995,
+        "latitude": 26.096667440000033,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.23932836999995,
+          26.096667440000033
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_035",
+        "fdot_objectid": 219402,
+        "hlid": "155499",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 6,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 1,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.24998332999996,
+        "latitude": 26.098952780000047,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.24998332999996,
+          26.098952780000047
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_036",
+        "fdot_objectid": 219403,
+        "hlid": "155500",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 6,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 1,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.24761126999994,
+        "latitude": 26.098519920000058,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.24761126999994,
+          26.098519920000058
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_037",
+        "fdot_objectid": 219409,
+        "hlid": "155526",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 7,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.23418275999995,
+        "latitude": 26.09548901000005,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.23418275999995,
+          26.09548901000005
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_038",
+        "fdot_objectid": 219201,
+        "hlid": "155041",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 9,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 4,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.20696845199996,
+        "latitude": 26.087904988000048,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.20696845199996,
+          26.087904988000048
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_039",
+        "fdot_objectid": 219406,
+        "hlid": "155523",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 6,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 1,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.23987429999994,
+        "latitude": 26.09615179000008,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.23987429999994,
+          26.09615179000008
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_040",
+        "fdot_objectid": 219408,
+        "hlid": "155525",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 6,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 1,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.23879166999996,
+        "latitude": 26.096346940000046,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.23879166999996,
+          26.096346940000046
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_041",
+        "fdot_objectid": 219202,
+        "hlid": "155042",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 9,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 4,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.20643752799998,
+        "latitude": 26.087988112000062,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.20643752799998,
+          26.087988112000062
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_042",
+        "fdot_objectid": 219200,
+        "hlid": "155040",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 9,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 4,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.21113537499997,
+        "latitude": 26.090135881000037,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.21113537499997,
+          26.090135881000037
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_043",
+        "fdot_objectid": 219122,
+        "hlid": "154832",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 3,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.29373463999997,
+        "latitude": 26.109358110000073,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.29373463999997,
+          26.109358110000073
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_044",
+        "fdot_objectid": 219126,
+        "hlid": "154836",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 3,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.29842491999995,
+        "latitude": 26.111181530000067,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.29842491999995,
+          26.111181530000067
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_045",
+        "fdot_objectid": 219128,
+        "hlid": "154838",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 3,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.28910400999996,
+        "latitude": 26.108548330000076,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.28910400999996,
+          26.108548330000076
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_046",
+        "fdot_objectid": 219360,
+        "hlid": "155360",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 5,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 1,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.26518873999999,
+        "latitude": 26.103739020000035,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.26518873999999,
+          26.103739020000035
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_047",
+        "fdot_objectid": 219412,
+        "hlid": "155529",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 7,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.23003824999995,
+        "latitude": 26.09404236000006,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.23003824999995,
+          26.09404236000006
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_048",
+        "fdot_objectid": 219411,
+        "hlid": "155528",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 7,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.23115665999995,
+        "latitude": 26.094505750000053,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.23115665999995,
+          26.094505750000053
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_UNCLASSIFIED_049",
+        "fdot_objectid": 219405,
+        "hlid": "155522",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 7,
+        "structure_type": "UNCLASSIFIED",
+        "fdot_sign_type": null,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.23174921999998,
+        "latitude": 26.09490722000004,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.23174921999998,
+          26.09490722000004
+        ]
+      }
+    }
+  ]
+}
