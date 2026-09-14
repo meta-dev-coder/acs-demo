@@ -7,7 +7,9 @@ import { roadStructureFromProperties, structureOverlapsSegment, structureTooltip
 
 /** Bridge overlay on the existing viewer, using its shared details and picking mechanisms. */
 export function installBridgeStructures(container, viewer, mainlineSegments) {
-  container.innerHTML = `<details class="structures-group"><summary>Structures</summary>
+  // Open by default: this group now holds the sign-structure layers as well as bridges, and a
+  // collapsed disclosure made them look absent.
+  container.innerHTML = `<details open class="structures-group"><summary>Structures</summary>
     <details class="bridges-group" style="--road:#e7cf96"><summary><input id="bridges-all" type="checkbox" aria-label="Bridges" disabled><span class="swatch"></span><span>Bridges</span><span class="badge">…</span></summary>
       <div class="bridge-list"></div><p class="bridge-hint">Select a bridge to zoom to its location.</p>
     </details><p class="bridge-status ramp-status" role="status">Loading bridges…</p><button class="ramp-retry" hidden>Retry bridge loading</button>

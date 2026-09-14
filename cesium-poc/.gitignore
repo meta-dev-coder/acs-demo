@@ -4,3 +4,8 @@ dist/
 test-results/
 playwright-report/
 .playwright/
+
+# Corridor GLB models: ~100 MB, well past GitHub's 50 MB advisory, and only needed to render the
+# toll-gantry and lane-barrier layers. Kept locally; config/cesiumModels.json still points at them,
+# so a clone without the files lists those layers and logs the URL it could not load.
+public/models/i595/*.glb

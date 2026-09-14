@@ -1,4 +1,5 @@
 import { Cartesian3, Math as CesiumMath, JulianDate } from 'cesium';
+import { makeDraggable } from './draggablePanel.js';
 
 const ASK_URL = (import.meta.env?.VITE_ASK_THE_TWIN_API ?? '').replace(/\/$/, '')
   || 'https://d3syo4sqvwi009.cloudfront.net/api/i595/ask';
@@ -66,6 +67,7 @@ export function installAskTheTwin(viewer, { cameraControls } = {}) {
     </div>`;
   document.body.appendChild(panel);
 
+  const header   = panel.querySelector('.ask-twin-header');
   const body     = panel.querySelector('.ask-twin-body');
   const messages = panel.querySelector('.ask-twin-messages');
   const suggestEl = panel.querySelector('.ask-twin-suggestions');
@@ -85,25 +87,9 @@ export function installAskTheTwin(viewer, { cameraControls } = {}) {
   });
 
   // ── Drag ──────────────────────────────────────────────────────────────
-  let dragOx = 0, dragOy = 0, dragging = false;
-  const header = panel.querySelector('.ask-twin-header');
-  header.onmousedown = e => {
-    if (e.target.closest('button')) return;
-    dragging = true;
-    const r = panel.getBoundingClientRect();
-    dragOx = e.clientX - r.left;
-    dragOy = e.clientY - r.top;
-    panel.style.transition = 'none';
-    e.preventDefault();
-  };
-  document.addEventListener('mousemove', e => {
-    if (!dragging) return;
-    panel.style.left   = `${e.clientX - dragOx}px`;
-    panel.style.top    = `${e.clientY - dragOy}px`;
-    panel.style.bottom = 'auto';
-    panel.style.transform = 'none';
-  });
-  document.addEventListener('mouseup', () => { dragging = false; });
+  // Shared with every details panel, so the whole map drags the same way — and so a panel cannot
+  // be dropped somewhere it can no longer be grabbed.
+  const drag = makeDraggable(panel, header);
 
   // ── Minimise ──────────────────────────────────────────────────────────
   let minimised = false;

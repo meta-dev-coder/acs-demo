@@ -64,7 +64,12 @@ function makeGroup(title, id, className) {
   };
 }
 
-export function installCctvCameras(container, viewer) {
+/**
+ * @param {{onStreetView?: (place: {longitude: number, latitude: number, label: string}) => void}} [hooks]
+ *   When provided, the details panel offers Street View for the camera's own coordinates. Street
+ *   View is Google's street-level photography, not this camera's feed — the panel keeps them apart.
+ */
+export function installCctvCameras(container, viewer, { onStreetView } = {}) {
   // Express lane cameras (gantry-mounted on I-595 Express) shown first/top.
   const expressGroup = makeGroup('Express Lane Cameras', 'cameras-express', 'cameras-group cameras-express-group');
   const mainlineGroup = makeGroup('Mainline Cameras', 'cameras-mainline', 'cameras-group cameras-mainline-group');
@@ -128,6 +133,19 @@ export function installCctvCameras(container, viewer) {
     const old = selected; selected = entity; style(old); style(entity);
     panel.select(entity ? records.get(entity) : null);
     document.querySelector('.camera-stream-action')?.remove();
+    document.querySelector('.camera-street-view')?.remove();
+    if (entity && onStreetView) {
+      const record = records.get(entity);
+      const action = document.createElement('button');
+      action.className = 'camera-street-view';
+      action.textContent = 'Street View';
+      action.title = 'Google street-level imagery near this camera';
+      action.onclick = () => onStreetView({
+        longitude: record.longitude, latitude: record.latitude,
+        label: `CCTV ${record.camera_id}`,
+      });
+      document.querySelector('.camera-details')?.append(action);
+    }
     if (entity) {
       const p = records.get(entity);
       const url = getCameraStreamUrl(p);

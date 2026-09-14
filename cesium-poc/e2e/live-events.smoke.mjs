@@ -8,6 +8,14 @@ import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { openExplorer, revealLayerGroup } from './i595Explorer.mjs';
 
+// Cameras are drawn in two groups — express-lane and mainline — and only those within 150 m of the
+// I-595 network are shown, so the counts come from the data rather than from a number written here.
+const cameraFeatures = JSON.parse(readFileSync(new URL('../public/data/i595_corridor_cameras.geojson', import.meta.url))).features
+  .filter(f => { const d = Number(f.properties.distance_to_i595_network_m); return Number.isFinite(d) ? d <= 150 : true; });
+const expressCameras = cameraFeatures.filter(f => f.properties.is_express_camera === true).length;
+const mainlineCameras = cameraFeatures.length - expressCameras;
+
+
 const mainline = JSON.parse(readFileSync(new URL('../public/data/i595_mainline_eb.geojson', import.meta.url)));
 const [onMainlineLon, onMainlineLat] = mainline.features[0].geometry.coordinates[40];
 
@@ -96,7 +104,8 @@ try {
   assert.equal(await page.locator('[data-live-count="CLOSURE"]').textContent(), '1');
   assert.match(await page.locator('.live-events-group [role="status"]').textContent(), /2 live events within 250 m · live/);
   // The Live Events group sits alongside the existing ITS layers, which keep working.
-  assert.equal(await page.locator('.cameras-group .badge').textContent(), '74');
+  assert.equal(await page.locator('.cameras-express-group .badge').textContent(), String(expressCameras));
+  assert.equal(await page.locator('.cameras-mainline-group .badge').textContent(), String(mainlineCameras));
   assert.equal(await page.locator('.signals-group .badge').textContent(), '22');
 
   // ---- defaults and independent toggles --------------------------------------------------------
@@ -231,7 +240,10 @@ try {
   await page.waitForTimeout(500);
   assert.match(await page.locator('.live-events-group [role="status"]').textContent(), /Live-event service unreachable · still showing 2 events/);
   const notice = await page.locator('.live-event-source').textContent();
-  assert.match(notice, /cannot reach \/api\/i595\/live-events/);
+  // The endpoint is configurable (VITE_LIVE_EVENTS_API), so the notice names whichever one the
+  // page actually tried — a relative path locally, an absolute URL against a deployed API. What
+  // matters is that it names the endpoint rather than failing vaguely.
+  assert.match(notice, /cannot reach \S*\/api\/i595\/live-events/);
   assert.ok(!/no FL511 data has been received/.test(notice), 'two events are visible; the notice must not deny them');
   assert.equal(await page.evaluate(() => live.entityById.size), 2, 'an outage must not clear the layer');
   assert.equal(await page.evaluate(() => live.entityById.get('FL511-INCIDENT-845391').__probe), 'survives-outage',

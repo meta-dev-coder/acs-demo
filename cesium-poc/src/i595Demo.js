@@ -9,19 +9,30 @@ import { Color, GeoJsonDataSource, Cartesian3, Math as CMath, CameraEventType } 
 import { MAINLINE_COLORS } from "./i595RoadSegmentData.js";
 import { CesiumRenderer } from "./renderers/cesium.js";
 import corridor from "../config/corridorCenterline.json";
+import cesiumModels from "../config/cesiumModels.json";
 import { installRampLayerControls } from "./rampLayerControls.js";
 import { installFrontageRoads } from "./sr84FrontageRoads.js";
 import { createI595RoadSegmentLayer } from "./i595RoadSegmentLayer.js";
 import { installI595SegmentControls } from "./i595SegmentControls.js";
 import { installBridgeStructures } from "./bridgeStructures.js";
+import { createSignStructureService } from "./signStructureService.js";
+import { installSignStructureLayers } from "./signStructureLayers.js";
+import { SIGN_STRUCTURE_TYPES } from "./signStructureData.js";
 import { installI595ExpressLanes } from "./i595ExpressLanes.js";
 import { createI595StartupSequence, enableLayerCheckbox } from "./i595StartupSequence.js";
 import { installMapNavigationControls } from "./mapNavigationControls.js";
 import { installCorridorStatusBar } from "./corridorStatusBar.js";
+import { createMapLayerStore } from "./mapLayerStore.js";
+import { createStreetViewService } from "./streetViewService.js";
+import { createStreetViewMode } from "./streetViewMode.js";
+import { createStreetViewPlacement } from "./streetViewPlacement.js";
+import { installMapExplorer } from "./mapExplorer.js";
 import { getTrafficColor } from "./corridorVisualConfig.js";
 import { installI595RoadShields } from "./i595RoadShields.js";
 import { installI595ContextLabels } from "./i595ContextLabels.js";
 import { installI595Hud } from "./i595Hud.js";
+import { createCesiumModelService } from "./cesiumModelService.js";
+import { installCorridorModelLayers } from "./corridorModelLayers.js";
 import { installAskTheTwin } from "./askTheTwin.js";
 import { corridorOverview, heroView } from "./i595CorridorViews.js";
 import "./i595Demo.css";
@@ -30,7 +41,6 @@ document.title = "I-595-DEMO · System-of-record";
 document.body.innerHTML = `
   <div id="cesiumContainer" aria-label="I-595 highway map"></div>
   <aside class="layers" aria-label="Map layers">
-    <button id="menu-toggle" aria-expanded="true" aria-controls="layer-content"><span>☷ <span class="menu-title">Map explorer</span></span><span id="toggle-icon">‹</span></button>
     <div id="layer-content">
       <details open class="roads"><summary>Traffic</summary>
         <details open class="mainline-group"><summary>Traffic flow <span class="badge">3</span></summary>
@@ -40,10 +50,12 @@ document.body.innerHTML = `
         </details>
         <label class="layer-option"><input type="checkbox" id="flow-direction" checked><span>Direction of travel</span></label>
         <div class="incidents-group"></div>
-      </details>
-      <details class="its-group"><summary>Infrastructure</summary>
+        <!-- Frontage roads and ramps carry traffic; they belong beside the mainline, not with the
+             fixed infrastructure that stands over it. -->
         <div id="frontage-layer-controls"></div>
         <div id="ramp-layer-controls"></div>
+      </details>
+      <details class="its-group"><summary>Infrastructure</summary>
         <div id="structure-layer-controls"></div>
         <div id="gantry-layer-controls"></div>
       </details>
@@ -61,17 +73,13 @@ for (const label of document.querySelectorAll("label[data-route]")) {
   label.style.setProperty("--road", getTrafficColor(undefined, label.dataset.route));
 }
 const panel = document.querySelector(".layers");
-const toggle = document.querySelector("#menu-toggle");
+let explorerToggle = null;
 const setExplorerCollapsed = (collapsed) => {
   panel.classList.toggle("collapsed", collapsed);
-  toggle.setAttribute("aria-expanded", String(!collapsed));
-  toggle.setAttribute("aria-label", collapsed ? "Expand map explorer" : "Collapse map explorer");
+  explorerToggle?.setAttribute("aria-expanded", String(!collapsed));
+  explorerToggle?.setAttribute("aria-label", collapsed ? "Open map explorer" : "Close map explorer");
   document.querySelector("#layer-content").hidden = collapsed;
-  document.querySelector("#toggle-icon").textContent = collapsed ? "›" : "‹";
 };
-toggle.onclick = () => setExplorerCollapsed(!panel.classList.contains("collapsed"));
-// A fresh load opens on the map, not on the layer tree; the explorer is one click away.
-setExplorerCollapsed(true);
 
 const status = document.querySelector("#layer-status");
 const inputs = [...document.querySelectorAll('input[type="checkbox"]')];
@@ -106,8 +114,11 @@ try {
     const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewer.canvas.clientHeight : 1);
     zoom(Math.exp(Math.max(-0.4, Math.min(0.4, pixels * 0.002))));
   }, { passive: false });
-  // One bottom toolbar for zoom, orbit, tilt and Reset View.
-  const navigation = installMapNavigationControls(document.body, viewer, { zoom });
+  // One bottom toolbar for zoom, orbit, tilt, Street View and Reset View.
+  let streetViewPlacement = null;
+  const navigation = installMapNavigationControls(document.body, viewer, {
+    zoom, onStreetView: () => streetViewPlacement?.toggle(),
+  });
   navigation.setEnabled(true);
   const lons = corridor.map(p => p.lon), lats = corridor.map(p => p.lat);
   const orientationOf = view => ({ heading: CMath.toRadians(view.headingDeg), pitch: CMath.toRadians(view.pitchDeg), roll: CMath.toRadians(view.rollDeg) });
@@ -147,13 +158,60 @@ try {
   };
   const segmentControls = installI595SegmentControls(mainlineSegments, updateMainlineCount);
   const flowToggle = document.querySelector("#flow-direction");
+  // Every checkbox starts disabled until its layer is ready; this one is a display option with no
+  // data to load, so it is ready as soon as the segment layer exists.
+  flowToggle.disabled = false;
   flowToggle.onchange = () => mainlineSegments.setFlowVisible(flowToggle.checked);
   const expressLanes = installI595ExpressLanes(viewer, document.querySelector("#express-way"), {
     onVisibilityChange: updateMainlineCount, onStatus: message => { status.textContent = message; },
   });
   const bridgeControls = installBridgeStructures(document.querySelector("#structure-layer-controls"), viewer, mainlineSegments);
+  // FDOT sign structures sit inside the Structures group the bridge layer opens, so the hierarchy
+  // reads Structures → Bridges / Overlane. The service loads each type's GeoJSON exactly once.
+  const signStructureService = createSignStructureService();
+  const signStructureControls = installSignStructureLayers(
+    document.querySelector("#structure-layer-controls .structures-group"), viewer, signStructureService,
+    // The corridor's own geometry aims the inspection camera along the road: FDOT's `heading`
+    // field is reserved for the model-calibration pass and is null in every current record.
+    { centerline: corridor });
   const signalControls = installTrafficSignals(document.querySelector(".its-group"), viewer);
-  const cameraControls = installCctvCameras(document.querySelector(".its-group"), viewer);
+  // Street View shares the map key the photorealistic tileset already uses; the provider is only
+  // created the first time someone asks for a panorama.
+  // No key of its own: the provider uses GoogleMaps.defaultApiKey, which the photorealistic
+  // tileset sets from VITE_GOOGLE_MAPS_API_KEY. One key, configured in one place.
+  const streetView = createStreetViewService();
+  const streetViewMode = createStreetViewMode(viewer, streetView, {
+    tilesets: () => [baseEnvironment.tileset()],
+  });
+  const openStreetView = async place => {
+    const result = await streetViewMode.enter(place);
+    if (!result.ok && result.message) status.textContent = result.message;
+    return result;
+  };
+  const cameraControls = installCctvCameras(document.querySelector(".its-group"), viewer, { onStreetView: openStreetView });
+
+  // Street View is a way of exploring the corridor, not a camera feature: the toolbar tool works
+  // whether or not any layer is switched on.
+  const placementChip = document.createElement("p");
+  placementChip.className = "street-view-placement";
+  placementChip.setAttribute("role", "status");
+  placementChip.hidden = true;
+  document.body.append(placementChip);
+  streetViewPlacement = createStreetViewPlacement(viewer, corridor, {
+    onPlace: openStreetView,
+    findPanorama: (lon, lat, radius) => streetView.findPanorama(lon, lat, radius),
+    // Which carriageway is under the drop, when the mainline is drawn there.
+    directionAt: screenPosition => mainlineSegments.directionAt(screenPosition),
+    onState: (state, message) => {
+      placementChip.dataset.state = state;
+      placementChip.hidden = !message;
+      placementChip.textContent = message ?? "";
+      navigation.setStreetViewActive(state !== "normal");
+    },
+  });
+  // Escape leaves placement without entering anything.
+  const onPlacementKey = event => { if (event.key === "Escape") streetViewPlacement.stop(); };
+  document.addEventListener("keydown", onPlacementKey);
   const gantryControls = installExpressGantries(document.querySelector("#gantry-layer-controls"), viewer);
   const liveEventControls = installLiveEvents(document.querySelector(".incidents-group"), viewer);
   // Base environment: the world the corridor sits on, so it lives outside the DataLayer tree.
@@ -171,18 +229,36 @@ try {
     document.querySelector("#base-environment-controls"), baseEnvironment, { onFlyRequest: view3d });
   // Photorealistic 3D is the default world. On a missing key or a failed load the service reverts to
   // the satellite basemap and says why, so startup degrades instead of failing.
+  // Whoever starts the base environment — the intro's first stage or the `?intro=off` path below —
+  // settles this, so work that needs the drawn world can wait on readiness without racing to be the
+  // one that triggers it.
+  let base3dSettled;
+  const base3dReady = new Promise(resolve => { base3dSettled = resolve; });
   const loadBase3D = async () => {
-    await baseEnvironmentControls.set(BASE_ENVIRONMENTS.GOOGLE_PHOTOREALISTIC_3D);
-    const tileset = baseEnvironment.tileset();
-    if (!tileset?.initialTilesLoaded) return;
-    // Wait for the first tiles so the flight below crosses a drawn world, but never hang on a slow
-    // or throttled connection — the intro continues either way.
-    await new Promise(resolve => {
-      const timer = setTimeout(resolve, 8000);
-      const remove = tileset.initialTilesLoaded.addEventListener(() => { clearTimeout(timer); remove(); resolve(); });
-    });
+    try {
+      await baseEnvironmentControls.set(BASE_ENVIRONMENTS.GOOGLE_PHOTOREALISTIC_3D);
+      const tileset = baseEnvironment.tileset();
+      if (!tileset?.initialTilesLoaded) return;
+      // Wait for the first tiles so the flight below crosses a drawn world, but never hang on a slow
+      // or throttled connection — the intro continues either way.
+      await new Promise(resolve => {
+        const timer = setTimeout(resolve, 8000);
+        const remove = tileset.initialTilesLoaded.addEventListener(() => { clearTimeout(timer); remove(); resolve(); });
+      });
+    } finally {
+      base3dSettled();
+    }
   };
   if (!showIntro) void loadBase3D();
+
+  // GLB models from config/cesiumModels.json. They are sampled onto the world that is actually
+  // drawn, so they wait for the base environment to settle — never on a timer, and never by moving
+  // the camera: whatever the user is looking at stays exactly where it is.
+  const corridorModels = createCesiumModelService(viewer);
+  // Gantries and lane barriers are corridor layers in their own right: their controls, pins and
+  // fly-to behaviour come from the records, so a new record joins the right layer on its own.
+  const corridorModelLayers = installCorridorModelLayers(document.querySelector(".its-group"), viewer, corridorModels, cesiumModels);
+  if (import.meta.env.DEV) window.__cesiumModels = corridorModels;
 
   const startupSequence = createI595StartupSequence({
     base3d: { load: loadBase3D },
@@ -203,18 +279,53 @@ try {
     markers: corridorMarkers,
     onStage: stage => { document.body.dataset.startup = stage.toLowerCase().replaceAll("_", "-"); },
   });
-  if (showIntro) void startupSequence.run();
-  else document.body.dataset.startup = "ready";
+  // Meshes are heavy — the gantry alone is tens of megabytes. Fetching one while the corridor is
+  // fading in competes with the intro for bandwidth and makes the choreography stutter, so models
+  // are the last thing to arrive: after the sequence for an intro run, after the world is up
+  // otherwise. Either way the camera is never touched.
+  const placeCorridorModels = () => corridorModelLayers.place();
+  if (showIntro) void startupSequence.run().then(placeCorridorModels);
+  else {
+    document.body.dataset.startup = "ready";
+    void base3dReady.then(placeCorridorModels);
+  }
   // Identity and real counts, read from layers that have loaded — never from the layers being shown.
   const hud = installI595Hud(document.body, {
     cameras: cameraControls.cameraById, signals: signalControls.trafficSignalById, liveEvents: liveEventControls,
   });
+  // One canonical view of layer visibility, read and written through the controls the layer modules
+  // already own — the rail, the quick layers, the categories, the presets and the full hierarchy
+  // are all surfaces onto the same state.
+  const layerStore = createMapLayerStore({
+    counts: {
+      signals: () => signalControls.trafficSignalById.size,
+      cameras: () => cameraControls.cameraById.size,
+      incidents: () => liveEventControls.events.length,
+      structures: () => bridgeControls.bridgeById.size,
+      // One entry per registered structure type, so a new type gets its badge for free.
+      ...Object.fromEntries(SIGN_STRUCTURE_TYPES.map(type => [type.id, () => signStructureControls.countFor(type.id)])),
+      gantries: () => corridorModelLayers.countFor("gantries"),
+      barriers: () => corridorModelLayers.countFor("lane-barriers"),
+    },
+  });
+  const explorer = installMapExplorer(panel, layerStore, {
+    onOpenWeather: () => document.querySelector(".weather-launch")?.click(),
+    onTogglePanel: () => setExplorerCollapsed(!panel.classList.contains("collapsed")),
+  });
+  explorerToggle = document.querySelector("#menu-toggle");
+  // A fresh load opens on the map, not on the layer tree; the quick rail keeps the common
+  // toggles one click away, and the explorer itself is one click from the rail.
+  setExplorerCollapsed(true);
+
   // Operational strip: corridor facts and the live-event feed, with gaps stated rather than filled.
   const corridorStatus = installCorridorStatusBar(document.body, { mainline: mainlineSegments, liveEvents: liveEventControls });
   const askTwin = installAskTheTwin(viewer, { cameraControls });
-  if (import.meta.hot) import.meta.hot.dispose(() => { askTwin.destroy(); corridorStatus.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
+  if (import.meta.hot) import.meta.hot.dispose(() => { document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
   for (const input of inputs) {
-    if (input.id === 'i595_mainline_eb' || input.id === 'i595_mainline_wb' || input.id === 'express-way') continue;
+    // Layers with their own loader, plus display options that are not data layers at all: this loop
+    // fetches `data/<id>.geojson`, and "flow-direction" has no such file — being swept up here
+    // overwrote its handler and reset it on every click.
+    if (['i595_mainline_eb', 'i595_mainline_wb', 'express-way', 'flow-direction'].includes(input.id)) continue;
     input.disabled = false;
     let source, pending;
     input.onchange = async () => {

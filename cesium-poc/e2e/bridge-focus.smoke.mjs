@@ -24,7 +24,8 @@ try {
   });
   await page.waitForTimeout(1600);
   await revealLayerGroup(page, '.structures-group');
-  await page.locator('.structures-group > summary').click();
+  // The group now opens by default, so ensure it is open rather than toggling it.
+  await page.evaluate(() => { document.querySelector('.structures-group').open = true; });
   const before = await page.evaluate(()=>window.bridgeViewer.camera.positionCartographic.height);
   await page.locator('#bridges-all').check();
   await page.waitForTimeout(300);
@@ -47,6 +48,10 @@ try {
   await page.screenshot({path:'/tmp/bridge-focus-desktop.png'});
   await page.getByRole('button',{name:'Close bridge details'}).click();
   await page.setViewportSize({width:390,height:844});
+  // Cesium resizes its canvas on its own tick, and the focus helper frames from the canvas size —
+  // let the new viewport reach it before asking it to frame anything.
+  await page.waitForTimeout(800);
+  await page.evaluate(()=>window.bridgeViewer.forceResize());
   await page.locator('button[data-bridge-id="BRIDGE-860648"]').click();
   await page.waitForTimeout(1600);
   assert.equal(await page.locator('#menu-toggle').getAttribute('aria-expanded'),'false');
@@ -54,8 +59,11 @@ try {
     const v=window.bridgeViewer,{SceneTransforms}=window.bridgeCesium;
     const points=window.bridgeLayer.bridgeById.get('BRIDGE-860648').polyline.positions.getValue();
     const top=0;
+    // Clear of whatever the collapsed explorer actually occupies, rather than a baked-in width:
+    // the quick rail is narrower than the panel shell it replaced.
+    const left=document.querySelector('.quick-rail').getBoundingClientRect().right;
     const bottom=document.querySelector('.bridge-details').getBoundingClientRect().top;
-    return points.every(p=>{const xy=SceneTransforms.worldToWindowCoordinates(v.scene,p);return xy && xy.x>80 && xy.x<innerWidth && xy.y>top && xy.y<bottom;});
+    return points.every(p=>{const xy=SceneTransforms.worldToWindowCoordinates(v.scene,p);return xy && xy.x>left && xy.x<innerWidth && xy.y>top && xy.y<bottom;});
   }));
   await page.screenshot({path:'/tmp/bridge-focus-mobile.png'});
   console.log('PASS: short/long bridges fit clear map area, mobile framing, checkbox camera unchanged.');

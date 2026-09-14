@@ -35,7 +35,7 @@ try {
   });
   await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
   await openExplorer(page);
-  for (const ready of ['#cameras-all', '#signals-all', '#bridges-all', '#live-events-all']) {
+  for (const ready of ['#cameras-mainline', '#signals-all', '#bridges-all', '#live-events-all']) {
     await page.locator(`${ready}:not(:disabled)`).waitFor({ state: 'attached', timeout: 60000 });
   }
   await page.evaluate(async () => {

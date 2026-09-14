@@ -60,7 +60,7 @@ export function gantryDetails(p) {
 export function installExpressGantries(container, viewer) {
   ensureStyles();
   const group = document.createElement('details'); group.className = 'gantries-group';
-  group.innerHTML = '<summary><input type="checkbox" id="gantries-all" aria-label="595 Express Gantries" disabled><span>595 Express Gantries</span><span class="badge">…</span></summary><div class="gantry-list"></div><p class="ramp-status" role="status">Loading gantries…</p><button class="gantry-retry" hidden>Retry gantries</button>';
+  group.innerHTML = '<summary><input type="checkbox" id="express-gantries-all" aria-label="595 Express Gantries" disabled><span>595 Express Gantries</span><span class="badge">…</span></summary><div class="gantry-list"></div><p class="ramp-status" role="status">Loading gantries…</p><button class="gantry-retry" hidden>Retry gantries</button>';
   container.append(group);
   const parent = group.querySelector('input'), list = group.querySelector('.gantry-list'), status = group.querySelector('[role="status"]'), retry = group.querySelector('.gantry-retry');
   const gantryById = new Map(), records = new Map(), rows = new Map();

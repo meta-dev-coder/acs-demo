@@ -1,3 +1,5 @@
+import { makeDraggable } from './draggablePanel.js';
+
 // Coordinate selection from both the map and explorer labels using existing close callbacks.
 const activePanels = new Set();
 // Mirrors the repository's DOM-only context panels; dataset strings never become HTML.
@@ -6,12 +8,15 @@ export function createMapDetailsPanel({ title, className, details, secondaryDeta
   panel.className = className;
   panel.hidden = true;
   panel.setAttribute('aria-label', title);
-  panel.innerHTML = '<div class="ramp-details-heading"><h2>Ramp details</h2><button aria-label="Close ramp details">×</button></div><dl></dl>'
+  panel.innerHTML = '<div class="ramp-details-heading" title="Drag to move"><h2>Ramp details</h2><button aria-label="Close ramp details">×</button></div><dl></dl>'
     + (secondaryDetails ? '<details class="details-more"><summary>More details</summary><dl></dl></details>' : '');
   panel.querySelector('h2').textContent = title;
   panel.querySelector('button').setAttribute('aria-label', `Close ${title.toLowerCase()}`);
   panel.querySelector('button').onclick = onClose;
   document.body.append(panel);
+  // Every details panel floats: the heading is its grab handle, so the user can move it off
+  // whatever it is covering. The Close button inside the heading stays clickable.
+  const drag = makeDraggable(panel, panel.querySelector('.ramp-details-heading'));
   const tooltip = document.createElement('div');
   tooltip.className = 'ramp-tooltip';
   tooltip.setAttribute('role', 'tooltip');

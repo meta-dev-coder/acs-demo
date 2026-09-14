@@ -99,7 +99,7 @@ try {
   const layers = await page.evaluate(() => Object.fromEntries(
     ['i595_mainline_eb', 'i595_mainline_wb', 'express-way'].map(id => [id, document.querySelector(`#${id}`)?.checked === true])));
   for (const [id, on] of Object.entries(layers)) assert.equal(on, true, `${id} must be on when the intro finishes`);
-  const untouched = await page.evaluate(() => ['ramps-all', 'frontage-all', 'bridges-all', 'cameras-all', 'signals-all', 'live-events-all']
+  const untouched = await page.evaluate(() => ['ramps-all', 'frontage-all', 'bridges-all', 'cameras-mainline', 'signals-all', 'live-events-all']
     .map(id => document.querySelector(`#${id}`)).filter(Boolean).every(input => !input.checked && !input.indeterminate));
   assert.equal(untouched, true, 'CCTV, signals, live events, ramps, frontage and bridges stay off at startup');
   // The context labels arrive with the shields.
