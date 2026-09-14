@@ -91,10 +91,10 @@ export class I595Stack extends cdk.Stack {
 
     new scheduler.CfnSchedule(this, 'PollerSchedule', {
       name: 'i595-poller',
-      scheduleExpression: 'rate(1 minute)',
+      scheduleExpression: 'rate(10 minutes)',
       flexibleTimeWindow: {
         mode: 'FLEXIBLE',
-        maximumWindowInMinutes: 1,
+        maximumWindowInMinutes: 2,
       },
       target: {
         arn: pollerFn.functionArn,

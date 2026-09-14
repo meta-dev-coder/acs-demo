@@ -22,9 +22,9 @@ function determineSourceStatus(items) {
 
   const age = Date.now() - new Date(mostRecent).getTime()
   let status
-  if (age < 90_000) {
+  if (age < 600_000) {
     status = 'LIVE'
-  } else if (age < 300_000) {
+  } else if (age < 1_200_000) {
     status = 'STALE'
   } else {
     status = 'UNAVAILABLE'
