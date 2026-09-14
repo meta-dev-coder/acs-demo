@@ -93,8 +93,8 @@ export function createI595RoadSegmentLayer(viewer) {
     hover(pick(movement.endPosition), movement.endPosition);
   }, ScreenSpaceEventType.MOUSE_MOVE);
   handler.setInputAction(movement => {
-    oldClick?.(movement);
-    select(pick(movement.position));
+    const entity = pick(movement.position);
+    if (entity) select(entity); else oldClick?.(movement);
   }, ScreenSpaceEventType.LEFT_CLICK);
   const leave = () => { if (hovered) { hover(null); viewer.canvas.style.cursor = ''; } };
   viewer.canvas.addEventListener('mouseleave', leave);

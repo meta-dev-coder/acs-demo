@@ -1,6 +1,7 @@
 import { installI595Weather } from './i595Weather.js';
 import { installCctvCameras } from './cctvCameras.js';
 import { installTrafficSignals } from './trafficSignals.js';
+import { installExpressGantries } from './expressGantries.js';
 import { installLiveEvents } from './liveEvents.js';
 import { BASE_ENVIRONMENTS, createGooglePhotorealistic3DService } from './basePhotorealistic3D.js';
 import { installBaseEnvironmentControls } from './baseEnvironmentControls.js';
@@ -21,6 +22,7 @@ import { getTrafficColor } from "./corridorVisualConfig.js";
 import { installI595RoadShields } from "./i595RoadShields.js";
 import { installI595ContextLabels } from "./i595ContextLabels.js";
 import { installI595Hud } from "./i595Hud.js";
+import { installAskTheTwin } from "./askTheTwin.js";
 import { corridorOverview, heroView } from "./i595CorridorViews.js";
 import "./i595Demo.css";
 
@@ -43,6 +45,7 @@ document.body.innerHTML = `
         <div id="frontage-layer-controls"></div>
         <div id="ramp-layer-controls"></div>
         <div id="structure-layer-controls"></div>
+        <div id="gantry-layer-controls"></div>
       </details>
       <div id="base-environment-controls"></div>
       <p id="layer-status" role="status" aria-live="polite">Select a road to highlight it on the map.</p>
@@ -151,6 +154,7 @@ try {
   const bridgeControls = installBridgeStructures(document.querySelector("#structure-layer-controls"), viewer, mainlineSegments);
   const signalControls = installTrafficSignals(document.querySelector(".its-group"), viewer);
   const cameraControls = installCctvCameras(document.querySelector(".its-group"), viewer);
+  const gantryControls = installExpressGantries(document.querySelector("#gantry-layer-controls"), viewer);
   const liveEventControls = installLiveEvents(document.querySelector(".incidents-group"), viewer);
   // Base environment: the world the corridor sits on, so it lives outside the DataLayer tree.
   // The oblique 3D view is derived from the same corridor extent as "Reset view" — no new coordinates.
@@ -207,7 +211,8 @@ try {
   });
   // Operational strip: corridor facts and the live-event feed, with gaps stated rather than filled.
   const corridorStatus = installCorridorStatusBar(document.body, { mainline: mainlineSegments, liveEvents: liveEventControls });
-  if (import.meta.hot) import.meta.hot.dispose(() => { corridorStatus.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
+  const askTwin = installAskTheTwin(viewer, { cameraControls });
+  if (import.meta.hot) import.meta.hot.dispose(() => { askTwin.destroy(); corridorStatus.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
   for (const input of inputs) {
     if (input.id === 'i595_mainline_eb' || input.id === 'i595_mainline_wb' || input.id === 'express-way') continue;
     input.disabled = false;

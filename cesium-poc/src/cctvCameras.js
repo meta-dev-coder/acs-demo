@@ -14,49 +14,138 @@ const cameraIcon = muted => `data:image/svg+xml;charset=utf-8,${encodeURICompone
 <circle cx="22" cy="25" r="5"/>
 </g></svg>`)}`;
 const icons = { available: cameraIcon(false), unavailable: cameraIcon(true) };
-// Extension point: return a verified stream URL when a real provider is integrated.
-export function getCameraStreamUrl(cameraId) { return null; }
-const videoLabel = p => p.video_enabled === true ? 'Available' : 'Not Available';
+
+// Returns the snapshot proxy URL for the DIVAS JPEG snapshot, or null when the
+// camera has no divas_chan_id. Uses VITE_SNAPSHOT_BASE when set (e.g. CloudFront),
+// otherwise falls back to the same-origin dev-server proxy.
+const SNAPSHOT_BASE = (import.meta.env?.VITE_SNAPSHOT_BASE ?? '').replace(/\/$/, '');
+export function getCameraStreamUrl(camera) {
+  const id = camera?.divas_chan_id;
+  if (typeof id !== 'string' || id.length === 0) return null;
+  return SNAPSHOT_BASE ? `${SNAPSHOT_BASE}/${id}/snapshot` : `/api/i595/camera/${id}/snapshot`;
+}
+const snapshotLabel = p => p.divas_chan_id ? 'Live snapshot' : p.video_enabled === true ? 'No public feed' : 'Not available';
 const valid = value => value != null && String(value).trim() !== '' && String(value).toUpperCase() !== 'N/A';
+
 export function cameraDetails(p) {
   const distance = Number(p.distance_to_i595_network_m);
-  return [['Camera ID', p.camera_id], ['Video Stream', videoLabel(p)],
-    ['Location', `${p.latitude.toFixed(6)}, ${p.longitude.toFixed(6)}`],
-    ['Distance to I-595 Network', valid(p.distance_to_i595_network_m) && Number.isFinite(distance) ? distance < 1000 ? `${Math.round(distance)} m` : `${(distance / 1000).toFixed(1)} km` : null],
-    ['Source', 'FDOT / FL511 Camera Feed Data']].filter(([, value]) => valid(value));
+  return [
+    ['Camera ID', p.camera_id],
+    ['Location', p.description || null],
+    ['Direction', p.direction ? { E: 'Eastbound', W: 'Westbound', N: 'Northbound', S: 'Southbound' }[p.direction] ?? p.direction : null],
+    ['Snapshot Feed', snapshotLabel(p)],
+    ['Coordinates', `${p.latitude.toFixed(6)}, ${p.longitude.toFixed(6)}`],
+    ['Dist. to I-595', valid(p.distance_to_i595_network_m) && Number.isFinite(distance) ? distance < 1000 ? `${Math.round(distance)} m` : `${(distance / 1000).toFixed(1)} km` : null],
+    ['Source', 'FDOT / FL511'],
+  ].filter(([, value]) => valid(value));
 }
+
+function cameraLabel(p) {
+  return p.description || `Camera ${p.camera_id}`;
+}
+
+// Feed status: 'live' = has DIVAS chan id, 'enabled' = video_enabled but no DIVAS, 'none' = no video
+function feedStatus(p) {
+  if (p.divas_chan_id) return 'live';
+  if (p.video_enabled) return 'enabled';
+  return 'none';
+}
+
+function makeGroup(title, id, className) {
+  const el = document.createElement('details');
+  el.className = className;
+  el.innerHTML = `<summary><input type="checkbox" id="${id}" aria-label="${title}" disabled><span>${title}</span><span class="badge">…</span></summary><div class="camera-list"></div><p class="ramp-status" role="status">Loading…</p><button class="camera-retry" hidden>Retry</button>`;
+  return {
+    el,
+    parent: el.querySelector('input'),
+    list: el.querySelector('.camera-list'),
+    status: el.querySelector('[role="status"]'),
+    retry: el.querySelector('.camera-retry'),
+  };
+}
+
 export function installCctvCameras(container, viewer) {
-  const group = document.createElement('details'); group.className = 'cameras-group';
-  group.innerHTML = '<summary><input type="checkbox" id="cameras-all" aria-label="CCTV Cameras" disabled><span>CCTV Cameras</span><span class="badge">…</span></summary><div class="camera-list"></div><p class="ramp-status" role="status">Loading cameras…</p><button class="camera-retry" hidden>Retry cameras</button>';
-  container.append(group);
-  const parent = group.querySelector('input'), list = group.querySelector('.camera-list'), status = group.querySelector('[role="status"]'), retry = group.querySelector('.camera-retry');
+  // Express lane cameras (gantry-mounted on I-595 Express) shown first/top.
+  const expressGroup = makeGroup('Express Lane Cameras', 'cameras-express', 'cameras-group cameras-express-group');
+  const mainlineGroup = makeGroup('Mainline Cameras', 'cameras-mainline', 'cameras-group cameras-mainline-group');
+  container.append(expressGroup.el, mainlineGroup.el);
+
+  // All entities share one data source and one records/cameraById map so the click handler
+  // can pick any camera regardless of which group it belongs to.
   const cameraById = new Map(), records = new Map(), rows = new Map();
+  // Track which IDs belong to each group so the master checkboxes work independently.
+  const expressIds = new Set(), mainlineIds = new Set();
+
   const source = new CustomDataSource('I-595 Corridor CCTV Cameras');
   let selected, hovered, disposed = false, loading;
+  let snapshotInterval = null;
+
+  function clearSnapshotInterval() {
+    if (snapshotInterval !== null) { clearInterval(snapshotInterval); snapshotInterval = null; }
+  }
+
   const panel = createMapDetailsPanel({ title: 'CCTV Camera Details', className: 'camera-details', details: cameraDetails,
-    tooltipText: p => `CCTV Camera\nCamera ID: ${p.camera_id}\nVideo: ${videoLabel(p)}`, onClose: () => select(null) });
+    tooltipText: p => `CCTV Camera\nCamera ID: ${p.camera_id}\nSnapshot: ${snapshotLabel(p)}`, onClose: () => select(null) });
+
   function style(entity) {
     if (!entity) return;
-    entity.billboard.distanceDisplayCondition = new DistanceDisplayCondition(0, entity===selected ? Number.MAX_VALUE : config.lod.corridorDistance);
+    entity.billboard.distanceDisplayCondition = new DistanceDisplayCondition(0, entity === selected ? Number.MAX_VALUE : config.lod.corridorDistance);
     entity.billboard.scale = entity === selected ? 1.18 : entity === hovered ? 1.1 : 1;
     entity.billboard.color = Color.WHITE;
   }
+
+  function buildSnapshotWidget(snapshotUrl) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'camera-stream-action';
+    const img = document.createElement('img');
+    img.alt = 'I-595 live snapshot';
+    img.style.cssText = 'width:100%;display:block;border-radius:4px;';
+    img.src = `${snapshotUrl}?t=${Date.now()}`;
+    const statusLine = document.createElement('p');
+    statusLine.style.cssText = 'font-size:0.75rem;color:#94a3b8;margin:4px 0 0;text-align:right;';
+    const updateTimestamp = () => { statusLine.textContent = `Last refreshed: ${new Date().toLocaleTimeString()}`; };
+    updateTimestamp();
+    const errorMsg = document.createElement('div');
+    errorMsg.hidden = true;
+    errorMsg.style.cssText = 'padding:12px;background:#1e293b;border-radius:4px;font-size:0.85rem;color:#f87171;';
+    errorMsg.textContent = 'Snapshot unavailable — camera may be offline or feed not yet active';
+    const retryBtn = document.createElement('button');
+    retryBtn.textContent = 'Retry';
+    retryBtn.style.cssText = 'margin-top:8px;padding:4px 12px;font-size:0.8rem;cursor:pointer;';
+    errorMsg.append(retryBtn);
+    function loadSnapshot() { img.hidden = false; errorMsg.hidden = true; img.src = `${snapshotUrl}?t=${Date.now()}`; }
+    img.onload = () => { img.hidden = false; errorMsg.hidden = true; updateTimestamp(); };
+    img.onerror = () => { img.hidden = true; errorMsg.hidden = false; };
+    retryBtn.onclick = loadSnapshot;
+    clearSnapshotInterval();
+    snapshotInterval = setInterval(loadSnapshot, 6_000);
+    wrapper.append(img, errorMsg, statusLine);
+    return wrapper;
+  }
+
   function select(entity) {
+    clearSnapshotInterval();
     const old = selected; selected = entity; style(old); style(entity);
     panel.select(entity ? records.get(entity) : null);
     document.querySelector('.camera-stream-action')?.remove();
-    if (entity && records.get(entity).video_enabled === true) {
-      const button = document.createElement('button'); button.className = 'camera-stream-action'; button.textContent = 'View Camera';
-      const url = getCameraStreamUrl(entity.id);
-      const usable = typeof url === 'string' && /^https:\/\//i.test(url);
-      button.disabled = !usable; button.title = usable ? 'View camera' : 'Video integration is not configured';
-      if (usable) button.onclick = () => window.open(url, '_blank', 'noopener,noreferrer');
-      document.querySelector('.camera-details').append(button);
+    if (entity) {
+      const p = records.get(entity);
+      const url = getCameraStreamUrl(p);
+      if (typeof url === 'string') {
+        document.querySelector('.camera-details').append(buildSnapshotWidget(url));
+      } else if (p.video_enabled === true) {
+        const note = document.createElement('p');
+        note.className = 'camera-stream-action camera-no-feed-note';
+        note.textContent = 'Snapshot feed not available for this camera — no public DIVAS mapping.';
+        document.querySelector('.camera-details').append(note);
+      }
+      focusMapPoints(viewer, [entity.position.getValue(viewer.clock.currentTime)], '.camera-details');
+    } else if (old) {
+      viewer.camera.cancelFlight();
     }
-    if (entity) focusMapPoints(viewer, [entity.position.getValue(viewer.clock.currentTime)], '.camera-details');
-    else if (old) viewer.camera.cancelFlight();
     viewer.scene.requestRender();
   }
+
   function hover(entity, position) {
     const old = hovered; hovered = entity; style(old); style(entity);
     panel.hover(entity ? records.get(entity) : null, position);
@@ -64,69 +153,123 @@ export function installCctvCameras(container, viewer) {
     else if (old) viewer.canvas.style.cursor = '';
     viewer.scene.requestRender();
   }
+
+  function syncGroup(idSet, grp) {
+    let on = 0;
+    for (const id of idSet) {
+      const entity = cameraById.get(id);
+      rows.get(id)?.classList.toggle('camera-row--hidden', !entity?.show);
+      if (entity?.show) on++;
+    }
+    grp.parent.checked = on > 0 && on === idSet.size;
+    grp.parent.indeterminate = on > 0 && on < idSet.size;
+    grp.status.textContent = `${on} of ${idSet.size} cameras visible`;
+  }
+
   function sync() {
-    let count = 0;
-    for (const [id, entity] of cameraById) { rows.get(id).checked = entity.show; if (entity.show) count++; }
-    parent.checked = count > 0 && count === cameraById.size;
-    parent.indeterminate = count > 0 && count < cameraById.size;
-    status.textContent = `${count} of ${cameraById.size} cameras visible`;
+    syncGroup(expressIds, expressGroup);
+    syncGroup(mainlineIds, mainlineGroup);
     if (selected && !selected.show) select(null);
     if (hovered && !hovered.show) hover(null);
     viewer.scene.requestRender();
   }
-  parent.onclick = event => event.stopPropagation();
-  parent.onchange = () => { for (const entity of cameraById.values()) entity.show = parent.checked; sync(); };
+
+  for (const grp of [expressGroup, mainlineGroup]) {
+    grp.parent.onclick = e => e.stopPropagation();
+    grp.parent.onchange = () => {
+      const idSet = grp === expressGroup ? expressIds : mainlineIds;
+      for (const id of idSet) { const e = cameraById.get(id); if (e) e.show = grp.parent.checked; }
+      sync();
+    };
+  }
+
   const handler = viewer.screenSpaceEventHandler;
-  const oldMove = handler.getInputAction(ScreenSpaceEventType.MOUSE_MOVE), oldClick = handler.getInputAction(ScreenSpaceEventType.LEFT_CLICK);
+  const oldMove = handler.getInputAction(ScreenSpaceEventType.MOUSE_MOVE);
+  const oldClick = handler.getInputAction(ScreenSpaceEventType.LEFT_CLICK);
   const pick = position => { const entity = viewer.scene.pick(position)?.id; return records.has(entity) && entity.show ? entity : null; };
   handler.setInputAction(movement => { oldMove?.(movement); hover(pick(movement.endPosition), movement.endPosition); }, ScreenSpaceEventType.MOUSE_MOVE);
-  handler.setInputAction(movement => { const entity = pick(movement.position); oldClick?.(movement); select(entity); }, ScreenSpaceEventType.LEFT_CLICK);
+  handler.setInputAction(movement => { const entity = pick(movement.position); if (entity) select(entity); else oldClick?.(movement); }, ScreenSpaceEventType.LEFT_CLICK);
   const leave = () => hover(null);
   viewer.canvas.addEventListener('mouseleave', leave);
   const removeMove = viewer.camera.moveStart.addEventListener(leave);
+
   function load() {
     loading ??= (async () => {
-      retry.hidden = true;
+      expressGroup.retry.hidden = true; mainlineGroup.retry.hidden = true;
       const response = await fetch(`${import.meta.env.BASE_URL}data/i595_corridor_cameras.geojson`);
       if (!response.ok) throw new Error(`Cameras request failed: ${response.status}`);
       const data = await response.json(), ids = new Set();
-      for (const f of data.features) {
+      const onRoad = f => { const d = Number(f.properties.distance_to_i595_network_m); return Number.isFinite(d) ? d <= 150 : true; };
+      const features = data.features.filter(onRoad);
+      for (const f of features) {
         if (!valid(f.properties.camera_id) || ids.has(String(f.properties.camera_id)) || f.geometry?.type !== 'Point') throw new Error('Invalid camera identity or geometry');
         ids.add(String(f.properties.camera_id));
       }
       if (disposed) return;
-      for (const f of data.features) {
+      for (const f of features) {
         const p = { ...f.properties, latitude: f.geometry.coordinates[1], longitude: f.geometry.coordinates[0] };
-        const entity = source.entities.add({ id: String(p.camera_id), name: `Camera ${p.camera_id}`, show: false,
+        const isExpress = p.is_express_camera === true;
+        const entity = source.entities.add({
+          id: String(p.camera_id), name: cameraLabel(p), show: false,
           position: Cartesian3.fromDegrees(...f.geometry.coordinates), properties: p,
-          // Keep cameras readable at overview distances without overpowering nearby roads.
-          billboard: { image: p.video_enabled === true ? icons.available : icons.unavailable, width: 34, height: 40, scale: 1, verticalOrigin: VerticalOrigin.BOTTOM,
-            heightReference: HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          billboard: { image: p.video_enabled === true ? icons.available : icons.unavailable, width: 34, height: 40, scale: 1,
+            verticalOrigin: VerticalOrigin.BOTTOM, heightReference: HeightReference.CLAMP_TO_GROUND,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
             distanceDisplayCondition: new DistanceDisplayCondition(0, config.lod.corridorDistance),
-            scaleByDistance: new NearFarScalar(400, 1, 12000, 0.7) } });
+            scaleByDistance: new NearFarScalar(400, 1, 12000, 0.7) },
+        });
         cameraById.set(String(p.camera_id), entity); records.set(entity, p);
-        const row = document.createElement('div'); row.className = 'segment-row';
-        const input = document.createElement('input'); input.type = 'checkbox'; input.dataset.cameraId = String(p.camera_id);
-        const label = `Camera ${p.camera_id}`;
-        input.setAttribute('aria-label', label);
-        const button = document.createElement('button'); button.className = 'segment-select'; button.textContent = label; button.dataset.cameraId = String(p.camera_id);
-        input.onchange = () => { entity.show = input.checked; sync(); };
+        if (isExpress) expressIds.add(String(p.camera_id)); else mainlineIds.add(String(p.camera_id));
+
+        const row = document.createElement('div'); row.className = 'segment-row camera-row';
+        row.dataset.cameraId = String(p.camera_id);
+        const dot = document.createElement('span'); dot.className = `camera-feed-dot feed-${feedStatus(p)}`;
+        dot.title = feedStatus(p) === 'live' ? 'Live snapshot available' : feedStatus(p) === 'enabled' ? 'Camera active, no public snapshot feed' : 'No snapshot feed';
+        const button = document.createElement('button'); button.className = 'segment-select camera-select';
+        button.textContent = cameraLabel(p); button.dataset.cameraId = String(p.camera_id);
         button.onclick = () => { entity.show = true; sync(); select(entity); };
-        rows.set(String(p.camera_id), input); row.append(input, button); list.append(row);
+        rows.set(String(p.camera_id), row); row.append(dot, button);
+        (isExpress ? expressGroup.list : mainlineGroup.list).append(row);
       }
       await viewer.dataSources.add(source);
       if (disposed) { viewer.dataSources.remove(source, true); return; }
-      group.querySelector('.badge').textContent = String(cameraById.size);
-      parent.disabled = false; sync();
-    })().catch(error => { loading = null; if (!disposed) { status.textContent = 'Cameras could not load.'; retry.hidden = false; console.error(error); } });
+      expressGroup.el.querySelector('.badge').textContent = String(expressIds.size);
+      mainlineGroup.el.querySelector('.badge').textContent = String(mainlineIds.size);
+      expressGroup.parent.disabled = false; mainlineGroup.parent.disabled = false;
+      sync();
+    })().catch(error => {
+      loading = null;
+      if (!disposed) {
+        const msg = 'Cameras could not load.';
+        expressGroup.status.textContent = msg; expressGroup.retry.hidden = false;
+        mainlineGroup.status.textContent = msg; mainlineGroup.retry.hidden = false;
+        console.error(error);
+      }
+    });
     return loading;
   }
-  retry.onclick = load; load();
-  return { cameraById, destroy() {
+
+  const retryLoad = () => { loading = null; load(); };
+  expressGroup.retry.onclick = retryLoad; mainlineGroup.retry.onclick = retryLoad;
+  load();
+
+  // Programmatically show + select a camera by ID (used by Ask the Twin)
+  function selectCamera(id) {
+    const entity = cameraById.get(String(id));
+    if (!entity) return false;
+    entity.show = true;
+    sync();
+    select(entity);
+    return true;
+  }
+
+  return { cameraById, records, selectCamera, destroy() {
+    clearSnapshotInterval();
     disposed = true; removeMove(); viewer.canvas.removeEventListener('mouseleave', leave);
     for (const [event, action] of [[ScreenSpaceEventType.MOUSE_MOVE, oldMove], [ScreenSpaceEventType.LEFT_CLICK, oldClick]]) {
       if (action) handler.setInputAction(action, event); else handler.removeInputAction(event);
     }
-    viewer.dataSources.remove(source, true); panel.destroy(); group.remove();
+    viewer.dataSources.remove(source, true); panel.destroy();
+    expressGroup.el.remove(); mainlineGroup.el.remove();
   } };
 }

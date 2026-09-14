@@ -1,0 +1,10 @@
+{
+  "I595StackV5": {
+    "DataBucketName": "i595stackv5-i595corridordata41064a5b-oixfpv0dyrzj",
+    "WsEndpoint": "wss://b0wqexsnpk.execute-api.us-east-1.amazonaws.com/prod",
+    "LiveEventsFunctionUrl": "https://oxvrrzdzakomt7xk4ylyddgj6u0kekfr.lambda-url.us-east-1.on.aws/",
+    "SnapshotFunctionUrl": "https://ru2wczlfzsxspos7k344smuqi40gnhrt.lambda-url.us-east-1.on.aws/",
+    "AskTheTwinFunctionUrl": "https://ujcgxd7lgq34r4eutstfaou3nq0rdvsp.lambda-url.us-east-1.on.aws/",
+    "CloudFrontDomain": "d3syo4sqvwi009.cloudfront.net"
+  }
+}
