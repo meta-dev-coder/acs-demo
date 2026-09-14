@@ -23,7 +23,12 @@ const ICONS = {
   camera: '<path d="M2.6 6.4h3l1.3-2h6.2l1.3 2h3a1.1 1.1 0 0 1 1.1 1.1v7.4a1.1 1.1 0 0 1-1.1 1.1H2.6a1.1 1.1 0 0 1-1.1-1.1V7.5a1.1 1.1 0 0 1 1.1-1.1Z"/><circle cx="10" cy="11.2" r="3.1"/>',
   bridge: '<path d="M2 8v7M18 8v7M2 11c5-5 11-5 16 0"/><path d="M7 11v4M13 11v4"/>',
   gantry: '<path d="M3 17V6h14v11"/><path d="M3 8.5h14"/><path d="M7 8.5v3M10 8.5v3M13 8.5v3"/><path d="M1.5 17h3M15.5 17h3"/>',
+  // An overhead sign structure: posts, the truss that spans the lanes and the sign panel on it.
   barrier: '<path d="M4 17V4"/><path d="M2 17h4"/><path d="M4 8h14"/><path d="M8 8v2.5M12 8v2.5M16 8v2.5"/>',
+  // An overhead sign structure: a portal spanning the road with a sign panel hung from it.
+  overlane: '<path d="M2.5 17V5h15v12"/><path d="M2.5 7.5h15"/><rect x="6" y="9.5" width="8" height="5" rx="1"/><path d="M1 17h3M16 17h3"/>',
+  cantilever: '<path d="M4 17V4"/><path d="M2 17h4"/><path d="M4 6.5h13"/><path d="M4 4h11"/><rect x="8" y="8.5" width="8" height="5" rx="1"/>',
+  unclassified: '<path d="M10 17v-4"/><path d="M7 17h6"/><rect x="3" y="4" width="14" height="9" rx="1.5"/>',
   weather: '<circle cx="10" cy="10" r="3.4"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.5 4.5l1.5 1.5M14 14l1.5 1.5M15.5 4.5 14 6M6 14l-1.5 1.5"/>',
 };
 const icon = name => `<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">${ICONS[name] ?? ICONS.road}</svg>`;

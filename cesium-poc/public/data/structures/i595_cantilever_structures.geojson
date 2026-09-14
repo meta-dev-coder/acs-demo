@@ -1,0 +1,244 @@
+{
+  "type": "FeatureCollection",
+  "name": "I595_Cantilever_Structures",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_CANTILEVER_001",
+        "fdot_objectid": 219047,
+        "hlid": "154582",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 2,
+        "structure_type": "CANTILEVER",
+        "fdot_sign_type": 2,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.33964761299995,
+        "latitude": 26.118917760000045,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.33964761299995,
+          26.118917760000045
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_CANTILEVER_002",
+        "fdot_objectid": 219049,
+        "hlid": "154584",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86075045",
+        "section": "075",
+        "subsection": "045",
+        "milepost": 1,
+        "structure_type": "CANTILEVER",
+        "fdot_sign_type": 2,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.33635308799995,
+        "latitude": 26.119388033000064,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.33635308799995,
+          26.119388033000064
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_CANTILEVER_003",
+        "fdot_objectid": 219051,
+        "hlid": "154586",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86075045",
+        "section": "075",
+        "subsection": "045",
+        "milepost": 1,
+        "structure_type": "CANTILEVER",
+        "fdot_sign_type": 2,
+        "lighting_type": 3,
+        "light_count": 1,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.33317490399997,
+        "latitude": 26.118968651000046,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.33317490399997,
+          26.118968651000046
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_CANTILEVER_004",
+        "fdot_objectid": 219054,
+        "hlid": "154589",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86075045",
+        "section": "075",
+        "subsection": "045",
+        "milepost": 1,
+        "structure_type": "CANTILEVER",
+        "fdot_sign_type": 2,
+        "lighting_type": 3,
+        "light_count": 1,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.33444490799997,
+        "latitude": 26.118804905000047,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.33444490799997,
+          26.118804905000047
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_CANTILEVER_005",
+        "fdot_objectid": 219053,
+        "hlid": "154588",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 2,
+        "structure_type": "CANTILEVER",
+        "fdot_sign_type": 2,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.33843283399995,
+        "latitude": 26.119086347000064,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.33843283399995,
+          26.119086347000064
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_CANTILEVER_006",
+        "fdot_objectid": 219045,
+        "hlid": "154580",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86075046",
+        "section": "075",
+        "subsection": "046",
+        "milepost": 2,
+        "structure_type": "CANTILEVER",
+        "fdot_sign_type": 2,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.34253745999996,
+        "latitude": 26.119022097000027,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.34253745999996,
+          26.119022097000027
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_CANTILEVER_007",
+        "fdot_objectid": 219363,
+        "hlid": "155363",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 5,
+        "structure_type": "CANTILEVER",
+        "fdot_sign_type": 2,
+        "lighting_type": 3,
+        "light_count": 1,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "longitude": -80.25797069999999,
+        "latitude": 26.100677510000025,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.25797069999999,
+          26.100677510000025
+        ]
+      }
+    }
+  ]
+}

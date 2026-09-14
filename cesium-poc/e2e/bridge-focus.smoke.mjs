@@ -24,7 +24,8 @@ try {
   });
   await page.waitForTimeout(1600);
   await revealLayerGroup(page, '.structures-group');
-  await page.locator('.structures-group > summary').click();
+  // The group now opens by default, so ensure it is open rather than toggling it.
+  await page.evaluate(() => { document.querySelector('.structures-group').open = true; });
   const before = await page.evaluate(()=>window.bridgeViewer.camera.positionCartographic.height);
   await page.locator('#bridges-all').check();
   await page.waitForTimeout(300);

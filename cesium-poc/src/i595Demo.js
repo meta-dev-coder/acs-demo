@@ -14,6 +14,9 @@ import { installFrontageRoads } from "./sr84FrontageRoads.js";
 import { createI595RoadSegmentLayer } from "./i595RoadSegmentLayer.js";
 import { installI595SegmentControls } from "./i595SegmentControls.js";
 import { installBridgeStructures } from "./bridgeStructures.js";
+import { createSignStructureService } from "./signStructureService.js";
+import { installSignStructureLayers } from "./signStructureLayers.js";
+import { SIGN_STRUCTURE_TYPES } from "./signStructureData.js";
 import { installI595ExpressLanes } from "./i595ExpressLanes.js";
 import { createI595StartupSequence, enableLayerCheckbox } from "./i595StartupSequence.js";
 import { installMapNavigationControls } from "./mapNavigationControls.js";
@@ -45,10 +48,12 @@ document.body.innerHTML = `
         </details>
         <label class="layer-option"><input type="checkbox" id="flow-direction" checked><span>Direction of travel</span></label>
         <div class="incidents-group"></div>
-      </details>
-      <details class="its-group"><summary>Infrastructure</summary>
+        <!-- Frontage roads and ramps carry traffic; they belong beside the mainline, not with the
+             fixed infrastructure that stands over it. -->
         <div id="frontage-layer-controls"></div>
         <div id="ramp-layer-controls"></div>
+      </details>
+      <details class="its-group"><summary>Infrastructure</summary>
         <div id="structure-layer-controls"></div>
       </details>
       <div id="base-environment-controls"></div>
@@ -158,6 +163,14 @@ try {
     onVisibilityChange: updateMainlineCount, onStatus: message => { status.textContent = message; },
   });
   const bridgeControls = installBridgeStructures(document.querySelector("#structure-layer-controls"), viewer, mainlineSegments);
+  // FDOT sign structures sit inside the Structures group the bridge layer opens, so the hierarchy
+  // reads Structures → Bridges / Overlane. The service loads each type's GeoJSON exactly once.
+  const signStructureService = createSignStructureService();
+  const signStructureControls = installSignStructureLayers(
+    document.querySelector("#structure-layer-controls .structures-group"), viewer, signStructureService,
+    // The corridor's own geometry aims the inspection camera along the road: FDOT's `heading`
+    // field is reserved for the model-calibration pass and is null in every current record.
+    { centerline: corridor });
   const signalControls = installTrafficSignals(document.querySelector(".its-group"), viewer);
   // Street View shares the map key the photorealistic tileset already uses; the provider is only
   // created the first time someone asks for a panorama.
@@ -285,6 +298,8 @@ try {
       cameras: () => cameraControls.cameraById.size,
       incidents: () => liveEventControls.events.length,
       structures: () => bridgeControls.bridgeById.size,
+      // One entry per registered structure type, so a new type gets its badge for free.
+      ...Object.fromEntries(SIGN_STRUCTURE_TYPES.map(type => [type.id, () => signStructureControls.countFor(type.id)])),
       gantries: () => corridorModelLayers.countFor("gantries"),
       barriers: () => corridorModelLayers.countFor("lane-barriers"),
     },
@@ -300,7 +315,7 @@ try {
 
   // Operational strip: corridor facts and the live-event feed, with gaps stated rather than filled.
   const corridorStatus = installCorridorStatusBar(document.body, { mainline: mainlineSegments, liveEvents: liveEventControls });
-  if (import.meta.hot) import.meta.hot.dispose(() => { document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
+  if (import.meta.hot) import.meta.hot.dispose(() => { document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
   for (const input of inputs) {
     // Layers with their own loader, plus display options that are not data layers at all: this loop
     // fetches `data/<id>.geojson`, and "flow-direction" has no such file — being swept up here

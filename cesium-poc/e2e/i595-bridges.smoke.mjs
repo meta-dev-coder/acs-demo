@@ -31,12 +31,15 @@ try {
   // assertions below; the zoom half of this test drives the camera itself.
   await page.locator('#reset-view').click();
   await page.waitForTimeout(2000);
-  assert.equal(await page.locator('.structures-group').getAttribute('open'),null);
-  assert.equal(await page.locator('.bridges-group').getAttribute('open'),null);
+  // The Structures group holds four layers now, so it opens by default; the layers inside it still
+  // start collapsed, and — the point of this assertion — none of them starts switched on.
+  assert.notEqual(await page.locator('.structures-group').getAttribute('open'), null);
+  assert.equal(await page.locator('.bridges-group').getAttribute('open'), null);
   const visible = () => page.evaluate(()=>[...window.bridgeLayer.bridgeById.values()].filter(e=>e.show).length);
   assert.equal(await visible(),0);
   await revealLayerGroup(page, '.structures-group');
-  await page.locator('.structures-group > summary').click();
+  // The group now opens by default, so ensure it is open rather than toggling it.
+  await page.evaluate(() => { document.querySelector('.structures-group').open = true; });
   await page.locator('#bridges-all').check();
   assert.equal(await visible(),data.features.length);
   await page.waitForTimeout(1800);

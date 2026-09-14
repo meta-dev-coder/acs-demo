@@ -11,7 +11,18 @@
  * Composite layers (Traffic Flow is the three mainline routes) resolve to `on`, `off` or `partial`.
  */
 
+import { SIGN_STRUCTURE_TYPES } from './signStructureData.js';
+
 /** @typedef {'on'|'off'|'partial'|'unavailable'} LayerState */
+
+/**
+ * Sign structures come from their own registry, so registering a new structure type gives it a
+ * rail button, an explorer row and a count without touching the list below.
+ */
+const SIGN_STRUCTURE_LAYERS = SIGN_STRUCTURE_TYPES.map(type => Object.freeze({
+  id: type.id, label: type.label, short: type.groupLabel, category: 'infrastructure',
+  icon: type.icon, accent: type.accent, control: `#${type.control}`, count: type.id,
+}));
 
 /**
  * Every layer the corridor actually has. `members` makes a layer composite; `count` is read from
@@ -33,13 +44,15 @@ export const CORRIDOR_LAYERS = Object.freeze([
   // A barrier arm is a different asset from an overhead gantry, so it is its own layer rather than
   // a sub-group of one.
   Object.freeze({ id: 'lane-barriers', label: 'Lane Barriers', category: 'infrastructure', icon: 'barrier', control: '#barriers-all', count: 'barriers' }),
+  ...SIGN_STRUCTURE_LAYERS,
 ]);
 
 /**
  * The tools on the quick rail — the one-click surface. Mile markers are absent because the corridor
  * has no such layer.
  */
-export const RAIL_LAYER_IDS = Object.freeze(['traffic-flow', 'direction', 'incidents', 'signals', 'cameras', 'structures', 'gantries', 'lane-barriers']);
+export const RAIL_LAYER_IDS = Object.freeze(['traffic-flow', 'direction', 'incidents', 'signals', 'cameras', 'structures',
+  ...SIGN_STRUCTURE_LAYERS.map(layer => layer.id), 'gantries', 'lane-barriers']);
 
 export const LAYER_CATEGORIES = Object.freeze([
   Object.freeze({ id: 'traffic', label: 'Traffic' }),
@@ -156,17 +169,27 @@ export function createMapLayerStore({ root = document, counts = {} } = {}) {
     return Number.isFinite(value) ? value : null;
   }
 
-  function notify() { for (const listener of listeners) listener(); }
+  /** Every notification re-baselines the poll, so a change cannot be announced and then forgotten. */
+  function notify() {
+    signature = currentSignature();
+    for (const listener of listeners) listener();
+  }
 
   // The layer modules also set their own checkboxes directly (a "select all" parent syncing its
   // children, a load finishing). `checked` is a property, not an attribute, so it cannot be
   // observed — a light poll of a handful of booleans keeps every surface honest without touching
   // Cesium or re-rendering anything that has not changed.
+  //
+  // `notify` re-reads the signature rather than leaving it to the poll. It used to be the poll's
+  // job alone, which lost any change that was made and undone inside one 400 ms window: a direct
+  // notify rendered the new state, the baseline still held the old one, and the next poll compared
+  // the restored state against that stale baseline, saw no difference and stayed silent — leaving
+  // every surface showing a layer as on after it had been switched off.
+  const currentSignature = () =>
+    CORRIDOR_LAYERS.map(layer => `${layer.id}:${stateOf(layer.id)}:${isReady(layer.id) ? 1 : 0}:${countOf(layer.id)}`).join('|');
   let signature = '';
   const tick = () => {
-    const next = CORRIDOR_LAYERS.map(layer => `${layer.id}:${stateOf(layer.id)}:${isReady(layer.id) ? 1 : 0}:${countOf(layer.id)}`).join('|');
-    if (next === signature) return;
-    signature = next;
+    if (currentSignature() === signature) return;
     notify();
   };
   const timer = setInterval(tick, 400);

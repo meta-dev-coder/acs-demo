@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CORRIDOR_LAYERS, MAP_VIEW_PRESETS, PRESET_SCOPE, RAIL_LAYER_IDS,
-  combineStates, matchingPreset,
+  combineStates, createMapLayerStore, matchingPreset,
 } from '../src/mapLayerStore.js';
+import { SIGN_STRUCTURE_TYPES } from '../src/signStructureData.js';
 
 const byId = new Map(CORRIDOR_LAYERS.map(layer => [layer.id, layer]));
 
@@ -11,6 +12,9 @@ test('every rail tool and preset names a layer that actually exists', () => {
   for (const id of RAIL_LAYER_IDS) assert.ok(byId.has(id), `rail tool "${id}" must exist`);
   assert.ok(RAIL_LAYER_IDS.includes('structures'), 'bridges are reachable from the rail');
   assert.ok(RAIL_LAYER_IDS.includes('gantries'), 'toll gantries are reachable from the rail');
+  for (const type of SIGN_STRUCTURE_TYPES) {
+    assert.ok(RAIL_LAYER_IDS.includes(type.id), `${type.label} must be reachable from the rail`);
+  }
   // A barrier arm is not a gantry: it must have its own tool, not hide inside the gantry layer.
   assert.ok(RAIL_LAYER_IDS.includes('lane-barriers'), 'lane barriers are a rail tool of their own');
   assert.notEqual(byId.get('gantries').icon, byId.get('lane-barriers').icon, 'the two model layers are told apart by their icons');
@@ -91,7 +95,79 @@ test('a preset states the whole map, so switching presets cannot leave a layer b
 
 test('layers whose module reports no count simply have none', () => {
   const counted = CORRIDOR_LAYERS.filter(layer => layer.count).map(layer => layer.id);
-  assert.deepEqual(counted.sort(), ['cameras', 'gantries', 'incidents', 'lane-barriers', 'signals', 'structures']);
+  // Sign-structure layers are generated from their registry, so they are expected by derivation
+  // rather than by name — registering a new structure type must not need an edit here.
+  const expected = ['cameras', 'gantries', 'incidents', 'lane-barriers', 'signals', 'structures',
+    ...SIGN_STRUCTURE_TYPES.map(type => type.id)];
+  assert.deepEqual(counted.sort(), expected.sort());
   // Ramps and frontage roads expose no count API, so the UI shows no number for them.
   for (const id of ['ramps', 'frontage', 'mainline-eb']) assert.equal(byId.get(id).count, undefined);
+});
+
+test('every registered sign-structure type reaches the rail, a category and its own control', () => {
+  for (const type of SIGN_STRUCTURE_TYPES) {
+    const layer = byId.get(type.id);
+    assert.ok(layer, `${type.id} is missing from the corridor layers`);
+    assert.equal(layer.category, 'infrastructure');
+    assert.equal(layer.control, `#${type.control}`);
+    assert.equal(layer.count, type.id);
+    assert.ok(RAIL_LAYER_IDS.includes(type.id), `${type.id} is missing from the quick rail`);
+  }
+});
+
+/**
+ * A checkbox standing in for the control a layer module owns: the store reads and writes these,
+ * and never keeps a copy of their state.
+ */
+class FakeCheckbox {
+  constructor() { this.checked = false; this.indeterminate = false; this.disabled = false; this.onchange = null; }
+  dispatchEvent() { return true; }
+}
+
+function fakeRoot(ids) {
+  const inputs = new Map(ids.map(id => [id, new FakeCheckbox()]));
+  return { inputs, querySelector: selector => inputs.get(selector) ?? null };
+}
+
+test('a change made and undone between polls still reaches every surface', async t => {
+  // The bug this guards: `notify` used to leave the poll's baseline untouched. Toggling a layer on
+  // and straight back off inside one poll interval announced the "on", then compared the restored
+  // "off" against a baseline that still said "off" — so nothing was announced, and the quick rail
+  // kept showing a layer as on after it had been switched off.
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const root = fakeRoot(['#signals-all']);
+  const store = createMapLayerStore({ root, counts: { signals: () => 3 } });
+  const seen = [];
+  store.subscribe(() => seen.push(store.stateOf('signals')));
+
+  await store.setVisible('signals', true);
+  assert.deepEqual(seen, ['on'], 'switching on is announced immediately');
+
+  // Back off again without letting the poll run in between.
+  await store.setVisible('signals', false);
+  assert.equal(seen.at(-1), 'off', 'switching off is announced immediately');
+
+  // And the poll agrees with reality rather than re-announcing a change that already landed.
+  const announced = seen.length;
+  t.mock.timers.tick(400);
+  assert.equal(seen.length, announced, 'a settled state is not re-announced');
+  assert.equal(store.stateOf('signals'), 'off');
+  store.destroy();
+  t.mock.timers.reset();
+});
+
+test('a control changed behind the store’s back is picked up by the poll', async t => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const root = fakeRoot(['#signals-all']);
+  const store = createMapLayerStore({ root, counts: {} });
+  const seen = [];
+  store.subscribe(() => seen.push(store.stateOf('signals')));
+
+  // A layer module ticking its own parent checkbox, exactly as the real ones do on load.
+  root.inputs.get('#signals-all').checked = true;
+  assert.deepEqual(seen, [], 'nothing is announced until the poll reads it');
+  t.mock.timers.tick(400);
+  assert.deepEqual(seen, ['on'], 'the poll notices a control the store did not write');
+  store.destroy();
+  t.mock.timers.reset();
 });

@@ -1,0 +1,2004 @@
+{
+  "type": "FeatureCollection",
+  "name": "I595_Overlane_Gantries",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_001",
+        "fdot_objectid": 219212,
+        "hlid": "155056",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 9,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 4,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{0485D8E3-B37A-41AE-9AFE-0AAD79BBAE9C}",
+        "source_id": "{FCC3783C-F691-4A31-AF51-B114F4B65988}",
+        "longitude": -80.20205080299996,
+        "latitude": 26.084909241000048,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.20205080299996,
+          26.084909241000048
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_002",
+        "fdot_objectid": 219145,
+        "hlid": "154952",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 4,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{D3007E53-E3B6-49B7-966D-5E277EA9290E}",
+        "source_id": null,
+        "longitude": -80.28123423999995,
+        "latitude": 26.106435420000025,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.28123423999995,
+          26.106435420000025
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_003",
+        "fdot_objectid": 219273,
+        "hlid": "155130",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 9,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 4,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{37413C72-424B-462B-B396-B56F5947DC16}",
+        "source_id": "{73D8B8AB-41B2-4A68-9B29-192A737D3610}",
+        "longitude": -80.20365039999996,
+        "latitude": 26.08064109000003,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.20365039999996,
+          26.08064109000003
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_004",
+        "fdot_objectid": 219211,
+        "hlid": "155055",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 9,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 4,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{C19BEE75-3D37-46A0-9D02-1B262EE0AEF3}",
+        "source_id": "{FFEE9EA0-7FEA-4AC8-919B-A97D4B0C2839}",
+        "longitude": -80.20394234199995,
+        "latitude": 26.085265468000046,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.20394234199995,
+          26.085265468000046
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_005",
+        "fdot_objectid": 219351,
+        "hlid": "155250",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 8,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{FD5953FF-C390-449F-AD60-8DEC5E012997}",
+        "source_id": "{4EC1C7D5-0C87-4023-A3FB-EFD54FAAC53E}",
+        "longitude": -80.21352999999993,
+        "latitude": 26.08573300000006,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.21352999999993,
+          26.08573300000006
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_006",
+        "fdot_objectid": 219344,
+        "hlid": "155243",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 8,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 4,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{31305E04-780A-4780-9111-B9F172E68AC9}",
+        "source_id": "{52412C23-472B-4E92-B3F2-B948EC3D955C}",
+        "longitude": -80.21578521999999,
+        "latitude": 26.080941800000062,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.21578521999999,
+          26.080941800000062
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_007",
+        "fdot_objectid": 219352,
+        "hlid": "155251",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 8,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{B34E8DF3-8BB3-4184-A94D-245B22C143FD}",
+        "source_id": "{EA8F8B7D-36CC-432E-8E61-06311B706BAC}",
+        "longitude": -80.21658329999997,
+        "latitude": 26.08627780000006,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.21658329999997,
+          26.08627780000006
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_008",
+        "fdot_objectid": 219168,
+        "hlid": "155004",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 8,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{8455FFB8-6756-4494-ADCF-B6EC643C9126}",
+        "source_id": "{9889fae6-5459-44ac-aad5-7bf21a2c573b}",
+        "longitude": -80.21045555999996,
+        "latitude": 26.08886111000004,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.21045555999996,
+          26.08886111000004
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_009",
+        "fdot_objectid": 219171,
+        "hlid": "155007",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 8,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{8974CC94-1FDF-4305-B93B-4EEEE24E827E}",
+        "source_id": "{AD914A5C-ABA7-48B8-A0CC-4C3582641447}",
+        "longitude": -80.21249315999995,
+        "latitude": 26.089150800000027,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.21249315999995,
+          26.089150800000027
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_010",
+        "fdot_objectid": 219347,
+        "hlid": "155246",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 8,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{591B93BF-6957-45A4-A19A-F92F44FA6166}",
+        "source_id": "{0888163C-C909-4A6A-9522-288009863B06}",
+        "longitude": -80.21470335999999,
+        "latitude": 26.084092620000035,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.21470335999999,
+          26.084092620000035
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_011",
+        "fdot_objectid": 219052,
+        "hlid": "154587",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86075046",
+        "section": "075",
+        "subsection": "046",
+        "milepost": 2,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{90AFF2FA-5936-433F-9646-2986C57B2715}",
+        "source_id": null,
+        "longitude": -80.33222558699998,
+        "latitude": 26.118172592000064,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.33222558699998,
+          26.118172592000064
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_012",
+        "fdot_objectid": 219059,
+        "hlid": "154594",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 1,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{3531A929-F9A5-4133-B54A-2D4B0435BF40}",
+        "source_id": null,
+        "longitude": -80.32177334699998,
+        "latitude": 26.116630873000076,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.32177334699998,
+          26.116630873000076
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_013",
+        "fdot_objectid": 219166,
+        "hlid": "155002",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 8,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{5ABF5518-9A17-4780-A3A0-2D8356368D33}",
+        "source_id": "{26797D64-4219-4ADC-9DCD-0BEA9E97FAE4}",
+        "longitude": -80.21857626099995,
+        "latitude": 26.09111586800003,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.21857626099995,
+          26.09111586800003
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_014",
+        "fdot_objectid": 219144,
+        "hlid": "154951",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 4,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{38334C69-7B32-4CA6-B3EF-83F547FCE198}",
+        "source_id": null,
+        "longitude": -80.28386128999995,
+        "latitude": 26.107059650000053,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.28386128999995,
+          26.107059650000053
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_015",
+        "fdot_objectid": 219365,
+        "hlid": "155365",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 4,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{6FAD2453-610E-48BA-94CC-933160ADE545}",
+        "source_id": null,
+        "longitude": -80.27132699999999,
+        "latitude": 26.104534000000058,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.27132699999999,
+          26.104534000000058
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_016",
+        "fdot_objectid": 219148,
+        "hlid": "154955",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 4,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{C18FC380-044C-4D72-922D-D747BB630BAF}",
+        "source_id": null,
+        "longitude": -80.27797999999996,
+        "latitude": 26.10559500000005,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.27797999999996,
+          26.10559500000005
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_017",
+        "fdot_objectid": 219165,
+        "hlid": "155001",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 7,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 4,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{8A0E326A-7C8E-4A5F-A999-CAAD5BFC8700}",
+        "source_id": "{F31C4487-1F4F-40D3-B0E2-541EC1052187}",
+        "longitude": -80.22219999999999,
+        "latitude": 26.09276667000006,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.22219999999999,
+          26.09276667000006
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_018",
+        "fdot_objectid": 219095,
+        "hlid": "154724",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 1,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{2D2F0C45-D843-4147-95C6-CF32097FB108}",
+        "source_id": null,
+        "longitude": -80.32252099999994,
+        "latitude": 26.117129000000034,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.32252099999994,
+          26.117129000000034
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_019",
+        "fdot_objectid": 219097,
+        "hlid": "154726",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 1,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{C031250D-416A-4D6D-9C43-1B01F3A98196}",
+        "source_id": null,
+        "longitude": -80.32130305999993,
+        "latitude": 26.116011600000036,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.32130305999993,
+          26.116011600000036
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_020",
+        "fdot_objectid": 219098,
+        "hlid": "154727",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 1,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{F492CE89-A06B-41E9-9362-39573E857C58}",
+        "source_id": null,
+        "longitude": -80.31965594999997,
+        "latitude": 26.116105840000046,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.31965594999997,
+          26.116105840000046
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_021",
+        "fdot_objectid": 219099,
+        "hlid": "154728",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 1,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{F54E08F6-6F69-474A-B37E-26526CC347E5}",
+        "source_id": null,
+        "longitude": -80.31829157999994,
+        "latitude": 26.115339310000024,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.31829157999994,
+          26.115339310000024
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_022",
+        "fdot_objectid": 219100,
+        "hlid": "154729",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 1,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{090CEE0A-C872-40C7-86B1-7896C23D8CCC}",
+        "source_id": null,
+        "longitude": -80.31750438999995,
+        "latitude": 26.115818218000072,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.31750438999995,
+          26.115818218000072
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_023",
+        "fdot_objectid": 219087,
+        "hlid": "154715",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 1,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{0E54EB79-A9C5-43B1-AFC6-5310E003442B}",
+        "source_id": null,
+        "longitude": -80.31491699999998,
+        "latitude": 26.115237000000036,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.31491699999998,
+          26.115237000000036
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_024",
+        "fdot_objectid": 219070,
+        "hlid": "154605",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 1,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{B35FE70E-72CA-4653-8184-DECD0A3B6C6D}",
+        "source_id": null,
+        "longitude": -80.32472116999998,
+        "latitude": 26.116792830000065,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.32472116999998,
+          26.116792830000065
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_025",
+        "fdot_objectid": 219058,
+        "hlid": "154593",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 1,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{F716CCD8-38F6-4BEF-B65C-E61807A768F1}",
+        "source_id": null,
+        "longitude": -80.31955169799994,
+        "latitude": 26.11608865200003,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.31955169799994,
+          26.11608865200003
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_026",
+        "fdot_objectid": 219057,
+        "hlid": "154592",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 1,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{64F33D28-C51C-4DE1-AF3D-2768A3B78229}",
+        "source_id": null,
+        "longitude": -80.32692436299999,
+        "latitude": 26.117670461000046,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.32692436299999,
+          26.117670461000046
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_027",
+        "fdot_objectid": 219163,
+        "hlid": "154998",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 8,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{ACF75F62-27A6-427D-B1E5-43FAD40AE013}",
+        "source_id": "{79665D74-9A03-4FAB-86C6-A2A91D579D6C}",
+        "longitude": -80.21566451999996,
+        "latitude": 26.09036356000007,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.21566451999996,
+          26.09036356000007
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_028",
+        "fdot_objectid": 219167,
+        "hlid": "155003",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 8,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{04B2C72A-AB45-4BEB-8981-B069641805B6}",
+        "source_id": "{51B34588-091B-4139-8D6E-12F7D14EDD42}",
+        "longitude": -80.21565094199997,
+        "latitude": 26.090937277000023,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.21565094199997,
+          26.090937277000023
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_029",
+        "fdot_objectid": 219354,
+        "hlid": "155253",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 8,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{9E40483B-B36F-42D1-A125-EC4DB2D68656}",
+        "source_id": "{D778EA90-F09A-4D08-AF91-8D3FEA34267C}",
+        "longitude": -80.21677779999999,
+        "latitude": 26.08844440000007,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.21677779999999,
+          26.08844440000007
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_030",
+        "fdot_objectid": 219247,
+        "hlid": "155098",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 10,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{5B7B443A-A6CF-4A12-96EE-D8D81072BC92}",
+        "source_id": "{7C03D7E9-91F9-452F-90D5-77C83700757F}",
+        "longitude": -80.19097350999994,
+        "latitude": 26.084167610000065,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.19097350999994,
+          26.084167610000065
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_031",
+        "fdot_objectid": 219213,
+        "hlid": "155059",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 8,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{D7C93FAA-E816-44EE-8E25-E5D8BCA7826C}",
+        "source_id": "{4769BECD-B5B1-4701-A224-D0355780D71D}",
+        "longitude": -80.20926743199999,
+        "latitude": 26.087596932000054,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.20926743199999,
+          26.087596932000054
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_032",
+        "fdot_objectid": 219350,
+        "hlid": "155249",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 8,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{008DEB64-E4AD-41F3-9A5C-EA452912C6AF}",
+        "source_id": "{27074D3C-F5B1-432F-8F5C-0B9642618930}",
+        "longitude": -80.21552059999993,
+        "latitude": 26.084981580000033,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.21552059999993,
+          26.084981580000033
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_033",
+        "fdot_objectid": 219271,
+        "hlid": "155128",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 9,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 4,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{F51B861D-760A-426B-A99A-DA17724AA949}",
+        "source_id": "{DFAD7500-24C6-4394-B154-35C206D43EC5}",
+        "longitude": -80.20364216899998,
+        "latitude": 26.083436241000072,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.20364216899998,
+          26.083436241000072
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_034",
+        "fdot_objectid": 219172,
+        "hlid": "155008",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 8,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{4DC0D84E-A7C7-42F8-9A86-0B0B3D892395}",
+        "source_id": "{F33D181F-EADA-4CE7-8E82-D0EB60E86F81}",
+        "longitude": -80.21459064799996,
+        "latitude": 26.09081518800008,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.21459064799996,
+          26.09081518800008
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_035",
+        "fdot_objectid": 219215,
+        "hlid": "155061",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 9,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 4,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{D2868F40-07F5-4AA0-B779-497180AF5DF3}",
+        "source_id": "{D2BA9E3F-94C1-4620-8F31-93B78C2DCDEF}",
+        "longitude": -80.20622365999998,
+        "latitude": 26.085663660000023,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.20622365999998,
+          26.085663660000023
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_036",
+        "fdot_objectid": 219214,
+        "hlid": "155060",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 8,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{E24D70ED-8F2F-4AD7-88E1-1ED5F40E09DE}",
+        "source_id": "{A03F7842-697F-447C-9336-229F3BCF352C}",
+        "longitude": -80.20773005799998,
+        "latitude": 26.086503064000055,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.20773005799998,
+          26.086503064000055
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_037",
+        "fdot_objectid": 219050,
+        "hlid": "154585",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86075046",
+        "section": "075",
+        "subsection": "046",
+        "milepost": 2,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{5197CA31-5C33-45C1-9253-68BCB71965E2}",
+        "source_id": "{abf5469c-a243-4c35-8665-76b40faff0da}",
+        "longitude": -80.33471375099998,
+        "latitude": 26.11833407900008,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.33471375099998,
+          26.11833407900008
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_038",
+        "fdot_objectid": 219364,
+        "hlid": "155364",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 4,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{9BF36BA9-1ABA-42AE-B6CD-D87EBE20CE63}",
+        "source_id": null,
+        "longitude": -80.27075599999995,
+        "latitude": 26.10440200000005,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.27075599999995,
+          26.10440200000005
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_039",
+        "fdot_objectid": 219246,
+        "hlid": "155097",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 9,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 4,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{A0A4B147-4DB9-441B-AD29-0D858EE3EF85}",
+        "source_id": "{DDB04243-6C9C-49B6-8896-5EFD24AD97AA}",
+        "longitude": -80.19339089999994,
+        "latitude": 26.084210030000065,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.19339089999994,
+          26.084210030000065
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_040",
+        "fdot_objectid": 219293,
+        "hlid": "155150",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 9,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 4,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{E946DF11-E618-4260-950B-B71BE4FCD5F2}",
+        "source_id": "{B4D16072-D864-4BEC-A2A2-A4B2B35035FA}",
+        "longitude": -80.19367406999999,
+        "latitude": 26.08471467000004,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.19367406999999,
+          26.08471467000004
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_041",
+        "fdot_objectid": 219170,
+        "hlid": "155006",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 8,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{5E44676C-6FC4-4E40-8996-28F678043A0B}",
+        "source_id": "{21CCB14E-FAD5-4E5A-997E-A3B7ACF9FFE6}",
+        "longitude": -80.20783494999995,
+        "latitude": 26.088061200000027,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.20783494999995,
+          26.088061200000027
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_042",
+        "fdot_objectid": 219169,
+        "hlid": "155005",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 8,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{230229E4-3854-4815-944E-D59DB4F69448}",
+        "source_id": "{B5B918A3-95E6-4779-89F2-606A707C9BB9}",
+        "longitude": -80.20928227599995,
+        "latitude": 26.088308477000055,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.20928227599995,
+          26.088308477000055
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_043",
+        "fdot_objectid": 219345,
+        "hlid": "155244",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 8,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 4,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{3896744C-9931-4538-BF95-8136C1692493}",
+        "source_id": "{DAE8EF29-0C8C-4BC9-B08F-E0B5F3C5E58C}",
+        "longitude": -80.21553525999997,
+        "latitude": 26.081120850000048,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.21553525999997,
+          26.081120850000048
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_044",
+        "fdot_objectid": 219355,
+        "hlid": "155254",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 8,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{C96B9C7E-5881-49D5-816B-E140FC24097F}",
+        "source_id": "{B06B430F-8B76-4D1A-8579-0F8D3281A448}",
+        "longitude": -80.21192547999993,
+        "latitude": 26.088167330000033,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.21192547999993,
+          26.088167330000033
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_045",
+        "fdot_objectid": 219353,
+        "hlid": "155252",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 8,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{901D03B8-CA3D-4F8E-9D97-B9219B808818}",
+        "source_id": "{83699D6F-4853-4A75-92E8-0D632C86E13D}",
+        "longitude": -80.21384072999996,
+        "latitude": 26.08648857000003,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.21384072999996,
+          26.08648857000003
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_046",
+        "fdot_objectid": 219210,
+        "hlid": "155054",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 9,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 4,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{8AD72B01-4261-4D64-A79F-3DDC17BCD422}",
+        "source_id": "{7787157A-ED49-40D3-BF9D-AEA4A9DA3421}",
+        "longitude": -80.20418786099998,
+        "latitude": 26.08614145200005,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.20418786099998,
+          26.08614145200005
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_047",
+        "fdot_objectid": 219295,
+        "hlid": "155152",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 9,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 4,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{7782A08F-3F88-491C-B3AF-259E3F7F5644}",
+        "source_id": "{E99A04B7-3843-459C-A2E9-BFEDEEACB044}",
+        "longitude": -80.19891426999999,
+        "latitude": 26.08517543000005,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.19891426999999,
+          26.08517543000005
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_048",
+        "fdot_objectid": 219147,
+        "hlid": "154954",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 4,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{8EB4C639-B0A4-4E03-B2EA-79D54C6A6938}",
+        "source_id": null,
+        "longitude": -80.27825415999996,
+        "latitude": 26.10570333000004,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.27825415999996,
+          26.10570333000004
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_049",
+        "fdot_objectid": 219206,
+        "hlid": "155050",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 9,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 4,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{0E87C2E5-E14C-48DF-BE19-8922CC6D57CD}",
+        "source_id": "{6B58CC74-31DB-4241-8DF9-1CEB64C5B28F}",
+        "longitude": -80.20199732499998,
+        "latitude": 26.083457570000064,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.20199732499998,
+          26.083457570000064
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_050",
+        "fdot_objectid": 219348,
+        "hlid": "155247",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 8,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{70521B88-D2EC-43CC-9C55-3201AD7B55B5}",
+        "source_id": "{6B50D20A-349E-48EF-ABC5-29DDA4B3BF13}",
+        "longitude": -80.21774794999999,
+        "latitude": 26.08472745000006,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.21774794999999,
+          26.08472745000006
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_051",
+        "fdot_objectid": 219349,
+        "hlid": "155248",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 8,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 2,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{17F27C7C-4232-4417-8B71-0F2C8DF13934}",
+        "source_id": "{90EB8231-B20E-43D8-AB48-7DD959629BFD}",
+        "longitude": -80.21459025999997,
+        "latitude": 26.084855300000072,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.21459025999997,
+          26.084855300000072
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_052",
+        "fdot_objectid": 219346,
+        "hlid": "155245",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 8,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 4,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{6734FB38-973D-4CED-AD92-6F6BA3F5020C}",
+        "source_id": "{A3A3C903-4772-4F0D-813D-F632EA3ED803}",
+        "longitude": -80.21633021999997,
+        "latitude": 26.081060300000047,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.21633021999997,
+          26.081060300000047
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_053",
+        "fdot_objectid": 219216,
+        "hlid": "155062",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 9,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 4,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{A036A8CA-C42F-41AB-9F77-9224B85218CA}",
+        "source_id": "{584910CD-8988-49F8-9AB9-BDAA65194ACE}",
+        "longitude": -80.20076794499994,
+        "latitude": 26.082657742000038,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.20076794499994,
+          26.082657742000038
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "I595_GANTRY_054",
+        "fdot_objectid": 219199,
+        "hlid": "155039",
+        "road": "I-595",
+        "state_road": "862",
+        "roadway_id": "86095000",
+        "section": "095",
+        "subsection": "000",
+        "milepost": 9,
+        "structure_type": "OVERLANE",
+        "fdot_sign_type": 1,
+        "lighting_type": 3,
+        "light_count": 4,
+        "agency": "FDOT",
+        "district": 4,
+        "county_code": 86,
+        "source": "FDOT eMaintenance HWLO Public",
+        "source_globalid": "{F43C3FEE-A856-42B3-97C1-B53470BA246A}",
+        "source_id": "{F70E00CE-9DC8-4CB6-BA6D-DB76EF347844}",
+        "longitude": -80.20366429499995,
+        "latitude": 26.08795178300005,
+        "model": null,
+        "heading": null,
+        "height_m": null,
+        "verified": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -80.20366429499995,
+          26.08795178300005
+        ]
+      }
+    }
+  ]
+}

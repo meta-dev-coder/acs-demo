@@ -25,6 +25,15 @@ async function expect_strip_length(page) {
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+  // "No corridor length before the FDOT segments load" is only meaningful while they have not
+  // loaded, and racing startup to sample that moment is a coin toss — whichever else the map is
+  // fetching decides it. Hold the segments file back instead, so the claim is actually tested.
+  let releaseSegments;
+  const segmentsHeld = new Promise(resolve => { releaseSegments = resolve; });
+  await page.route('**/data/i595_fdot_traffic_segments.geojson', async route => {
+    await segmentsHeld;
+    await route.continue();
+  });
   await page.route('**/src/i595Demo.js*', async route => {
     const response = await route.fetch();
     await route.fulfill({ response, body: (await response.text())
@@ -70,6 +79,7 @@ try {
   // Corridor length is real FDOT linear referencing, so it appears once that data is loaded — and
   // not before: the strip reports what the corridor actually knows.
   assert.ok(!stripText.includes('Corridor'), 'no corridor length before the FDOT segments load');
+  releaseSegments();
   await openExplorer(page);
   await page.locator('#i595_mainline_eb').check();
   await page.waitForTimeout(2500);
