@@ -272,7 +272,56 @@ try {
   await page.screenshot({ path: '/tmp/i595-shields-google3d.png' });
   await page.evaluate(() => window.baseEnv.disable());
 
-  console.log(`road shields OK — ${shields.length} shields, startup ${start.lon.toFixed(4)},${start.lat.toFixed(4)} @ ${Math.round(start.height)} m`);
+  // ---- 7. the horizon pile-up is decluttered ----------------------------------------------------
+  // Looking east down the corridor from road level, interchanges 4.5 km to 15.6 km away project
+  // into a ~57 px band. Shields carry no depth test, so without decluttering all five draw on top
+  // of one another.
+  const horizon = await page.evaluate(async () => {
+    window.v.camera.cancelFlight();
+    window.v.camera.setView({
+      destination: window.C.Cartesian3.fromDegrees(-80.3200, 26.1150, 60),
+      orientation: { heading: window.C.Math.toRadians(101.3), pitch: window.C.Math.toRadians(-12), roll: 0 },
+    });
+    await window.settle(90);
+    const scene = window.v.scene, camera = scene.camera, time = window.v.clock.currentTime;
+    const onScreen = [];
+    for (const [id, entity] of window.shields.shieldById) {
+      const position = entity.position.getValue(time);
+      const point = scene.cartesianToCanvasCoordinates(position);
+      if (!point) continue;
+      const toward = window.C.Cartesian3.subtract(position, camera.positionWC, new window.C.Cartesian3());
+      if (window.C.Cartesian3.dot(toward, camera.directionWC) <= 0) continue;
+      if (point.x < 0 || point.y < 0 || point.x > scene.canvas.clientWidth || point.y > scene.canvas.clientHeight) continue;
+      onScreen.push({ id, x: point.x, y: point.y, drawn: entity.show !== false });
+    }
+    return onScreen;
+  });
+  assert.ok(horizon.length >= 4, `expected the corridor horizon to stack shields, saw ${horizon.length} on screen`);
+  const drawnShields = horizon.filter(shield => shield.drawn);
+  assert.ok(drawnShields.length >= 1, 'decluttering must never empty the frame');
+  assert.ok(drawnShields.length < horizon.length, 'overlapping shields must stand down');
+  for (let i = 0; i < drawnShields.length; i++) {
+    for (let j = i + 1; j < drawnShields.length; j++) {
+      const [a, b] = [drawnShields[i], drawnShields[j]];
+      assert.ok(Math.abs(a.x - b.x) >= 40 || Math.abs(a.y - b.y) >= 40,
+        `${a.id} and ${b.id} are drawn on top of each other at ${Math.round(a.x)},${Math.round(a.y)}`);
+    }
+  }
+
+  // The overview is the case distance culling would have broken: every shield is 20 km away there,
+  // and every one of them must still be drawn.
+  const overviewDrawn = await page.evaluate(async () => {
+    window.v.camera.cancelFlight();
+    window.v.camera.setView({
+      destination: window.C.Cartesian3.fromDegrees(-80.26, 26.07, 20000),
+      orientation: { heading: 0, pitch: window.C.Math.toRadians(-90), roll: 0 },
+    });
+    await window.settle(90);
+    return [...window.shields.shieldById.values()].filter(entity => entity.show !== false).length;
+  });
+  assert.equal(overviewDrawn, shields.length, 'the corridor overview must keep every shield');
+
+  console.log(`road shields OK — ${shields.length} shields, ${drawnShields.length}/${horizon.length} drawn at the horizon, startup ${start.lon.toFixed(4)},${start.lat.toFixed(4)} @ ${Math.round(start.height)} m`);
 } finally {
   await browser.close();
 }

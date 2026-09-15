@@ -10,9 +10,28 @@ import { corridorVisualConfig as config } from './corridorVisualConfig.js';
 import { Cartesian2, Cartesian3, Color, CustomDataSource, DistanceDisplayCondition, LabelStyle, NearFarScalar, VerticalOrigin } from 'cesium';
 import { CONTEXT_LABEL_ASSET_TYPE, contextLabelPlacements } from './i595ShieldData.js';
 import { registerUiOnlyEntities } from './uiOnlyMapEntities.js';
+import { installMarkerDeclutter, nearFarScalarValue } from './mapMarkerDeclutter.js';
 
 /** Beyond this the corridor is a line on a map and individual crossings stop being useful. */
 export const LABEL_VISIBLE_TO_M = config.lod.overviewDistance;
+
+/** Shared by the label graphic and the text measurement that keeps labels from overlapping. */
+export const LABEL_FONT = '600 13px system-ui, -apple-system, "Segoe UI", sans-serif';
+
+/**
+ * How wide a label really is on screen, measured rather than guessed: "Florida's Turnpike" covers
+ * roughly three times the screen of "I-95", so a single gap figure would either overlap the long
+ * names or needlessly drop the short ones.
+ */
+function labelFootprint(measure) {
+  return (entity, distance) => {
+    const time = undefined;
+    const text = entity.label.text?.getValue(time) ?? '';
+    const scale = nearFarScalarValue(entity.label.scaleByDistance?.getValue(time), distance);
+    // Half the drawn text box, plus the outline that makes it legible.
+    return { halfWidth: ((measure(text) * scale) / 2) + 2, halfHeight: (13 * scale) / 2 + 2 };
+  };
+}
 
 /**
  * @param {import('cesium').Viewer} viewer
@@ -30,7 +49,7 @@ export function installI595ContextLabels(viewer, centerline) {
       properties: { assetType: CONTEXT_LABEL_ASSET_TYPE, uiOnly: true, interchange: placement.interchange },
       label: {
         text: placement.interchange,
-        font: '600 13px system-ui, -apple-system, "Segoe UI", sans-serif',
+        font: LABEL_FONT,
         fillColor: Color.WHITE,
         // An outline rather than a background plate, so the label reads over bright and dark
         // photogrammetry alike without becoming a POI chip.
@@ -47,6 +66,12 @@ export function installI595ContextLabels(viewer, centerline) {
   }
 
   const unregister = registerUiOnlyEntities(viewer, labels);
+  // Same horizon pile-up as the shields, and worse: overlapping names are unreadable rather than
+  // merely duplicated. Decluttered separately from the shields so a label is never hidden by the
+  // shield it belongs to.
+  const canvas = document.createElement('canvas').getContext('2d');
+  const measure = text => { canvas.font = LABEL_FONT; return canvas.measureText(text).width; };
+  const declutter = installMarkerDeclutter(viewer, labels, { graphic: 'label', footprint: labelFootprint(measure) });
   const added = viewer.dataSources.add(source).then(() => viewer.scene.requestRender());
 
   return {
@@ -54,6 +79,8 @@ export function installI595ContextLabels(viewer, centerline) {
     labelById: new Map([...labels].map(entity => [entity.id, entity])),
     placements,
     ready: added,
+    /** Which labels are currently standing down behind a nearer one. */
+    hiddenIds: () => declutter.hiddenIds(),
     /** Startup choreography hook: 0 = not drawn at all, 1 = fully opaque. */
     setOpacity(alpha) {
       const value = Math.min(1, Math.max(0, alpha));
@@ -65,6 +92,7 @@ export function installI595ContextLabels(viewer, centerline) {
       viewer.scene.requestRender();
     },
     destroy() {
+      declutter.destroy();
       unregister();
       viewer.dataSources.remove(source, true);
       labels.clear();

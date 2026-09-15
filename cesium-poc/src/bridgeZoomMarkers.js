@@ -56,8 +56,10 @@ export function installBridgeZoomMarkers(viewer, entities) {
   const update = () => {
     for (const bridge of bridges) {
       if (!bridge.entity.show) continue;
-      const distance = Cartesian3.distance(viewer.camera.positionWC, bridge.anchor);
-      const visible = distance > (bridge.iconVisible ? 3000 : 3500);
+      // Keep the location marker stable while the camera is moving. Distance-based hiding made
+      // pins blink out during panning and could leave the first bridge without a marker at startup.
+      // The polyline remains the detailed close-range representation underneath the pin.
+      const visible = true;
       if (visible !== bridge.iconVisible) {
         bridge.iconVisible = visible;
         viewer.scene.requestRender();

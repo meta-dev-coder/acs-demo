@@ -487,3 +487,55 @@ body .map-nav, body:has(.twin-hud) .map-nav { top: 16px; bottom: auto; right: 16
 @media (max-width:720px) {
   body .map-nav, body:has(.twin-hud) .map-nav { top: 10px; right: 10px; bottom: auto; left: auto; }
 }
+
+/* Clipping Polygon Editor — a development tool, deliberately quiet and out of the way. */
+.clip-editor { position: absolute; left: 92px; top: 16px; z-index: 22; width: 280px; border: 1px solid #ffffff24; border-radius: 12px; background: #0b1729f2; color: #e8eef6; font-size: 12px; backdrop-filter: blur(12px); }
+.clip-editor > summary { padding: 9px 12px; font-weight: 600; letter-spacing: 0.02em; cursor: grab; user-select: none; list-style: none; }
+.clip-editor > summary::-webkit-details-marker { display: none; }
+.clip-editor > summary::before { content: '▸ '; color: #92a8c3; }
+.clip-editor[open] > summary::before { content: '▾ '; }
+.clip-editor.is-drawing > summary { color: #ff9a8b; }
+.clip-editor-body { padding: 0 12px 12px; display: grid; gap: 9px; }
+.clip-editor-model { display: grid; gap: 4px; color: #92a8c3; }
+.clip-editor-select { background: #132539; color: #e8eef6; border: 1px solid #ffffff24; border-radius: 7px; padding: 6px; font: inherit; }
+.clip-editor-count { margin: 0; color: #92a8c3; }
+.clip-editor-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.clip-editor-actions button { padding: 7px 6px; font: 600 11px system-ui; color: #cfe6ff; background: #17293d; border: 1px solid #ffffff1f; border-radius: 7px; cursor: pointer; }
+.clip-editor-actions button:hover:not(:disabled) { background: #1f3a55; }
+.clip-editor-actions button:disabled { opacity: 0.4; cursor: default; }
+.clip-editor-status { margin: 0; color: #92a8c3; line-height: 1.4; min-height: 2.4em; }
+.clip-editor-json, .clip-placement-json { width: 100%; box-sizing: border-box; background: #0d1e2e; color: #b9f5ec; border: 1px solid #ffffff1f; border-radius: 7px; padding: 7px; font: 11px ui-monospace, monospace; resize: vertical; }
+
+/* Model Placement section inside the developer panel. */
+.clip-editor-placement { border-top: 1px solid #ffffff1f; padding-top: 10px; display: grid; gap: 8px; }
+.clip-editor-placement h3 { margin: 0; font: 600 11px system-ui; letter-spacing: 0.06em; text-transform: uppercase; color: #92a8c3; }
+.clip-editor-nudge { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; align-items: center; justify-items: stretch; }
+.clip-editor-nudge button { padding: 6px 4px; font: 600 10px system-ui; color: #cfe6ff; background: #17293d; border: 1px solid #ffffff1f; border-radius: 6px; cursor: pointer; }
+.clip-editor-nudge button:disabled, .clip-editor-field-steps button:disabled { opacity: 0.4; cursor: default; }
+.clip-editor-step { display: grid; gap: 3px; font-size: 10px; color: #92a8c3; }
+.clip-editor-step select { background: #132539; color: #e8eef6; border: 1px solid #ffffff24; border-radius: 6px; padding: 4px; font: inherit; }
+.clip-editor-fields { display: grid; gap: 6px; }
+.clip-editor-field { display: grid; grid-template-columns: 1fr auto; gap: 2px 6px; align-items: baseline; }
+.clip-editor-field-name { font-size: 10px; color: #92a8c3; text-transform: uppercase; letter-spacing: 0.04em; }
+.clip-editor-field output { font: 600 12px ui-monospace, monospace; color: #b9f5ec; }
+.clip-editor-field-steps { grid-column: 1 / -1; display: flex; gap: 3px; }
+.clip-editor-field-steps button { flex: 1; padding: 4px 2px; font: 600 10px system-ui; color: #cfe6ff; background: #17293d; border: 1px solid #ffffff1f; border-radius: 5px; cursor: pointer; }
+.clip-editor-readout { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; margin: 0; font-size: 10px; }
+.clip-editor-readout dt { color: #92a8c3; }
+.clip-editor-readout dd { margin: 0; font: 11px ui-monospace, monospace; color: #e8eef6; }
+.clip-editor { width: 320px; max-height: calc(100dvh - 32px); overflow-y: auto; }
+
+/* A desktop development tool; on a narrow screen it must still fit rather than widen the page. */
+@media (max-width: 700px) {
+  .clip-editor { left: 8px; right: 8px; width: auto; max-height: 60dvh; }
+}
+
+/* Alignment mode: the one state where the panel says so at a glance. */
+.clip-editor-placement.is-aligning { box-shadow: inset 2px 0 0 #67f4e2; padding-left: 8px; }
+.clip-editor-inline-value { min-width: 58px; text-align: center; font: 600 11px ui-monospace, monospace; color: #b9f5ec; align-self: center; }
+
+/* Comparison group: three ways of viewing the same model, no configuration involved. */
+.clip-editor-compare { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 2px 0 6px; }
+.clip-editor-compare button { padding: 6px 3px; font: 600 10px system-ui; color: #cfe6ff; background: #17293d; border: 1px solid #ffffff1f; border-radius: 6px; cursor: pointer; }
+.clip-editor-compare button[aria-pressed="true"] { background: #1f4a5c; border-color: #58d6c8aa; color: #b9f5ec; }
+.clip-editor-compare button:disabled { opacity: 0.4; cursor: default; }

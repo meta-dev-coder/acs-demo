@@ -117,18 +117,34 @@ try {
   await direct.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
   await direct.locator('body[data-startup="ready"]').waitFor({ timeout: 30000 });
   await direct.waitForTimeout(1500);
-  const skipped = await direct.evaluate(() => ({
-    height: window.v.camera.positionCartographic.height,
-    shieldsShown: [...window.shields.shieldById.values()].every(entity => entity.isShowing),
-    // "Direction of travel" is a display option that ships on; it switches no data layer on.
-    checked: [...document.querySelectorAll('input[type=checkbox]')].filter(input => input.checked && input.id !== 'flow-direction').length,
-  }));
+  const skipped = await direct.evaluate(() => {
+    const shields = [...window.shields.shieldById.values()];
+    const hidden = window.shields.hiddenIds();
+    return {
+      height: window.v.camera.positionCartographic.height,
+      layerVisible: window.shields.visible,
+      // Full strength, not left part-way through the intro's fade. An untouched billboard has no
+      // colour property at all, which is the default opaque white.
+      opaque: shields.every(entity => (entity.billboard.color?.getValue(window.v.clock.currentTime)?.alpha ?? 1) === 1),
+      // Anything not standing down behind a nearer shield must actually be drawn.
+      shownUndecluttered: shields.filter(entity => !hidden.has(entity.id)).every(entity => entity.isShowing),
+      drawn: shields.filter(entity => entity.isShowing).length,
+      total: shields.length,
+      // "Direction of travel" is a display option that ships on; it switches no data layer on.
+      checked: [...document.querySelectorAll('input[type=checkbox]')].filter(input => input.checked && input.id !== 'flow-direction').length,
+    };
+  });
   assert.ok(skipped.height > 500 && skipped.height < 1400, 'without the intro the map opens at the corridor directly');
-  assert.equal(skipped.shieldsShown, true, 'shields are simply on when the intro is skipped');
+  // Shields are simply on when the intro is skipped. Screen-space decluttering may still stand a
+  // shield down behind a nearer one, so the test is the layer's state, not every single entity.
+  assert.equal(skipped.layerVisible, true, 'the shield layer is on when the intro is skipped');
+  assert.equal(skipped.opaque, true, 'shields are at full strength, not mid-fade');
+  assert.equal(skipped.shownUndecluttered, true, 'every shield that is not decluttered is drawn');
+  assert.ok(skipped.drawn >= 2, `the opening view must still carry route shields, drew ${skipped.drawn}/${skipped.total}`);
   assert.equal(skipped.checked, 0, 'no layer is switched on when the intro is skipped');
   await direct.close();
 
-  console.log(`startup sequence OK — ${seen.join(' → ')}`);
+  console.log(`startup sequence OK — ${seen.join(' → ')}; opening view draws ${skipped.drawn}/${skipped.total} shields`);
 } finally {
   await browser.close();
 }

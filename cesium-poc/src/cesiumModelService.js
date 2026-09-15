@@ -22,15 +22,47 @@ const DEFAULT_MINIMUM_PIXEL_SIZE = 32;
 const DEFAULT_MAXIMUM_SCALE = 20000;
 
 /**
- * Config URLs are written from the site root (`/models/i595/x.glb`) so the JSON stays free of build
- * concerns; under GitHub Pages the app is served from a sub-path, so they resolve against BASE_URL
- * exactly like `data/` and the existing `models/car.glb`.
+ * Where the corridor's GLB models are hosted. Configured once, never repeated in the records.
+ * @returns {string} the base, without a trailing slash, or '' when unconfigured
  */
-export function resolveModelUrl(modelUrl) {
-  if (typeof modelUrl !== 'string' || modelUrl.trim() === '') return null;
-  const url = modelUrl.trim();
-  if (/^(https?:)?\/\//.test(url) || url.startsWith('data:') || url.startsWith('blob:')) return url;
-  return import.meta.env.BASE_URL + url.replace(/^\/+/, '');
+export const modelBaseUrl = () =>
+  String(import.meta.env.VITE_I595_MODEL_BASE_URL ?? '').trim().replace(/\/+$/, '');
+
+/**
+ * Encode an object key one path segment at a time.
+ *
+ * `encodeURIComponent` on the whole key would escape the separators too, and re-encoding a key that
+ * already carries escapes would turn `%20` into `%2520`, so a segment that already looks encoded is
+ * left as it is.
+ */
+export function encodeModelKey(key) {
+  return String(key).split('/').filter(Boolean)
+    .map(segment => (/%[0-9A-Fa-f]{2}/.test(segment) ? segment : encodeURIComponent(segment)))
+    .join('/');
+}
+
+/**
+ * The URL a record's mesh is fetched from.
+ *
+ * `modelUrl` wins where a record names its own location — an absolute URL, or a path under the
+ * app's own origin, which resolves against BASE_URL so a sub-path deployment still works. Otherwise
+ * the record names only its object key and the configured base supplies the rest, so moving the
+ * models is one environment variable rather than an edit to every record.
+ * @param {{modelUrl?: string, modelKey?: string}} config
+ * @returns {string|null} null when the record names nothing loadable
+ */
+export function resolveModelUrl(config) {
+  const direct = typeof config?.modelUrl === 'string' ? config.modelUrl.trim() : '';
+  if (direct) {
+    if (/^(https?:)?\/\//.test(direct) || direct.startsWith('data:') || direct.startsWith('blob:')) return direct;
+    return import.meta.env.BASE_URL + direct.replace(/^\/+/, '');
+  }
+  const key = typeof config?.modelKey === 'string' ? config.modelKey.trim() : '';
+  if (!key) return null;
+  const base = modelBaseUrl();
+  // Without a base there is nothing to resolve against; the caller reports which record and why.
+  if (!base) return null;
+  return `${base}/${encodeModelKey(key)}`;
 }
 
 /**
@@ -44,7 +76,12 @@ export function resolveModelUrl(modelUrl) {
 export function validateModelConfig(config) {
   if (!config || typeof config !== 'object') return { ok: false, reason: 'not an object' };
   if (typeof config.id !== 'string' || config.id.trim() === '') return { ok: false, reason: 'missing id' };
-  if (!resolveModelUrl(config.modelUrl)) return { ok: false, reason: 'missing modelUrl' };
+  if (!config.modelUrl && !config.modelKey) return { ok: false, reason: 'record names neither modelUrl nor modelKey' };
+  if (!resolveModelUrl(config)) {
+    return { ok: false, reason: config.modelKey && !modelBaseUrl()
+      ? `modelKey "${config.modelKey}" needs VITE_I595_MODEL_BASE_URL to resolve against`
+      : 'model source could not be resolved' };
+  }
   const { latitude, longitude } = config;
   if (!Number.isFinite(latitude) || Math.abs(latitude) > 90) return { ok: false, reason: `latitude ${latitude} is out of range` };
   if (!Number.isFinite(longitude) || Math.abs(longitude) > 180) return { ok: false, reason: `longitude ${longitude} is out of range` };
@@ -96,6 +133,22 @@ export function medianHeight(heights) {
   if (!sorted.length) return null;
   const middle = sorted.length >> 1;
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+/**
+ * Where a record puts its model, and which way it faces.
+ *
+ * The single source of this arithmetic: the loader calls it when placing a model, and the placement
+ * editor calls it on every nudge. If the editor worked it out differently, a model would jump the
+ * moment the copied values were reloaded.
+ * @param {{longitude: number, latitude: number, heightOffset?: number, heading?: number, pitch?: number, roll?: number}} config
+ * @param {number} groundHeight  the sampled surface under the model
+ */
+export function modelPlacement(config, groundHeight) {
+  const finalHeight = groundHeight + (config.heightOffset ?? 0);
+  // fromDegrees takes longitude first; the record names its fields so they cannot be swapped here.
+  const position = Cartesian3.fromDegrees(config.longitude, config.latitude, finalHeight);
+  return { position, orientation: modelOrientation(position, config), finalHeight };
 }
 
 /**
@@ -156,26 +209,24 @@ export function createCesiumModelService(viewer, { logger = console } = {}) {
   async function addModel(config) {
     const valid = validateModelConfig(config);
     if (!valid.ok) {
-      logger.error?.('[Cesium Models] skipped an invalid model record', { id: config?.id, modelUrl: config?.modelUrl, reason: valid.reason });
+      logger.error?.('[Cesium Models] skipped an invalid model record',
+        { id: config?.id, modelUrl: config?.modelUrl, modelKey: config?.modelKey, reason: valid.reason });
       return null;
     }
     if (config.enabled === false) return null;
 
     const { id, longitude, latitude, heightOffset = 0 } = config;
-    const uri = resolveModelUrl(config.modelUrl);
+    const uri = resolveModelUrl(config);
     const ground = await sampleGroundHeight(viewer.scene, longitude, latitude, { objectsToExclude: placed() });
     if (destroyed) return null;
-    const finalHeight = ground.height + heightOffset;
-    // fromDegrees takes longitude first — the corridor's own coordinates are stored lon/lat for the
-    // same reason, so the JSON's named fields are the only place lat and lon can be confused.
-    const position = Cartesian3.fromDegrees(longitude, latitude, finalHeight);
+    const { position, orientation, finalHeight } = modelPlacement(config, ground.height);
 
     removeModel(id);
     const entity = source.entities.add({
       id,
       name: config.name ?? id,
       position,
-      orientation: modelOrientation(position, config),
+      orientation,
       model: {
         uri,
         scale: config.scale ?? 1,
@@ -190,14 +241,17 @@ export function createCesiumModelService(viewer, { logger = console } = {}) {
     });
     modelById.set(id, entity);
     logger.debug?.('[Cesium Models]', {
-      id, longitude, latitude,
+      id, modelKey: config.modelKey, resolvedUrl: uri, longitude, latitude,
       sampledHeight: ground.height, heightSource: ground.source, sampleSpread: ground.spread, heightOffset, finalHeight,
       heading: config.heading ?? 0, scale: config.scale ?? 1,
     });
     // A missing or misnamed file is otherwise a silent nothing on the map.
+    // One model's failure is reported and survived; the others are already placed.
     void fetch(uri, { method: 'HEAD' })
-      .then(response => { if (!response.ok) logger.error?.('[Cesium Models] model file did not resolve', { id, uri, status: response.status }); })
-      .catch(error => logger.error?.('[Cesium Models] model file could not be fetched', { id, uri, error }));
+      .then(response => {
+        if (!response.ok) logger.error?.(`[Cesium Models] Failed to load ${config.name ?? id}\nURL: ${uri}\nHTTP ${response.status}`);
+      })
+      .catch(error => logger.error?.(`[Cesium Models] Failed to load ${config.name ?? id}\nURL: ${uri}`, error));
     viewer.scene.requestRender();
     return entity;
   }
@@ -206,7 +260,8 @@ export function createCesiumModelService(viewer, { logger = console } = {}) {
   async function loadModels(configs) {
     const records = Array.isArray(configs) ? configs : [];
     const entities = await Promise.all(records.map(config => addModel(config).catch(error => {
-      logger.error?.('[Cesium Models] model could not be placed', { id: config?.id, modelUrl: config?.modelUrl, error });
+      logger.error?.('[Cesium Models] model could not be placed',
+        { id: config?.id, modelUrl: config?.modelUrl, modelKey: config?.modelKey, error });
       return null;
     })));
     return entities.filter(Boolean);
@@ -224,6 +279,12 @@ export function createCesiumModelService(viewer, { logger = console } = {}) {
   return {
     modelById,
     ready: added,
+    /**
+     * Sample the surface for a moved model, excluding the placed models themselves — otherwise a
+     * model that has just been dropped would measure its own roof.
+     */
+    sampleGroundFor: (longitude, latitude, exclude = placed()) =>
+      sampleGroundHeight(viewer.scene, longitude, latitude, { objectsToExclude: exclude }),
     addModel,
     loadModels,
     removeModel,

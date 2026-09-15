@@ -10,6 +10,7 @@
 import { Color, CustomDataSource, Cartesian3, HeightReference, HorizontalOrigin, NearFarScalar, VerticalOrigin } from 'cesium';
 import { ROAD_SHIELD_ASSET_TYPE, shieldPlacements } from './i595ShieldData.js';
 import { registerUiOnlyEntities } from './uiOnlyMapEntities.js';
+import { installMarkerDeclutter } from './mapMarkerDeclutter.js';
 
 /** Local Interstate shield asset: red header, dark blue body, white border and numerals. */
 export const SHIELD_ICON_URL = `${import.meta.env.BASE_URL}icons/interstate-595.svg`;
@@ -45,6 +46,9 @@ export function installI595RoadShields(viewer, centerline) {
 
   // Shields are map furniture: invisible to every hit test, and never blocking one.
   const unregister = registerUiOnlyEntities(viewer, shields);
+  // Interchanges kilometres apart project into the same pixels down a road-level view of the
+  // corridor; without a depth test nothing hides the far ones. Nearest shield keeps the screen.
+  const declutter = installMarkerDeclutter(viewer, shields, { graphic: 'billboard' });
 
   const added = viewer.dataSources.add(source).then(() => viewer.scene.requestRender());
   return {
@@ -52,6 +56,8 @@ export function installI595RoadShields(viewer, centerline) {
     shieldById: new Map([...shields].map(entity => [entity.id, entity])),
     placements,
     ready: added,
+    /** Which shields are currently standing down behind a nearer one. */
+    hiddenIds: () => declutter.hiddenIds(),
     /** Shields ride with the road network; no separate checkbox in the layer tree. */
     setVisible(show) {
       source.show = show;
@@ -70,6 +76,7 @@ export function installI595RoadShields(viewer, centerline) {
     },
     get visible() { return source.show; },
     destroy() {
+      declutter.destroy();
       unregister();
       viewer.dataSources.remove(source, true);
       shields.clear();

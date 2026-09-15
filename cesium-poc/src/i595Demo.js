@@ -33,6 +33,7 @@ import { installI595ContextLabels } from "./i595ContextLabels.js";
 import { installI595Hud } from "./i595Hud.js";
 import { createCesiumModelService } from "./cesiumModelService.js";
 import { installCorridorModelLayers } from "./corridorModelLayers.js";
+import { createPhotorealisticClipping } from "./photorealisticClipping.js";
 import { installAskTheTwin } from "./askTheTwin.js";
 import { corridorOverview, heroView } from "./i595CorridorViews.js";
 import "./i595Demo.css";
@@ -122,12 +123,7 @@ try {
   navigation.setEnabled(true);
   const lons = corridor.map(p => p.lon), lats = corridor.map(p => p.lat);
   const orientationOf = view => ({ heading: CMath.toRadians(view.headingDeg), pitch: CMath.toRadians(view.pitchDeg), roll: CMath.toRadians(view.rollDeg) });
-  // Reset view stays the full corridor extent — deliberately not the close startup view.
   const overview = corridorOverview(corridor);
-  const reset = () => viewer.camera.flyTo({
-    destination: Cartesian3.fromDegrees(overview.lon, overview.lat, overview.height),
-    orientation: orientationOf(overview), duration: 1.2,
-  });
   // The opening frame is the corridor overview; the startup sequence flies from here down to the
   // oblique hero view once the 3D world is up. `?intro=off` skips the choreography entirely.
   const hero = heroView(corridor);
@@ -137,6 +133,12 @@ try {
   const closer = viewer.camera.positionCartographic;
   Object.assign(hero, { lon: CMath.toDegrees(closer.longitude), lat: CMath.toDegrees(closer.latitude), height: closer.height,
     headingDeg: CMath.toDegrees(viewer.camera.heading), pitchDeg: CMath.toDegrees(viewer.camera.pitch) });
+  // Reset returns to the same close oblique hero frame used after startup, rather than the distant
+  // corridor overview that is only used as the opening step of the cinematic sequence.
+  const reset = () => viewer.camera.flyTo({
+    destination: Cartesian3.fromDegrees(hero.lon, hero.lat, hero.height),
+    orientation: orientationOf(hero), duration: 1.2,
+  });
   const showIntro = new URLSearchParams(location.search).get("intro") !== "off";
   viewer.camera.setView(showIntro
     ? { destination: Cartesian3.fromDegrees(overview.lon, overview.lat, overview.height), orientation: orientationOf(overview) }
@@ -283,6 +285,22 @@ try {
   // fading in competes with the intro for bandwidth and makes the choreography stutter, so models
   // are the last thing to arrive: after the sequence for an intro run, after the world is up
   // otherwise. Either way the camera is never touched.
+  // Google's own photogrammetry is cut away wherever a record says a GLB replaces it. Saved
+  // polygons apply on every load; the editor below only ever adds a preview on top of them.
+  const photorealisticClipping = createPhotorealisticClipping(viewer, { tileset: () => baseEnvironment.tileset() });
+  void base3dReady.then(() => photorealisticClipping.applySaved(cesiumModels));
+
+  // A development tool, off unless asked for: it draws polygons against the real scene so the
+  // coordinates are traced rather than guessed.
+  let clipEditor = null;
+  if (import.meta.env.VITE_ENABLE_CESIUM_CLIP_EDITOR === "true") {
+    const { installClippingPolygonEditor } = await import("./clippingPolygonEditor.js");
+    clipEditor = installClippingPolygonEditor(document.body, viewer, cesiumModels,
+      // The placed GLB entities, so the replacement can be hidden while its Google counterpart is
+      // traced. Visibility only — the editor never removes an entity or writes to the config.
+      { clipping: photorealisticClipping, models: corridorModels });
+  }
+
   const placeCorridorModels = () => corridorModelLayers.place();
   if (showIntro) void startupSequence.run().then(placeCorridorModels);
   else {
@@ -320,7 +338,7 @@ try {
   // Operational strip: corridor facts and the live-event feed, with gaps stated rather than filled.
   const corridorStatus = installCorridorStatusBar(document.body, { mainline: mainlineSegments, liveEvents: liveEventControls });
   const askTwin = installAskTheTwin(viewer, { cameraControls });
-  if (import.meta.hot) import.meta.hot.dispose(() => { document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
+  if (import.meta.hot) import.meta.hot.dispose(() => { document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
   for (const input of inputs) {
     // Layers with their own loader, plus display options that are not data layers at all: this loop
     // fetches `data/<id>.geojson`, and "flow-direction" has no such file — being swept up here

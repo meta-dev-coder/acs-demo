@@ -20,7 +20,9 @@ const compactIcon = `data:image/svg+xml;charset=utf-8,${encodeURIComponent('<svg
 const selectedIcon = `data:image/svg+xml;charset=utf-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="56" height="72" viewBox="0 0 56 72"><circle cx="28" cy="58" r="12" fill="#67f4e21f" stroke="#67f4e2" stroke-width="2"/><path d="M26 56h4v9h-4z" fill="#152030" stroke="white"/><rect x="17" y="4" width="22" height="48" rx="6" fill="#111820" stroke="#67f4e2" stroke-width="2.5"/><circle cx="28" cy="14" r="6" fill="#f44336"/><circle cx="28" cy="28" r="6" fill="#ffda16"/><circle cx="28" cy="42" r="6" fill="#07934c"/></svg>')}`;
 export const SIGNAL_LOD = Object.freeze({
   DETAILED: Object.freeze({ image: icon, width: 25, height: 46 }),
-  COMPACT: Object.freeze({ image: compactIcon, width: 10, height: 16 }),
+  // Sized against the neighbouring corridor markers — CCTV cameras are 34x40 — so a signal reads
+  // as a smaller sibling rather than a speck. Still the quiet one: it is the marker you scan past.
+  COMPACT: Object.freeze({ image: compactIcon, width: 16, height: 26 }),
   SELECTED: Object.freeze({ image: selectedIcon, width: 36, height: 46 }),
 });
 /** Hysteresis: switch to detail below the near bound, back to compact above the far bound. */

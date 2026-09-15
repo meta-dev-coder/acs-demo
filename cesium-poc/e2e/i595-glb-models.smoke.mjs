@@ -10,6 +10,7 @@
  * separately, over HTTP, for the thing that actually matters about it — that it resolves.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 
 /**
@@ -29,16 +30,22 @@ async function settleCamera(page, from) {
 }
 
 const MODEL_ID = 'i595-gantry-1-toll-plaza';
-const MODEL_URL = '/models/i595/gantry-1-toll-plaza.glb';
-const LON = -80.3168131, LAT = 26.1153108;
+/** Records name an object key; the base comes from VITE_I595_MODEL_BASE_URL. */
+const MODEL_KEY = 'Gantry1_TollPlaza.glb';
+const CONFIGURED = JSON.parse(readFileSync(new URL('../config/cesiumModels.json', import.meta.url), 'utf8'))
+  .find(record => record.id === MODEL_ID);
+const LON = CONFIGURED.longitude, LAT = CONFIGURED.latitude;
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 
   // ---- 1. the real GLB resolves: no 404, and it is a real glTF binary ---------------------------
-  const head = await page.request.get(`http://127.0.0.1:5188${MODEL_URL}`, { headers: { Range: 'bytes=0-11' } });
-  assert.ok(head.ok(), `${MODEL_URL} must resolve, got ${head.status()}`);
+  const modelBase = (process.env.VITE_I595_MODEL_BASE_URL
+    ?? readFileSync(new URL('../.env', import.meta.url), 'utf8').match(/^VITE_I595_MODEL_BASE_URL=(.*)$/m)?.[1] ?? '').trim();
+  assert.ok(modelBase, 'VITE_I595_MODEL_BASE_URL must be configured');
+  const head = await page.request.get(`${modelBase}/${MODEL_KEY}`, { headers: { Range: 'bytes=0-11' } });
+  assert.ok(head.ok(), `${modelBase}/${MODEL_KEY} must resolve, got ${head.status()}`);
   assert.equal((await head.body()).toString('ascii', 0, 4), 'glTF', 'the served file is a binary glTF');
 
   await page.addInitScript(() => {
@@ -46,7 +53,7 @@ try {
   });
   await page.route('**://tile.googleapis.com/**', route => route.abort());
   // Stand-in mesh: the assertions are about where the entity is, not what it looks like.
-  await page.route('**/models/i595/*.glb', async route => {
+  await page.route('**/*.glb', async route => {
     const response = await route.fetch({ url: 'http://127.0.0.1:5188/models/car.glb' });
     await route.fulfill({ response });
   });
@@ -88,7 +95,8 @@ try {
   const config = await page.evaluate(() => window.modelConfigs[0]);
   assert.equal(config.longitude, LON);
   assert.equal(config.latitude, LAT);
-  assert.equal(config.modelUrl, MODEL_URL);
+  assert.equal(config.modelKey, MODEL_KEY);
+  assert.equal(config.modelUrl, undefined, 'the record names a key, not a local path');
   assert.equal(config.enabled, true);
 
   const placed = await page.evaluate(id => {
@@ -129,7 +137,8 @@ try {
   assert.ok(placed.orientationMatches, 'orientation is headingPitchRollQuaternion of the configured HPR');
   assert.equal(placed.identityOrientation, false, 'a configured heading actually rotates the model');
   assert.equal(placed.scale, config.scale);
-  assert.ok(placed.uri.endsWith(MODEL_URL), `model uri ${placed.uri} resolves to the configured file`);
+  assert.ok(placed.uri.startsWith(modelBase), `model uri ${placed.uri} resolves against the configured base`);
+  assert.ok(placed.uri.endsWith(MODEL_KEY), `model uri ${placed.uri} ends in the configured key`);
   assert.equal(placed.assetType, 'GLB_MODEL');
   assert.equal(placed.picked, true, 'the model is a real scene entity, not an HTML overlay');
 
@@ -143,13 +152,13 @@ try {
   const second = await page.evaluate(async () => {
     const { Cartographic, Math: CMath } = window.cesiumNs;
     await window.models.loadModels([
-      { id: 'model-002', name: 'Second', type: 'GLB_MODEL', modelUrl: '/models/i595/gantry-1-toll-plaza.glb',
+      { id: 'model-002', name: 'Second', type: 'GLB_MODEL', modelUrl: '/models/car.glb',
         latitude: 26.116, longitude: -80.317, heightOffset: 0.5, heading: 145, pitch: 0, roll: 0, scale: 0.8, enabled: true },
-      { id: 'model-003-disabled', modelUrl: '/models/i595/gantry-1-toll-plaza.glb',
+      { id: 'model-003-disabled', modelUrl: '/models/car.glb',
         latitude: 26.117, longitude: -80.318, enabled: false },
       // Unplaceable records are rejected individually — they must not take the batch down with them.
       { id: 'model-004-no-file', latitude: 26.118, longitude: -80.319 },
-      { id: 'model-005-off-globe', modelUrl: '/models/i595/gantry-1-toll-plaza.glb', latitude: 126.118, longitude: -80.319 },
+      { id: 'model-005-off-globe', modelUrl: '/models/car.glb', latitude: 126.118, longitude: -80.319 },
     ]);
     const entity = window.models.modelById.get('model-002');
     const time = v.clock.currentTime;
@@ -283,7 +292,7 @@ try {
     try {
       const entity = await window.models.addModel({
         id: 'seating-probe', name: 'Seating probe', layer: 'gantries',
-        modelUrl: '/models/i595/gantry-3-toll-lane.glb',
+        modelUrl: '/models/car.glb',
         latitude: 26.118724, longitude: -80.334469, heightOffset: 0, heading: 0, scale: 1, enabled: true,
       });
       const height = entity.properties.groundHeight.getValue(v.clock.currentTime);

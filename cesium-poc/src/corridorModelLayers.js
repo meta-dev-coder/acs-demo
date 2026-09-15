@@ -54,7 +54,7 @@ export function modelDetails(config) {
     ['Type', MODEL_LAYERS.find(layer => layer.id === config.layer)?.label ?? config.type],
     ['Location', `${config.latitude.toFixed(6)}, ${config.longitude.toFixed(6)}`],
     ['Heading', `${config.heading ?? 0}°`],
-    ['Model', config.modelUrl.split('/').pop()],
+    ['Model', (config.modelKey ?? config.modelUrl ?? '').split('/').pop() || '—'],
   ];
 }
 
