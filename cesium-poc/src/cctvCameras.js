@@ -137,14 +137,16 @@ export function installCctvCameras(container, viewer, { onStreetView } = {}) {
     if (entity && onStreetView) {
       const record = records.get(entity);
       const action = document.createElement('button');
-      action.className = 'camera-street-view';
-      action.textContent = 'Street View';
+      action.className = 'camera-street-view camera-street-view-inline';
+      action.textContent = '⌖';
       action.title = 'Google street-level imagery near this camera';
       action.onclick = () => onStreetView({
         longitude: record.longitude, latitude: record.latitude,
         label: `CCTV ${record.camera_id}`,
       });
-      document.querySelector('.camera-details')?.append(action);
+      const details = document.querySelector('.camera-details');
+      const cameraIdLabel = [...(details?.querySelectorAll('dt') ?? [])].find(node => node.textContent.trim() === 'Camera ID');
+      (cameraIdLabel?.nextElementSibling ?? details)?.append(action);
     }
     if (entity) {
       const p = records.get(entity);

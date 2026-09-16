@@ -350,6 +350,9 @@ body:has(.layers:not(.collapsed)) .corridor-status { left: 420px; }
 body:has(.street-view[data-state="active"]) :is(.layers, .corridor-status, .twin-hud, .map-nav, .weather-launch, .clip-editor),
 body:has(.street-view[data-state="active"]) :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details, .structure-details, .ramp-tooltip) { display: none; }
 .camera-street-view { display: block; width: 100%; margin-top: 8px; white-space: nowrap; padding: 8px 12px; border: 1px solid #ffffff24; border-radius: 9px; background: #ffffff0d; color: #cfdcea; font-size: 12.5px; cursor: pointer; transition: background .15s ease; }
+.camera-street-view-inline { display: inline-flex !important; width: 24px !important; height: 24px !important; margin: 0 0 0 6px; padding: 0 !important; align-items: center; justify-content: center; border-radius: 6px; background: transparent !important; color: #67f4e2; font-size: 16px !important; vertical-align: middle; }
+.camera-details dd:has(.camera-street-view-inline) { display: flex; align-items: center; justify-content: space-between; }
+.camera-details dd .camera-street-view-inline { margin-left: auto; }
 .camera-street-view:hover { background: #ffffff17; color: #eaf3fb; }
 @media (max-width: 900px) {
   .street-view-bar { flex-wrap: wrap; gap: 10px; margin: 10px; }

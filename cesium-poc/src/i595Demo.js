@@ -117,8 +117,9 @@ try {
   }, { passive: false });
   // One bottom toolbar for zoom, orbit, tilt, Street View and Reset View.
   let streetViewPlacement = null;
+  const streetViewEnabled = String(import.meta.env.VITE_ENABLE_STREET_VIEW ?? 'true').toLowerCase() === 'true';
   const navigation = installMapNavigationControls(document.body, viewer, {
-    zoom, onStreetView: () => streetViewPlacement?.toggle(),
+    zoom, onStreetView: streetViewEnabled ? (() => streetViewPlacement?.toggle()) : undefined,
   });
   navigation.setEnabled(true);
   const lons = corridor.map(p => p.lon), lats = corridor.map(p => p.lat);
@@ -190,7 +191,7 @@ try {
     if (!result.ok && result.message) status.textContent = result.message;
     return result;
   };
-  const cameraControls = installCctvCameras(document.querySelector(".its-group"), viewer, { onStreetView: openStreetView });
+  const cameraControls = installCctvCameras(document.querySelector(".its-group"), viewer, { onStreetView: streetViewEnabled ? openStreetView : undefined });
 
   // Street View is a way of exploring the corridor, not a camera feature: the toolbar tool works
   // whether or not any layer is switched on.
