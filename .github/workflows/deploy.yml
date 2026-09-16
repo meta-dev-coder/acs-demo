@@ -67,6 +67,10 @@ jobs:
           VITE_LIVE_EVENTS_API: https://d3syo4sqvwi009.cloudfront.net/api/i595/live-events
           VITE_WS_ENDPOINT: wss://b0wqexsnpk.execute-api.us-east-1.amazonaws.com/prod
           VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
+          # The corridor GLB models (toll gantries, lane barrier) are fetched from the public
+          # CloudFront distribution — the .glb files are not in the repo. Without this the models
+          # resolve to null and those layers load nothing, silently.
+          VITE_I595_MODEL_BASE_URL: https://d3syo4sqvwi009.cloudfront.net/data/models
 
       # ---------- Assemble the multi-demo site under one Pages root ----------
       - name: Assemble _site (launcher + acs/ + twin/)
