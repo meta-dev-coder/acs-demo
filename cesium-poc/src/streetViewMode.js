@@ -30,6 +30,7 @@ export function createStreetViewMode(viewer, service, { tilesets = () => [], onM
   overlay.hidden = true;
   overlay.setAttribute('aria-label', 'Street View');
   overlay.innerHTML = `
+    <div class="street-view-google" aria-label="Google Street View panorama"></div>
     <div class="street-view-bar">
       <div class="street-view-identity">
         <p class="street-view-title">I-595 Street View</p>
@@ -44,10 +45,24 @@ export function createStreetViewMode(viewer, service, { tilesets = () => [], onM
   const context = overlay.querySelector('.street-view-context');
   const imagery = overlay.querySelector('.street-view-imagery');
   const statusLine = overlay.querySelector('.street-view-status');
+  const panoramaHost = overlay.querySelector('.street-view-google');
 
   /** @type {MapExperienceMode} */
   let mode = 'digital-twin';
-  let panorama = null, saved = null, busy = false;
+  let panorama = null, googlePanorama = null, saved = null, busy = false;
+
+  async function loadGoogleMaps() {
+    if (window.google?.maps?.StreetViewPanorama) return window.google.maps;
+    const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    if (!key) throw new Error('VITE_GOOGLE_MAPS_API_KEY is not configured.');
+    await new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}`;
+      script.async = true; script.defer = true; script.onload = resolve; script.onerror = reject;
+      document.head.append(script);
+    });
+    return window.google.maps;
+  }
 
   const setMode = next => { if (next !== mode) { mode = next; onModeChange?.(mode); } };
 
@@ -118,6 +133,8 @@ export function createStreetViewMode(viewer, service, { tilesets = () => [], onM
     if (!panorama) return;
     viewer.scene.primitives.remove(panorama);
     panorama = null;
+    googlePanorama = null;
+    panoramaHost.replaceChildren();
   }
 
   const showStatus = message => { statusLine.hidden = !message; statusLine.textContent = message ?? ''; };
@@ -145,24 +162,15 @@ export function createStreetViewMode(viewer, service, { tilesets = () => [], onM
         return { ok: false, message: found.message };
       }
 
-      const loaded = await service.loadPanorama({
-        longitude: found.longitude, latitude: found.latitude, height: EYE_HEIGHT_M, panoId: found.panoId,
-      });
+      const maps = await loadGoogleMaps();
 
       // Only now commit: the twin is untouched if anything above failed.
       saved = saveTwinState();
       for (const { source } of saved.dataSources) source.show = false;
       for (const { tileset } of saved.tilesets) tileset.show = false;
       viewer.scene.globe.show = false;
-      panorama = viewer.scene.primitives.add(loaded);
-      applyPanoramaNavigation();
-      viewer.canvas.addEventListener('wheel', onPanoramaWheel, { passive: false });
-      viewer.camera.cancelFlight();
-      viewer.camera.setView({
-        destination: Cartesian3.fromDegrees(found.longitude, found.latitude, EYE_HEIGHT_M),
-        orientation: { heading: CMath.toRadians(place.headingDeg ?? 0), pitch: 0, roll: 0 },
-      });
-      viewer.scene.requestRender();
+      googlePanorama = new maps.StreetViewPanorama(panoramaHost, { pano: found.panoId, pov: { heading: place.headingDeg ?? 0, pitch: 0 }, zoom: 1, addressControl: false, fullscreenControl: false, motionTracking: false, linksControl: true });
+      panoramaHost.hidden = false;
 
       overlay.dataset.state = 'active';
       showStatus(null);

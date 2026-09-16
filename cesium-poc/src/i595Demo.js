@@ -181,7 +181,7 @@ try {
   // created the first time someone asks for a panorama.
   // No key of its own: the provider uses GoogleMaps.defaultApiKey, which the photorealistic
   // tileset sets from VITE_GOOGLE_MAPS_API_KEY. One key, configured in one place.
-  const streetView = createStreetViewService();
+  const streetView = createStreetViewService({ apiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY });
   const streetViewMode = createStreetViewMode(viewer, streetView, {
     tilesets: () => [baseEnvironment.tileset()],
   });

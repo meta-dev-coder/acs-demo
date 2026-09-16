@@ -11,7 +11,7 @@
  *
  * The provider is created on first use, so nothing here touches application start-up.
  *
- * Google API used: Street View Static API (panorama metadata and cube faces). Billable.
+ * Google API used: Map Tiles API — Street View Tiles (panorama metadata and cube faces). Billable.
  */
 import { Cartographic, GoogleMaps, GoogleStreetViewCubeMapPanoramaProvider, Math as CMath } from 'cesium';
 
