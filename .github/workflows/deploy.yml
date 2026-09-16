@@ -71,6 +71,11 @@ jobs:
           # CloudFront distribution — the .glb files are not in the repo. Without this the models
           # resolve to null and those layers load nothing, silently.
           VITE_I595_MODEL_BASE_URL: https://d3syo4sqvwi009.cloudfront.net/data/models
+          # Clipping Polygon Editor + Model Placement Editor, deliberately ON for this internal
+          # demo deployment so the corridor work can be traced against the live scene. Set here
+          # rather than in .env.production so the safe default still holds for any other build:
+          # a local `npm run build` ships without the developer tooling.
+          VITE_ENABLE_CESIUM_CLIP_EDITOR: "true"
 
       # ---------- Assemble the multi-demo site under one Pages root ----------
       - name: Assemble _site (launcher + acs/ + twin/)
