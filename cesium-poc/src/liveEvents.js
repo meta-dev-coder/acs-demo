@@ -37,10 +37,11 @@ const CONNECTOR_COLOR = Color.fromCssColorString('#ff8a8a');
 export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_API, refreshMs = REFRESH_MS, fetchImpl = fetch } = {}) {
   const group = document.createElement('details');
   group.className = 'live-events-group';
+  group.open = true;
   group.innerHTML = `<summary><input type="checkbox" id="live-events-all" aria-label="Live Events" disabled><span>Live Events</span><span class="badge">…</span></summary>
     <div class="live-event-children">
       <div class="segment-row"><input type="checkbox" data-live-type="INCIDENT" aria-label="Incidents"><button class="segment-select" data-live-type="INCIDENT">Incidents</button><span class="badge" data-live-count="INCIDENT">0</span></div>
-      <div class="segment-row"><input type="checkbox" data-live-type="CLOSURE" aria-label="Closures"><button class="segment-select" data-live-type="CLOSURE">Closures</button><span class="badge" data-live-count="CLOSURE">0</span></div>
+      <div class="segment-row"><input type="checkbox" id="live-events-closure" data-live-type="CLOSURE" aria-label="Closures"><button class="segment-select" data-live-type="CLOSURE">Closures</button><span class="badge" data-live-count="CLOSURE">0</span></div>
     </div>
     <p class="live-event-source" hidden></p>
     <p class="ramp-status" role="status">Loading live events…</p>

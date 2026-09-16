@@ -37,6 +37,7 @@ export const CORRIDOR_LAYERS = Object.freeze([
   Object.freeze({ id: 'traffic-flow', label: 'Traffic Flow', category: 'traffic', icon: 'road', members: ['mainline-eb', 'mainline-wb', 'express'] }),
   Object.freeze({ id: 'direction', label: 'Direction', category: 'traffic', icon: 'direction', control: '#flow-direction' }),
   Object.freeze({ id: 'incidents', label: 'Incidents', category: 'traffic', icon: 'incident', control: '#live-events-all', count: 'incidents' }),
+  Object.freeze({ id: 'closures', label: 'Closures', category: 'traffic', icon: 'closure', control: '#live-events-closure', count: 'closures' }),
   Object.freeze({ id: 'signals', label: 'Traffic Signals', category: 'infrastructure', icon: 'signal', control: '#signals-all', count: 'signals' }),
   // CCTV is two groups on the corridor — express-lane cameras on the gantries, and the mainline —
   // so the single tool folds them the way Traffic Flow folds its three routes.
@@ -55,7 +56,7 @@ export const CORRIDOR_LAYERS = Object.freeze([
  * The tools on the quick rail — the one-click surface. Mile markers are absent because the corridor
  * has no such layer.
  */
-export const RAIL_LAYER_IDS = Object.freeze(['traffic-flow', 'direction', 'incidents', 'signals', 'cameras', 'structures',
+export const RAIL_LAYER_IDS = Object.freeze(['traffic-flow', 'direction', 'incidents', 'closures', 'signals', 'cameras', 'structures',
   ...SIGN_STRUCTURE_LAYERS.map(layer => layer.id), 'gantries', 'lane-barriers']);
 
 export const LAYER_CATEGORIES = Object.freeze([
