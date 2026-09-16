@@ -18,7 +18,7 @@ export function installFrontageRoads(container, viewer) {
   function style(entity) {
     if (!entity) return;
     const base = colors.get(records.get(entity).direction);
-    entity.polyline.width = entity === selected ? 5 : entity === hovered ? 4 : 2.5;
+    entity.polyline.width = entity === selected ? 12 : entity === hovered ? 10 : 8;
     entity.polyline.material = entity === selected || entity === hovered ? Color.lerp(base, Color.WHITE, 0.4, new Color()) : base;
   }
   function select(entity) {

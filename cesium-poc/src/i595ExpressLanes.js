@@ -30,7 +30,7 @@ export function installI595ExpressLanes(viewer, input, { onVisibilityChange, onS
     const emphasis = entity === selected ? 'SELECTED' : entity === hovered ? 'HOVERED' : 'RESTING';
     // Ground-line width changes rebuild the primitive and briefly remove its pick target.
     // Keep geometry and the translucent render pass stable through interaction.
-    entity.polyline.width = 3.5;
+    entity.polyline.width = 12;
     const glow = { SELECTED: 0.35, HOVERED: 0.22, RESTING: 0 }[emphasis];
     const resting = { SELECTED: 0.99, HOVERED: 0.95, RESTING: 0.8 }[emphasis];
     const color = glow ? Color.lerp(base, Color.WHITE, glow, new Color()) : base;
