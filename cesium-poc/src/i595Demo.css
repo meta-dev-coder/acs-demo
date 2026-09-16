@@ -5,7 +5,7 @@ button, a, summary, label { -webkit-tap-highlight-color: transparent; }
 button { font: inherit; color: inherit; cursor: pointer; }
 small { font-size: 9px; letter-spacing: .18em; color: #65dfd4; }
 h1 { margin: 4px 0 0; font-size: 20px; letter-spacing: -.03em; }
-.layers { position: absolute; top: 16px; left: 16px; width: auto; max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); }
+.layers { position: absolute; top: 16px; left: 16px; width: auto; max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); z-index: 30; }
 .mainline-parent { margin: 4px 0 4px 20px; }
 .mainline-parent > summary { display: grid; grid-template-columns: 10px 17px 18px minmax(0, 1fr) auto; align-items: center; gap: 7px; font-size: 12px; padding: 12px 6px; list-style: none; }
 .mainline-parent > summary::-webkit-details-marker { display: none; }
@@ -489,7 +489,7 @@ body .map-nav, body:has(.twin-hud) .map-nav { top: 16px; bottom: auto; right: 16
 }
 
 /* Clipping Polygon Editor — a development tool, deliberately quiet and out of the way. */
-.clip-editor { position: absolute; left: 92px; top: 16px; z-index: 22; width: 280px; border: 1px solid #ffffff24; border-radius: 12px; background: #0b1729f2; color: #e8eef6; font-size: 12px; backdrop-filter: blur(12px); }
+.clip-editor { position: absolute; left: 92px; top: 16px; z-index: 10; width: 280px; border: 1px solid #ffffff24; border-radius: 12px; background: #0b1729f2; color: #e8eef6; font-size: 12px; backdrop-filter: blur(12px); }
 .clip-editor > summary { padding: 9px 12px; font-weight: 600; letter-spacing: 0.02em; cursor: grab; user-select: none; list-style: none; }
 .clip-editor > summary::-webkit-details-marker { display: none; }
 .clip-editor > summary::before { content: '▸ '; color: #92a8c3; }
