@@ -36,7 +36,9 @@ export const CORRIDOR_LAYERS = Object.freeze([
   Object.freeze({ id: 'ramps', label: 'Ramps & Connectors', category: 'roads', control: '#ramps-all' }),
   Object.freeze({ id: 'traffic-flow', label: 'Traffic Flow', category: 'traffic', icon: 'road', members: ['mainline-eb', 'mainline-wb', 'express'] }),
   Object.freeze({ id: 'direction', label: 'Direction', category: 'traffic', icon: 'direction', control: '#flow-direction' }),
-  Object.freeze({ id: 'incidents', label: 'Incidents', category: 'traffic', icon: 'incident', control: '#live-events-all', count: 'incidents' }),
+  // Its own checkbox, not the Live Events parent: pointing this at the parent meant switching
+  // Incidents on also switched Closures on, because ticking a parent ticks its children.
+  Object.freeze({ id: 'incidents', label: 'Incidents', category: 'traffic', icon: 'incident', control: '#live-events-incident', count: 'incidents' }),
   Object.freeze({ id: 'closures', label: 'Closures', category: 'traffic', icon: 'closure', control: '#live-events-closure', count: 'closures' }),
   Object.freeze({ id: 'signals', label: 'Traffic Signals', category: 'infrastructure', icon: 'signal', control: '#signals-all', count: 'signals' }),
   // CCTV is two groups on the corridor — express-lane cameras on the gantries, and the mainline —

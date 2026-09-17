@@ -35,12 +35,17 @@ const ICONS = {
 const CONNECTOR_COLOR = Color.fromCssColorString('#ff8a8a');
 
 export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_API, refreshMs = REFRESH_MS, fetchImpl = fetch } = {}) {
+  // ---- Asset Explorer bridge -------------------------------------------------------------------
+  // Live events keep their own details panel, provenance rendering and framing; the Asset Explorer
+  // adds browsing on top and shares one selection with them.
+  let reportSelection = null;
+
   const group = document.createElement('details');
   group.className = 'live-events-group';
   group.open = true;
   group.innerHTML = `<summary><input type="checkbox" id="live-events-all" aria-label="Live Events" disabled><span>Live Events</span><span class="badge">…</span></summary>
     <div class="live-event-children">
-      <div class="segment-row"><input type="checkbox" data-live-type="INCIDENT" aria-label="Incidents"><button class="segment-select" data-live-type="INCIDENT">Incidents</button><span class="badge" data-live-count="INCIDENT">0</span></div>
+      <div class="segment-row"><input type="checkbox" id="live-events-incident" data-live-type="INCIDENT" aria-label="Incidents"><button class="segment-select" data-live-type="INCIDENT">Incidents</button><span class="badge" data-live-count="INCIDENT">0</span></div>
       <div class="segment-row"><input type="checkbox" id="live-events-closure" data-live-type="CLOSURE" aria-label="Closures"><button class="segment-select" data-live-type="CLOSURE">Closures</button><span class="badge" data-live-count="CLOSURE">0</span></div>
     </div>
     <p class="live-event-source" hidden></p>
@@ -110,6 +115,7 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
     const event = entity ? records.get(entity) : null;
     panel.select(event);
     renderProvenance(event);
+    reportSelection?.(event);
     if (event) focusMapPoints(viewer, pointsOf(event), '.live-event-details');
     else if (previous) viewer.camera.cancelFlight();
     viewer.scene.requestRender();
@@ -288,6 +294,16 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
 
   return {
     ready, entityById, refresh: load,
+    records,
+    /** Select a live event by id — its own panel, provenance and framing, driven from the explorer. */
+    selectById(id) {
+      const entity = id == null ? null : entityById.get(String(id));
+      if (id != null && !entity) return false;
+      select(entity ?? null);
+      return true;
+    },
+    clearSelection() { select(null); },
+    onSelection(callback) { reportSelection = callback; },
     get events() { return events; },
     get payload() { return payload; },
     destroy() {

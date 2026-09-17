@@ -216,15 +216,31 @@ try {
   await page.waitForFunction(() => window.models.modelById.get('i595-lane-barrier-arm-1').show, null, { timeout: 10000 });
   assert.deepEqual(await shownByLayer(), { gantries: [true, true, true], 'lane-barriers': [true] });
 
-  // ---- 10. selecting an asset flies to it and says what it is ----------------------------------
+  // ---- 10. selecting an asset says what it is; inspecting it is what flies the camera ----------
+  // While the Asset Explorer is browsing gantries it owns selection, and selection is deliberately
+  // not a camera flight — stepping through a corridor should not throw the camera at each asset in
+  // turn. The close view now belongs to the explicit "View on map" action, exercised below.
   const heightBefore = await page.evaluate(() => v.camera.positionCartographic.height);
   await page.evaluate(() => { window.__pose = null; });
   await page.evaluate(() => window.modelLayers.select(window.models.modelById.get('i595-gantry-3-toll-lane')));
+  await page.waitForFunction(() =>
+    window.__assetExplorer?.store.getState().selectedAsset?.id === 'i595-gantry-3-toll-lane',
+    null, { timeout: 30000 });
+  const heightAfterSelect = await page.evaluate(() => v.camera.positionCartographic.height);
+  assert.ok(Math.abs(heightAfterSelect - heightBefore) < 1,
+    `selecting must not move the camera, height went ${heightBefore.toFixed(0)} -> ${heightAfterSelect.toFixed(0)}`);
+
+  const details = await page.locator('[role="complementary"]').innerText();
+  assert.ok(details.includes('Gantry 3'), 'the details panel names the selected asset');
+  assert.ok(details.includes('Toll Gantries'), 'the details panel names its layer');
+
+  // The explicit inspection is what flies, and it saves the camera so Back can restore it.
+  await page.evaluate(() => window.__assetExplorer.inspect(
+    window.__assetExplorer.store.getState().selectedAsset));
   await page.waitForFunction(h => v.camera.positionCartographic.height < h / 2, heightBefore, { timeout: 30000 });
   await settleCamera(page, null);
-  const details = await page.locator('.model-details:not([hidden])').innerText();
-  assert.ok(details.includes('i595-gantry-3-toll-lane'), 'the details panel names the selected asset');
-  assert.ok(details.includes('Toll Gantries'), 'the details panel names its layer');
+  assert.equal(await page.evaluate(() => window.__assetExplorer.navigation.hasSaved()), true,
+    'inspecting saves the camera it left, so Back has something to return to');
   // The camera must face the gantry's front, not simply point north: a structure that spans the
   // road is edge-on from the north, which is what the fixed heading used to give.
   const view = await page.evaluate(() => {
@@ -249,7 +265,13 @@ try {
   const overridden = await page.evaluate(() => window.modelConfigs.find(record => Number.isFinite(record.viewHeading)));
   if (overridden) {
     const fromPose = await cameraPose(page);
-    await page.evaluate(id => window.modelLayers.select(window.models.modelById.get(id)), overridden.id);
+    // Selection no longer moves the camera, so the view direction is exercised where it now
+    // applies: the explicit inspection.
+    await page.evaluate(id => {
+      const store = window.__assetExplorer.store;
+      const asset = (store.getState().assetsByType.gantry ?? []).find(candidate => candidate.id === id);
+      window.__assetExplorer.inspect(asset);
+    }, overridden.id);
     await settleCamera(page, fromPose);
     const actual = await page.evaluate(() => (v.camera.heading * 180 / Math.PI + 360) % 360);
     const off = Math.abs(((actual - overridden.viewHeading + 540) % 360) - 180);

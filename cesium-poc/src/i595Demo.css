@@ -227,6 +227,9 @@ body .map-nav .map-nav-north { grid-column: auto; margin: 0; border: 0; border-l
 /* Corridor status strip: bottom-left, clear of the Cesium credits and the camera toolbar. */
 .corridor-status { position: absolute; left: 16px; bottom: 48px; display: flex; align-items: stretch; max-width: min(620px, calc(100vw - 340px)); border: 1px solid #ffffff1f; border-radius: 12px; background: #0b1729cc; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 12px 32px #0006; color: #e8eef6; font-size: 12px; overflow: hidden; }
 body:has(.layers:not(.collapsed)) .corridor-status { left: 420px; }
+/* `display: flex` above beats the hidden attribute on its own, so the strip needs this to be able
+   to stand aside for the Asset Explorer. Same trap as .street-view and .ask-twin-panel. */
+.corridor-status[hidden] { display: none; }
 .corridor-status-toggle { flex: none; padding: 0 12px; border: 0; border-right: 1px solid #ffffff14; background: transparent; color: #92a8c3; font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; cursor: pointer; }
 .corridor-status-toggle span { color: #67f4e2; }
 .corridor-status-toggle:hover { background: #ffffff0d; }

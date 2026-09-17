@@ -39,6 +39,10 @@ export default defineConfig({
   // asset URLs resolve against import.meta.env.BASE_URL so data/ and models/ load under either base.
   base: process.env.CESIUM_BASE_PATH || process.env.POC_BASE_PATH || "/",
   build: { target: 'esnext' },
+  // The Asset Explorer is a React island inside an otherwise framework-free app. esbuild's
+  // automatic runtime is enough for it — no fast-refresh plugin, so the rest of the app's plain
+  // HMR is untouched.
+  esbuild: { jsx: 'automatic' },
   plugins: [cesium({ cesiumBuildRootPath, cesiumBuildPath: join(cesiumBuildRootPath, "Cesium") }), liveEventsApi(), snapshotApi()],
   // Port 5188 (not the default 5180) keeps this NTTA worktree isolated from a sibling session's
   // dev server sharing localhost. Disable auto-open under headless e2e.

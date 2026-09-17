@@ -14,7 +14,13 @@
   },
   "dependencies": {
     "@arcgis/core": "^5.1.9",
-    "cesium": "^1.123.0"
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^9.4.0",
+    "@mui/material": "^9.4.0",
+    "cesium": "^1.123.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",

@@ -65,6 +65,14 @@ export function modelDetails(config) {
  * @param {object[]} configs  the records from config/cesiumModels.json
  */
 export function installCorridorModelLayers(container, viewer, service, configs) {
+  // ---- Asset Explorer handover -----------------------------------------------------------------
+  // While the Asset Explorer is browsing this type it owns selection: the panel and the camera move
+  // below belong to the standalone behaviour, and running them too would put two details panels on
+  // screen and fly the camera on every Next. The layer still highlights, and still reports what the
+  // user picked, so one shared selection stays in charge.
+  let externallyOwned = false;
+  let reportSelection = null;
+
   const records = new Map();          // entity  -> config
   const entityById = new Map();       // model id -> entity
   const layerOf = new Map();          // entity  -> layer id
@@ -107,6 +115,13 @@ export function installCorridorModelLayers(container, viewer, service, configs) 
   function select(entity) {
     selected = entity;
     style();
+    if (externallyOwned) {
+      // Highlight only. The Asset Explorer opens its own panel and decides what the camera does.
+      panel.select(null);
+      viewer.scene.requestRender();
+      reportSelection?.(entity ? records.get(entity) : null);
+      return;
+    }
     panel.select(entity ? records.get(entity) : null);
     if (entity) {
       const config = records.get(entity);
@@ -114,6 +129,16 @@ export function installCorridorModelLayers(container, viewer, service, configs) 
       focusMapPoints(viewer, positionOf(entity), '.model-details', { ...framing, headingDeg: focusHeadingFor(config) });
     }
     viewer.scene.requestRender();
+    reportSelection?.(entity ? records.get(entity) : null);
+  }
+
+  /** Highlight by model id without opening a panel or moving the camera. */
+  function highlightById(id) {
+    const entity = id == null ? null : entityById.get(String(id));
+    selected = entity;
+    style();
+    viewer.scene.requestRender();
+    return Boolean(entity) || id == null;
   }
 
   function hover(entity, position) {
@@ -212,6 +237,10 @@ export function installCorridorModelLayers(container, viewer, service, configs) 
   }
 
   return {
+    records,
+    highlightById,
+    setExternallyOwned(owned) { externallyOwned = Boolean(owned); },
+    onSelection(callback) { reportSelection = callback; },
     place,
     entityById,
     /** Test/diagnostic hook: how many assets each layer owns. */

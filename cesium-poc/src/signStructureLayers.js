@@ -55,6 +55,11 @@ function markerIcon(type, selected) {
  * @param {{types?: object[], centerline?: {lon: number, lat: number}[], logger?: Console}} [options]
  */
 export function installSignStructureLayers(container, viewer, service, { types = SIGN_STRUCTURE_TYPES, centerline = [], logger = console } = {}) {
+  // ---- Asset Explorer bridge -------------------------------------------------------------------
+  // These layers keep their own details panel and framing; the explorer adds browsing on top and
+  // shares one selection with them.
+  let reportSelection = null;
+
   const records = new Map();   // entity  -> record
   const layers = new Map();    // type id -> layer state
   let selected = null, hovered = null, disposed = false;
@@ -103,10 +108,12 @@ export function installSignStructureLayers(container, viewer, service, { types =
   }
 
   function select(entity) {
+    document.querySelector('.camera-details')?.setAttribute('hidden', '');
     const previous = selected;
     selected = entity;
     style(previous); style(selected);
     panel.select(entity ? records.get(entity) : null);
+    reportSelection?.(entity ? records.get(entity) : null);
     if (entity) {
       const record = records.get(entity);
       // One flight, never a tracked entity: pan, orbit and zoom stay with the user afterwards.
@@ -292,6 +299,17 @@ export function installSignStructureLayers(container, viewer, service, { types =
     countFor: typeId => layers.get(typeId)?.records.length ?? 0,
     entityFor: (typeId, id) => layers.get(typeId)?.entities.get(id) ?? null,
     recordFor: entity => records.get(entity) ?? null,
+    /** Every structure of one type, for the Asset Explorer's card list. */
+    recordsFor: typeId => layers.get(typeId)?.records ?? [],
+    /** Select one structure by type and id — its own panel and framing, driven from the explorer. */
+    selectById(typeId, id) {
+      const entity = id == null ? null : layers.get(typeId)?.entities.get(String(id));
+      if (id != null && !entity) return false;
+      select(entity ?? null);
+      return true;
+    },
+    clearSelection() { select(null); },
+    onSelection(callback) { reportSelection = callback; },
     select,
     destroy() {
       disposed = true;

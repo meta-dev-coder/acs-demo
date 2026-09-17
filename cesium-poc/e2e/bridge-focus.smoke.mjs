@@ -35,25 +35,44 @@ try {
   for(const id of ['BRIDGE-860648',longest]) {
     await page.locator(`button[data-bridge-id="${id}"]`).click();
     await page.waitForTimeout(1600);
+    // While the Asset Explorer browses bridges, picking one selects it; framing it is the explicit
+    // inspection. The framing requirement is unchanged — the bridge must land in the map area the
+    // panels leave clear — but the panels it has to clear now include the bottom asset explorer.
+    await page.evaluate(id=>{
+      const store=window.__assetExplorer.store;
+      const asset=(store.getState().assetsByType.bridge??[]).find(candidate=>candidate.id===id);
+      window.__assetExplorer.inspect(asset);
+    },id);
+    await page.waitForTimeout(2600);
     const result=await page.evaluate(id=>{
       const v=window.bridgeViewer,{SceneTransforms}=window.bridgeCesium;
       const pixels=window.bridgeLayer.bridgeById.get(id).polyline.positions.getValue().map(p=>SceneTransforms.worldToWindowCoordinates(v.scene,p));
-      const left=document.querySelector('.layers').getBoundingClientRect().right;
-      const right=document.querySelector('.bridge-details').getBoundingClientRect().left;
-      const top=0;
-      return {height:v.camera.positionCartographic.height, clear:pixels.every(p=>p && p.x>left && p.x<right && p.y>top && p.y<innerHeight-40)};
+      const rectOf=selector=>document.querySelector(selector)?.getBoundingClientRect()??null;
+      const left=rectOf('.layers').right;
+      const details=rectOf('[role="complementary"]');
+      const right=details&&details.width>0?details.left:innerWidth;
+      const explorer=rectOf('[role="region"][aria-label*="explorer"]');
+      const bottom=explorer&&explorer.height>0?explorer.top:innerHeight-40;
+      return {height:v.camera.positionCartographic.height,
+        clear:pixels.every(p=>p&&p.x>left&&p.x<right&&p.y>0&&p.y<bottom)};
     },id);
     assert.ok(result.clear,JSON.stringify(result));
   }
   await page.screenshot({path:'/tmp/bridge-focus-desktop.png'});
-  await page.getByRole('button',{name:'Close bridge details'}).click();
+  await page.getByRole('button',{name:'Close asset details'}).click();
   await page.setViewportSize({width:390,height:844});
   // Cesium resizes its canvas on its own tick, and the focus helper frames from the canvas size —
   // let the new viewport reach it before asking it to frame anything.
   await page.waitForTimeout(800);
   await page.evaluate(()=>window.bridgeViewer.forceResize());
   await page.locator('button[data-bridge-id="BRIDGE-860648"]').click();
-  await page.waitForTimeout(1600);
+  await page.waitForTimeout(1200);
+  await page.evaluate(()=>{
+    const store=window.__assetExplorer.store;
+    const asset=(store.getState().assetsByType.bridge??[]).find(c=>c.id==='BRIDGE-860648');
+    window.__assetExplorer.inspect(asset);
+  });
+  await page.waitForTimeout(2600);
   assert.equal(await page.locator('#menu-toggle').getAttribute('aria-expanded'),'false');
   assert.ok(await page.evaluate(()=>{
     const v=window.bridgeViewer,{SceneTransforms}=window.bridgeCesium;
@@ -62,7 +81,8 @@ try {
     // Clear of whatever the collapsed explorer actually occupies, rather than a baked-in width:
     // the quick rail is narrower than the panel shell it replaced.
     const left=document.querySelector('.quick-rail').getBoundingClientRect().right;
-    const bottom=document.querySelector('.bridge-details').getBoundingClientRect().top;
+    const panel=document.querySelector('[role="region"][aria-label*="explorer"]');
+    const bottom=panel&&panel.getBoundingClientRect().height>0?panel.getBoundingClientRect().top:innerHeight-40;
     return points.every(p=>{const xy=SceneTransforms.worldToWindowCoordinates(v.scene,p);return xy && xy.x>left && xy.x<innerWidth && xy.y>top && xy.y<bottom;});
   }));
   await page.screenshot({path:'/tmp/bridge-focus-mobile.png'});

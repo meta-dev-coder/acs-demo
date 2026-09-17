@@ -100,6 +100,15 @@ export function installCorridorStatusBar(container, { mainline, liveEvents } = {
   return {
     element: strip,
     refresh,
+    /**
+     * Step aside without being torn down. The Asset Explorer occupies the same edge of the map, and
+     * two stacked bars leave neither enough room — but the strip is still a live feature with its
+     * own toggle and refresh, so it hides rather than being removed and rebuilt.
+     */
+    setSuppressed(suppressed) {
+      strip.hidden = Boolean(suppressed);
+    },
+    get suppressed() { return strip.hidden === true; },
     get collapsed() { return strip.classList.contains('collapsed'); },
     destroy() { disposed = true; clearInterval(timer); strip.remove(); },
   };

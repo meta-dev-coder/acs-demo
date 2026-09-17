@@ -7,6 +7,14 @@ import { roadStructureFromProperties, structureOverlapsSegment, structureTooltip
 
 /** Bridge overlay on the existing viewer, using its shared details and picking mechanisms. */
 export function installBridgeStructures(container, viewer, mainlineSegments) {
+  // ---- Asset Explorer handover -----------------------------------------------------------------
+  // While the Asset Explorer is browsing bridges it owns selection: the panel and the camera move
+  // below belong to the standalone behaviour, and running them too would put two details panels on
+  // screen and fly the camera on every Next. The layer still highlights, and still reports what the
+  // user picked, so one shared selection stays in charge.
+  let externallyOwned = false;
+  let reportSelection = null;
+
   // Open by default: this group now holds the sign-structure layers as well as bridges, and a
   // collapsed disclosure made them look absent.
   container.innerHTML = `<details open class="structures-group"><summary>Structures</summary>
@@ -38,11 +46,27 @@ export function installBridgeStructures(container, viewer, mainlineSegments) {
   }
   function select(entity) {
     const previous = selected; selected = entity; style(previous); style(selected);
+    if (externallyOwned) {
+      panel.select(null);
+      renderLocationMembers(null);
+      viewer.scene.requestRender();
+      reportSelection?.(entity ? records.get(entity) : null);
+      return;
+    }
     panel.select(entity ? records.get(entity) : null);
     renderLocationMembers(entity);
     if (entity) focusBridge(viewer, entity);
     else if (previous) viewer.camera.cancelFlight();
     viewer.scene.requestRender();
+    reportSelection?.(entity ? records.get(entity) : null);
+  }
+
+  /** Highlight by bridge asset id without opening a panel or moving the camera. */
+  function highlightById(id) {
+    const entity = id == null ? null : bridgeById.get(String(id));
+    const previous = selected; selected = entity; style(previous); style(selected);
+    viewer.scene.requestRender();
+    return Boolean(entity) || id == null;
   }
   function renderLocationMembers(entity) {
     document.querySelector('.bridge-location-members')?.remove();
@@ -146,6 +170,9 @@ export function installBridgeStructures(container, viewer, mainlineSegments) {
   }
   retry.onclick = load; load();
   return {
+    records, highlightById,
+    setExternallyOwned(owned) { externallyOwned = Boolean(owned); },
+    onSelection(callback) { reportSelection = callback; },
     bridgeById, segmentsByBridge, bridgesBySegment,
     destroy() {
       disposed = true; removeMove(); viewer.canvas.removeEventListener('mouseleave', leave);

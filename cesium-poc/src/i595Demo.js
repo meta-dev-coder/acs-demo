@@ -3,6 +3,7 @@ import { installCctvCameras } from './cctvCameras.js';
 import { installTrafficSignals } from './trafficSignals.js';
 import { installExpressGantries } from './expressGantries.js';
 import { installLiveEvents } from './liveEvents.js';
+import { LIVE_EVENT_TYPES } from './liveEventsData.js';
 import { BASE_ENVIRONMENTS, createGooglePhotorealistic3DService } from './basePhotorealistic3D.js';
 import { installBaseEnvironmentControls } from './baseEnvironmentControls.js';
 import { Color, GeoJsonDataSource, Cartesian3, Math as CMath, CameraEventType } from "cesium";
@@ -33,6 +34,7 @@ import { installI595ContextLabels } from "./i595ContextLabels.js";
 import { installI595Hud } from "./i595Hud.js";
 import { createCesiumModelService } from "./cesiumModelService.js";
 import { installCorridorModelLayers } from "./corridorModelLayers.js";
+import { installAssetExplorer } from "./assetExplorer/installAssetExplorer.jsx";
 import { createPhotorealisticClipping } from "./photorealisticClipping.js";
 import { installAskTheTwin } from "./askTheTwin.js";
 import { corridorOverview, heroView } from "./i595CorridorViews.js";
@@ -319,7 +321,11 @@ try {
     counts: {
       signals: () => signalControls.trafficSignalById.size,
       cameras: () => cameraControls.cameraById.size,
-      incidents: () => liveEventControls.events.length,
+      // Each badge counts its own feed. Incidents used to count every live event, which was
+      // consistent while the Incidents tool drove the whole Live Events group and wrong once it
+      // became its own layer.
+      incidents: () => liveEventControls.events.filter(event => event.type === LIVE_EVENT_TYPES.INCIDENT).length,
+      closures: () => liveEventControls.events.filter(event => event.type === LIVE_EVENT_TYPES.CLOSURE).length,
       structures: () => bridgeControls.bridgeById.size,
       // One entry per registered structure type, so a new type gets its badge for free.
       ...Object.fromEntries(SIGN_STRUCTURE_TYPES.map(type => [type.id, () => signStructureControls.countFor(type.id)])),
@@ -331,15 +337,40 @@ try {
     onOpenWeather: () => document.querySelector(".weather-launch")?.click(),
     onTogglePanel: () => setExplorerCollapsed(!panel.classList.contains("collapsed")),
   });
+  // Operational strip: corridor facts and the live-event feed, with gaps stated rather than filled.
+  // Installed before the Asset Explorer because the explorer takes a reference to it — they share
+  // the bottom edge of the map and the strip yields while an explorer is open.
+  const corridorStatus = installCorridorStatusBar(document.body, { mainline: mainlineSegments, liveEvents: liveEventControls });
+
+  // Asset Explorer: one selection shared by the map, the bottom carousel, the mini-map and the
+  // details panel. Layer visibility stays the Map Explorer's job — this only browses what is on.
+  const assetExplorer = installAssetExplorer(document.body, viewer, {
+    centerline: corridor,
+    layerStore,
+    corridorModels: corridorModelLayers,
+    cameras: cameraControls,
+    bridges: bridgeControls,
+    signals: signalControls,
+    liveEvents: liveEventControls,
+    signStructures: signStructureControls,
+    modelConfigs: cesiumModels,
+    // The bottom edge is shared: the corridor strip yields it while the explorer is open.
+    corridorStatus,
+    // Street View wants a labelled place, not bare coordinates.
+    onViewCamera: streetViewEnabled
+      ? asset => (asset?.coordinates ? openStreetView({ ...asset.coordinates, label: asset.name }) : undefined)
+      : null,
+  });
+  if (import.meta.env.DEV) window.__assetExplorer = assetExplorer;
+
   explorerToggle = document.querySelector("#menu-toggle");
   // A fresh load opens on the map, not on the layer tree; the quick rail keeps the common
   // toggles one click away, and the explorer itself is one click from the rail.
   setExplorerCollapsed(true);
 
   // Operational strip: corridor facts and the live-event feed, with gaps stated rather than filled.
-  const corridorStatus = installCorridorStatusBar(document.body, { mainline: mainlineSegments, liveEvents: liveEventControls });
   const askTwin = installAskTheTwin(viewer, { cameraControls });
-  if (import.meta.hot) import.meta.hot.dispose(() => { document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
+  if (import.meta.hot) import.meta.hot.dispose(() => { assetExplorer.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
   for (const input of inputs) {
     // Layers with their own loader, plus display options that are not data layers at all: this loop
     // fetches `data/<id>.geojson`, and "flow-direction" has no such file — being swept up here

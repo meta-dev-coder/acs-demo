@@ -70,6 +70,14 @@ function makeGroup(title, id, className) {
  *   View is Google's street-level photography, not this camera's feed — the panel keeps them apart.
  */
 export function installCctvCameras(container, viewer, { onStreetView } = {}) {
+  // ---- Asset Explorer handover -----------------------------------------------------------------
+  // While the Asset Explorer is browsing this type it owns selection: the panel and the camera move
+  // below belong to the standalone behaviour, and running them too would put two details panels on
+  // screen and fly the camera on every Next. The layer still highlights, and still reports what the
+  // user picked, so one shared selection stays in charge.
+  let externallyOwned = false;
+  let reportSelection = null;
+
   // Express lane cameras (gantry-mounted on I-595 Express) shown first/top.
   const expressGroup = makeGroup('Express Lane Cameras', 'cameras-express', 'cameras-group cameras-express-group');
   const mainlineGroup = makeGroup('Mainline Cameras', 'cameras-mainline', 'cameras-group cameras-mainline-group');
@@ -131,6 +139,12 @@ export function installCctvCameras(container, viewer, { onStreetView } = {}) {
   function select(entity) {
     clearSnapshotInterval();
     const old = selected; selected = entity; style(old); style(entity);
+    if (externallyOwned) {
+      panel.select(null);
+      viewer.scene.requestRender();
+      reportSelection?.(entity ? records.get(entity) : null);
+      return;
+    }
     panel.select(entity ? records.get(entity) : null);
     document.querySelector('.camera-stream-action')?.remove();
     document.querySelector('.camera-street-view')?.remove();
@@ -283,7 +297,27 @@ export function installCctvCameras(container, viewer, { onStreetView } = {}) {
     return true;
   }
 
-  return { cameraById, records, selectCamera, destroy() {
+  /** Highlight by camera id without opening a panel or moving the camera. */
+  function highlightById(id) {
+    const entity = id == null ? null : cameraById.get(String(id));
+    const old = selected; selected = entity; style(old); style(entity);
+    viewer.scene.requestRender();
+    return Boolean(entity) || id == null;
+  }
+
+  /**
+   * Drop the selection entirely — highlight AND this layer's own details panel.
+   *
+   * highlightById() deliberately only restyles, which is what a shared selection needs when it is
+   * merely moving between assets. Clearing is different: a camera that is no longer selected must
+   * not leave its panel on screen describing it.
+   */
+  function clearSelection() { select(null); }
+
+  return { cameraById, records, selectCamera, highlightById, clearSelection,
+    setExternallyOwned(owned) { externallyOwned = Boolean(owned); },
+    onSelection(callback) { reportSelection = callback; },
+    destroy() {
     clearSnapshotInterval();
     disposed = true; removeMove(); viewer.canvas.removeEventListener('mouseleave', leave);
     for (const [event, action] of [[ScreenSpaceEventType.MOUSE_MOVE, oldMove], [ScreenSpaceEventType.LEFT_CLICK, oldClick]]) {

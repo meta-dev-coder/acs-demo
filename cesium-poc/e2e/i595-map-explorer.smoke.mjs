@@ -14,7 +14,7 @@ import { RAIL_LAYER_IDS } from '../src/mapLayerStore.js';
 const signalCount = JSON.parse(readFileSync(new URL('../public/data/i595_corridor_traffic_signals.geojson', import.meta.url))).features.length;
 const cameraCount = JSON.parse(readFileSync(new URL('../public/data/i595_corridor_cameras.geojson', import.meta.url))).features.length;
 /** The control each logical layer ultimately writes to — the module's own checkbox. */
-const CONTROLS = { signals: '#signals-all', cameras: '#cameras-mainline', incidents: '#live-events-all', direction: '#flow-direction' };
+const CONTROLS = { signals: '#signals-all', cameras: '#cameras-mainline', incidents: '#live-events-incident', direction: '#flow-direction' };
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 try {

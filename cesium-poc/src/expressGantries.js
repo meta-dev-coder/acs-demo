@@ -82,6 +82,7 @@ export function installExpressGantries(container, viewer) {
   }
 
   function select(entity) {
+    document.querySelector('.camera-details')?.setAttribute('hidden', '');
     const old = selected; selected = entity; styleEntity(old); styleEntity(entity);
     panel.select(entity ? records.get(entity) : null);
     clearCustomPanelContent();

@@ -53,6 +53,12 @@ export function signalSecondaryDetails(p) {
   return [['County', p.county], ['District', p.district]].filter(([, value]) => valid(value));
 }
 export function installTrafficSignals(container, viewer) {
+  // ---- Asset Explorer bridge -------------------------------------------------------------------
+  // This layer keeps its own details panel and its own focus behaviour; the Asset Explorer adds
+  // browsing on top and shares one selection with it. So selection is reported out, and can be
+  // driven in, without changing anything about how this layer presents an asset.
+  let reportSelection = null;
+
   const group = document.createElement('details'); group.className = 'signals-group';
   group.innerHTML = '<summary><input type="checkbox" id="signals-all" aria-label="Traffic Signals" disabled><span>Traffic Signals</span><span class="badge">…</span></summary><div class="signal-list"></div><p class="ramp-status" role="status">Loading traffic signals…</p><button class="signal-retry" hidden>Retry traffic signals</button>';
   container.append(group);
@@ -104,6 +110,7 @@ export function installTrafficSignals(container, viewer) {
   function select(entity) {
     const old = selected; selected = entity; style(old); style(entity);
     panel.select(entity ? records.get(entity) : null);
+    reportSelection?.(entity ? records.get(entity) : null);
     // An oblique feature view, not a close top-down: the intersection is only meaningful next to
     // I-595 and the roads around it.
     if (entity) focusMapPoints(viewer, [entity.position.getValue(viewer.clock.currentTime)], '.signal-details',
@@ -181,7 +188,18 @@ export function installTrafficSignals(container, viewer) {
     return loading;
   }
   retry.onclick = load; load();
-  return { trafficSignalById, destroy() {
+  return { trafficSignalById, records,
+    /** Select by FDOT signal id — the layer's own panel and framing, driven from the explorer. */
+    selectById(id) {
+      const entity = id == null ? null : trafficSignalById.get(String(id));
+      if (id != null && !entity) return false;
+      entity && (entity.show = true);
+      select(entity ?? null);
+      return true;
+    },
+    clearSelection() { select(null); },
+    onSelection(callback) { reportSelection = callback; },
+    destroy() {
     disposed = true; removeMove(); removeChanged(); removeMoveEnd(); viewer.canvas.removeEventListener('mouseleave', leave);
     for (const [event, action] of [[ScreenSpaceEventType.MOUSE_MOVE, oldMove], [ScreenSpaceEventType.LEFT_CLICK, oldClick]]) {
       if (action) handler.setInputAction(action, event); else handler.removeInputAction(event);
