@@ -39,8 +39,10 @@ export function AssetDetailsPanel({ asset, inspecting, onClose, onInspect, onRet
       role="complementary"
       aria-label={title}
     >
-      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
-        <Typography component="h2" sx={{ fontSize: 17, fontWeight: 600, lineHeight: 1.25 }}>
+      <Stack direction="row" alignItems="flex-start" spacing={1}>
+        {/* The title takes the remaining width so the close button sits hard against the top-right
+            corner, whatever the title's length. */}
+        <Typography component="h2" sx={{ flex: 1, minWidth: 0, fontSize: 17, fontWeight: 600, lineHeight: 1.25 }}>
           {title}
         </Typography>
         <Tooltip title="Close asset details">

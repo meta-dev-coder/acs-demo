@@ -57,7 +57,15 @@ export function installTrafficSignals(container, viewer) {
   // This layer keeps its own details panel and its own focus behaviour; the Asset Explorer adds
   // browsing on top and shares one selection with it. So selection is reported out, and can be
   // driven in, without changing anything about how this layer presents an asset.
-  let reportSelection = null;
+  /**
+   * Report selections to every listener, not one.
+   *
+   * A single module backs several asset types (gantries and lane barriers here; three structure
+   * types elsewhere), and each registers its own listener. Holding one callback meant the last
+   * registration silently replaced the others, so picks for every other type vanished.
+   */
+  const selectionListeners = new Set();
+  const reportSelection = record => { for (const listener of [...selectionListeners]) listener(record); };
 
   const group = document.createElement('details'); group.className = 'signals-group';
   group.innerHTML = '<summary><input type="checkbox" id="signals-all" aria-label="Traffic Signals" disabled><span>Traffic Signals</span><span class="badge">…</span></summary><div class="signal-list"></div><p class="ramp-status" role="status">Loading traffic signals…</p><button class="signal-retry" hidden>Retry traffic signals</button>';
@@ -110,7 +118,7 @@ export function installTrafficSignals(container, viewer) {
   function select(entity) {
     const old = selected; selected = entity; style(old); style(entity);
     panel.select(entity ? records.get(entity) : null);
-    reportSelection?.(entity ? records.get(entity) : null);
+    reportSelection(entity ? records.get(entity) : null);
     // An oblique feature view, not a close top-down: the intersection is only meaningful next to
     // I-595 and the roads around it.
     if (entity) focusMapPoints(viewer, [entity.position.getValue(viewer.clock.currentTime)], '.signal-details',
@@ -198,7 +206,12 @@ export function installTrafficSignals(container, viewer) {
       return true;
     },
     clearSelection() { select(null); },
-    onSelection(callback) { reportSelection = callback; },
+    onSelection(callback) {
+      // null clears every listener, which is what teardown wants.
+      if (!callback) { selectionListeners.clear(); return () => {}; }
+      selectionListeners.add(callback);
+      return () => selectionListeners.delete(callback);
+    },
     destroy() {
     disposed = true; removeMove(); removeChanged(); removeMoveEnd(); viewer.canvas.removeEventListener('mouseleave', leave);
     for (const [event, action] of [[ScreenSpaceEventType.MOUSE_MOVE, oldMove], [ScreenSpaceEventType.LEFT_CLICK, oldClick]]) {

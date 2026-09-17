@@ -76,7 +76,15 @@ export function installCctvCameras(container, viewer, { onStreetView } = {}) {
   // screen and fly the camera on every Next. The layer still highlights, and still reports what the
   // user picked, so one shared selection stays in charge.
   let externallyOwned = false;
-  let reportSelection = null;
+  /**
+   * Report selections to every listener, not one.
+   *
+   * A single module backs several asset types (gantries and lane barriers here; three structure
+   * types elsewhere), and each registers its own listener. Holding one callback meant the last
+   * registration silently replaced the others, so picks for every other type vanished.
+   */
+  const selectionListeners = new Set();
+  const reportSelection = record => { for (const listener of [...selectionListeners]) listener(record); };
 
   // Express lane cameras (gantry-mounted on I-595 Express) shown first/top.
   const expressGroup = makeGroup('Express Lane Cameras', 'cameras-express', 'cameras-group cameras-express-group');
@@ -115,12 +123,13 @@ export function installCctvCameras(container, viewer, { onStreetView } = {}) {
     img.style.cssText = 'width:100%;display:block;border-radius:4px;';
     img.src = `${snapshotUrl}?t=${Date.now()}`;
     const statusLine = document.createElement('p');
-    statusLine.style.cssText = 'font-size:0.75rem;color:#94a3b8;margin:4px 0 0;text-align:right;';
+    statusLine.style.cssText = 'font-size:0.75rem;color:var(--ui-text-secondary);margin:4px 0 0;text-align:right;';
     const updateTimestamp = () => { statusLine.textContent = `Last refreshed: ${new Date().toLocaleTimeString()}`; };
     updateTimestamp();
     const errorMsg = document.createElement('div');
     errorMsg.hidden = true;
-    errorMsg.style.cssText = 'padding:12px;background:#1e293b;border-radius:4px;font-size:0.85rem;color:#f87171;';
+    // The surface follows the theme; the error colour does not — it is a status, not a style.
+    errorMsg.style.cssText = 'padding:12px;background:var(--ui-surface-raised);border-radius:4px;font-size:0.85rem;color:#f87171;';
     errorMsg.textContent = 'Snapshot unavailable — camera may be offline or feed not yet active';
     const retryBtn = document.createElement('button');
     retryBtn.textContent = 'Retry';
@@ -142,7 +151,7 @@ export function installCctvCameras(container, viewer, { onStreetView } = {}) {
     if (externallyOwned) {
       panel.select(null);
       viewer.scene.requestRender();
-      reportSelection?.(entity ? records.get(entity) : null);
+      reportSelection(entity ? records.get(entity) : null);
       return;
     }
     panel.select(entity ? records.get(entity) : null);
@@ -316,7 +325,12 @@ export function installCctvCameras(container, viewer, { onStreetView } = {}) {
 
   return { cameraById, records, selectCamera, highlightById, clearSelection,
     setExternallyOwned(owned) { externallyOwned = Boolean(owned); },
-    onSelection(callback) { reportSelection = callback; },
+    onSelection(callback) {
+      // null clears every listener, which is what teardown wants.
+      if (!callback) { selectionListeners.clear(); return () => {}; }
+      selectionListeners.add(callback);
+      return () => selectionListeners.delete(callback);
+    },
     destroy() {
     clearSnapshotInterval();
     disposed = true; removeMove(); viewer.canvas.removeEventListener('mouseleave', leave);

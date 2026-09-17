@@ -27,6 +27,12 @@ export const clampPitchDeg = pitchDeg =>
 /** Wrap a heading into [0, 360). */
 export const normalizeHeadingDeg = headingDeg => ((headingDeg % 360) + 360) % 360;
 
+/** Material's light/dark mode glyphs, on the same 20x20 grid as the Street View figure. */
+export const THEME_ICONS = Object.freeze({
+  light: '<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="3.2"/><path d="M10 3.2v1.6M10 15.2v1.6M3.2 10h1.6M15.2 10h1.6M5.2 5.2l1.1 1.1M13.7 13.7l1.1 1.1M14.8 5.2l-1.1 1.1M6.3 13.7l-1.1 1.1"/></svg>',
+  dark: '<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M16 11.4A6.4 6.4 0 0 1 8.6 4a6.4 6.4 0 1 0 7.4 7.4Z"/></svg>',
+});
+
 const BUTTONS = [
   { id: 'zoom-in', label: 'Zoom in', text: '+', group: 'zoom' },
   { id: 'zoom-out', label: 'Zoom out', text: '−', group: 'zoom' },
@@ -72,16 +78,43 @@ export function cameraPivot(viewer) {
  * @param {import('cesium').Viewer} viewer
  * @param {{zoom?: (factor: number) => void}} [hooks]  reuses the map's own proportional zoom
  */
-export function installMapNavigationControls(container, viewer, { zoom, onStreetView } = {}) {
+export function installMapNavigationControls(container, viewer, { zoom, onStreetView, themeMode, onToggleTheme } = {}) {
   const group = document.createElement('div');
   group.className = 'map-nav';
   group.setAttribute('role', 'group');
   group.setAttribute('aria-label', 'Map navigation');
   group.innerHTML = BUTTONS.map(button =>
     `<button id="${button.id}" class="map-nav-${button.group}" type="button" aria-label="${button.label}" title="${button.label}">${button.text}</button>`).join('');
+  // The theme switch belongs with the other view controls rather than in the layer rail: it
+  // changes how the application looks, not which data is on the map. Its own group, so the
+  // divider separates it from the camera controls.
+  let themeButton = null;
+  let unsubscribeTheme = null;
+  if (onToggleTheme) {
+    themeButton = document.createElement('button');
+    themeButton.id = 'theme-toggle';
+    themeButton.className = 'map-nav-theme';
+    themeButton.type = 'button';
+    group.append(themeButton);
+  }
+
   const reset = document.querySelector('#reset-view');
   if (reset) group.append(reset);
   container.append(group);
+
+  function renderTheme() {
+    if (!themeButton) return;
+    const toLight = !themeMode?.isLight;
+    const label = toLight ? 'Switch to light theme' : 'Switch to dark theme';
+    // The control advertises where it takes you, so it shows the mode it switches TO.
+    themeButton.innerHTML = toLight ? THEME_ICONS.light : THEME_ICONS.dark;
+    themeButton.title = label;
+    themeButton.setAttribute('aria-label', label);
+    themeButton.setAttribute('aria-pressed', String(Boolean(themeMode?.isLight)));
+  }
+  renderTheme();
+  themeButton?.addEventListener('click', () => { onToggleTheme(); renderTheme(); });
+  unsubscribeTheme = themeMode?.subscribe?.(renderTheme) ?? null;
 
   const camera = viewer.camera;
   /**
@@ -163,6 +196,6 @@ export function installMapNavigationControls(container, viewer, { zoom, onStreet
     },
     /** Exposed so the zoom buttons can be enabled once the viewer is ready. */
     setEnabled(enabled) { for (const button of group.querySelectorAll('button')) button.disabled = !enabled; },
-    destroy() { removeChanged(); removeMoveEnd(); group.remove(); },
+    destroy() { removeChanged(); removeMoveEnd(); unsubscribeTheme?.(); group.remove(); },
   };
 }

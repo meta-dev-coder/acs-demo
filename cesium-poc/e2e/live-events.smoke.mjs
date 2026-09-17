@@ -116,12 +116,21 @@ try {
   await page.locator('input[data-live-type="CLOSURE"]').check();
   assert.deepEqual(await shown(), ['FL511-CLOSURE-845752']);
   assert.ok(await page.locator('#live-events-all').evaluate(node => node.indeterminate), 'one feed on is indeterminate');
+  // Asset layers are mutually exclusive: switching Incidents on switches Closures off, so the two
+  // feeds are alternatives rather than a pair. Selecting a layer deselects the previous one.
   await page.locator('input[data-live-type="INCIDENT"]').check();
-  assert.deepEqual(await shown(), ['FL511-CLOSURE-845752', 'FL511-INCIDENT-845391']);
-  assert.equal(await page.locator('#live-events-all').evaluate(node => node.indeterminate), false);
-  assert.ok(await page.locator('#live-events-all').isChecked(), 'both feeds on checks the parent');
-  await page.locator('#live-events-all').uncheck();
-  assert.deepEqual(await shown(), [], 'the parent switches both feeds off');
+  await page.waitForFunction(() => [...live.entityById.values()].filter(e => e.show).length === 1,
+    null, { timeout: 15000 });
+  assert.deepEqual(await shown(), ['FL511-INCIDENT-845391']);
+  assert.equal(await page.locator('input[data-live-type="CLOSURE"]').isChecked(), false,
+    'the previously selected feed is deselected');
+  // One feed on is still indeterminate — the parent can no longer reach "both on", so it acts as a
+  // group switch: it clears the feeds, and opens the first one again when the group is empty.
+  assert.ok(await page.locator('#live-events-all').evaluate(node => node.indeterminate),
+    'one feed on leaves the parent indeterminate');
+  await page.locator('#live-events-all').click();
+  await page.waitForFunction(() => [...live.entityById.values()].every(e => !e.show), null, { timeout: 15000 });
+  assert.deepEqual(await shown(), [], 'the parent switches every feed off');
   await page.locator('#live-events-all').check();
   assert.deepEqual(await shown(), ['FL511-CLOSURE-845752', 'FL511-INCIDENT-845391']);
 

@@ -57,6 +57,7 @@ export const ASSET_TYPES = Object.freeze({
      * measured heading and a placement, and no operational status, so none is claimed.
      */
     details: asset => [
+      ['Gantry', text(asset.name)],
       ['Corridor position', asset.corridorMiles == null ? null : `${asset.corridorMiles.toFixed(2)} mi along corridor`],
       ['Latitude', asset.coordinates ? asset.coordinates.latitude.toFixed(6) : null],
       ['Longitude', asset.coordinates ? asset.coordinates.longitude.toFixed(6) : null],
@@ -119,6 +120,7 @@ export const ASSET_TYPES = Object.freeze({
       return side ? { label: `Road side ${side}`, tone: 'muted' } : null;
     },
     details: asset => [
+      ['Bridge', text(asset.name)],
       ['Structure ID', text(asset.source?.structureId ?? asset.source?.structure_id)],
       ['Begin post', number(asset.source?.begin_post) == null ? null : Number(asset.source.begin_post).toFixed(3)],
       ['End post', number(asset.source?.end_post) == null ? null : Number(asset.source.end_post).toFixed(3)],
@@ -144,6 +146,7 @@ export const ASSET_TYPES = Object.freeze({
     getSubtitle: asset => positionLabel(asset) ?? text(asset.source?.layerLabel),
     getStatus: asset => (asset.source?.enabled === false ? { label: 'Disabled', tone: 'muted' } : { label: 'Placed', tone: 'ok' }),
     details: asset => [
+      ['Barrier', text(asset.name)],
       ['Corridor position', asset.corridorMiles == null ? null : `${asset.corridorMiles.toFixed(2)} mi along corridor`],
       ['Latitude', asset.coordinates ? asset.coordinates.latitude.toFixed(6) : null],
       ['Longitude', asset.coordinates ? asset.coordinates.longitude.toFixed(6) : null],

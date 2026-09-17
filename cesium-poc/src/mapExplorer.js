@@ -55,6 +55,8 @@ export function installMapExplorer(panel, store, { onOpenWeather, onTogglePanel 
   ].join('');
   panel.prepend(rail);
 
+
+
   const content = panel.querySelector('#layer-content');
   const header = document.createElement('div');
   header.className = 'explorer-header';

@@ -170,15 +170,22 @@ try {
     await page.evaluate(id => { const group = document.querySelector(`.${id}-group`); if (group) group.open = false; }, type.id);
   }
 
-  // ---- the types do not interfere with each other, or with anything already on the map ---------
+  // ---- asset layers are mutually exclusive ------------------------------------------------------
+  // Selecting a layer deselects the previous one, so only the type switched on last is drawn. The
+  // loop above switched all three on in turn; the last one is the survivor.
   const shown = await page.evaluate(types => Object.fromEntries(types.map(type =>
     [type.id, window.v.dataSources.getByName(`I-595 ${type.groupLabel} Sign Structures`)[0].show])), types);
-  assert.deepEqual(Object.values(shown), types.map(() => true), 'every layer switched on stays on');
+  const last = types[types.length - 1].id;
+  assert.deepEqual(shown, Object.fromEntries(types.map(type => [type.id, type.id === last])),
+    `only the most recently selected type stays on, expected ${last}`);
+
+  // Switching a different type on takes over from it, rather than adding to it.
   await page.click(`.quick-rail [data-layer="${types[0].id}"]`);
-  await page.waitForFunction(name => window.v.dataSources.getByName(name)[0].show === false,
+  await page.waitForFunction(name => window.v.dataSources.getByName(name)[0].show === true,
     `I-595 ${types[0].groupLabel} Sign Structures`, { timeout: 20000 });
   assert.equal(await page.evaluate(name => window.v.dataSources.getByName(name)[0].show,
-    `I-595 ${types[1].groupLabel} Sign Structures`), true, 'switching one structure type off must not touch another');
+    `I-595 ${types[types.length - 1].groupLabel} Sign Structures`), false,
+    'selecting a structure type deselects the one that was on');
 
   for (const control of ['#bridges-all', '#cameras-mainline', '#signals-all']) {
     assert.equal(await page.locator(control).count(), 1, `${control} must survive`);

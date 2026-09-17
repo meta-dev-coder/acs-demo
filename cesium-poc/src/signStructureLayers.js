@@ -58,7 +58,15 @@ export function installSignStructureLayers(container, viewer, service, { types =
   // ---- Asset Explorer bridge -------------------------------------------------------------------
   // These layers keep their own details panel and framing; the explorer adds browsing on top and
   // shares one selection with them.
-  let reportSelection = null;
+  /**
+   * Report selections to every listener, not one.
+   *
+   * A single module backs several asset types (gantries and lane barriers here; three structure
+   * types elsewhere), and each registers its own listener. Holding one callback meant the last
+   * registration silently replaced the others, so picks for every other type vanished.
+   */
+  const selectionListeners = new Set();
+  const reportSelection = record => { for (const listener of [...selectionListeners]) listener(record); };
 
   const records = new Map();   // entity  -> record
   const layers = new Map();    // type id -> layer state
@@ -108,12 +116,14 @@ export function installSignStructureLayers(container, viewer, service, { types =
   }
 
   function select(entity) {
-    document.querySelector('.camera-details')?.setAttribute('hidden', '');
+    // Only when actually selecting something here. A deselection must not close another
+    // layer's panel — the shared selection clears every other layer on every pick.
+    if (entity) document.querySelector('.camera-details')?.setAttribute('hidden', '');
     const previous = selected;
     selected = entity;
     style(previous); style(selected);
     panel.select(entity ? records.get(entity) : null);
-    reportSelection?.(entity ? records.get(entity) : null);
+    reportSelection(entity ? records.get(entity) : null);
     if (entity) {
       const record = records.get(entity);
       // One flight, never a tracked entity: pan, orbit and zoom stay with the user afterwards.
@@ -309,7 +319,12 @@ export function installSignStructureLayers(container, viewer, service, { types =
       return true;
     },
     clearSelection() { select(null); },
-    onSelection(callback) { reportSelection = callback; },
+    onSelection(callback) {
+      // null clears every listener, which is what teardown wants.
+      if (!callback) { selectionListeners.clear(); return () => {}; }
+      selectionListeners.add(callback);
+      return () => selectionListeners.delete(callback);
+    },
     select,
     destroy() {
       disposed = true;

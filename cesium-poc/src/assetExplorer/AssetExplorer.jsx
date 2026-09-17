@@ -13,7 +13,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import CloseIcon from '@mui/icons-material/Close';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { assetExplorerTheme } from './theme.js';
+import { createAppTheme } from './theme.js';
 import { useAssetStore } from './useAssetStore.js';
 import { assetTypeConfig } from './assetTypes.js';
 import { corridorLengthMiles } from './corridorPosition.js';
@@ -30,8 +30,11 @@ export const EXPLORER_MAX_WIDTH = 720;
 /** Sits close to the bottom edge now that no status strip runs beneath it. */
 export const BOTTOM_OFFSET = 20;
 
-export function AssetExplorer({ store, centerline, leftInset = 16, onInspect, onReturn, onViewCamera }) {
+export function AssetExplorer({ store, centerline, leftInset = 16, themeMode = 'dark', onInspect, onReturn, onViewCamera }) {
   const state = useAssetStore(store);
+  // Rebuilt only when the mode actually changes; a new theme object on every render would remount
+  // every styled node in the island.
+  const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
   const { activeExplorerType, selectedAsset, explorerExpanded, detailsOpen, inspectionViewActive } = state;
   const showMiniMap = useMediaQuery(`(min-width:${MINIMAP_MIN_WIDTH}px)`);
   const compact = useMediaQuery('(max-width:820px)');
@@ -81,7 +84,7 @@ export function AssetExplorer({ store, centerline, leftInset = 16, onInspect, on
   const rightInset = detailsShowing && !compact && leftInset > 16 ? DETAILS_WIDTH + 32 : 16;
 
   return (
-    <ThemeProvider theme={assetExplorerTheme}>
+    <ThemeProvider theme={theme}>
       <CssBaseline enableColorScheme={false} />
       {/* The island covers the map, so it must not intercept pointer events except on its own
           surfaces — Cesium navigation has to keep working around it. */}

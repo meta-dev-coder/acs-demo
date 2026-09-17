@@ -13,7 +13,15 @@ export function installBridgeStructures(container, viewer, mainlineSegments) {
   // screen and fly the camera on every Next. The layer still highlights, and still reports what the
   // user picked, so one shared selection stays in charge.
   let externallyOwned = false;
-  let reportSelection = null;
+  /**
+   * Report selections to every listener, not one.
+   *
+   * A single module backs several asset types (gantries and lane barriers here; three structure
+   * types elsewhere), and each registers its own listener. Holding one callback meant the last
+   * registration silently replaced the others, so picks for every other type vanished.
+   */
+  const selectionListeners = new Set();
+  const reportSelection = record => { for (const listener of [...selectionListeners]) listener(record); };
 
   // Open by default: this group now holds the sign-structure layers as well as bridges, and a
   // collapsed disclosure made them look absent.
@@ -50,7 +58,7 @@ export function installBridgeStructures(container, viewer, mainlineSegments) {
       panel.select(null);
       renderLocationMembers(null);
       viewer.scene.requestRender();
-      reportSelection?.(entity ? records.get(entity) : null);
+      reportSelection(entity ? records.get(entity) : null);
       return;
     }
     panel.select(entity ? records.get(entity) : null);
@@ -58,7 +66,7 @@ export function installBridgeStructures(container, viewer, mainlineSegments) {
     if (entity) focusBridge(viewer, entity);
     else if (previous) viewer.camera.cancelFlight();
     viewer.scene.requestRender();
-    reportSelection?.(entity ? records.get(entity) : null);
+    reportSelection(entity ? records.get(entity) : null);
   }
 
   /** Highlight by bridge asset id without opening a panel or moving the camera. */
@@ -172,7 +180,12 @@ export function installBridgeStructures(container, viewer, mainlineSegments) {
   return {
     records, highlightById,
     setExternallyOwned(owned) { externallyOwned = Boolean(owned); },
-    onSelection(callback) { reportSelection = callback; },
+    onSelection(callback) {
+      // null clears every listener, which is what teardown wants.
+      if (!callback) { selectionListeners.clear(); return () => {}; }
+      selectionListeners.add(callback);
+      return () => selectionListeners.delete(callback);
+    },
     bridgeById, segmentsByBridge, bridgesBySegment,
     destroy() {
       disposed = true; removeMove(); viewer.canvas.removeEventListener('mouseleave', leave);

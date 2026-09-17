@@ -38,7 +38,15 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
   // ---- Asset Explorer bridge -------------------------------------------------------------------
   // Live events keep their own details panel, provenance rendering and framing; the Asset Explorer
   // adds browsing on top and shares one selection with them.
-  let reportSelection = null;
+  /**
+   * Report selections to every listener, not one.
+   *
+   * A single module backs several asset types (gantries and lane barriers here; three structure
+   * types elsewhere), and each registers its own listener. Holding one callback meant the last
+   * registration silently replaced the others, so picks for every other type vanished.
+   */
+  const selectionListeners = new Set();
+  const reportSelection = record => { for (const listener of [...selectionListeners]) listener(record); };
 
   const group = document.createElement('details');
   group.className = 'live-events-group';
@@ -115,7 +123,7 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
     const event = entity ? records.get(entity) : null;
     panel.select(event);
     renderProvenance(event);
-    reportSelection?.(event);
+    reportSelection(event);
     if (event) focusMapPoints(viewer, pointsOf(event), '.live-event-details');
     else if (previous) viewer.camera.cancelFlight();
     viewer.scene.requestRender();
@@ -258,7 +266,13 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
 
   parent.onclick = event => event.stopPropagation();
   parent.onchange = () => {
-    for (const type of typeInputs.keys()) visible[type] = parent.checked;
+    // Asset layers are mutually exclusive, so "both feeds on" is no longer a state this group can
+    // hold — switching the second on switches the first off. The parent is therefore a group
+    // switch rather than a select-all: it clears both feeds, or opens the first one when the group
+    // is already empty. Its checked/indeterminate display still mirrors the children below.
+    const anyOn = [...typeInputs.keys()].some(type => visible[type]);
+    const first = [...typeInputs.keys()][0];
+    for (const type of typeInputs.keys()) visible[type] = !anyOn && type === first;
     applyVisibility();
   };
   for (const [type, input] of typeInputs) {
@@ -303,7 +317,12 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
       return true;
     },
     clearSelection() { select(null); },
-    onSelection(callback) { reportSelection = callback; },
+    onSelection(callback) {
+      // null clears every listener, which is what teardown wants.
+      if (!callback) { selectionListeners.clear(); return () => {}; }
+      selectionListeners.add(callback);
+      return () => selectionListeners.delete(callback);
+    },
     get events() { return events; },
     get payload() { return payload; },
     destroy() {

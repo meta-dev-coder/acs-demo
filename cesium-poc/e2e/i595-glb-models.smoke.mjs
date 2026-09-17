@@ -207,19 +207,30 @@ try {
   // The map opens clean — these are data layers, so they start off like every other one.
   assert.deepEqual(await shownByLayer(), { gantries: [false, false, false], 'lane-barriers': [false] },
     'no model layer may switch itself on at startup');
-  // Toggling one layer must leave the other exactly as it was.
+  // Asset layers are mutually exclusive: selecting one deselects the previous one, so the two model
+  // layers are alternatives rather than a pair. A barrier arm is still a different asset from an
+  // overhead gantry — the tools are separate, they just cannot both be on.
   await page.click('.quick-rail [data-layer="gantries"]');
   await page.waitForFunction(() => window.models.modelById.get('i595-gantry-1-toll-plaza').show, null, { timeout: 10000 });
   assert.deepEqual(await shownByLayer(), { gantries: [true, true, true], 'lane-barriers': [false] },
-    'the gantry tool must not touch the lane barrier');
+    'the gantry tool shows every gantry and no barrier');
   await page.click('.quick-rail [data-layer="lane-barriers"]');
   await page.waitForFunction(() => window.models.modelById.get('i595-lane-barrier-arm-1').show, null, { timeout: 10000 });
-  assert.deepEqual(await shownByLayer(), { gantries: [true, true, true], 'lane-barriers': [true] });
+  await page.waitForFunction(() => !window.models.modelById.get('i595-gantry-1-toll-plaza').show, null, { timeout: 10000 });
+  assert.deepEqual(await shownByLayer(), { gantries: [false, false, false], 'lane-barriers': [true] },
+    'selecting the lane barrier tool deselects the gantries');
 
   // ---- 10. selecting an asset says what it is; inspecting it is what flies the camera ----------
   // While the Asset Explorer is browsing gantries it owns selection, and selection is deliberately
   // not a camera flight — stepping through a corridor should not throw the camera at each asset in
   // turn. The close view now belongs to the explicit "View on map" action, exercised below.
+  // Switch back to gantries: the barrier tool above deselected them, and an asset can only be
+  // selected while its own layer is the one being browsed.
+  await page.click('.quick-rail [data-layer="gantries"]');
+  await page.waitForFunction(() => window.__assetExplorer?.store.getState().activeExplorerType === 'gantry',
+    null, { timeout: 30000 });
+  await page.waitForFunction(() => (window.__assetExplorer?.store.getState().assetsByType.gantry ?? []).length === 3,
+    null, { timeout: 30000 });
   const heightBefore = await page.evaluate(() => v.camera.positionCartographic.height);
   await page.evaluate(() => { window.__pose = null; });
   await page.evaluate(() => window.modelLayers.select(window.models.modelById.get('i595-gantry-3-toll-lane')));

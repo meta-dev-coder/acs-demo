@@ -42,9 +42,13 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
           source: { ...config, layerLabel: layerLabel(config.layer), viewHeadingDeg: focusHeadingFor(config) },
         })),
       highlight: id => corridorModels.highlightById(id),
-      // One module serves both model layers, so a pick is only this source's if it belongs to it.
-      listen: report => corridorModels.onSelection(config =>
-        report(config && config.layer === layerId ? String(config.id) : null)),
+      // One module serves both model layers. A pick that belongs to the other layer is not this
+      // source's to report AT ALL — reporting null for it would read as "the user deselected" and
+      // wipe the selection the other source has just made. Only a genuine clear reports null.
+      listen: report => corridorModels.onSelection(config => {
+        if (config && config.layer !== layerId) return;
+        report(config ? String(config.id) : null);
+      }),
       own: owned => corridorModels.setExternallyOwned(owned),
       silence: () => corridorModels.onSelection(null),
     });
@@ -141,8 +145,10 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
           });
         }),
       highlight: id => (id == null ? liveEvents.clearSelection() : liveEvents.selectById(id)),
-      listen: report => liveEvents.onSelection(event =>
-        report(event && event.type === eventType ? String(event.id) : null)),
+      listen: report => liveEvents.onSelection(event => {
+        if (event && event.type !== eventType) return;   // the other feed's pick, not ours
+        report(event ? String(event.id) : null);
+      }),
       own: () => {},
       silence: () => liveEvents.onSelection(null),
     });
@@ -161,9 +167,11 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
         source: record,
       })),
       highlight: id => (id == null ? signStructures.clearSelection() : signStructures.selectById(typeId, id)),
-      // One module serves all three types, so a pick only belongs to the source that owns its type.
-      listen: report => signStructures.onSelection(record =>
-        report(record && record.typeId === typeId ? String(record.id) : null)),
+      // One module serves all three types; a pick belonging to another type is not ours to report.
+      listen: report => signStructures.onSelection(record => {
+        if (record && record.typeId !== typeId) return;
+        report(record ? String(record.id) : null);
+      }),
       own: () => {},
       silence: () => signStructures.onSelection(null),
     });

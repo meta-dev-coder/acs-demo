@@ -28,6 +28,7 @@ import { createStreetViewService } from "./streetViewService.js";
 import { createStreetViewMode } from "./streetViewMode.js";
 import { createStreetViewPlacement } from "./streetViewPlacement.js";
 import { installMapExplorer } from "./mapExplorer.js";
+import { createThemeMode } from "./themeMode.js";
 import { getTrafficColor } from "./corridorVisualConfig.js";
 import { installI595RoadShields } from "./i595RoadShields.js";
 import { installI595ContextLabels } from "./i595ContextLabels.js";
@@ -120,8 +121,13 @@ try {
   // One bottom toolbar for zoom, orbit, tilt, Street View and Reset View.
   let streetViewPlacement = null;
   const streetViewEnabled = String(import.meta.env.VITE_ENABLE_STREET_VIEW ?? 'true').toLowerCase() === 'true';
+  // Light/dark is owned outside both worlds: it sets data-theme on the document, which the CSS
+  // tokens key off, and the Asset Explorer's MUI theme is derived from the same mode. Created
+  // here because the map navigation toolbar below hosts the switch.
+  const themeMode = createThemeMode();
   const navigation = installMapNavigationControls(document.body, viewer, {
     zoom, onStreetView: streetViewEnabled ? (() => streetViewPlacement?.toggle()) : undefined,
+    themeMode, onToggleTheme: () => themeMode.toggle(),
   });
   navigation.setEnabled(true);
   const lons = corridor.map(p => p.lon), lats = corridor.map(p => p.lat);
@@ -353,6 +359,7 @@ try {
     signals: signalControls,
     liveEvents: liveEventControls,
     signStructures: signStructureControls,
+    themeMode,
     modelConfigs: cesiumModels,
     // The bottom edge is shared: the corridor strip yields it while the explorer is open.
     corridorStatus,

@@ -82,7 +82,9 @@ export function installExpressGantries(container, viewer) {
   }
 
   function select(entity) {
-    document.querySelector('.camera-details')?.setAttribute('hidden', '');
+    // Only when actually selecting something here. A deselection must not close another
+    // layer's panel — the shared selection clears every other layer on every pick.
+    if (entity) document.querySelector('.camera-details')?.setAttribute('hidden', '');
     const old = selected; selected = entity; styleEntity(old); styleEntity(entity);
     panel.select(entity ? records.get(entity) : null);
     clearCustomPanelContent();

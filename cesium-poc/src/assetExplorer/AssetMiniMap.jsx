@@ -43,22 +43,37 @@ export function AssetMiniMap({ centerline, assets, selectedAsset, onSelect, widt
       .map(asset => ({ asset, ...view.project(asset.coordinates.longitude, asset.coordinates.latitude) })) : []),
     [assets, view]);
 
+  // Whether this component is still mounted — deliberately NOT a per-effect flag.
+  //
+  // The tiles are cached across effect runs, so only the run that created an image attaches its
+  // onload. `view` changes as soon as the measured height arrives (it starts at 0), and a per-run
+  // flag would be cleared by that run's cleanup while its images were still decoding: the handler
+  // would then see a stale "dead" flag and skip the repaint, leaving the mini-map showing the
+  // corridor line over an empty background until some other state change forced a redraw.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+
   // Load the covering tiles once. A failed tile is remembered as failed so it is not retried on
   // every repaint — the map still draws, just without that square.
   useEffect(() => {
     if (!view) return;
-    let live = true;
     for (const tile of tilesFor(view)) {
       const url = tileUrl(tile);
       if (tileCache.current.has(url)) continue;
       const image = new Image();
       image.crossOrigin = 'anonymous';
-      image.onload = () => { if (live) setTilesVersion(version => version + 1); };
-      image.onerror = () => { tileCache.current.set(url, null); };
+      image.onload = () => { if (mounted.current) setTilesVersion(version => version + 1); };
+      image.onerror = () => {
+        tileCache.current.set(url, null);
+        // Repaint anyway: the ground colour and corridor must not wait on a tile that failed.
+        if (mounted.current) setTilesVersion(version => version + 1);
+      };
       image.src = url;
       tileCache.current.set(url, image);
     }
-    return () => { live = false; };
   }, [view]);
 
   useEffect(() => {

@@ -30,6 +30,7 @@ export function installAssetExplorer(container, viewer, {
   modelConfigs = [],
   onViewCamera = null,
   corridorStatus = null,
+  themeMode = null,
   logger = console,
 } = {}) {
   bindCartographic(position => {
@@ -103,6 +104,7 @@ export function installAssetExplorer(container, viewer, {
         store={store}
         centerline={centerline}
         leftInset={leftInset}
+        themeMode={themeMode?.mode ?? 'dark'}
         onInspect={inspect}
         onReturn={returnFromInspection}
         onViewCamera={onViewCamera}
@@ -113,6 +115,8 @@ export function installAssetExplorer(container, viewer, {
   const panelObserver = explorerPanel
     ? new MutationObserver(() => measureInsets()) : null;
   panelObserver?.observe(explorerPanel, { attributes: true, attributeFilter: ['class', 'style'] });
+  // Switching theme re-renders the island with the matching MUI theme — no reload.
+  const unsubscribeTheme = themeMode?.subscribe?.(() => render()) ?? null;
   const onResize = () => measureInsets();
   window.addEventListener('resize', onResize);
   measureInsets();
@@ -206,6 +210,7 @@ export function installAssetExplorer(container, viewer, {
     inspect,
     returnFromInspection,
     destroy() {
+      unsubscribeTheme?.();
       panelObserver?.disconnect();
       cancelAnimationFrame(settleMeasure);
       window.removeEventListener('resize', onResize);

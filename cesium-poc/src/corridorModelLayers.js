@@ -71,7 +71,15 @@ export function installCorridorModelLayers(container, viewer, service, configs) 
   // screen and fly the camera on every Next. The layer still highlights, and still reports what the
   // user picked, so one shared selection stays in charge.
   let externallyOwned = false;
-  let reportSelection = null;
+  /**
+   * Report selections to every listener, not one.
+   *
+   * A single module backs several asset types (gantries and lane barriers here; three structure
+   * types elsewhere), and each registers its own listener. Holding one callback meant the last
+   * registration silently replaced the others, so picks for every other type vanished.
+   */
+  const selectionListeners = new Set();
+  const reportSelection = record => { for (const listener of [...selectionListeners]) listener(record); };
 
   const records = new Map();          // entity  -> config
   const entityById = new Map();       // model id -> entity
@@ -119,7 +127,7 @@ export function installCorridorModelLayers(container, viewer, service, configs) 
       // Highlight only. The Asset Explorer opens its own panel and decides what the camera does.
       panel.select(null);
       viewer.scene.requestRender();
-      reportSelection?.(entity ? records.get(entity) : null);
+      reportSelection(entity ? records.get(entity) : null);
       return;
     }
     panel.select(entity ? records.get(entity) : null);
@@ -129,7 +137,7 @@ export function installCorridorModelLayers(container, viewer, service, configs) 
       focusMapPoints(viewer, positionOf(entity), '.model-details', { ...framing, headingDeg: focusHeadingFor(config) });
     }
     viewer.scene.requestRender();
-    reportSelection?.(entity ? records.get(entity) : null);
+    reportSelection(entity ? records.get(entity) : null);
   }
 
   /** Highlight by model id without opening a panel or moving the camera. */
@@ -240,7 +248,12 @@ export function installCorridorModelLayers(container, viewer, service, configs) 
     records,
     highlightById,
     setExternallyOwned(owned) { externallyOwned = Boolean(owned); },
-    onSelection(callback) { reportSelection = callback; },
+    onSelection(callback) {
+      // null clears every listener, which is what teardown wants.
+      if (!callback) { selectionListeners.clear(); return () => {}; }
+      selectionListeners.add(callback);
+      return () => selectionListeners.delete(callback);
+    },
     place,
     entityById,
     /** Test/diagnostic hook: how many assets each layer owns. */
