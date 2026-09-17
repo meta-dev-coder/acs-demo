@@ -15,7 +15,8 @@ const TONE_COLOR = { ok: 'success.main', warn: 'warning.main', muted: 'text.seco
 function AssetCardBase({ asset, selected, onSelect }) {
   const config = assetTypeConfig(asset.assetType);
   const subtitle = config?.getSubtitle(asset) ?? null;
-  const status = config?.getStatus(asset) ?? null;
+  // A type may suppress status on the card while still reporting it in the details panel.
+  const status = (config?.getCardStatus ?? config?.getStatus)?.(asset) ?? null;
   return (
     <Card
       elevation={selected ? 3 : 0}
@@ -34,7 +35,7 @@ function AssetCardBase({ asset, selected, onSelect }) {
         sx={{ p: 1.25, height: '100%', alignItems: 'stretch' }}
       >
         <Stack spacing={0.75}>
-          <Stack direction="row" alignItems="center" spacing={0.75}>
+          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
             <AssetTypeIcon assetType={asset.assetType} fontSize="small" sx={{ color: selected ? 'primary.main' : 'text.secondary' }} />
             <Typography variant="subtitle2" noWrap sx={{ flex: 1 }}>{config?.getTitle(asset) ?? asset.name}</Typography>
             {/* Selection is not signalled by colour alone. */}

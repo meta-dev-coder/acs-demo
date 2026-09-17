@@ -1,3 +1,4 @@
+import { ROAD_STYLE } from './corridorVisualConfig.js';
 /**
  * @typedef {'EB'|'WB'} FrontageRoadDirection
  * @typedef {object} FrontageRoadFeature
@@ -8,8 +9,8 @@
  * @property {string} source
  */
 export const FRONTAGE_DIRECTIONS = [
-  { direction: 'EB', id: 'SR84_EB', label: 'SR 84 Eastbound', color: '#55bda8' },
-  { direction: 'WB', id: 'SR84_WB', label: 'SR 84 Westbound', color: '#719ddd' },
+  { direction: 'EB', id: 'SR84_EB', label: 'SR 84 Eastbound', color: ROAD_STYLE.frontageEB.color },
+  { direction: 'WB', id: 'SR84_WB', label: 'SR 84 Westbound', color: ROAD_STYLE.frontageWB.color },
 ];
 export const frontageName = road => FRONTAGE_DIRECTIONS.find(item => item.direction === road.direction)?.label || 'SR 84';
 

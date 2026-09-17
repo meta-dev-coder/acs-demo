@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
-import { corridorVisualConfig, getTrafficColor } from '../src/corridorVisualConfig.js';
+import { ROAD_STYLE, corridorVisualConfig, getTrafficColor } from '../src/corridorVisualConfig.js';
 
 // Road width is a level-of-detail property now: every visible segment carries the width configured
 // for the camera's current level, plus the casing that gives it contrast over imagery.
@@ -53,10 +53,14 @@ try {
   for (const feature of data.features) {
     const entity = actual.find(e => e.id === feature.properties.segment_id);
     assert.ok(LOD_WIDTHS.includes(entity.width), `segment width ${entity.width} must be one of the configured levels`);
-    // The route hue is unchanged; only the resting opacity is, so compare the RGB and the alpha.
-    assert.equal(entity.color.slice(0, 7), getTrafficColor(undefined, feature.properties.direction),
+    // Compare colours, not strings: Cesium's toCssHexString() lowercases, and the palette is a
+    // colour source rather than a text one.
+    assert.equal(entity.color.slice(0, 7).toLowerCase(),
+      getTrafficColor(undefined, feature.properties.direction).toLowerCase(),
       'an unobserved segment is drawn in its route colour');
-    assert.equal(entity.alpha, 0.8, 'the resting overlay is part-transparent so the roadway shows through');
+    // Resting opacity comes from the central road palette, so the two cannot drift apart.
+    assert.equal(entity.alpha, ROAD_STYLE.generalPurposeEB.opacity,
+      'the resting overlay is part-transparent so the roadway shows through');
     for (const key of ['segment_id', 'direction', 'begin_post', 'end_post', 'aadt', 'desc_from', 'desc_to']) assert.equal(entity.properties[key], feature.properties[key]);
     assert.equal(entity.points.length, feature.geometry.coordinates.length);
     entity.points.forEach((point, i) => point.forEach((v, axis) => assert.ok(Math.abs(v - feature.geometry.coordinates[i][axis]) < 1e-8)));
@@ -103,7 +107,12 @@ try {
     assert.equal(values[6], feature.properties.desc_to);
     assert.equal(values[7], `${feature.properties.aadt.toLocaleString('en-US')} vehicles/day`);
     assert.equal(values[8], '2025');
-    assert.deepEqual(await page.evaluate(() => [...window.fdotLayer.segmentById.values()].filter(e => e.polyline.material.getValue?.().color?.alpha === 1).map(e => e.id)), [feature.properties.segment_id]);
+    // Exactly one segment carries the selected opacity, and it is the one that was clicked. The
+    // figure comes from the road palette rather than being pinned here, so restyling cannot make
+    // this test wrong about what "selected" means.
+    assert.deepEqual(await page.evaluate(selectedAlpha => [...window.fdotLayer.segmentById.values()]
+      .filter(e => Math.abs((e.polyline.material.getValue?.().color?.alpha ?? 0) - selectedAlpha) < 0.01)
+      .map(e => e.id), ROAD_STYLE.selected.opacity), [feature.properties.segment_id]);
     await page.mouse.move(950, 110);
   }
   await page.screenshot({ path: '/tmp/i595-fdot-desktop.png' });
@@ -111,7 +120,9 @@ try {
   await page.screenshot({ path: '/tmp/i595-fdot-mobile.png' });
   await page.getByRole('button', { name: 'Close road segment details' }).click();
   assert.equal(await page.locator('.segment-details').isVisible(), false);
-  assert.equal(await page.evaluate(() => [...window.fdotLayer.segmentById.values()].filter(e => e.polyline.material.getValue?.().color?.alpha === 1).length), 0);
+  assert.equal(await page.evaluate(selectedAlpha => [...window.fdotLayer.segmentById.values()]
+    .filter(e => Math.abs((e.polyline.material.getValue?.().color?.alpha ?? 0) - selectedAlpha) < 0.01).length,
+    ROAD_STYLE.selected.opacity), 0, 'closing the panel clears the selected styling');
   assert.ok(await page.evaluate(() => window.fdotOriginalEntities.every(e => e === window.fdotLayer.segmentById.get(e.id))));
   assert.equal(combinedRequests, 1);
   assert.equal(oldRequests, 0);

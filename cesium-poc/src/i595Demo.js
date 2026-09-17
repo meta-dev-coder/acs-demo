@@ -363,6 +363,7 @@ try {
     modelConfigs: cesiumModels,
     // The bottom edge is shared: the corridor strip yields it while the explorer is open.
     corridorStatus,
+    roadShields,
     // Street View wants a labelled place, not bare coordinates.
     onViewCamera: streetViewEnabled
       ? asset => (asset?.coordinates ? openStreetView({ ...asset.coordinates, label: asset.name }) : undefined)

@@ -28,7 +28,10 @@
  * @property {string} [scenarioImpact]
  */
 
-export const MAINLINE_COLORS = { EB: '#52dcf5', WB: '#c49aff' };
+import { ROAD_STYLE } from './corridorVisualConfig.js';
+/** Category colours for the two carriageways; see ROAD_STYLE for why they are one hue apart. */
+export const MAINLINE_COLORS = { EB: ROAD_STYLE.generalPurposeEB.color, WB: ROAD_STYLE.generalPurposeWB.color };
+export const MAINLINE_OPACITY = ROAD_STYLE.generalPurposeEB.opacity;
 export const segmentDirectionLabel = direction => direction === 'EB' ? 'Eastbound' : direction === 'WB' ? 'Westbound' : 'Unknown';
 export const formatMilepost = value => Number.isFinite(value) ? value.toFixed(3) : 'Unknown';
 export const formatAadt = value => Number.isFinite(value) ? `${value.toLocaleString('en-US')} vehicles/day` : 'Unknown';

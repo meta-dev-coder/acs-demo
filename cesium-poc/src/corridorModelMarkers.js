@@ -1,3 +1,4 @@
+import { assetIdMarker, MARKER_LABELS, OVERHEAD_STEM } from './assetIdMarker.js';
 /**
  * Map pins for the GLB models, so a gantry or a barrier can be found from a corridor-wide view.
  *
@@ -32,11 +33,17 @@ export const MODEL_LAYER_PINS = Object.freeze({
  * @param {{entity: import('cesium').Entity, layer: string}[]} models
  * @param {{onSelect?: (entity: import('cesium').Entity) => void}} [options]
  */
+/** Billboard fields for a placed model's ID marker. */
+function modelMarker(entity, selected) {
+  const { image, width, height } = assetIdMarker({ id: MARKER_LABELS.gantry(entity?.name), selected, stem: OVERHEAD_STEM });
+  return { image, width, height };
+}
+
 export function installCorridorModelMarkers(viewer, models) {
   const pinned = models.map(({ entity, layer }) => {
     entity.billboard = {
-      image: MODEL_LAYER_PINS[layer] ?? MODEL_LAYER_PINS.gantries,
-      width: 34, height: 41, verticalOrigin: VerticalOrigin.BOTTOM,
+      // "Gantry 2 — Toll Lane" marks as "Gantry 2": the descriptor repeats across the layer.
+      ...modelMarker(entity, false), verticalOrigin: VerticalOrigin.BOTTOM,
       heightReference: HeightReference.CLAMP_TO_GROUND,
       // Photogrammetry would otherwise bury a pin standing on the road deck.
       disableDepthTestDistance: Number.POSITIVE_INFINITY, show: false,
@@ -44,11 +51,17 @@ export function installCorridorModelMarkers(viewer, models) {
     return { entity, anchor: entity.position.getValue(viewer.clock.currentTime), visible: false };
   });
 
+  // The selected model keeps its pin at any distance. Selecting one flies the camera closer than
+  // the hide threshold, so without this the marker turns yellow and is hidden in the same moment —
+  // which reads as "selection does nothing". The same rule the camera layer already applies.
+  let selectedEntity = null;
+
   const update = () => {
     let changed = false;
     for (const model of pinned) {
       const distance = Cartesian3.distance(viewer.camera.positionWC, model.anchor);
-      const visible = model.entity.show && distance > (model.visible ? PIN_HIDE_BELOW_M : PIN_SHOW_FROM_M);
+      const visible = model.entity.show
+        && (model.entity === selectedEntity || distance > (model.visible ? PIN_HIDE_BELOW_M : PIN_SHOW_FROM_M));
       if (visible === model.visible) continue;
       model.visible = visible;
       model.entity.billboard.show = visible;
@@ -62,7 +75,17 @@ export function installCorridorModelMarkers(viewer, models) {
   return {
     /** Highlight state is the pin's scale, exactly as the bridge pins do it. */
     setSelected(entity) {
-      for (const model of pinned) model.entity.billboard.scale = model.entity === entity ? 1.18 : 1;
+      selectedEntity = entity ?? null;
+      for (const model of pinned) {
+        const marker = modelMarker(model.entity, model.entity === entity);
+        model.entity.billboard.image = marker.image;
+        model.entity.billboard.width = marker.width;
+        model.entity.billboard.height = marker.height;
+        model.entity.billboard.scale = model.entity === entity ? 1.08 : 1;
+      }
+      // Re-evaluate visibility straight away: the selected pin must appear without waiting for
+      // the next camera move.
+      update();
       viewer.scene.requestRender();
     },
     isPinVisible: entity => pinned.find(model => model.entity === entity)?.visible ?? false,

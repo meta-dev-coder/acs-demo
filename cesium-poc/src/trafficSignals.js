@@ -1,4 +1,5 @@
 import { corridorVisualConfig as config } from './corridorVisualConfig.js';
+import { assetIdMarker } from './assetIdMarker.js';
 import { CustomDataSource, Cartesian3, Color, HeightReference, NearFarScalar, ScreenSpaceEventType, VerticalOrigin } from 'cesium';
 import { createMapDetailsPanel } from './mapDetailsPanel.js';
 import { focusMapPoints } from './bridgeCamera.js';
@@ -52,6 +53,12 @@ export function signalDetails(p) {
 export function signalSecondaryDetails(p) {
   return [['County', p.county], ['District', p.district]].filter(([, value]) => valid(value));
 }
+/** Billboard fields for a signal's ID marker. */
+function signalMarker(signalId, selected) {
+  const { image, width, height } = assetIdMarker({ id: signalId, selected });
+  return { image, width, height };
+}
+
 export function installTrafficSignals(container, viewer) {
   // ---- Asset Explorer bridge -------------------------------------------------------------------
   // This layer keeps its own details panel and its own focus behaviour; the Asset Explorer adds
@@ -80,13 +87,15 @@ export function installTrafficSignals(container, viewer) {
   const levels = new Map();
   function style(entity) {
     if (!entity) return;
+    const marker = signalMarker(records.get(entity)?.signal_id ?? entity.id, entity === selected);
+    entity.billboard.image = marker.image;
+    entity.billboard.width = marker.width;
+    entity.billboard.height = marker.height;
     // A selected signal always keeps its detailed housing, whatever the camera distance — losing
     // sight of what you just selected is worse than showing detail from a little further out.
     const level = entity === selected ? 'SELECTED' : levels.get(entity) ?? 'COMPACT';
     const lod = SIGNAL_LOD[level];
-    if (entity.billboard.image?.getValue() !== lod.image) entity.billboard.image = lod.image;
-    entity.billboard.width = lod.width;
-    entity.billboard.height = lod.height;
+    // The ID marker replaces the pictogram at every level of detail; only scale still varies.
     entity.billboard.scale = entity === selected ? 1.15 : entity === hovered ? 1.08 : 1;
     // A selected signal stays on the map at any distance — losing sight of what you just clicked is
     // worse than showing one marker further out than the level of detail would otherwise allow.
@@ -174,7 +183,9 @@ export function installTrafficSignals(container, viewer) {
           // One billboard, swapped between two levels of detail. Deliberately not a second
           // graphic: a clamped `point` is drawn as a billboard and collides with this one, and
           // then neither renders reliably.
-          billboard: { image: SIGNAL_LOD.COMPACT.image, width: SIGNAL_LOD.COMPACT.width, height: SIGNAL_LOD.COMPACT.height,
+          // Marked by its FDOT Signal ID rather than a traffic-light pictogram: the layer already
+          // says these are signals, so the marker says which one.
+          billboard: { ...signalMarker(p.signal_id, false),
             verticalOrigin: VerticalOrigin.BOTTOM,
             heightReference: HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: Number.POSITIVE_INFINITY,
             scaleByDistance: new NearFarScalar(400, 1, 16000, 0.6) } });

@@ -459,6 +459,10 @@ body:has(.layers:not(.collapsed)) .corridor-status { left: 420px; }
 .street-view-status { margin: 0 auto 24px; padding: 8px 14px; border: 1px solid var(--ui-border); border-radius: 999px; background: var(--ui-surface-translucent); backdrop-filter: blur(14px); color: var(--ui-text); font-size: 12px; }
 /* While a panorama is up, the twin's own panels would only get in its way. */
 /* The overlay is appended last, so a sibling combinator would never reach these. */
+/* The Asset Explorer is a React island in its own host element, so it needs naming here too —
+   the selector below only covers the app's plain-DOM panels. Street View is a full-screen
+   photographic view; the bottom browser and mini-map have nothing to sit over. */
+body:has(.street-view[data-state="active"]) .asset-explorer-host,
 body:has(.street-view[data-state="active"]) :is(.layers, .corridor-status, .twin-hud, .map-nav, .weather-launch, .clip-editor),
 body:has(.street-view[data-state="active"]) :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details, .structure-details, .ramp-tooltip) { display: none; }
 .camera-street-view { display: block; width: 100%; margin-top: 8px; white-space: nowrap; padding: 8px 12px; border: 1px solid var(--ui-border-strong); border-radius: 9px; background: var(--ui-hover); color: var(--ui-text); font-size: 12.5px; cursor: pointer; transition: background .15s ease; }

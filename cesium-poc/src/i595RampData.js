@@ -1,3 +1,4 @@
+import { ROAD_STYLE } from './corridorVisualConfig.js';
 /**
  * @typedef {'ENTRY_RAMP'|'EXIT_RAMP'|'INTERCHANGE_RAMP'|'INTERCHANGE_CONNECTOR'|'EXPRESS_CONNECTOR'} RampType
  * @typedef {object} I595Ramp
@@ -17,11 +18,11 @@
  */
 
 export const RAMP_CATEGORIES = [
-  { type: 'ENTRY_RAMP', label: 'Entry / On-ramps', display: 'Entry / On-ramp', color: '#94ed69' },
-  { type: 'EXIT_RAMP', label: 'Exit / Off-ramps', display: 'Exit / Off-ramp', color: '#ff7380' },
-  { type: 'INTERCHANGE_RAMP', label: 'Interchange Ramps', display: 'Interchange Ramp', color: '#ffe66d' },
-  { type: 'INTERCHANGE_CONNECTOR', label: 'Freeway Connectors', display: 'Freeway Connector', color: '#f38ed8' },
-  { type: 'EXPRESS_CONNECTOR', label: 'Express Connectors', display: 'Express Connector', color: '#f0f5ff' },
+  { type: 'ENTRY_RAMP', label: 'Entry / On-ramps', display: 'Entry / On-ramp', color: ROAD_STYLE.rampByType.ENTRY_RAMP },
+  { type: 'EXIT_RAMP', label: 'Exit / Off-ramps', display: 'Exit / Off-ramp', color: ROAD_STYLE.rampByType.EXIT_RAMP },
+  { type: 'INTERCHANGE_RAMP', label: 'Interchange Ramps', display: 'Interchange Ramp', color: ROAD_STYLE.rampByType.INTERCHANGE_RAMP },
+  { type: 'INTERCHANGE_CONNECTOR', label: 'Freeway Connectors', display: 'Freeway Connector', color: ROAD_STYLE.rampByType.INTERCHANGE_CONNECTOR },
+  { type: 'EXPRESS_CONNECTOR', label: 'Express Connectors', display: 'Express Connector', color: ROAD_STYLE.rampByType.EXPRESS_CONNECTOR },
 ];
 
 // Labels only: feature membership always comes from the source interchange property.

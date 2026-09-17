@@ -1,3 +1,4 @@
+import { assetIdMarker, MARKER_LABELS } from './assetIdMarker.js';
 import { Cartesian3, HeightReference, VerticalOrigin } from 'cesium';
 
 // Vector recreation of the reference: a white-edged red map pin with a bridge glyph.
@@ -32,6 +33,16 @@ function midpoint(positions) {
  * the same rule. Distant bridges in tilted views retain their pins. Hysteresis avoids flickering.
  * Billboard and polyline share the original bridge entity, identity and visibility.
  */
+/** Billboard fields for one bridge's ID marker, taken from its display name. */
+/** The width bridgeStructures draws a selected bridge at — the marker reads selection from it. */
+export const SELECTED_POLYLINE_WIDTH = 7;
+
+export function bridgeMarker(entity, selected) {
+  const label = MARKER_LABELS.bridge(entity?.name, entity?.id);
+  const { image, width, height } = assetIdMarker({ id: label, selected });
+  return { image, width, height };
+}
+
 export function installBridgeZoomMarkers(viewer, entities) {
   const groups = new Map(), groupByEntity = new Map();
   const bridges = entities.map(entity => {
@@ -39,7 +50,8 @@ export function installBridgeZoomMarkers(viewer, entities) {
     const anchor = midpoint(positions);
     entity.position = anchor;
     entity.billboard = {
-      image: ICON, width: 38, height: 46, verticalOrigin: VerticalOrigin.BOTTOM,
+      // Marked by its structure number: every bridge on the layer would repeat "Bridge".
+      ...bridgeMarker(entity, false), verticalOrigin: VerticalOrigin.BOTTOM,
       heightReference: HeightReference.CLAMP_TO_GROUND,
       disableDepthTestDistance: Number.POSITIVE_INFINITY, show: false,
     };
@@ -67,12 +79,25 @@ export function installBridgeZoomMarkers(viewer, entities) {
     }
     for (const group of groups.values()) {
       const visible = group.filter(bridge => bridge.entity.show);
-      const representative = visible.find(bridge => bridge.entity.polyline.width.getValue() === 7) || visible[0];
+      const representative = visible.find(bridge => bridge.entity.polyline.width.getValue() === SELECTED_POLYLINE_WIDTH) || visible[0];
       for (const bridge of group) {
         const show = bridge === representative && bridge.iconVisible;
         if (bridge.entity.billboard.show.getValue() !== show) bridge.entity.billboard.show = show;
       }
-      if (representative) representative.entity.billboard.image = iconForCount(visible.length);
+      if (representative) {
+        // Several bridges share one location: the marker says how many rather than naming one.
+        const label = visible.length > 1
+          ? `${MARKER_LABELS.bridge(representative.entity.name, representative.entity.id)} +${visible.length - 1}`
+          : MARKER_LABELS.bridge(representative.entity.name, representative.entity.id);
+        // This runs every frame, so it has to preserve the selection rather than reset it. The
+        // selected bridge is the one drawn at the selected polyline width — the same signal the
+        // representative is chosen by, two lines above.
+        const isSelected = representative.entity.polyline.width.getValue() === SELECTED_POLYLINE_WIDTH;
+        const marker = assetIdMarker({ id: label, selected: isSelected });
+        representative.entity.billboard.image = marker.image;
+        representative.entity.billboard.width = marker.width;
+        representative.entity.billboard.height = marker.height;
+      }
     }
   };
   const remove = viewer.scene.preRender.addEventListener(update);

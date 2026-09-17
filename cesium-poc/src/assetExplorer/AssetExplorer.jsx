@@ -145,7 +145,7 @@ export function AssetExplorer({ store, centerline, leftInset = 16, themeMode = '
             role="region"
             aria-label={`${config.label} explorer`}
           >
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 1.5, py: 1 }}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', px: 1.5, py: 1 }}>
               <Typography variant="h6">{config.label}</Typography>
               <Chip
                 label={status.loading ? '…' : `${assets.length} ${assets.length === 1 ? 'asset' : 'assets'}`}

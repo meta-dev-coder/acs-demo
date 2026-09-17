@@ -30,6 +30,7 @@ export function installAssetExplorer(container, viewer, {
   modelConfigs = [],
   onViewCamera = null,
   corridorStatus = null,
+  roadShields = null,
   themeMode = null,
   logger = console,
 } = {}) {
@@ -137,6 +138,19 @@ export function installAssetExplorer(container, viewer, {
     })
     : null;
 
+  // Route shields are map furniture and sit exactly where assets do — on the corridor. While an
+  // asset is selected they step aside, so the marker naming it is never competing with a shield.
+  // They come straight back when the selection is cleared.
+  let shieldsHidden = null;
+  const unsubscribeShields = roadShields
+    ? store.subscribe(state => {
+      const hide = state.selectedAsset !== null;
+      if (hide === shieldsHidden) return;
+      shieldsHidden = hide;
+      roadShields.setVisible?.(!hide);
+    })
+    : null;
+
   // A selection gets at most a moderate look, and only when the user did not make it by clicking
   // the map — they are already looking at what they just clicked.
   let lastFocusKey = null;
@@ -215,6 +229,9 @@ export function installAssetExplorer(container, viewer, {
       cancelAnimationFrame(settleMeasure);
       window.removeEventListener('resize', onResize);
       unsubscribeSelection();
+      unsubscribeShields?.();
+      // Never leave the corridor without its shields because this island went away.
+      roadShields?.setVisible?.(true);
       unsubscribeStrip?.();
       // Never leave the strip hidden because this island went away.
       corridorStatus?.setSuppressed?.(false);

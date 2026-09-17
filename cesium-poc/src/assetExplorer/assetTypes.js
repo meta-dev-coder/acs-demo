@@ -41,6 +41,9 @@ export function bridgeMilepost(properties) {
 export const ASSET_TYPES = Object.freeze({
   gantry: Object.freeze({
     id: 'gantry',
+    // The card omits status: every gantry reads "Placed", which distinguishes nothing. The
+    // details panel still reports it.
+    getCardStatus: () => null,
     label: 'Toll Gantries',
     singular: 'Gantry',
     detailsTitle: 'Toll Gantry Details',
@@ -135,6 +138,8 @@ export const ASSET_TYPES = Object.freeze({
 
   laneBarrier: Object.freeze({
     id: 'laneBarrier',
+    // Same as gantries: "Placed" on every card carries no information.
+    getCardStatus: () => null,
     label: 'Lane Barriers',
     singular: 'Barrier',
     detailsTitle: 'Lane Barrier Details',
@@ -227,6 +232,8 @@ export const ASSET_TYPES = Object.freeze({
 
   overlane: Object.freeze({
     id: 'overlane',
+    // The card omits status: it repeats the layer's own name on every card.
+    getCardStatus: () => null,
     label: 'Overlane Structures',
     singular: 'Structure',
     detailsTitle: 'Overlane Structure Details',
@@ -253,6 +260,7 @@ export const ASSET_TYPES = Object.freeze({
 
   cantilever: Object.freeze({
     id: 'cantilever',
+    getCardStatus: () => null,
     label: 'Cantilever Structures',
     singular: 'Structure',
     detailsTitle: 'Cantilever Structure Details',
@@ -279,6 +287,7 @@ export const ASSET_TYPES = Object.freeze({
 
   unclassified: Object.freeze({
     id: 'unclassified',
+    getCardStatus: () => null,
     label: 'Unclassified Structures',
     singular: 'Structure',
     detailsTitle: 'Structure Details',

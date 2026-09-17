@@ -15,6 +15,9 @@ import { installMarkerDeclutter } from './mapMarkerDeclutter.js';
 /** Local Interstate shield asset: red header, dark blue body, white border and numerals. */
 export const SHIELD_ICON_URL = `${import.meta.env.BASE_URL}icons/interstate-595.svg`;
 
+/** Pushed away from the eye so asset markers always draw in front of route furniture. */
+const SHIELD_EYE_OFFSET = new Cartesian3(0, 0, 25);
+
 /**
  * @param {import('cesium').Viewer} viewer
  * @param {{lon: number, lat: number}[]} centerline  the corridor geometry the shields are placed on
@@ -37,6 +40,9 @@ export function installI595RoadShields(viewer, centerline) {
         // Clamped like every other corridor marker, so the shield follows Google's photogrammetry
         // surface, and depth-test-free so the mesh can never bury it. No invented Z offset.
         heightReference: HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        // Furniture yields to assets: both are drawn without a depth test, so without this the
+        // shield can land in front of the marker naming the asset underneath it.
+        eyeOffset: SHIELD_EYE_OFFSET,
         // Keep a readable 34px minimum even in the corridor overview.
         scaleByDistance: new NearFarScalar(800, 1, 22000, 0.85),
       },

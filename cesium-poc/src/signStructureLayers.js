@@ -18,6 +18,7 @@
 import { Cartesian3, CustomDataSource, DistanceDisplayCondition, HeightReference, NearFarScalar, ScreenSpaceEventType, VerticalOrigin } from 'cesium';
 import { corridorVisualConfig as config } from './corridorVisualConfig.js';
 import { createMapDetailsPanel } from './mapDetailsPanel.js';
+import { assetIdMarker, MARKER_LABELS, OVERHEAD_STEM } from './assetIdMarker.js';
 import { focusMapPoints } from './bridgeCamera.js';
 import {
   SIGN_STRUCTURE_ASSET_TYPE, SIGN_STRUCTURE_TYPES, corridorBearingAt,
@@ -54,6 +55,12 @@ function markerIcon(type, selected) {
  * @param {ReturnType<import('./signStructureService.js').createSignStructureService>} service
  * @param {{types?: object[], centerline?: {lon: number, lat: number}[], logger?: Console}} [options]
  */
+/** Structures are marked by the number in their id — I595_GANTRY_037 shows 037. */
+function structureMarker(structureId, selected) {
+  const { image, width, height } = assetIdMarker({ id: MARKER_LABELS.structureNumber(structureId), selected, stem: OVERHEAD_STEM });
+  return { image, width, height };
+}
+
 export function installSignStructureLayers(container, viewer, service, { types = SIGN_STRUCTURE_TYPES, centerline = [], logger = console } = {}) {
   // ---- Asset Explorer bridge -------------------------------------------------------------------
   // These layers keep their own details panel and framing; the explorer adds browsing on top and
@@ -103,9 +110,11 @@ export function installSignStructureLayers(container, viewer, service, { types =
 
   function style(entity) {
     if (!entity?.billboard) return;
-    const type = layers.get(records.get(entity).typeId)?.type;
-    if (type) entity.billboard.image = markerIcon(type, entity === selected);
-    entity.billboard.scale = entity === selected ? 1.16 : entity === hovered ? 1.08 : 1;
+    const marker = structureMarker(records.get(entity)?.id, entity === selected);
+    entity.billboard.image = marker.image;
+    entity.billboard.width = marker.width;
+    entity.billboard.height = marker.height;
+    entity.billboard.scale = entity === selected ? 1.08 : entity === hovered ? 1.04 : 1;
   }
 
   /** Look along the road, so a structure is met the way a driver meets it. */
@@ -230,8 +239,8 @@ export function installSignStructureLayers(container, viewer, service, { types =
             milepost: record.milepost, roadwayId: record.roadwayId, lightCount: record.lightCount,
           },
           billboard: {
-            image: markerIcon(layer.type, false),
-            width: 34, height: 39, verticalOrigin: VerticalOrigin.BOTTOM,
+            ...structureMarker(record.id, false),
+            verticalOrigin: VerticalOrigin.BOTTOM,
             // Stands on the road surface, and is never buried by the photogrammetry around it.
             heightReference: HeightReference.CLAMP_TO_GROUND,
             disableDepthTestDistance: Number.POSITIVE_INFINITY,

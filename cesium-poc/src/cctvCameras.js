@@ -1,19 +1,11 @@
 import { corridorVisualConfig as config } from './corridorVisualConfig.js';
 import { CustomDataSource, Cartesian3, Color, DistanceDisplayCondition, HeightReference, NearFarScalar, ScreenSpaceEventType, VerticalOrigin } from 'cesium';
 import { createMapDetailsPanel } from './mapDetailsPanel.js';
+import { assetIdMarker } from './assetIdMarker.js';
 import { focusMapPoints } from './bridgeCamera.js';
 
-// Rasterize the vector at 4× display size so Cesium's billboard texture stays crisp
-// on high-density screens. The solid badge keeps the glyph readable over imagery.
-const cameraIcon = muted => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="176" height="208" viewBox="0 0 44 52">
-<path d="M17 40 22 49 27 40" fill="#0b1729" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/>
-<rect x="2" y="2" width="40" height="40" rx="12" fill="#0b1729" stroke="white" stroke-width="2.5"/>
-<rect x="5" y="5" width="34" height="34" rx="9" fill="${muted ? '#25364b' : '#103d53'}"/>
-<g fill="none" stroke="${muted ? '#e2e8f0' : '#67f4e2'}" stroke-width="2.5" stroke-linejoin="round">
-<path d="M17 15h6l2 3h6a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H11a2 2 0 0 1-2-2V20a2 2 0 0 1 2-2h4Z"/>
-<circle cx="22" cy="25" r="5"/>
-</g></svg>`)}`;
-const icons = { available: cameraIcon(false), unavailable: cameraIcon(true) };
+// Cameras are marked on the map by their own ID rather than by a camera pictogram: the layer
+// already tells you these are cameras, so the marker answers "which one". See assetIdMarker.js.
 
 // Returns the snapshot proxy URL for the DIVAS JPEG snapshot, or null when the
 // camera has no divas_chan_id. Uses VITE_SNAPSHOT_BASE when set (e.g. CloudFront),
@@ -69,6 +61,12 @@ function makeGroup(title, id, className) {
  *   When provided, the details panel offers Street View for the camera's own coordinates. Street
  *   View is Google's street-level photography, not this camera's feed — the panel keeps them apart.
  */
+/** Billboard fields for one camera's ID marker, at CSS size so Cesium scales it correctly. */
+function idMarkerGraphics(cameraId, selected) {
+  const { image, width, height } = assetIdMarker({ id: cameraId, selected });
+  return { image, width, height };
+}
+
 export function installCctvCameras(container, viewer, { onStreetView } = {}) {
   // ---- Asset Explorer handover -----------------------------------------------------------------
   // While the Asset Explorer is browsing this type it owns selection: the panel and the camera move
@@ -110,8 +108,14 @@ export function installCctvCameras(container, viewer, { onStreetView } = {}) {
 
   function style(entity) {
     if (!entity) return;
+    // Two cached textures per camera — charcoal and yellow — swapped on selection. Nothing is
+    // redrawn per frame, and the marker's own colours carry the state rather than a tint.
+    const marker = idMarkerGraphics(records.get(entity)?.camera_id ?? entity.id, entity === selected);
+    entity.billboard.image = marker.image;
+    entity.billboard.width = marker.width;
+    entity.billboard.height = marker.height;
     entity.billboard.distanceDisplayCondition = new DistanceDisplayCondition(0, entity === selected ? Number.MAX_VALUE : config.lod.corridorDistance);
-    entity.billboard.scale = entity === selected ? 1.18 : entity === hovered ? 1.1 : 1;
+    entity.billboard.scale = entity === selected ? 1.08 : entity === hovered ? 1.04 : 1;
     entity.billboard.color = Color.WHITE;
   }
 
@@ -155,6 +159,9 @@ export function installCctvCameras(container, viewer, { onStreetView } = {}) {
       return;
     }
     panel.select(entity ? records.get(entity) : null);
+    // Cameras keep their own panel, so this is the path a map click actually takes. It has to
+    // report too, or picking a camera on the map never reaches the shared selection.
+    reportSelection(entity ? records.get(entity) : null);
     document.querySelector('.camera-stream-action')?.remove();
     document.querySelector('.camera-street-view')?.remove();
     if (entity && onStreetView) {
@@ -255,7 +262,7 @@ export function installCctvCameras(container, viewer, { onStreetView } = {}) {
         const entity = source.entities.add({
           id: String(p.camera_id), name: cameraLabel(p), show: false,
           position: Cartesian3.fromDegrees(...f.geometry.coordinates), properties: p,
-          billboard: { image: p.video_enabled === true ? icons.available : icons.unavailable, width: 34, height: 40, scale: 1,
+          billboard: { ...idMarkerGraphics(p.camera_id, false), scale: 1,
             verticalOrigin: VerticalOrigin.BOTTOM, heightReference: HeightReference.CLAMP_TO_GROUND,
             disableDepthTestDistance: Number.POSITIVE_INFINITY,
             distanceDisplayCondition: new DistanceDisplayCondition(0, config.lod.corridorDistance),

@@ -1,3 +1,4 @@
+import { ROAD_STYLE } from './corridorVisualConfig.js';
 import { GeoJsonDataSource, Color, ScreenSpaceEventType } from 'cesium';
 import { RAMP_CATEGORIES, rampFromProperties, matchesRamp } from './i595RampData.js';
 
@@ -11,12 +12,15 @@ export function createI595RampLayerService(viewer, { onSelect, onHover, onChange
   const byInterchange = new Map();
   /** @type {Map<import('cesium').Entity, import('./i595RampData.js').I595Ramp>} */
   const records = new Map();
-  const colors = new Map(RAMP_CATEGORIES.map(category => [category.type, Color.fromCssColorString(category.color)]));
+  const colors = new Map(RAMP_CATEGORIES.map(category =>
+    [category.type, Color.fromCssColorString(category.color).withAlpha(ROAD_STYLE.ramp.opacity)]));
+  const selectedColor = Color.fromCssColorString(ROAD_STYLE.selected.color).withAlpha(ROAD_STYLE.selected.opacity);
   const restyle = entity => {
     if (!entity) return;
     const base = colors.get(records.get(entity).rampType);
     entity.polyline.width = entity === selected ? 6 : entity === hovered ? 5 : near ? 3 : 2;
-    entity.polyline.material = entity === selected || entity === hovered ? Color.lerp(base, Color.WHITE, 0.5, new Color()) : base;
+    entity.polyline.material = entity === selected ? selectedColor
+      : entity === hovered ? base.withAlpha(ROAD_STYLE.hoverOpacity) : base;
   };
   function hover(entity, position) {
     const previous = hovered; hovered = entity; restyle(previous); restyle(hovered);

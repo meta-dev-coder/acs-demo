@@ -1,4 +1,5 @@
 import { GeoJsonDataSource, Color, ScreenSpaceEventType } from 'cesium';
+import { ROAD_STYLE } from './corridorVisualConfig.js';
 import { FRONTAGE_DIRECTIONS, frontageFromProperties, frontageDetails, frontageName } from './sr84FrontageData.js';
 import { createMapDetailsPanel } from './mapDetailsPanel.js';
 
@@ -12,14 +13,19 @@ export function installFrontageRoads(container, viewer) {
   const status = container.querySelector('.frontage-status'), retry = container.querySelector('button');
   const byDirection = new Map(FRONTAGE_DIRECTIONS.map(item => [item.direction, []]));
   const records = new Map();
-  const colors = new Map(FRONTAGE_DIRECTIONS.map(item => [item.direction, Color.fromCssColorString(item.color).withAlpha(0.9)]));
+  const colors = new Map(FRONTAGE_DIRECTIONS.map(item =>
+    [item.direction, Color.fromCssColorString(item.color).withAlpha(ROAD_STYLE.frontageEB.opacity)]));
+  const selectedColor = Color.fromCssColorString(ROAD_STYLE.selected.color).withAlpha(ROAD_STYLE.selected.opacity);
   let source, loading, selected = null, hovered = null, disposed = false;
   const panel = createMapDetailsPanel({ title: 'Road details', className: 'road-details', details: frontageDetails, tooltipText: frontageName, onClose: () => select(null) });
   function style(entity) {
     if (!entity) return;
     const base = colors.get(records.get(entity).direction);
     entity.polyline.width = entity === selected ? 12 : entity === hovered ? 10 : 8;
-    entity.polyline.material = entity === selected || entity === hovered ? Color.lerp(base, Color.WHITE, 0.4, new Color()) : base;
+    // Selection strengthens the road rather than washing it toward white, which is what made a
+    // selected road no more prominent than an unselected one.
+    entity.polyline.material = entity === selected ? selectedColor
+      : entity === hovered ? base.withAlpha(ROAD_STYLE.hoverOpacity) : base;
   }
   function select(entity) {
     const previous = selected; selected = entity; style(previous); style(selected);

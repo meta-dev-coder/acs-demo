@@ -1,4 +1,4 @@
-import { corridorVisualConfig as config, corridorLOD, getTrafficColor, getFlowAnimationSpeed } from './corridorVisualConfig.js';
+import { ROAD_STYLE, corridorVisualConfig as config, corridorLOD, getTrafficColor, getFlowAnimationSpeed } from './corridorVisualConfig.js';
 import { TrafficFlowMaterial } from './trafficFlowMaterial.js';
 import { GeoJsonDataSource, Color, Cartographic, ScreenSpaceEventType } from 'cesium';
 import { createMapDetailsPanel } from './mapDetailsPanel.js';
@@ -46,9 +46,11 @@ export function createI595RoadSegmentLayer(viewer) {
     const base = colorResolver?.(segment, segmentStatus.get(segment.segmentId)) ?? Color.fromCssColorString(getTrafficColor(segmentStatus.get(segment.segmentId), segment.direction));
     const emphasis = entity === selected ? 'SELECTED' : entity === hovered ? 'HOVERED' : 'RESTING';
     entity.polyline.width = config.lineWidth[lod] + (config.casing.enabled ? config.casing.pixels : 0);
-    const glow = { SELECTED: 0.35, HOVERED: 0.22, RESTING: 0 }[emphasis];
-    const opacity = { SELECTED: 1, HOVERED: 0.95, RESTING: 0.8 }[emphasis];
-    const color = glow ? Color.lerp(base, Color.WHITE, glow, new Color()) : base;
+    // Selection is a GIS selection: a stronger transportation blue, not the road lerped toward
+    // white. Lightening it made a selected road paler than its neighbours rather than firmer.
+    const opacity = { SELECTED: ROAD_STYLE.selected.opacity, HOVERED: ROAD_STYLE.hoverOpacity,
+      RESTING: ROAD_STYLE.generalPurposeEB.opacity }[emphasis];
+    const color = emphasis === 'SELECTED' ? Color.fromCssColorString(ROAD_STYLE.selected.color) : base;
     let material=materials.get(entity);
     if(!material){
       const points=entity.polyline.positions.getValue(viewer.clock.currentTime);

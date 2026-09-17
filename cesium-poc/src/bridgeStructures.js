@@ -1,6 +1,6 @@
 import { GeoJsonDataSource, Color, PolylineDashMaterialProperty, ScreenSpaceEventType } from 'cesium';
 import { createMapDetailsPanel } from './mapDetailsPanel.js';
-import { installBridgeZoomMarkers } from './bridgeZoomMarkers.js';
+import { bridgeMarker, installBridgeZoomMarkers, SELECTED_POLYLINE_WIDTH } from './bridgeZoomMarkers.js';
 import { bridgesForDisplay } from './bridgeDisplayData.js';
 import { focusBridge } from './bridgeCamera.js';
 import { roadStructureFromProperties, structureOverlapsSegment, structureTooltip, bridgeDetails } from './roadStructureData.js';
@@ -43,7 +43,15 @@ export function installBridgeStructures(container, viewer, mainlineSegments) {
   });
   function style(entity) {
     if (!entity) return;
-    entity.polyline.width = entity === selected ? 7 : entity === hovered ? 6 : 4;
+    // The ID marker carries the selection, the same as every other asset layer: charcoal normally,
+    // warm yellow for the selected bridge.
+    if (entity.billboard) {
+      const marker = bridgeMarker(entity, entity === selected);
+      entity.billboard.image = marker.image;
+      entity.billboard.width = marker.width;
+      entity.billboard.height = marker.height;
+    }
+    entity.polyline.width = entity === selected ? SELECTED_POLYLINE_WIDTH : entity === hovered ? 6 : 4;
     entity.polyline.material = new PolylineDashMaterialProperty({
       color: entity === selected || entity === hovered ? Color.lerp(normal, Color.WHITE, 0.5, new Color()) : normal,
       gapColor: Color.BLACK.withAlpha(0.65), dashLength: 12,

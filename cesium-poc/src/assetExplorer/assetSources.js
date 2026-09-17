@@ -31,6 +31,7 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
   for (const [layerId, assetType] of corridorModels ? Object.entries(MODEL_LAYER_TYPES) : []) {
     sources.push({
       assetType,
+      group: 'corridorModels',
       read: () => modelConfigs
         .filter(config => config.layer === layerId && config.enabled !== false)
         .map(config => normalize({
@@ -57,6 +58,7 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
   if (cameras) {
     sources.push({
       assetType: 'camera',
+      group: 'cameras',
       read: () => [...cameras.cameraById.entries()].map(([id, entity]) => {
         const record = cameras.records.get(entity) ?? {};
         const position = entity.position?.getValue?.();
@@ -84,6 +86,7 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
   if (bridges) {
     sources.push({
       assetType: 'bridge',
+      group: 'bridges',
       read: () => [...bridges.bridgeById.entries()].map(([id, entity]) => {
         const structure = bridges.records.get(entity) ?? {};
         const positions = entity.polyline?.positions?.getValue?.() ?? null;
@@ -108,6 +111,7 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
   if (signals) {
     sources.push({
       assetType: 'signal',
+      group: 'signals',
       usesLegacyPanel: true,
       read: () => [...signals.trafficSignalById.entries()].map(([id, entity]) => {
         const record = signals.records.get(entity) ?? {};
@@ -133,6 +137,7 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
     sources.push({
       assetType,
       usesLegacyPanel: true,
+      group: 'liveEvents',
       read: () => [...liveEvents.entityById.entries()]
         .map(([id, entity]) => [id, entity, liveEvents.records.get(entity)])
         .filter(([, , event]) => event?.type === eventType)
@@ -159,6 +164,7 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
   for (const typeId of signStructures ? ['overlane', 'cantilever', 'unclassified'] : []) {
     sources.push({
       assetType: typeId,
+      group: 'signStructures',
       usesLegacyPanel: true,
       read: () => signStructures.recordsFor(typeId).map(record => normalize({
         id: record.id, assetType: typeId, name: record.id,
@@ -250,10 +256,17 @@ export function connectAssetSources(store, sources, { logger = console } = {}) {
     if (key === lastSelectedId) return;
     lastSelectedId = key;
     // Exactly one layer shows a highlight at a time, so switching types clears the old one.
+    // Several asset types can be backed by ONE layer module — gantries and lane barriers, the three
+    // sign-structure types, incidents and closures. Clearing a sibling would clear the module the
+    // selected type has just set, which is how selecting an overlane structure closed the very
+    // details panel it had opened. Only sources from other modules are cleared.
+    const selectedGroup = selected ? byType.get(selected.assetType)?.group : null;
     applying = true;
     try {
       for (const [assetType, source] of byType) {
-        source.highlight(selected?.assetType === assetType ? selected.id : null);
+        if (selected?.assetType === assetType) { source.highlight(selected.id); continue; }
+        if (selectedGroup && source.group === selectedGroup) continue;
+        source.highlight(null);
       }
     } finally {
       applying = false;

@@ -9,6 +9,7 @@
  * same red on white as on navy, because the colour carries meaning rather than style.
  */
 import { createTheme } from '@mui/material/styles';
+import { ROAD_STYLE } from '../corridorVisualConfig.js';
 
 /** Surfaces, text and lines per mode — the same roles the stylesheet defines. */
 export const UI_TOKENS = Object.freeze({
@@ -16,14 +17,18 @@ export const UI_TOKENS = Object.freeze({
     surface: '#0f1d31', surfaceRaised: '#17293d', canvas: '#0b1729',
     text: '#e8eef6', textSecondary: '#92a8c3',
     line: '#24344f',
-    accent: '#38c9bf', accentBright: '#67f4e2', accentContrast: '#0b1729',
+    // The explorer's accent IS the corridor's colour, taken from the road palette rather than
+    // restated here: the selected card, the rail tick and the primary action all point at the same
+    // asset the blue route on the map does, so a second blue cannot drift away from it.
+    accent: ROAD_STYLE.generalPurposeEB.color, accentBright: '#5C9EE0', accentContrast: '#ffffff',
   }),
   light: Object.freeze({
     surface: '#ffffff', surfaceRaised: '#f8fafc', canvas: '#eef2f7',
     text: '#172033', textSecondary: '#5f6b7a',
     line: '#d8dee6',
     // Darkened for legibility on white; the dark mode keeps the brighter corridor teal.
-    accent: '#0b6f66', accentBright: '#14a89b', accentContrast: '#ffffff',
+    // A deeper step for legibility on white, matching the corridor's selected blue.
+    accent: ROAD_STYLE.selected.color, accentBright: ROAD_STYLE.generalPurposeEB.color, accentContrast: '#ffffff',
   }),
 });
 

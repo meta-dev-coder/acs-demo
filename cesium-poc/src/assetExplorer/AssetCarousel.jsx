@@ -39,7 +39,7 @@ export function AssetCarousel({ assets, selectedAsset, singular, status, emptyMe
   }
 
   return (
-    <Stack direction="row" alignItems="center" spacing={0.5} sx={{ px: 0.5 }}>
+    <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', px: 0.5 }}>
       <Tooltip title={`Previous ${singular.toLowerCase()}`}>
         {/* A disabled button cannot host a tooltip, so it needs this wrapper — and the wrapper
             stretches to the row height, which left the chevron sitting at the top of the cards.

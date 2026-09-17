@@ -8,7 +8,10 @@
 import { formatMilepost } from './i595RoadSegmentData.js';
 
 /** Matches the "--road" swatch already set on the 595 Express label in the layer tree. */
-export const EXPRESS_COLOR = '#ffba62';
+import { ROAD_STYLE } from './corridorVisualConfig.js';
+/** Managed-lane category colour — a cartographic ochre, not the amber used for warnings. */
+export const EXPRESS_COLOR = ROAD_STYLE.managed.color;
+export const EXPRESS_OPACITY = ROAD_STYLE.managed.opacity;
 
 /**
  * @typedef {object} ExpressLanes

@@ -8,6 +8,7 @@
  */
 import { GeoJsonDataSource, Color, ColorMaterialProperty, CallbackProperty, ScreenSpaceEventType } from 'cesium';
 import { createMapDetailsPanel } from './mapDetailsPanel.js';
+import { ROAD_STYLE } from './corridorVisualConfig.js';
 import { EXPRESS_COLOR, expressDetails, expressFromProperties, expressName, expressTooltip } from './i595ExpressData.js';
 
 /**
@@ -31,9 +32,12 @@ export function installI595ExpressLanes(viewer, input, { onVisibilityChange, onS
     // Ground-line width changes rebuild the primitive and briefly remove its pick target.
     // Keep geometry and the translucent render pass stable through interaction.
     entity.polyline.width = 12;
-    const glow = { SELECTED: 0.35, HOVERED: 0.22, RESTING: 0 }[emphasis];
-    const resting = { SELECTED: 0.99, HOVERED: 0.95, RESTING: 0.8 }[emphasis];
-    const color = glow ? Color.lerp(base, Color.WHITE, glow, new Color()) : base;
+    // A GIS selection: the stronger transportation blue, not the ochre washed toward white.
+    const glow = { SELECTED: 0, HOVERED: 0.12, RESTING: 0 }[emphasis];
+    const resting = { SELECTED: ROAD_STYLE.selected.opacity, HOVERED: ROAD_STYLE.hoverOpacity,
+      RESTING: ROAD_STYLE.managed.opacity }[emphasis];
+    const color = emphasis === 'SELECTED' ? Color.fromCssColorString(ROAD_STYLE.selected.color)
+      : glow ? Color.lerp(base, Color.WHITE, glow, new Color()) : base;
     // Startup fades the layer in; hovering or selecting mid-fade must not snap it to full strength.
     // Mutate the sampled value, not the material property: definitionChanged would
     // invalidate Cesium's ground batch and cause a black frame while it rebuilds.
