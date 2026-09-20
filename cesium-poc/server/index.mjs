@@ -1,3 +1,4 @@
+import { createMessageSignsApi } from './messageSigns.mjs';
 /**
  * Standalone host for the live-event API (`npm run api`). In development the same handler is
  * mounted straight into Vite (vite.config.js), so this entry point exists for deployments where
@@ -10,16 +11,16 @@ import { API_BASE, createLiveEventsApi, createSnapshotApi } from './api.mjs';
 const config = loadConfig();
 const api = createLiveEventsApi({ config });
 const snapshotApi = createSnapshotApi();
+const messageSignsApi = createMessageSignsApi({ config });
 
 const server = createServer((request, response) => {
-  api.handle(request, response).then(handled => {
-    if (handled) return;
-    return snapshotApi.handle(request, response);
-  }).then(handled => {
-    if (handled) return;
+  (async () => {
+    for (const handler of [api, snapshotApi, messageSignsApi]) {
+      if (await handler.handle(request, response)) return;
+    }
     response.writeHead(404, { 'content-type': 'application/json' });
     response.end(JSON.stringify({ error: `Not found. Try GET ${API_BASE}` }));
-  }).catch(error => {
+  })().catch(error => {
     console.error('Unhandled request failure', error);
     response.writeHead(500, { 'content-type': 'application/json' });
     response.end(JSON.stringify({ error: 'Internal error' }));

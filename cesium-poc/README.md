@@ -213,3 +213,20 @@ classifiable by Cesium's 3D-Tiles classification path, so ground-clamped polylin
 3D mode. No workaround was applied, because guessing at one (height offsets, draping) would mean
 inventing elevation. Add a key, switch to 3D and check the road lines; if they are missing, that is
 the one follow-up this feature needs.
+
+## FL511 message signs
+
+In `?demo=i595`, click **Message Signs** on the left Map Explorer rail to show corridor
+signs and open the shared corridor carousel. Selecting a marker or card fetches its FL511
+message and source timestamp; an empty message is shown as **No message displayed**.
+The statewide feed is filtered to the existing I-595 / SR 84 / ramp network within 250 m,
+using the same `I595_LIVE_EVENT_BUFFER_METERS` configuration as live events.
+
+The same-origin API is mounted in Vite and in `npm run api`:
+
+- `GET /api/i595/message-signs` — corridor markers, cached for `FL511_REFRESH_SECONDS`.
+- `GET /api/i595/message-signs/:id` — on-demand FL511 tooltip details for a corridor sign.
+
+`FL511_MESSAGE_SIGNS_PATH` overrides the upstream marker path. A separately hosted frontend
+can set `VITE_MESSAGE_SIGNS_API`. Upstream failures retain cached data marked stale; without
+cached data, the UI shows an unavailable state and supports retrying.

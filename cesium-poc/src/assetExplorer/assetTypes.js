@@ -39,6 +39,16 @@ export function bridgeMilepost(properties) {
 }
 
 export const ASSET_TYPES = Object.freeze({
+  messageSign: Object.freeze({
+    id: 'messageSign', label: 'Message Signs', singular: 'Message Sign', icon: 'messageSign',
+    layerId: 'message-signs', legacyDetailsPanel: true,
+    emptyMessage: 'No message signs are reported along the corridor.',
+    errorMessage: 'Unable to load FL511 message signs. Use Retry message signs in All layers.',
+    getTitle: asset => asset.name,
+    getSubtitle: asset => positionLabel(asset),
+    getStatus: () => null,
+    details: asset => [['Sign ID', asset.id], ['Location', asset.source?.title]],
+  }),
   gantry: Object.freeze({
     id: 'gantry',
     // The card omits status: every gantry reads "Placed", which distinguishes nothing. The

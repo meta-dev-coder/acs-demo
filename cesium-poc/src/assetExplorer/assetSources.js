@@ -20,7 +20,7 @@ const layerLabel = layerId => MODEL_LAYERS.find(layer => layer.id === layerId)?.
  * @returns {{assetType: string, read: () => object[], highlight: (id: string|null) => void,
  *            listen: (report: (asset: object|null) => void) => void, own: (owned: boolean) => void}[]}
  */
-export function createAssetSources({ corridorModels, cameras, bridges, signals, liveEvents, signStructures, centerline, modelConfigs = [] }) {
+export function createAssetSources({ corridorModels, cameras, bridges, signals, messageSigns, liveEvents, signStructures, centerline, modelConfigs = [] }) {
   const distances = centerline?.length ? centerlineDistances(centerline) : null;
   const normalize = input => normalizeAsset(input, centerline, distances);
   const sources = [];
@@ -52,6 +52,23 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
       }),
       own: owned => corridorModels.setExternallyOwned(owned),
       silence: () => corridorModels.onSelection(null),
+    });
+  }
+
+  if (messageSigns) {
+    sources.push({
+      assetType: 'messageSign', group: 'messageSigns', usesLegacyPanel: true,
+      read: () => {
+        if (messageSigns.error) throw messageSigns.error;
+        return [...messageSigns.records.values()].map(record => normalize({
+          id: record.id, assetType: 'messageSign', name: record.title,
+          longitude: record.longitude, latitude: record.latitude, source: record,
+        }));
+      },
+      highlight: id => id == null ? messageSigns.clearSelection() : messageSigns.selectById(id),
+      listen: report => messageSigns.onSelection(record => report(record?.id ?? null)),
+      own: () => {},
+      silence: () => messageSigns.onSelection(null),
     });
   }
 

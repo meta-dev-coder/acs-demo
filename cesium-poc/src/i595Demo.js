@@ -1,3 +1,4 @@
+import { installMessageSigns } from './messageSigns.js';
 import { installI595Weather } from './i595Weather.js';
 import { installCctvCameras } from './cctvCameras.js';
 import { installTrafficSignals } from './trafficSignals.js';
@@ -52,7 +53,7 @@ document.body.innerHTML = `
         <label data-route="WB"><input type="checkbox" id="i595_mainline_wb"><span class="swatch"></span><span>I-595 Westbound</span></label>
         <label style="--road:#ffba62"><input type="checkbox" id="express-way"><span class="swatch"></span><span>595 Express</span></label>
         </details>
-        <label class="layer-option"><input type="checkbox" id="flow-direction" checked><span>Direction of travel</span></label>
+        <label class="layer-option"><input type="checkbox" id="flow-direction"><span>Direction of travel</span></label>
         <div class="incidents-group"></div>
         <!-- Frontage roads and ramps carry traffic; they belong beside the mainline, not with the
              fixed infrastructure that stands over it. -->
@@ -63,7 +64,6 @@ document.body.innerHTML = `
         <div id="structure-layer-controls"></div>
         <div id="gantry-layer-controls"></div>
       </details>
-      <div id="base-environment-controls"></div>
       <p id="layer-status" role="status" aria-live="polite">Select a road to highlight it on the map.</p>
     </div>
   </aside>
@@ -173,6 +173,8 @@ try {
   // data to load, so it is ready as soon as the segment layer exists.
   flowToggle.disabled = false;
   flowToggle.onchange = () => mainlineSegments.setFlowVisible(flowToggle.checked);
+  // Ships off, so the layer must start off too rather than inheriting its own default.
+  mainlineSegments.setFlowVisible(flowToggle.checked);
   const expressLanes = installI595ExpressLanes(viewer, document.querySelector("#express-way"), {
     onVisibilityChange: updateMainlineCount, onStatus: message => { status.textContent = message; },
   });
@@ -199,6 +201,7 @@ try {
     if (!result.ok && result.message) status.textContent = result.message;
     return result;
   };
+  const messageSignControls = installMessageSigns(document.querySelector(".its-group"), viewer);
   const cameraControls = installCctvCameras(document.querySelector(".its-group"), viewer, { onStreetView: streetViewEnabled ? openStreetView : undefined });
 
   // Street View is a way of exploring the corridor, not a camera feature: the toolbar tool works
@@ -237,7 +240,13 @@ try {
   const baseEnvironmentControls = installBaseEnvironmentControls(
     // No first-activation flight any more: 3D is the world the map opens in, and the startup camera
     // above already frames the corridor. The button below stays as an explicit "re-frame" action.
-    document.querySelector("#base-environment-controls"), baseEnvironment, { onFlyRequest: view3d });
+    // Inside the navigation toolbar, beside Reset view: it belongs with the other view controls
+    // rather than in the layer tree or in a bar of its own.
+    document.querySelector(".map-nav"), baseEnvironment, { onFlyRequest: view3d, variant: "bar" });
+  const navGroup = document.querySelector(".map-nav");
+  const resetButton = document.querySelector("#reset-view");
+  const baseEnvElement = navGroup?.querySelector(".base-environment--bar");
+  if (navGroup && resetButton && baseEnvElement) navGroup.insertBefore(baseEnvElement, resetButton);
   // Photorealistic 3D is the default world. On a missing key or a failed load the service reverts to
   // the satellite basemap and says why, so startup degrades instead of failing.
   // Whoever starts the base environment — the intro's first stage or the `?intro=off` path below —
@@ -327,6 +336,7 @@ try {
     counts: {
       signals: () => signalControls.trafficSignalById.size,
       cameras: () => cameraControls.cameraById.size,
+      messageSigns: () => messageSignControls.signById.size,
       // Each badge counts its own feed. Incidents used to count every live event, which was
       // consistent while the Incidents tool drove the whole Live Events group and wrong once it
       // became its own layer.
@@ -355,6 +365,7 @@ try {
     layerStore,
     corridorModels: corridorModelLayers,
     cameras: cameraControls,
+    messageSigns: messageSignControls,
     bridges: bridgeControls,
     signals: signalControls,
     liveEvents: liveEventControls,
@@ -378,7 +389,7 @@ try {
 
   // Operational strip: corridor facts and the live-event feed, with gaps stated rather than filled.
   const askTwin = installAskTheTwin(viewer, { cameraControls });
-  if (import.meta.hot) import.meta.hot.dispose(() => { assetExplorer.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
+  if (import.meta.hot) import.meta.hot.dispose(() => { assetExplorer.destroy(); messageSignControls.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
   for (const input of inputs) {
     // Layers with their own loader, plus display options that are not data layers at all: this loop
     // fetches `data/<id>.geojson`, and "flow-direction" has no such file — being swept up here

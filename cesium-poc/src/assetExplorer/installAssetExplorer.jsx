@@ -23,6 +23,7 @@ export function installAssetExplorer(container, viewer, {
   layerStore = null,
   corridorModels = null,
   cameras = null,
+  messageSigns = null,
   bridges = null,
   signals = null,
   liveEvents = null,
@@ -41,7 +42,7 @@ export function installAssetExplorer(container, viewer, {
       : null;
   });
 
-  const sources = createAssetSources({ corridorModels, cameras, bridges, signals, liveEvents, signStructures, centerline, modelConfigs });
+  const sources = createAssetSources({ corridorModels, cameras, bridges, signals, messageSigns, liveEvents, signStructures, centerline, modelConfigs });
   const navigation = createAssetNavigation(viewer, { logger });
   const disconnect = connectAssetSources(store, sources, { logger });
 

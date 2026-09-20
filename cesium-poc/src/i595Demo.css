@@ -462,7 +462,7 @@ body:has(.layers:not(.collapsed)) .corridor-status { left: 420px; }
 /* The Asset Explorer is a React island in its own host element, so it needs naming here too —
    the selector below only covers the app's plain-DOM panels. Street View is a full-screen
    photographic view; the bottom browser and mini-map have nothing to sit over. */
-body:has(.street-view[data-state="active"]) .asset-explorer-host,
+body:has(.street-view[data-state="active"]) :is(.asset-explorer-host, .base-environment--bar),
 body:has(.street-view[data-state="active"]) :is(.layers, .corridor-status, .twin-hud, .map-nav, .weather-launch, .clip-editor),
 body:has(.street-view[data-state="active"]) :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details, .structure-details, .ramp-tooltip) { display: none; }
 .camera-street-view { display: block; width: 100%; margin-top: 8px; white-space: nowrap; padding: 8px 12px; border: 1px solid var(--ui-border-strong); border-radius: 9px; background: var(--ui-hover); color: var(--ui-text); font-size: 12.5px; cursor: pointer; transition: background .15s ease; }
@@ -660,3 +660,45 @@ body .map-nav, body:has(.twin-hud) .map-nav { top: 16px; bottom: auto; right: 16
 .clip-editor-compare button { padding: 6px 3px; font: 600 10px system-ui; color: var(--ui-text); background: var(--ui-surface-raised); border: 1px solid var(--ui-border); border-radius: 6px; cursor: pointer; }
 .clip-editor-compare button[aria-pressed="true"] { background: var(--ui-accent-soft); border-color: var(--ui-accent-line); color: var(--ui-accent); }
 .clip-editor-compare button:disabled { opacity: 0.4; cursor: default; }
+
+/* ---- Base environment switch, on the map ------------------------------------------------------
+   A segmented control at the top of the scene: which world the corridor is drawn on is a constant
+   decision during a demo, so it should not require opening the layer tree. Same tokens, same
+   restraint as the navigation toolbar it sits beside. */
+/* Inside the navigation toolbar: static flow, no surface of its own — the toolbar already provides
+   the panel, the border and the shadow. */
+.map-nav .base-environment--bar { position: static; transform: none; padding: 0; border: 0;
+  border-radius: 0; background: transparent; box-shadow: none; backdrop-filter: none;
+  -webkit-backdrop-filter: none; grid-column: 1 / -1; }
+.map-nav .base-environment--bar label { height: 34px; }
+.map-nav .base-environment--bar .base-environment-status { display: none; }
+.base-environment--bar { position: absolute; top: 16px; left: 92px; z-index: 30;
+  display: flex; align-items: center; gap: 8px; padding: 4px; border: 1px solid var(--ui-border);
+  border-radius: 12px; background: var(--ui-surface-translucent); backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px); box-shadow: 0 12px 32px var(--ui-shadow-color); color: var(--ui-text); }
+.base-environment--bar .base-environment-options { display: flex; gap: 2px; margin: 0; padding: 0; border: 0; }
+.base-environment--bar legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.base-environment--bar label { display: flex; align-items: center; gap: 0; margin: 0; padding: 7px 12px;
+  border: 0; border-radius: 9px; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer;
+  color: var(--ui-text-secondary); background: transparent; }
+.base-environment--bar label:hover { background: var(--ui-hover); color: var(--ui-text); }
+/* The radio itself is the state, not a visible dot: the segment carries it. */
+.base-environment--bar input { position: absolute; opacity: 0; pointer-events: none; }
+.base-environment--bar label:has(input:checked) { background: var(--ui-accent-soft); color: var(--ui-accent);
+  border: 0; box-shadow: inset 0 0 0 1px var(--ui-accent-line); }
+.base-environment--bar .base-environment-fly { padding: 7px 12px; border: 1px solid var(--ui-border);
+  border-radius: 9px; background: transparent; color: var(--ui-accent); font-size: 12px; font-weight: 600;
+  cursor: pointer; white-space: nowrap; }
+.base-environment--bar .base-environment-fly:hover { background: var(--ui-hover); }
+.base-environment--bar .base-environment-status:empty { display: none; }
+.base-environment--bar .base-environment-status { margin: 0; padding-right: 8px; font-size: 11px;
+  color: var(--ui-text-secondary); max-width: 220px; }
+/* The clipping editor is a development tool that owns the same corner; the switch moves past it
+   rather than sitting underneath. */
+body:has(.clip-editor) .base-environment--bar { left: 388px; }
+@media (max-width: 900px) {
+  /* Narrow screens keep the top corners for navigation; the switch drops its long labels. */
+  .base-environment--bar { top: 10px; left: 76px; }
+  body:has(.clip-editor) .base-environment--bar { left: 76px; top: 60px; }
+  .base-environment--bar label { padding: 6px 9px; font-size: 11px; }
+}

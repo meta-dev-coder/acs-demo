@@ -12,6 +12,7 @@ export function loadConfig(env = process.env) {
   return {
     baseUrl: (env.FL511_BASE_URL || 'https://fl511.com').replace(/\/+$/, ''),
     incidentsPath: env.FL511_INCIDENTS_PATH || '/map/mapIcons/Incidents',
+    messageSignsPath: env.FL511_MESSAGE_SIGNS_PATH || '/map/mapIcons/MessageSigns',
     closuresPath: env.FL511_CLOSURES_PATH || '/map/mapIcons/Closures',
     // Declared by FL511's own map markup as data-tooltipbaseurl; {layerId}/{id}/{lang} are theirs.
     detailPath: env.FL511_DETAIL_PATH || '/tooltip/{layerId}/{id}?lang={lang}',

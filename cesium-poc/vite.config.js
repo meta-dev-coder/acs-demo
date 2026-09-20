@@ -1,3 +1,4 @@
+import { createMessageSignsApi } from './server/messageSigns.mjs';
 import { defineConfig } from "vite";
 import cesium from "vite-plugin-cesium";
 import { createRequire } from "node:module";
@@ -17,6 +18,15 @@ const liveEventsApi = () => {
       server.middlewares.use(api.middleware);
       server.httpServer?.on("close", () => { void api.stop(); });
     },
+    configurePreviewServer(server) { server.middlewares.use(api.middleware); },
+  };
+};
+
+// FL511 message sign markers and details stay same-origin.
+const messageSignsApi = () => {
+  const api = createMessageSignsApi();
+  return { name: 'i595-message-signs-api',
+    configureServer(server) { server.middlewares.use(api.middleware); },
     configurePreviewServer(server) { server.middlewares.use(api.middleware); },
   };
 };
@@ -43,7 +53,7 @@ export default defineConfig({
   // automatic runtime is enough for it — no fast-refresh plugin, so the rest of the app's plain
   // HMR is untouched.
   esbuild: { jsx: 'automatic' },
-  plugins: [cesium({ cesiumBuildRootPath, cesiumBuildPath: join(cesiumBuildRootPath, "Cesium") }), liveEventsApi(), snapshotApi()],
+  plugins: [cesium({ cesiumBuildRootPath, cesiumBuildPath: join(cesiumBuildRootPath, "Cesium") }), liveEventsApi(), snapshotApi(), messageSignsApi()],
   // Port 5188 (not the default 5180) keeps this NTTA worktree isolated from a sibling session's
   // dev server sharing localhost. Disable auto-open under headless e2e.
   server: { port: 5188, open: false, strictPort: true },

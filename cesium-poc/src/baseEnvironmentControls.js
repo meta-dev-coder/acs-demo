@@ -12,28 +12,36 @@ const LABELS = {
   [BASE_ENVIRONMENTS.GOOGLE_PHOTOREALISTIC_3D]: 'Google Photorealistic 3D',
 };
 
+/** On the map the switch shares the top edge with the navigation toolbar, so the names are short.
+ *  The full names stay as the accessible label. */
+const SHORT_LABELS = {
+  [BASE_ENVIRONMENTS.SATELLITE]: 'Satellite',
+  [BASE_ENVIRONMENTS.GOOGLE_PHOTOREALISTIC_3D]: 'Google 3D',
+};
+
 /**
  * @param {HTMLElement} container
  * @param {ReturnType<import('./basePhotorealistic3D.js').createGooglePhotorealistic3DService>} service
- * @param {{onFirstActivation?: () => void, onFlyRequest?: () => void}} [hooks]
+ * @param {{onFirstActivation?: () => void, onFlyRequest?: () => void, variant?: 'panel' | 'bar'}} [hooks]
+ *   `bar` renders the same controls as a compact segmented switch for the top of the map, where
+ *   changing the world you are looking at does not require opening a layer tree first.
  */
-export function installBaseEnvironmentControls(container, service, { onFirstActivation, onFlyRequest } = {}) {
-  const group = document.createElement('details');
-  group.className = 'base-environment';
-  group.open = true;
-  group.innerHTML = `<summary>Map</summary>
+export function installBaseEnvironmentControls(container, service, { onFirstActivation, onFlyRequest, variant = 'panel' } = {}) {
+  const bar = variant === 'bar';
+  const group = document.createElement(bar ? 'div' : 'details');
+  group.className = bar ? 'base-environment base-environment--bar' : 'base-environment';
+  if (!bar) group.open = true;
+  group.innerHTML = `${bar ? '' : '<summary>Map</summary>'}
     <fieldset class="base-environment-options">
       <legend>Base Environment</legend>
-      <label><input type="radio" name="base-environment" value="${BASE_ENVIRONMENTS.SATELLITE}" checked><span>${LABELS.SATELLITE}</span></label>
-      <label><input type="radio" name="base-environment" value="${BASE_ENVIRONMENTS.GOOGLE_PHOTOREALISTIC_3D}"><span>${LABELS.GOOGLE_PHOTOREALISTIC_3D}</span></label>
+      <label title="${LABELS.SATELLITE}"><input type="radio" name="base-environment" value="${BASE_ENVIRONMENTS.SATELLITE}" aria-label="${LABELS.SATELLITE}" checked><span>${bar ? SHORT_LABELS.SATELLITE : LABELS.SATELLITE}</span></label>
+      <label title="${LABELS.GOOGLE_PHOTOREALISTIC_3D}"><input type="radio" name="base-environment" value="${BASE_ENVIRONMENTS.GOOGLE_PHOTOREALISTIC_3D}" aria-label="${LABELS.GOOGLE_PHOTOREALISTIC_3D}"><span>${bar ? SHORT_LABELS.GOOGLE_PHOTOREALISTIC_3D : LABELS.GOOGLE_PHOTOREALISTIC_3D}</span></label>
     </fieldset>
-    <button class="base-environment-fly" hidden>View I-595 in 3D</button>
     <p class="base-environment-status" role="status"></p>`;
   container.append(group);
 
   const radios = new Map([...group.querySelectorAll('input[name="base-environment"]')].map(input => [input.value, input]));
   const status = group.querySelector('.base-environment-status');
-  const fly = group.querySelector('.base-environment-fly');
   let current = DEFAULT_BASE_ENVIRONMENT, flown = false, busy = false;
 
   const select = value => { radios.get(value).checked = true; };
@@ -44,7 +52,6 @@ export function installBaseEnvironmentControls(container, service, { onFirstActi
       service.disable();
       current = next;
       status.textContent = '';
-      fly.hidden = true;
       return current;
     }
     busy = true;
@@ -57,7 +64,6 @@ export function installBaseEnvironmentControls(container, service, { onFirstActi
       status.textContent = result.message;
       select(BASE_ENVIRONMENTS.SATELLITE);
       current = BASE_ENVIRONMENTS.SATELLITE;
-      fly.hidden = true;
       return current;
     }
     current = next;
@@ -66,14 +72,12 @@ export function installBaseEnvironmentControls(container, service, { onFirstActi
     status.textContent = '';
     // Keep the radio in step when the environment is set programmatically, not by a click.
     select(next);
-    fly.hidden = false;
     // Fly once, on first activation only — later toggles leave the camera where the user put it.
     if (!flown) { flown = true; onFirstActivation?.(); }
     return current;
   }
 
   for (const [value, input] of radios) input.onchange = () => { if (input.checked) void apply(value); };
-  fly.onclick = () => onFlyRequest?.();
 
   return {
     get environment() { return current; },

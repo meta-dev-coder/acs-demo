@@ -15,6 +15,7 @@ import { RAIL_LAYER_IDS } from './mapLayerStore.js';
 
 /** Line icons, drawn to the same weight so the rail reads as one set. */
 const ICONS = {
+  messageSign: '<rect x="2" y="2" width="16" height="11" rx="2"/><path d="M5 13v5m10-5v5M5 6h10M5 9h7"/>',
   explorer: '<path d="M3 6h14M3 10h14M3 14h14"/>',
   road: '<path d="M6 17 8 3M14 17 12 3M10 5v3M10 11v3"/>',
   direction: '<path d="M3 10h12M11 6l4 4-4 4"/>',
