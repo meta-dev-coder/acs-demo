@@ -15,6 +15,7 @@ import { RAIL_LAYER_IDS } from './mapLayerStore.js';
 
 /** Line icons, drawn to the same weight so the rail reads as one set. */
 const ICONS = {
+  lighting: '<path d="M7 14h6M8 17h4M7 11c-4-4-1-9 3-9s7 5 3 9v3H7z"/>',
   messageSign: '<rect x="2" y="2" width="16" height="11" rx="2"/><path d="M5 13v5m10-5v5M5 6h10M5 9h7"/>',
   explorer: '<path d="M3 6h14M3 10h14M3 14h14"/>',
   road: '<path d="M6 17 8 3M14 17 12 3M10 5v3M10 11v3"/>',
@@ -64,18 +65,19 @@ export function installMapExplorer(panel, store, { onOpenWeather, onTogglePanel 
   header.innerHTML = '<h2>Map Explorer</h2>';
   const categories = document.createElement('section');
   categories.className = 'layer-categories';
+  const layerRow = layer => `<button class="layer-row" type="button" data-layer="${layer.id}" aria-pressed="false">
+    <span class="layer-row-swatch" data-route="${layer.route ?? ''}"${layer.accent ? ` style="--road:${layer.accent}"` : ''}></span>
+    <span class="layer-row-label">${layer.label}</span><span class="layer-row-count" data-count="${layer.id}"></span>
+    <span class="quick-layer-state" aria-hidden="true"></span></button>`;
   categories.innerHTML = store.categories.map(category => `
     <details class="layer-category" data-category="${category.id}">
       <summary>${category.label}<span class="layer-category-count"></span></summary>
-      <div class="layer-category-items">${
-        store.layers.filter(layer => layer.category === category.id && !layer.members).map(layer => `
-          <button class="layer-row" type="button" data-layer="${layer.id}" aria-pressed="false">
-            <span class="layer-row-swatch" data-route="${layer.route ?? ''}"${layer.accent ? ` style="--road:${layer.accent}"` : ''}></span>
-            <span class="layer-row-label">${layer.label}</span>
-            <span class="layer-row-count" data-count="${layer.id}"></span>
-            <span class="quick-layer-state" aria-hidden="true"></span>
-          </button>`).join('')
-      }</div>
+      <div class="layer-category-items">${store.layers
+        .filter(layer => layer.category === category.id && !layer.parentId && (!layer.members || layer.categoryGroup))
+        .map(layer => layer.categoryGroup
+          ? `<details class="layer-subgroup" data-group="${layer.id}"><summary>${layer.label}<span class="layer-row-count" data-count="${layer.id}"></span></summary>
+              ${layerRow({ ...layer, label: 'All lighting' })}<div class="layer-subgroup-items">${layer.members.map(id => layerRow(store.get(id))).join('')}</div></details>`
+          : layerRow(layer)).join('')}</div>
     </details>`).join('');
 
   // Level 4: the complete existing hierarchy, moved wholesale rather than rebuilt.

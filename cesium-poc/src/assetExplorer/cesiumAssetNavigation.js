@@ -17,6 +17,21 @@
 import { BoundingSphere, Cartesian3, Cartographic, HeadingPitchRange, Math as CMath } from 'cesium';
 import { ASSET_CAMERA_PRESETS, SELECTION_FOCUS } from './assetTypes.js';
 
+/**
+ * Where the ground is, relative to the ellipsoid, when the scene cannot say. South Florida's geoid
+ * sits about 25 m below the ellipsoid (see bridgeCamera.js), and the corridor itself is a few metres
+ * above sea level, so every surface here is at roughly -25 m. Aiming at 0 m instead put the camera's
+ * target 25 m above a ground-clamped marker: at a 55 m close view that pushed the marker off the
+ * bottom of the screen.
+ *
+ * A constant rather than a scene sample on purpose: the close view is computed before the flight,
+ * when the destination's tiles are not loaded, and a sample then returned anything from +20 m to
+ * -193 m. The corridor is flat, so the constant is within a few metres everywhere on it.
+ */
+export const CORRIDOR_GROUND_HEIGHT_M = -25;
+/** Headroom above Cesium's minimum zoom distance for a close view, for trees and poles under it. */
+export const GROUND_CLEARANCE_MARGIN_M = 5;
+
 /** Fallback framing for a type with no preset — deliberately not a close-up. */
 export const DEFAULT_PRESET = Object.freeze({ rangeM: 220, pitchDeg: -30 });
 
@@ -52,13 +67,27 @@ export function cameraState(camera) {
 export function createAssetNavigation(viewer, { presets = ASSET_CAMERA_PRESETS, logger = console } = {}) {
   let saved = null;
 
+  /**
+   * Steepen a close view just enough that the camera stays GROUND_CLEARANCE_M above the ground.
+   * Cesium's collision detection will not let the camera sit closer than minimumZoomDistance to the
+   * surface under it; asked to, it lifts the camera after arriving, and the asset it was aimed at
+   * slides down the frame. A 46 m view at -22° put the camera 17 m up — lifted, and the camera
+   * marker ended below the screen.
+   */
+  function clearedPitch(pitchDeg, range) {
+    const clearance = (viewer.scene.screenSpaceCameraController.minimumZoomDistance ?? 0) + GROUND_CLEARANCE_MARGIN_M;
+    if (range <= clearance) return -90;
+    const steepest = -CMath.toDegrees(Math.asin(clearance / range));
+    return Math.min(pitchDeg, steepest);
+  }
+
   /** Ground-level sphere for a point asset; the asset's own extent when it has geometry. */
   function sphereFor(asset) {
     if (!asset?.coordinates) return null;
     const { longitude, latitude } = asset.coordinates;
     const points = Array.isArray(asset.geometry?.positions) && asset.geometry.positions.length
       ? asset.geometry.positions
-      : [Cartesian3.fromDegrees(longitude, latitude, asset.geometry?.height ?? 0)];
+      : [Cartesian3.fromDegrees(longitude, latitude, asset.geometry?.height ?? CORRIDOR_GROUND_HEIGHT_M)];
     return BoundingSphere.fromPoints(points);
   }
 
@@ -71,7 +100,7 @@ export function createAssetNavigation(viewer, { presets = ASSET_CAMERA_PRESETS, 
       duration,
       offset: new HeadingPitchRange(
         CMath.toRadians(headingDeg ?? CMath.toDegrees(viewer.camera.heading)),
-        CMath.toRadians(pitchDeg),
+        CMath.toRadians(sphere.radius === 0 ? clearedPitch(pitchDeg, range) : pitchDeg),
         range),
     });
     return true;

@@ -12,6 +12,7 @@
  */
 
 import { SIGN_STRUCTURE_TYPES } from './signStructureData.js';
+import { LIGHTING_CATEGORIES } from './lightingData.js';
 
 /** @typedef {'on'|'off'|'partial'|'unavailable'} LayerState */
 
@@ -29,6 +30,8 @@ const SIGN_STRUCTURE_LAYERS = SIGN_STRUCTURE_TYPES.map(type => Object.freeze({
  * the owning module, and layers whose module exposes no count simply have none.
  */
 export const CORRIDOR_LAYERS = Object.freeze([
+  Object.freeze({ id: 'lighting', label: 'Lighting', category: 'infrastructure', icon: 'lighting', count: 'lighting', categoryGroup: true, members: LIGHTING_CATEGORIES.map(c => c.id) }),
+  ...LIGHTING_CATEGORIES.map(c => Object.freeze({ id: c.id, label: c.label, category: 'infrastructure', parentId: 'lighting', control: `#${c.id}-toggle`, count: c.id })),
   Object.freeze({ id: 'mainline-eb', label: 'I-595 Eastbound', short: 'Eastbound', category: 'roads', route: 'EB', control: '#i595_mainline_eb' }),
   Object.freeze({ id: 'mainline-wb', label: 'I-595 Westbound', short: 'Westbound', category: 'roads', route: 'WB', control: '#i595_mainline_wb' }),
   Object.freeze({ id: 'express', label: '595 Express', short: 'Express', category: 'roads', accent: '#ffba62', control: '#express-way' }),
@@ -59,7 +62,7 @@ export const CORRIDOR_LAYERS = Object.freeze([
  * The tools on the quick rail — the one-click surface. Mile markers are absent because the corridor
  * has no such layer.
  */
-export const RAIL_LAYER_IDS = Object.freeze(['traffic-flow', 'direction', 'incidents', 'closures', 'signals', 'cameras', 'message-signs', 'structures',
+export const RAIL_LAYER_IDS = Object.freeze(['traffic-flow', 'direction', 'incidents', 'closures', 'signals', 'cameras', 'lighting', 'message-signs', 'structures',
   ...SIGN_STRUCTURE_LAYERS.map(layer => layer.id), 'gantries', 'lane-barriers']);
 
 export const LAYER_CATEGORIES = Object.freeze([

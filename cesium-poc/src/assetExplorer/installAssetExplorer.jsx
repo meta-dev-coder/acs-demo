@@ -13,6 +13,8 @@ import { createAssetSelectionStore, SELECTION_SOURCES } from './assetSelectionSt
 import { createAssetNavigation } from './cesiumAssetNavigation.js';
 import { bindCartographic, connectAssetSources, createAssetSources, refreshAssets } from './assetSources.js';
 import { LAYER_TO_ASSET_TYPE, nextExplorerType } from './explorerRouting.js';
+import { assetTypeConfig } from './assetTypes.js';
+import { searchEntry } from './assetSearch.js';
 
 export { LAYER_TO_ASSET_TYPE, nextExplorerType };
 
@@ -24,6 +26,7 @@ export function installAssetExplorer(container, viewer, {
   corridorModels = null,
   cameras = null,
   messageSigns = null,
+  lighting = null,
   bridges = null,
   signals = null,
   liveEvents = null,
@@ -42,7 +45,7 @@ export function installAssetExplorer(container, viewer, {
       : null;
   });
 
-  const sources = createAssetSources({ corridorModels, cameras, bridges, signals, messageSigns, liveEvents, signStructures, centerline, modelConfigs });
+  const sources = createAssetSources({ corridorModels, cameras, bridges, signals, messageSigns, lighting, liveEvents, signStructures, centerline, modelConfigs });
   const navigation = createAssetNavigation(viewer, { logger });
   const disconnect = connectAssetSources(store, sources, { logger });
 
@@ -215,10 +218,97 @@ export function installAssetExplorer(container, viewer, {
   const unsubscribeLayers = layerStore ? layerStore.subscribe(syncLayers) : null;
   if (layerStore) syncLayers();
 
+  // ── Fly to an asset by name (Ask the Twin) ────────────────────────────────────────────────────
+  /**
+   * Every asset the app has loaded, as search entries — whether or not its layer is switched on.
+   * A layer that fails to read is skipped rather than failing the whole search.
+   */
+  function searchableAssets() {
+    const entries = [];
+    for (const source of sources) {
+      let assets = [];
+      try { assets = (source.readAll ?? source.read)(); } catch (error) { logger.warn?.(`[asset-explorer] ${source.assetType} not searchable`, error); }
+      const config = assetTypeConfig(source.assetType);
+      for (const asset of assets) {
+        if (!asset.coordinates) continue;
+        entries.push(searchEntry(asset, { label: `${config?.label ?? ''} ${config?.singular ?? ''}`, subtitle: config?.getSubtitle?.(asset) ?? null }));
+      }
+    }
+    return entries;
+  }
+
+  /** Resolves once `predicate(state)` holds, or null after `timeoutMs`. */
+  function waitForState(predicate, timeoutMs) {
+    return new Promise(resolve => {
+      const hit = predicate(store.getState());
+      if (hit) { resolve(hit); return; }
+      const timer = setTimeout(() => { unsubscribe(); resolve(null); }, timeoutMs);
+      const unsubscribe = store.subscribe(state => {
+        const found = predicate(state);
+        if (!found) return;
+        clearTimeout(timer); unsubscribe(); resolve(found);
+      });
+    });
+  }
+
+  /**
+   * Exactly what a user would do by hand: switch the asset's layer on (which opens its explorer and
+   * switches the other asset layers off), select it, then take the close "View on map" look — so
+   * the details panel, the highlight, the mini-map and Back all behave as they always do.
+   *
+   * @returns {Promise<object|null>} the asset flown to, or null if its layer never delivered it
+   */
+  async function flyToAsset(asset) {
+    const source = sources.find(candidate => candidate.assetType === asset.assetType);
+    const layerId = source?.layerFor?.(asset) ?? assetTypeConfig(asset.assetType)?.layerId;
+    if (!layerId || !layerStore) return null;
+    await layerStore.setVisible(layerId, true);
+    const live = await waitForState(state => (state.assetsByType[asset.assetType] ?? []).find(candidate => candidate.id === asset.id), 10000);
+    if (!live) { logger.warn?.(`[asset-explorer] ${asset.assetType} ${asset.id} did not appear after enabling ${layerId}`); return null; }
+    store.selectAsset(live, SELECTION_SOURCES.SEARCH);
+    inspect(live);
+    return live;
+  }
+
+  /**
+   * Fly to a place that is not an asset — the end of a road segment, or a whole segment — with the
+   * same saved-camera close view, so "Back" returns from it exactly as from an asset. The explorer's
+   * selection is left alone: nothing was selected.
+   *
+   * @param {{longitude: number, latitude: number, positions?: import('cesium').Cartesian3[]}} place
+   */
+  function flyToPlace({ longitude, latitude, positions = null }) {
+    clearNarrowScreenPanels();
+    const place = { assetType: 'place', id: 'place', coordinates: { longitude, latitude },
+      geometry: positions?.length ? { positions } : null };
+    return navigation.inspect(place, { alreadyInspecting: false });
+  }
+
+  /**
+   * Switch one asset type's layer on — its markers appear and its explorer opens, exactly as the
+   * rail button does — and hand back its assets in corridor order.
+   *
+   * @returns {Promise<object[]>} the type's assets; empty when it has none or its layer failed
+   */
+  async function showAssetType(assetType) {
+    const layerId = assetTypeConfig(assetType)?.layerId;
+    if (!layerId || !layerStore) return [];
+    await layerStore.setVisible(layerId, true);
+    // The explorer switches type before it reads the type's assets, so an empty list at that moment
+    // means "not read yet", not "none". Its status is only set once the read has happened.
+    const assets = await waitForState(state => (state.activeExplorerType === assetType && state.statusByType[assetType]
+      ? state.assetsByType[assetType] : null), 10000);
+    return assets ?? [];
+  }
+
   return {
     store,
     navigation,
     sources,
+    searchableAssets,
+    flyToAsset,
+    flyToPlace,
+    showAssetType,
     /** Re-read every layer's records, e.g. once an async layer has finished loading. */
     refresh: () => refreshAssets(store, sources, { logger }),
     /** Test/diagnostic hook. */

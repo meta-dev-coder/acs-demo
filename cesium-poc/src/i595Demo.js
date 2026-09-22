@@ -1,3 +1,5 @@
+import { installLighting } from './lighting.js';
+import { LIGHTING_CATEGORIES } from './lightingData.js';
 import { installMessageSigns } from './messageSigns.js';
 import { installI595Weather } from './i595Weather.js';
 import { installCctvCameras } from './cctvCameras.js';
@@ -201,6 +203,7 @@ try {
     if (!result.ok && result.message) status.textContent = result.message;
     return result;
   };
+  const lightingControls = installLighting(document.querySelector(".its-group"), viewer);
   const messageSignControls = installMessageSigns(document.querySelector(".its-group"), viewer);
   const cameraControls = installCctvCameras(document.querySelector(".its-group"), viewer, { onStreetView: streetViewEnabled ? openStreetView : undefined });
 
@@ -337,6 +340,8 @@ try {
       signals: () => signalControls.trafficSignalById.size,
       cameras: () => cameraControls.cameraById.size,
       messageSigns: () => messageSignControls.signById.size,
+      lighting: () => lightingControls.countFor("lighting"),
+      ...Object.fromEntries(LIGHTING_CATEGORIES.map(c => [c.id, () => lightingControls.countFor(c.id)])),
       // Each badge counts its own feed. Incidents used to count every live event, which was
       // consistent while the Incidents tool drove the whole Live Events group and wrong once it
       // became its own layer.
@@ -366,6 +371,7 @@ try {
     corridorModels: corridorModelLayers,
     cameras: cameraControls,
     messageSigns: messageSignControls,
+    lighting: lightingControls,
     bridges: bridgeControls,
     signals: signalControls,
     liveEvents: liveEventControls,
@@ -388,8 +394,8 @@ try {
   setExplorerCollapsed(true);
 
   // Operational strip: corridor facts and the live-event feed, with gaps stated rather than filled.
-  const askTwin = installAskTheTwin(viewer, { cameraControls });
-  if (import.meta.hot) import.meta.hot.dispose(() => { assetExplorer.destroy(); messageSignControls.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
+  const askTwin = installAskTheTwin(viewer, { cameraControls, assetExplorer, segments: mainlineSegments, layerStore, centerline: corridor });
+  if (import.meta.hot) import.meta.hot.dispose(() => { assetExplorer.destroy(); lightingControls.destroy(); messageSignControls.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
   for (const input of inputs) {
     // Layers with their own loader, plus display options that are not data layers at all: this loop
     // fetches `data/<id>.geojson`, and "flow-direction" has no such file — being swept up here

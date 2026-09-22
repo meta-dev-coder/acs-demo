@@ -148,7 +148,7 @@ export function AssetExplorer({ store, centerline, leftInset = 16, themeMode = '
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center', px: 1.5, py: 1 }}>
               <Typography variant="h6">{config.label}</Typography>
               <Chip
-                label={status.loading ? '…' : `${assets.length} ${assets.length === 1 ? 'asset' : 'assets'}`}
+                label={status.loading ? '…' : `${assets.length.toLocaleString('en-US')} ${assets.length === 1 ? 'asset' : 'assets'}`}
                 size="small" variant="outlined"
               />
               <Box sx={{ flex: 1 }} />

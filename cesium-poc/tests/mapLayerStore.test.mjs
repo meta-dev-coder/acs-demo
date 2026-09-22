@@ -1,3 +1,4 @@
+import { LIGHTING_CATEGORIES } from '../src/lightingData.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -97,7 +98,7 @@ test('layers whose module reports no count simply have none', () => {
   const counted = CORRIDOR_LAYERS.filter(layer => layer.count).map(layer => layer.id);
   // Sign-structure layers are generated from their registry, so they are expected by derivation
   // rather than by name — registering a new structure type must not need an edit here.
-  const expected = ['cameras', 'closures', 'gantries', 'incidents', 'lane-barriers', 'message-signs', 'signals', 'structures',
+  const expected = ['lighting', ...LIGHTING_CATEGORIES.map(c => c.id), 'cameras', 'closures', 'gantries', 'incidents', 'lane-barriers', 'message-signs', 'signals', 'structures',
     ...SIGN_STRUCTURE_TYPES.map(type => type.id)];
   assert.deepEqual(counted.sort(), expected.sort());
   // Ramps and frontage roads expose no count API, so the UI shows no number for them.

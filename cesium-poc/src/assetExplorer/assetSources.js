@@ -20,7 +20,7 @@ const layerLabel = layerId => MODEL_LAYERS.find(layer => layer.id === layerId)?.
  * @returns {{assetType: string, read: () => object[], highlight: (id: string|null) => void,
  *            listen: (report: (asset: object|null) => void) => void, own: (owned: boolean) => void}[]}
  */
-export function createAssetSources({ corridorModels, cameras, bridges, signals, messageSigns, liveEvents, signStructures, centerline, modelConfigs = [] }) {
+export function createAssetSources({ corridorModels, cameras, bridges, signals, messageSigns, lighting, liveEvents, signStructures, centerline, modelConfigs = [] }) {
   const distances = centerline?.length ? centerlineDistances(centerline) : null;
   const normalize = input => normalizeAsset(input, centerline, distances);
   const sources = [];
@@ -52,6 +52,37 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
       }),
       own: owned => corridorModels.setExternallyOwned(owned),
       silence: () => corridorModels.onSelection(null),
+    });
+  }
+
+  if (lighting) {
+    // ~2,900 records, re-read on every category toggle. Each is projected onto the centerline once
+    // and the same frozen object is reused, so a toggle is a filter and memoized cards stay memoized.
+    const normalized = new WeakMap();
+    const asAsset = record => {
+      let asset = normalized.get(record);
+      if (!asset) {
+        asset = normalize({
+          id: record.id, assetType: 'lighting', name: `Lighting ${record.id}`,
+          longitude: record.longitude, latitude: record.latitude,
+          source: { categoryId: record.categoryId, categoryLabel: record.categoryLabel, record: record.source },
+        });
+        normalized.set(record, asset);
+      }
+      return asset;
+    };
+    sources.push({
+      assetType: 'lighting', group: 'lighting',
+      read: () => {
+        if (lighting.error) throw lighting.error;
+        return lighting.visibleRecords().map(asAsset);
+      },
+      // Search looks through every category, not just the ones switched on…
+      readAll: () => lighting.allRecords().map(asAsset),
+      // …and switches on only the category the asset belongs to.
+      layerFor: asset => asset.source?.categoryId ?? 'lighting',
+      highlight: id => lighting.highlightById(id),
+      listen: report => lighting.onSelection(report), own: () => {}, silence: () => lighting.onSelection(null),
     });
   }
 

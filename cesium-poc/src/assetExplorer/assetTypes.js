@@ -16,6 +16,8 @@ export const ASSET_CAMERA_PRESETS = Object.freeze({
   gantry: Object.freeze({ rangeM: 78, pitchDeg: -16, useModelHeading: true }),
   // A camera is a small object on a pole: closer, and a little steeper to see what it overlooks.
   camera: Object.freeze({ rangeM: 46, pitchDeg: -22 }),
+  // A light is a pole-top fixture: close enough to pick out the pole, as for a camera.
+  lighting: Object.freeze({ rangeM: 55, pitchDeg: -24 }),
   // A bridge is an extended structure, so its span drives the distance rather than a fixed range.
   // The multiplier is generous on purpose: Cesium's default range just fits a sphere head-on, and
   // at a -28° pitch that leaves the far end of a long span off screen.
@@ -38,7 +40,70 @@ export function bridgeMilepost(properties) {
   return begin ?? end;
 }
 
+/**
+ * A lighting record's details. The DataConnect registry fills some columns for part of the lighting
+ * inventory and leaves others empty for all of it: the first kind always gets a row, with — where
+ * this record has no value, and the second kind only appears if a record ever carries it. Nothing is
+ * filled in that the record does not say.
+ */
+const LIGHTING_FIELDS = Object.freeze([
+  ['System class', 'System Class'], ['Location category', 'Location Category'],
+  ['Description', 'Asset Description'], ['Notes', 'Notes'],
+]);
+
+/**
+ * What a lighting record's `Segment` column actually holds. DataConnect uses the one column for
+ * different things depending on the inventory the record came from:
+ *   Roadway records — the corridor section:              "Central-West Segment"
+ *   ITS records     — pole code plus lighting zone:      "A-6 -21-Z2 - Zone Z2"
+ *   bridge lighting — the FDOT bridge number:            "860384"
+ *   the rest        — a pole or structure code:          "A1 5-Z6", "86S652"
+ * Showing all of them as "segment" put "Central-West Segment" and "Zone Z2" side by side for the
+ * same pole, as if they disagreed. Each is labelled for what it is; the value is the record's own
+ * text, never derived from the ID or the coordinates.
+ */
+export function lightingPlace(record) {
+  const segment = text(record?.Segment);
+  if (!segment) return null;
+  if (/^(West|Central-West|Central|East) Segment$/.test(segment)) return { label: 'Corridor section', value: segment, card: segment };
+  const zone = / - Zone (Z\d+)$/.exec(segment);
+  if (zone) return { label: 'Pole / zone', value: segment, card: `Lighting zone ${zone[1]}` };
+  if (/^\d{6}$/.test(segment)) return { label: 'Bridge', value: segment, card: `Bridge ${segment}` };
+  return { label: 'Pole / structure', value: segment, card: segment };
+}
+const LIGHTING_SPARSE_FIELDS = Object.freeze([
+  ['Parent asset', 'Parent Asset ID'], ['Segment ID', 'Segment ID'], ['Status', 'Status'],
+  ['Criticality', 'Criticality'], ['Install date', 'Instal Date'], ['Event date', 'Event Date (extracted)'],
+]);
+export function lightingDetails(record, asset) {
+  return [
+    ['Asset ID', asset.id],
+    ['Lighting type', text(record['Asset Category']) ?? '—'],
+    ['Latitude', asset.coordinates ? asset.coordinates.latitude.toFixed(6) : '—'],
+    ['Longitude', asset.coordinates ? asset.coordinates.longitude.toFixed(6) : '—'],
+    (place => (place ? [place.label, place.value] : ['Segment', '—']))(lightingPlace(record)),
+    ...LIGHTING_FIELDS.map(([label, field]) => [label, text(record[field]) ?? '—']),
+    ...LIGHTING_SPARSE_FIELDS.map(([label, field]) => [label, text(record[field])]),
+    ['Source', 'DataConnect asset registry'],
+  ];
+}
+
 export const ASSET_TYPES = Object.freeze({
+  lighting: Object.freeze({
+    id: 'lighting', label: 'Lighting', singular: 'Lighting asset', detailsTitle: 'Lighting Asset Details', icon: 'lighting', layerId: 'lighting',
+    emptyMessage: 'No lighting assets in the selected categories.', errorMessage: 'Unable to load lighting. Use Retry lighting in All layers.',
+    // The ID is the title because it is what the map marker shows; the two must read the same.
+    getTitle: asset => asset.id,
+    // DataConnect's own `Asset Category`, verbatim.
+    getSubtitle: asset => text(asset.source?.record?.['Asset Category']),
+    // The record's Segment column, labelled for what it holds in this record (see lightingPlace).
+    getCardStatus: asset => {
+      const place = lightingPlace(asset.source?.record);
+      return place ? { label: place.card, tone: 'muted' } : null;
+    },
+    getStatus: () => null,
+    details: asset => lightingDetails(asset.source?.record ?? {}, asset),
+  }),
   messageSign: Object.freeze({
     id: 'messageSign', label: 'Message Signs', singular: 'Message Sign', icon: 'messageSign',
     layerId: 'message-signs', legacyDetailsPanel: true,

@@ -121,6 +121,37 @@ export function assetIdMarker({ id, selected = false, stem = STEM }) {
   return marker;
 }
 
+/**
+ * Just the marker's location dot, with the same anchor: drawn at the bottom-anchored position the
+ * full marker's dot occupies, so promoting a dot to an ID marker grows the pill above the same
+ * point rather than shifting it. One shared texture, for layers too dense to label every asset.
+ *
+ * @returns {{image: HTMLCanvasElement, width: number, height: number}}
+ */
+export function assetDotMarker() {
+  const key = 'dot:normal';
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const colors = MARKER_COLORS.normal;
+  // The full marker's dot centre sits DOT_RADIUS + 2 above its bottom edge; so does this one's.
+  const size = DOT_RADIUS * 2 + 4;
+  const canvas = document.createElement('canvas');
+  canvas.width = size * SUPERSAMPLE;
+  canvas.height = size * SUPERSAMPLE;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(SUPERSAMPLE, SUPERSAMPLE);
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, DOT_RADIUS, 0, Math.PI * 2);
+  ctx.fillStyle = colors.dot;
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = colors.dotRing;
+  ctx.stroke();
+  const marker = Object.freeze({ image: canvas, width: size, height: size });
+  cache.set(key, marker);
+  return marker;
+}
+
 /** Test/diagnostic hook: how many textures have been drawn. */
 export const markerCacheSize = () => cache.size;
 export function clearMarkerCache() { cache.clear(); }
