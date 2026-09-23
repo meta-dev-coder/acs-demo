@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
-import { openExplorer, revealLayerGroup } from './i595Explorer.mjs';
+import { openExplorer, revealLayerGroup, openLayers } from './i595Explorer.mjs';
 import { RAIL_LAYER_IDS } from '../src/mapLayerStore.js';
 
 const signalCount = JSON.parse(readFileSync(new URL('../public/data/i595_corridor_traffic_signals.geojson', import.meta.url))).features.length;
@@ -47,6 +47,9 @@ try {
   };
 
   // ---- collapsed: the quick rail is the interface, and one click is enough ----------------------
+  // The Map Explorer now belongs to the left bar's Layers button, and opens on its rail.
+  assert.equal(await page.locator('.layers').isVisible(), false, 'it starts closed, behind Layers');
+  await openLayers(page);
   assert.equal(await page.locator('#layer-content').isHidden(), true, 'the panel starts closed');
   assert.equal(await page.locator('.quick-rail').isVisible(), true, 'the quick rail stays on screen');
   const railWidth = (await page.locator('.quick-rail').boundingBox()).width;

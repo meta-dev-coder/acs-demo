@@ -2,7 +2,19 @@
  * The Map explorer now opens collapsed, so a fresh load shows the map rather than the layer tree.
  * Tests that drive layer controls open it first, exactly as a user does.
  */
+/**
+ * The Map Explorer now belongs to the left bar's Layers button and starts closed, so anything that
+ * drives layer controls opens it first — exactly as a user does.
+ */
+export async function openLayers(page) {
+  const layers = page.locator('.app-nav [data-action="layers"]');
+  await layers.waitFor({ timeout: 60000 });
+  if (await layers.getAttribute('aria-pressed') === 'false') await layers.click();
+  await page.locator('.layers').waitFor({ state: 'visible', timeout: 10000 });
+}
+
 export async function openExplorer(page) {
+  await openLayers(page);
   const toggle = page.locator('#menu-toggle');
   await toggle.waitFor({ timeout: 60000 });
   if (await toggle.getAttribute('aria-expanded') === 'false') await toggle.click();

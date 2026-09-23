@@ -36,6 +36,9 @@
   --ui-accent-soft: #17383f;        /* tonal selected background */
   --ui-accent-contrast: #0b1729;    /* text on an accent fill */
 
+  /* The left navigation bar's width — everything anchored to the left edge clears it. */
+  --app-nav-w: 76px;
+
   /* Scrollbars */
   --ui-surface-translucent: #0b1729d9;   /* rail and floating bars, over the map */
   --ui-accent-tint: #67f4e229;           /* selected tint */
@@ -109,7 +112,7 @@ button, a, summary, label { -webkit-tap-highlight-color: transparent; }
 button { font: inherit; color: inherit; cursor: pointer; }
 small { font-size: 9px; letter-spacing: .18em; color: var(--ui-accent); }
 h1 { margin: 4px 0 0; font-size: 20px; letter-spacing: -.03em; }
-.layers { position: absolute; top: 16px; left: 16px; width: auto; max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); z-index: 30; }
+.layers { position: absolute; top: 16px; left: calc(var(--app-nav-w) + 16px); width: auto; max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); z-index: 30; }
 .mainline-parent { margin: 4px 0 4px 20px; }
 .mainline-parent > summary { display: grid; grid-template-columns: 10px 17px 18px minmax(0, 1fr) auto; align-items: center; gap: 7px; font-size: 12px; padding: 12px 6px; list-style: none; }
 .mainline-parent > summary::-webkit-details-marker { display: none; }
@@ -334,8 +337,8 @@ body .map-nav .map-nav-north { grid-column: auto; margin: 0; border: 0; border-l
 .map-nav button:active:not(:disabled) { background: var(--ui-accent-tint); color: var(--ui-accent); }
 
 /* Corridor status strip: bottom-left, clear of the Cesium credits and the camera toolbar. */
-.corridor-status { position: absolute; left: 16px; bottom: 48px; display: flex; align-items: stretch; max-width: min(620px, calc(100vw - 340px)); border: 1px solid var(--ui-border); border-radius: 12px; background: var(--ui-surface); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 12px 32px var(--ui-shadow-color); color: var(--ui-text); font-size: 12px; overflow: hidden; }
-body:has(.layers:not(.collapsed)) .corridor-status { left: 420px; }
+.corridor-status { position: absolute; left: calc(var(--app-nav-w) + 16px); bottom: 48px; display: flex; align-items: stretch; max-width: min(620px, calc(100vw - 340px)); border: 1px solid var(--ui-border); border-radius: 12px; background: var(--ui-surface); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 12px 32px var(--ui-shadow-color); color: var(--ui-text); font-size: 12px; overflow: hidden; }
+body:has(.layers:not(.collapsed)) .corridor-status { left: calc(var(--app-nav-w) + 420px); }
 /* `display: flex` above beats the hidden attribute on its own, so the strip needs this to be able
    to stand aside for the Asset Explorer. Same trap as .street-view and .ask-twin-panel. */
 .corridor-status[hidden] { display: none; }
@@ -672,7 +675,7 @@ body .map-nav, body:has(.twin-hud) .map-nav { top: 16px; bottom: auto; right: 16
   -webkit-backdrop-filter: none; grid-column: 1 / -1; }
 .map-nav .base-environment--bar label { height: 34px; }
 .map-nav .base-environment--bar .base-environment-status { display: none; }
-.base-environment--bar { position: absolute; top: 16px; left: 92px; z-index: 30;
+.base-environment--bar { position: absolute; top: 16px; left: calc(var(--app-nav-w) + 92px); z-index: 30;
   display: flex; align-items: center; gap: 8px; padding: 4px; border: 1px solid var(--ui-border);
   border-radius: 12px; background: var(--ui-surface-translucent); backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px); box-shadow: 0 12px 32px var(--ui-shadow-color); color: var(--ui-text); }
@@ -695,7 +698,7 @@ body .map-nav, body:has(.twin-hud) .map-nav { top: 16px; bottom: auto; right: 16
   color: var(--ui-text-secondary); max-width: 220px; }
 /* The clipping editor is a development tool that owns the same corner; the switch moves past it
    rather than sitting underneath. */
-body:has(.clip-editor) .base-environment--bar { left: 388px; }
+body:has(.clip-editor) .base-environment--bar { left: calc(var(--app-nav-w) + 388px); }
 @media (max-width: 900px) {
   /* Narrow screens keep the top corners for navigation; the switch drops its long labels. */
   .base-environment--bar { top: 10px; left: 76px; }
@@ -712,3 +715,33 @@ body:has(.clip-editor) .base-environment--bar { left: 388px; }
 .layer-subgroup > summary .layer-row-count { margin-left: auto; }
 .layer-subgroup-items { margin-left: 13px; padding-left: 5px; border-left: 1px solid var(--ui-border-soft); }
 .lighting-controls label { display: flex; gap: 8px; padding: 6px 0; }
+
+/* ==========================================================================================
+   Left navigation — the four workspaces, with Layers kept apart at the foot of the bar.
+   Colours come entirely from the theme tokens, so light and dark need nothing of their own.
+   ========================================================================================== */
+.app-nav { position: absolute; top: 0; left: 0; bottom: 0; z-index: 40; width: var(--app-nav-w);
+  display: flex; flex-direction: column; justify-content: space-between; gap: 8px; padding: 12px 8px;
+  background: var(--ui-surface-solid); border-right: 1px solid var(--ui-border-soft); box-shadow: var(--ui-shadow-soft); }
+.app-nav-sections, .app-nav-foot { display: flex; flex-direction: column; gap: 4px; }
+.app-nav-foot { border-top: 1px solid var(--ui-border-soft); padding-top: 10px; }
+.app-nav-item { display: flex; flex-direction: column; align-items: center; gap: 5px; width: 100%;
+  padding: 9px 2px; border: 0; border-radius: 12px; background: transparent; color: var(--ui-text-secondary);
+  font: inherit; font-size: 10px; letter-spacing: .01em; text-align: center; cursor: pointer;
+  transition: background .15s ease, color .15s ease; }
+.app-nav-item svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.app-nav-item:hover { background: var(--ui-hover); color: var(--ui-text); }
+.app-nav-item:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: -2px; }
+/* The chosen workspace and an open Layers panel read the same: tinted, accented, never colour alone. */
+.app-nav-item[aria-current="page"], .app-nav-item[aria-pressed="true"] { background: var(--ui-accent-tint); color: var(--ui-accent); }
+.app-nav-label { line-height: 1.2; }
+
+/* The Map Explorer belongs to the Layers button now, and waits until it is asked for. */
+body[data-layers-open="false"] .layers { display: none; }
+
+@media (max-width: 700px) {
+  :root { --app-nav-w: 56px; }
+  .app-nav { padding: 8px 6px; }
+  .app-nav-item { font-size: 0; gap: 0; padding: 10px 2px; }
+  .app-nav-item svg { width: 20px; height: 20px; }
+}

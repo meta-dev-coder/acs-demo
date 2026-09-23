@@ -41,7 +41,7 @@ export function installAssetExplorer(container, viewer, {
   bindCartographic(position => {
     const carto = Cartographic.fromCartesian(position);
     return carto
-      ? { longitude: CMath.toDegrees(carto.longitude), latitude: CMath.toDegrees(carto.latitude) }
+      ? { longitude: CMath.toDegrees(carto.longitude), latitude: CMath.toDegrees(carto.latitude), height: carto.height }
       : null;
   });
 
@@ -92,12 +92,15 @@ export function installAssetExplorer(container, viewer, {
   // §19: the overlays have to be aware of each other. The Map Explorer is an existing DOM panel
   // that expands and collapses, so its width is measured rather than assumed, and the island keeps
   // clear of it instead of sliding underneath.
-  const explorerPanel = document.querySelector('.map-explorer, #map-explorer, .explorer-panel');
+  const explorerPanel = document.querySelector('.layers, .map-explorer, #map-explorer, .explorer-panel');
+  // The left navigation bar is always there, so the island starts beside it rather than under it.
+  const navBar = document.querySelector('.app-nav');
   let leftInset = 16;
   function measureInsets() {
-    const rect = explorerPanel?.getBoundingClientRect();
+    const navWidth = navBar?.getBoundingClientRect().width ?? 0;
+    const rect = explorerPanel?.offsetParent === null ? null : explorerPanel?.getBoundingClientRect();
     const nextLeft = rect && rect.width > 0 && rect.right > 0 && !explorerPanel.classList.contains('collapsed')
-      ? Math.round(rect.right) + 16 : 16;
+      ? Math.round(rect.right) + 16 : Math.round(navWidth) + 16;
     if (nextLeft === leftInset) return;
     leftInset = nextLeft;
     render();
@@ -120,6 +123,9 @@ export function installAssetExplorer(container, viewer, {
   const panelObserver = explorerPanel
     ? new MutationObserver(() => measureInsets()) : null;
   panelObserver?.observe(explorerPanel, { attributes: true, attributeFilter: ['class', 'style'] });
+  // Layers opening or closing is written on <body>, and moves the panel in and out of the layout.
+  const bodyObserver = new MutationObserver(() => measureInsets());
+  bodyObserver.observe(document.body, { attributes: true, attributeFilter: ['data-layers-open'] });
   // Switching theme re-renders the island with the matching MUI theme — no reload.
   const unsubscribeTheme = themeMode?.subscribe?.(() => render()) ?? null;
   const onResize = () => measureInsets();
@@ -317,6 +323,7 @@ export function installAssetExplorer(container, viewer, {
     destroy() {
       unsubscribeTheme?.();
       panelObserver?.disconnect();
+      bodyObserver.disconnect();
       cancelAnimationFrame(settleMeasure);
       window.removeEventListener('resize', onResize);
       unsubscribeSelection();

@@ -8,6 +8,7 @@
  */
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
+import { openLayers } from './i595Explorer.mjs';
 
 const SAVED = [
   { id: 'saved-a', name: 'Saved A', photorealisticReplacement: { enabled: true,
@@ -33,6 +34,7 @@ try {
   });
   await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
   await page.waitForFunction(() => window.clip != null, null, { timeout: 120000 });
+  await openLayers(page);
   // Nothing can be clipped until the photorealistic tileset exists; refresh() reports when it does.
   await page.waitForFunction(() => window.clip.refresh() === true, null, { timeout: 120000 });
   // The app applies the configuration's own polygons once the base environment is up. Fixtures set

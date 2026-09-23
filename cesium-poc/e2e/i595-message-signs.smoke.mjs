@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
+import { openLayers } from './i595Explorer.mjs';
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 try {
@@ -27,6 +28,7 @@ try {
   });
   await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
   await page.locator('body[data-startup="ready"]').waitFor({ timeout: 90000 });
+  await openLayers(page);
   const toggle = page.locator('.quick-rail [data-layer="message-signs"]');
   await toggle.click();
   await page.getByRole('region', { name: 'Message Signs explorer', exact: true }).waitFor();

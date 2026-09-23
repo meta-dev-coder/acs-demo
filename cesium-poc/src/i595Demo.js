@@ -32,6 +32,7 @@ import { createStreetViewMode } from "./streetViewMode.js";
 import { createStreetViewPlacement } from "./streetViewPlacement.js";
 import { installMapExplorer } from "./mapExplorer.js";
 import { createThemeMode } from "./themeMode.js";
+import { installAppNav } from "./appNav.js";
 import { getTrafficColor } from "./corridorVisualConfig.js";
 import { installI595RoadShields } from "./i595RoadShields.js";
 import { installI595ContextLabels } from "./i595ContextLabels.js";
@@ -86,6 +87,13 @@ const setExplorerCollapsed = (collapsed) => {
   explorerToggle?.setAttribute("aria-label", collapsed ? "Open map explorer" : "Close map explorer");
   document.querySelector("#layer-content").hidden = collapsed;
 };
+
+// The left bar is part of the frame, so it is mounted before the map boots rather than after.
+// Layers starts closed: a fresh load opens on the map, and the Map Explorer is one click away.
+const appNav = installAppNav(document.body, {
+  layersOpen: false,
+  onToggleLayers: (open) => { if (open) setExplorerCollapsed(true); },
+});
 
 const status = document.querySelector("#layer-status");
 const inputs = [...document.querySelectorAll('input[type="checkbox"]')];
@@ -395,7 +403,7 @@ try {
 
   // Operational strip: corridor facts and the live-event feed, with gaps stated rather than filled.
   const askTwin = installAskTheTwin(viewer, { cameraControls, assetExplorer, segments: mainlineSegments, layerStore, centerline: corridor });
-  if (import.meta.hot) import.meta.hot.dispose(() => { assetExplorer.destroy(); lightingControls.destroy(); messageSignControls.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
+  if (import.meta.hot) import.meta.hot.dispose(() => { appNav.destroy(); assetExplorer.destroy(); lightingControls.destroy(); messageSignControls.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
   for (const input of inputs) {
     // Layers with their own loader, plus display options that are not data layers at all: this loop
     // fetches `data/<id>.geojson`, and "flow-direction" has no such file — being swept up here

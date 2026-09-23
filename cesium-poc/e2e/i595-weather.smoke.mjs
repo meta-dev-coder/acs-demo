@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
+import { openLayers } from './i595Explorer.mjs';
 import { HOURLY, DAILY, WEATHER_URL, validateForecast, localHour, direction, number } from '../src/i595WeatherData.js';
 const daily={time:[]},hourly={time:[]};for(const k of DAILY)daily[k]=[];for(const k of HOURLY)hourly[k]=[];
 // The forecast is only treated as cached while its first day is today, so the fixture has to start
@@ -21,6 +22,7 @@ try{
  await page.route('https://api.open-meteo.com/**',route=>{requests++;return fail?route.fulfill({status:503,body:'Unavailable'}):route.fulfill({json:fixture});});
  await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
  // The launcher is hidden in the map-focused view; the rail's weather tool is how it opens now.
+ await openLayers(page);
  await page.locator('.quick-rail [data-action="weather"]').click();
  await page.locator('.weather-days button').first().waitFor();
  assert.equal(await page.locator('.weather-days button').count(),8);assert.equal(await page.locator('.weather-wind article').count(),4);

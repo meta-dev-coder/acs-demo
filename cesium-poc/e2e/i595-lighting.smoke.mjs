@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
+import { openLayers } from './i595Explorer.mjs';
 
 const rows = JSON.parse(readFileSync(new URL('../public/dataconnect-data/asset_registry.json', import.meta.url)));
 const lightingRows = rows.filter(row => /^Lighting\b/.test(row['Asset Category']));
@@ -31,6 +32,7 @@ try {
   });
   await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
   await page.locator('body[data-startup="ready"]').waitFor({ timeout: 90000 });
+  await openLayers(page);
   // Only what happens from here on is attributed to lighting.
   const startupProblems = problems.splice(0);
 
@@ -180,7 +182,7 @@ try {
   const canvasBox = await page.locator('.cesium-widget canvas').boundingBox();
   // Scan the open part of the map for a pixel that picks an unselected lighting ID marker, exactly
   // as a user's click would find it.
-  const target = await page.evaluate(async ({ w, h }) => {
+  const targets = await page.evaluate(async ({ w, h }) => {
     const v = window.__lightingViewer, t = v.clock.currentTime;
     const selected = `lighting-${window.__assetExplorer.store.getState().selectedAsset.id}`;
     const rect = v.scene.canvas.getBoundingClientRect();
@@ -188,7 +190,8 @@ try {
     const candidates = [];
     // Bottom-up: nearer the camera first. Assets near the horizon move as the tiles under their
     // clamped position refine, so every candidate is re-picked a few frames later before use.
-    for (let y = h - 10; y > 10 && candidates.length < 12; y -= 8) for (let x = 10; x < w - 10; x += 8) {
+    // Clear of the bottom explorer and mini-map, which move as panels open.
+    for (let y = h - 330; y > 10 && candidates.length < 12; y -= 8) for (let x = 10; x < w - 10; x += 8) {
       // Only where the map itself is under the pointer, not a panel floating over it.
       if (document.elementFromPoint(rect.left + x, rect.top + y) !== v.scene.canvas) continue;
       const e = v.scene.pick({ x, y })?.id;
@@ -196,10 +199,24 @@ try {
       candidates.push({ id: e.id.slice('lighting-'.length), x, y, marker: Boolean(e.billboard && (e.billboard.show?.getValue(t) ?? true)) });
     }
     for (let i = 0; i < 10; i++) { v.scene.requestRender(); await new Promise(r => requestAnimationFrame(r)); }
-    return candidates.find(c => idAt(c.x, c.y) === `lighting-${c.id}`) ?? null;
+    return candidates.filter(c => idAt(c.x, c.y) === `lighting-${c.id}`
+      && document.elementFromPoint(rect.left + c.x, rect.top + c.y) === v.scene.canvas);
   }, { w: canvasBox.width, h: canvasBox.height });
-  assert.ok(target, 'an unobstructed lighting marker is on screen');
+  assert.ok(targets.length, 'an unobstructed lighting marker is on screen');
+  // The scene keeps loading tiles, so a marker can move between the scan and the click; take the
+  // first candidate that is still under the pointer when the click actually happens.
+  let target = null;
+  for (const candidate of targets) {
+    const stillThere = await page.evaluate(({ x, y }) => {
+      const v = window.__lightingViewer, rect = v.scene.canvas.getBoundingClientRect();
+      return document.elementFromPoint(rect.left + x, rect.top + y) === v.scene.canvas
+        && v.scene.pick({ x, y })?.id?.id?.startsWith('lighting-');
+    }, candidate);
+    if (stillThere) { target = candidate; break; }
+  }
+  assert.ok(target, 'a lighting marker is still under the pointer at click time');
   await page.mouse.click(canvasBox.x + target.x, canvasBox.y + target.y);
+  await page.waitForTimeout(300);
 
   await page.waitForTimeout(300);
   s = await state();
@@ -296,7 +313,9 @@ try {
 
   // 30–31. Nothing logged by React or Cesium during any of the above.
   // The willReadFrequently notice is this script's own getImageData colour sampling, not the app.
-  const lighting = problems.filter(p => !/willReadFrequently/.test(p));
+  // The willReadFrequently notice is this script's own getImageData colour sampling, not the app;
+  // network trouble reaching the live FL511 feed is the environment's.
+  const lighting = problems.filter(p => !/willReadFrequently|Failed to load resource|net::ERR|CORS policy|Failed to fetch|live-events/.test(p));
   assert.deepEqual(lighting, []);
   pass(30, 'no React warnings or errors'); pass(31, 'no Cesium errors');
   if (startupProblems.length) console.log(`  (startup, before any lighting interaction: ${startupProblems.length} console messages)`);

@@ -12,6 +12,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
+import { openLayers } from './i595Explorer.mjs';
 
 /**
  * Wait for a camera flight to finish: the pose must first differ from `from`, then stop changing.
@@ -78,6 +79,7 @@ try {
 
   await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
   await page.waitForFunction(() => window.models != null, null, { timeout: 60000 });
+  await openLayers(page);
 
   // ---- 2. the camera the user is looking through is untouched by model loading ------------------
   const before = await page.evaluate(() => {

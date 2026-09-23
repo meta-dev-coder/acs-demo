@@ -37,6 +37,10 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
         .map(config => normalize({
           id: config.id, assetType, name: config.name,
           longitude: config.longitude, latitude: config.latitude,
+          // A placed model sits at the height the scene sampled for it, which is what a close view
+          // should look at: the corridor's nominal ground is only the fallback for assets that are
+          // clamped rather than placed.
+          geometry: placedHeight(corridorModels, config.id),
           // The bearing to view this model from already has one definition in the app — the layer's
           // viewOffsetDeg, with a per-model viewHeading override. Reused rather than re-derived, so
           // the explorer frames a gantry exactly as the existing focus does.
@@ -232,6 +236,13 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
   }
 
   return sources;
+}
+
+/** Where a placed model actually stands, as geometry the camera can frame. */
+function placedHeight(corridorModels, id) {
+  const position = corridorModels?.entityById?.get(String(id))?.position?.getValue?.();
+  const height = position ? cartographicDegrees(position)?.height : null;
+  return Number.isFinite(height) ? { height } : null;
 }
 
 /** An entity's position in degrees, whatever geometry it was built from. */
