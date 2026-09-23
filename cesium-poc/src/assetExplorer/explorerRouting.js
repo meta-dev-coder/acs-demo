@@ -8,7 +8,11 @@ import { ASSET_TYPES } from './assetTypes.js';
 
 /** Map Explorer layer id -> asset type, for the layers this explorer can browse. */
 export const LAYER_TO_ASSET_TYPE = Object.freeze(
-  Object.fromEntries(Object.values(ASSET_TYPES).map(config => [config.layerId, config.id])));
+  Object.fromEntries(Object.values(ASSET_TYPES)
+    // A type with no layerId is not switched on from the Map Explorer — the Maintenance workspace
+    // owns what it loads and draws — so it takes no part in layer-driven routing.
+    .filter(config => config.layerId)
+    .map(config => [config.layerId, config.id])));
 
 /**
  * A layer the user just switched on wins, because that is the thing they were reaching for. With no

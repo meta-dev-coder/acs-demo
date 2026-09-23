@@ -38,6 +38,8 @@ export function createAssetSelectionStore() {
     statusByType: Object.freeze({}),
     selectedAsset: null,
     selectionSource: SELECTION_SOURCES.NONE,
+    /** What the explorer is showing of the active type: a search, and at most one named filter. */
+    filter: Object.freeze({ query: '', id: null }),
     explorerExpanded: true,
     detailsOpen: false,
     /** True while the camera is parked at an asset's close view, so Back can be offered. */
@@ -58,6 +60,14 @@ export function createAssetSelectionStore() {
   }
 
   const assetsOf = type => state.assetsByType[type] ?? EMPTY;
+
+  /**
+   * How a type's search and filters are applied. Registered by the installer, which is the layer
+   * that knows the asset registry; the store stays a plain state container.
+   */
+  let filterResolver = (type, assets) => assets;
+  /** The assets on screen: the active type's, narrowed by the search and filter. */
+  const visibleAssets = () => filterResolver(state.activeExplorerType, assetsOf(state.activeExplorerType), state.filter);
 
   return {
     getState: () => state,
@@ -96,6 +106,7 @@ export function createAssetSelectionStore() {
       const keepSelection = state.selectedAsset?.assetType === assetType;
       set({
         activeExplorerType: assetType,
+        filter: Object.freeze({ query: '', id: null }),
         explorerExpanded: assetType ? state.explorerExpanded : true,
         ...(keepSelection ? {} : { selectedAsset: null, detailsOpen: false, inspectionViewActive: false }),
       });
@@ -122,9 +133,27 @@ export function createAssetSelectionStore() {
       return asset;
     },
 
-    /** Step through the active list. Returns the newly selected asset, or null at the ends. */
+    setFilterResolver(resolver) { filterResolver = resolver ?? ((type, assets) => assets); },
+    filteredAssets: visibleAssets,
+
+    /**
+     * Narrow what is shown. A selection the filter removes is dropped rather than left highlighted
+     * on a card nobody can see — the same rule a hidden layer follows.
+     */
+    setFilter(changes) {
+      const filter = Object.freeze({ ...state.filter, ...changes });
+      if (filter.query === state.filter.query && filter.id === state.filter.id) return;
+      set({ filter });
+      const selected = state.selectedAsset;
+      if (selected && selected.assetType === state.activeExplorerType
+        && !visibleAssets().some(asset => asset.id === selected.id)) {
+        set({ selectedAsset: null, detailsOpen: false, inspectionViewActive: false });
+      }
+    },
+
+    /** Step through what is on screen. Returns the newly selected asset, or null at the ends. */
     step(delta) {
-      const assets = assetsOf(state.activeExplorerType);
+      const assets = visibleAssets();
       if (!assets.length) return null;
       const at = state.selectedAsset ? assets.findIndex(asset => asset.id === state.selectedAsset.id) : -1;
       // No selection yet: Next opens the list at its start rather than doing nothing.

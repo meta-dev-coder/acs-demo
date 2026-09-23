@@ -15,7 +15,7 @@ import { assetTypeConfig, detailRows } from './assetTypes.js';
 
 export const DETAILS_WIDTH = 310;
 
-export function AssetDetailsPanel({ asset, inspecting, onClose, onInspect, onReturn, onViewCamera, top = 220, bottom = 16 }) {
+export function AssetDetailsPanel({ asset, inspecting, onClose, onInspect, onReturn, onViewCamera, top = 220, bottom = 16, right = 16 }) {
   if (!asset) return null;
   const config = assetTypeConfig(asset.assetType);
   const status = config?.getStatus(asset) ?? null;
@@ -31,7 +31,7 @@ export function AssetDetailsPanel({ asset, inspecting, onClose, onInspect, onRet
       sx={{
         // Matches the existing corridor details panels (.camera-details and friends): same column,
         // same width, same padding and radius, so the two kinds of panel are visibly one family.
-        position: 'absolute', right: 16, top, width: DETAILS_WIDTH,
+        position: 'absolute', right, top, width: DETAILS_WIDTH,
         maxHeight: `calc(100% - ${top + bottom}px)`,
         p: 2.25, borderRadius: 2, overflowY: 'auto',
         display: 'flex', flexDirection: 'column', gap: 1.5, pointerEvents: 'auto',

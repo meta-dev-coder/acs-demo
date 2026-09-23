@@ -27,6 +27,7 @@ export function installAssetExplorer(container, viewer, {
   cameras = null,
   messageSigns = null,
   lighting = null,
+  maintenance = null,
   bridges = null,
   signals = null,
   liveEvents = null,
@@ -45,7 +46,25 @@ export function installAssetExplorer(container, viewer, {
       : null;
   });
 
-  const sources = createAssetSources({ corridorModels, cameras, bridges, signals, messageSigns, lighting, liveEvents, signStructures, centerline, modelConfigs });
+  // How a search and a filter chip narrow a type's assets. The rules come from the type registry,
+  // so a type without either simply shows everything.
+  store.setFilterResolver((assetType, assets, filter) => {
+    if (!assetType || (!filter?.query && !filter?.id)) return assets;
+    const config = assetTypeConfig(assetType);
+    let list = assets;
+    if (filter.id) {
+      const match = config?.getFilters?.(assets).find(entry => entry.id === filter.id)?.match;
+      if (match) list = list.filter(match);
+    }
+    const query = filter.query.trim().toLowerCase();
+    if (query) {
+      const searchText = config?.getSearchText ?? (asset => `${asset.id} ${asset.name}`.toLowerCase());
+      list = list.filter(asset => searchText(asset).includes(query));
+    }
+    return list;
+  });
+
+  const sources = createAssetSources({ corridorModels, cameras, bridges, signals, messageSigns, lighting, maintenance, liveEvents, signStructures, centerline, modelConfigs });
   const navigation = createAssetNavigation(viewer, { logger });
   const disconnect = connectAssetSources(store, sources, { logger });
 
@@ -93,10 +112,16 @@ export function installAssetExplorer(container, viewer, {
   // that expands and collapses, so its width is measured rather than assumed, and the island keeps
   // clear of it instead of sliding underneath.
   const explorerPanel = document.querySelector('.layers, .map-explorer, #map-explorer, .explorer-panel');
+  /** The Maintenance list shares the right-hand column, so the details panel moves left of it. */
+  const rightPanel = () => document.querySelector('.mx-list:not([hidden])');
   // The left navigation bar is always there, so the island starts beside it rather than under it.
   const navBar = document.querySelector('.app-nav');
   let leftInset = 16;
+  let rightInset = 16;
   function measureInsets() {
+    const right = rightPanel()?.getBoundingClientRect();
+    const nextRight = right && right.width > 0 ? Math.round(window.innerWidth - right.left) + 16 : 16;
+    if (nextRight !== rightInset) { rightInset = nextRight; render(); }
     const navWidth = navBar?.getBoundingClientRect().width ?? 0;
     const rect = explorerPanel?.offsetParent === null ? null : explorerPanel?.getBoundingClientRect();
     const nextLeft = rect && rect.width > 0 && rect.right > 0 && !explorerPanel.classList.contains('collapsed')
@@ -113,6 +138,7 @@ export function installAssetExplorer(container, viewer, {
         centerline={centerline}
         leftInset={leftInset}
         themeMode={themeMode?.mode ?? 'dark'}
+        rightInset={rightInset}
         onInspect={inspect}
         onReturn={returnFromInspection}
         onViewCamera={onViewCamera}
@@ -126,6 +152,9 @@ export function installAssetExplorer(container, viewer, {
   // Layers opening or closing is written on <body>, and moves the panel in and out of the layout.
   const bodyObserver = new MutationObserver(() => measureInsets());
   bodyObserver.observe(document.body, { attributes: true, attributeFilter: ['data-layers-open'] });
+  // The Maintenance list opens and closes inside the body, not by a class on it.
+  const rightObserver = new MutationObserver(() => measureInsets());
+  rightObserver.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['hidden', 'style'] });
   // Switching theme re-renders the island with the matching MUI theme — no reload.
   const unsubscribeTheme = themeMode?.subscribe?.(() => render()) ?? null;
   const onResize = () => measureInsets();
@@ -192,7 +221,16 @@ export function installAssetExplorer(container, viewer, {
     const visibleTypes = Object.entries(LAYER_TO_ASSET_TYPE)
       .filter(([layerId]) => VISIBLE_STATES.has(layerStore.stateOf(layerId)))
       .map(([, assetType]) => assetType);
-    const next = nextExplorerType(visibleTypes, previousTypes, store.getState().activeExplorerType);
+    const current = store.getState().activeExplorerType;
+    // A type with no map layer belongs to a workspace (Maintenance), not to the Map Explorer. With
+    // no asset layer on, "nothing is visible" says nothing about it — closing the explorer here
+    // would drop the workspace's own selection every time a layer count changed.
+    if (current && !assetTypeConfig(current)?.layerId && !visibleTypes.length) {
+      store.setVisibleAssetLayers(visibleTypes);
+      previousTypes = visibleTypes;
+      return;
+    }
+    const next = nextExplorerType(visibleTypes, previousTypes, current);
 
     const strays = Object.entries(LAYER_TO_ASSET_TYPE)
       .filter(([layerId, assetType]) => assetType !== next && VISIBLE_STATES.has(layerStore.stateOf(layerId)));
@@ -324,6 +362,7 @@ export function installAssetExplorer(container, viewer, {
       unsubscribeTheme?.();
       panelObserver?.disconnect();
       bodyObserver.disconnect();
+      rightObserver.disconnect();
       cancelAnimationFrame(settleMeasure);
       window.removeEventListener('resize', onResize);
       unsubscribeSelection();

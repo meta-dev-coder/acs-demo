@@ -8,9 +8,10 @@
  * when it is open, so nothing is ever parked underneath it.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Box, Chip, IconButton, Paper, Stack, ThemeProvider, Tooltip, Typography, useMediaQuery } from '@mui/material';
+import { Box, Chip, IconButton, InputBase, Paper, Stack, ThemeProvider, Tooltip, Typography, useMediaQuery } from '@mui/material';
 import CssBaseline from '@mui/material/CssBaseline';
 import CloseIcon from '@mui/icons-material/Close';
+import SearchIcon from '@mui/icons-material/SearchOutlined';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { createAppTheme } from './theme.js';
@@ -30,7 +31,7 @@ export const EXPLORER_MAX_WIDTH = 720;
 /** Sits close to the bottom edge now that no status strip runs beneath it. */
 export const BOTTOM_OFFSET = 20;
 
-export function AssetExplorer({ store, centerline, leftInset = 16, themeMode = 'dark', onInspect, onReturn, onViewCamera }) {
+export function AssetExplorer({ store, centerline, leftInset = 16, rightInset: detailsInset = 16, themeMode = 'dark', onInspect, onReturn, onViewCamera }) {
   const state = useAssetStore(store);
   // Rebuilt only when the mode actually changes; a new theme object on every render would remount
   // every styled node in the island.
@@ -40,7 +41,11 @@ export function AssetExplorer({ store, centerline, leftInset = 16, themeMode = '
   const compact = useMediaQuery('(max-width:820px)');
 
   const config = activeExplorerType ? assetTypeConfig(activeExplorerType) : null;
-  const assets = state.assetsByType[activeExplorerType] ?? [];
+  const all = state.assetsByType[activeExplorerType] ?? [];
+  // Search and filters live on the browser itself, so the cards, the rail, the mini-map, Next and
+  // the map are all looking at the same narrowed set.
+  const assets = store.filteredAssets();
+  const filters = useMemo(() => config?.getFilters?.(all) ?? [], [config, all]);
   const status = state.statusByType[activeExplorerType] ?? { loading: false, error: null };
   const corridorMiles = useMemo(() => corridorLengthMiles(centerline), [centerline]);
 
@@ -69,6 +74,8 @@ export function AssetExplorer({ store, centerline, leftInset = 16, themeMode = '
   const selectFromMiniMap = useCallback(asset => select(asset, SELECTION_SOURCES.MINIMAP), [select]);
   const selectFromRail = useCallback(asset => select(asset, SELECTION_SOURCES.RAIL), [select]);
   const step = useCallback(delta => { store.step(delta); }, [store]);
+  const setQuery = useCallback(event => { store.setFilter({ query: event.target.value }); }, [store]);
+  const toggleFilter = useCallback(id => { store.setFilter({ id: store.getState().filter.id === id ? null : id }); }, [store]);
 
   if (!config) return null;
 
@@ -81,7 +88,7 @@ export function AssetExplorer({ store, centerline, leftInset = 16, themeMode = '
   // only thing that reaches toward the details panel is the browser's own right edge, and a centred
   // browser of EXPLORER_MAX_WIDTH stops well short of it. The panel's width is still subtracted
   // when the Map Explorer is also open, which is the one case where the two could otherwise meet.
-  const rightInset = detailsShowing && !compact && leftInset > 16 ? DETAILS_WIDTH + 32 : 16;
+  const rightInset = Math.max(detailsInset, detailsShowing && !compact && leftInset > 16 ? DETAILS_WIDTH + 32 : 16);
 
   return (
     <ThemeProvider theme={theme}>
@@ -91,6 +98,7 @@ export function AssetExplorer({ store, centerline, leftInset = 16, themeMode = '
       <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 12 }}>
         {detailsShowing && (
           <AssetDetailsPanel
+            right={detailsInset}
             asset={selectedAsset}
             inspecting={inspectionViewActive}
             onClose={() => store.setDetailsOpen(false)}
@@ -148,10 +156,25 @@ export function AssetExplorer({ store, centerline, leftInset = 16, themeMode = '
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center', px: 1.5, py: 1 }}>
               <Typography variant="h6">{config.label}</Typography>
               <Chip
-                label={status.loading ? '…' : `${assets.length.toLocaleString('en-US')} ${assets.length === 1 ? 'asset' : 'assets'}`}
+                label={status.loading ? '…'
+                  : assets.length === all.length ? `${all.length.toLocaleString('en-US')} ${all.length === 1 ? 'asset' : 'assets'}`
+                    : `${assets.length.toLocaleString('en-US')} of ${all.length.toLocaleString('en-US')}`}
                 size="small" variant="outlined"
               />
               <Box sx={{ flex: 1 }} />
+              {(all.length > 8 || state.filter.query) && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 1, py: 0.25, borderRadius: 1.5,
+                  border: 1, borderColor: 'divider', bgcolor: 'action.hover', minWidth: 0, width: compact ? 120 : 170 }}>
+                  <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                  <InputBase
+                    value={state.filter.query}
+                    onChange={setQuery}
+                    placeholder={`Search ${config.label.toLowerCase()}`}
+                    inputProps={{ 'aria-label': `Search ${config.label.toLowerCase()}` }}
+                    sx={{ fontSize: 12.5, flex: 1, minWidth: 0 }}
+                  />
+                </Box>
+              )}
               <Tooltip title={explorerExpanded ? 'Collapse' : 'Expand'}>
                 <IconButton
                   onClick={() => store.setExplorerExpanded(!explorerExpanded)}
@@ -167,6 +190,30 @@ export function AssetExplorer({ store, centerline, leftInset = 16, themeMode = '
                 </IconButton>
               </Tooltip>
             </Stack>
+            {explorerExpanded && filters.length > 0 && (
+              <Stack direction="row" spacing={0.75} sx={{ px: 1.5, pb: 0.5, flexWrap: 'wrap', rowGap: 0.75 }}>
+                {/* "All" is the state with no filter, named so it can be chosen rather than guessed at. */}
+                <Chip
+                  label="All"
+                  size="small"
+                  variant={state.filter.id === null ? 'filled' : 'outlined'}
+                  color={state.filter.id === null ? 'primary' : 'default'}
+                  onClick={() => store.setFilter({ id: null })}
+                  aria-pressed={state.filter.id === null}
+                />
+                {filters.map(filter => (
+                  <Chip
+                    key={filter.id}
+                    label={filter.label}
+                    size="small"
+                    variant={state.filter.id === filter.id ? 'filled' : 'outlined'}
+                    color={state.filter.id === filter.id ? 'primary' : 'default'}
+                    onClick={() => toggleFilter(filter.id)}
+                    aria-pressed={state.filter.id === filter.id}
+                  />
+                ))}
+              </Stack>
+            )}
             {explorerExpanded && (
               <>
                 <AssetCarousel

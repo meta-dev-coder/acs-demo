@@ -231,3 +231,17 @@ test('one control turning on several types opens the first by registry order', (
   // And it stays on Incidents even with nothing to show, rather than falling through to Closures.
   assert.equal(nextExplorerType(['incident', 'closure'], ['incident', 'closure'], 'incident'), 'incident');
 });
+
+test('live feed refresh updates explorer even when event count is unchanged', async () => {
+  const { connectAssetSources } = await import('../src/assetExplorer/assetSources.js');
+  const store = createAssetSelectionStore();
+  let changed, stopped = false, rows = [asset('old')];
+  const source = { assetType: 'gantry', read: () => rows, listen() {}, highlight() {}, own() {}, silence() {},
+    subscribeChanges(fn) { changed = fn; return () => { stopped = true; }; } };
+  const disconnect = connectAssetSources(store, [source]);
+  changed();
+  assert.equal(store.getState().assetsByType.gantry[0].id, 'old');
+  rows = [asset('replacement')]; changed();
+  assert.equal(store.getState().assetsByType.gantry[0].id, 'replacement');
+  disconnect(); assert.equal(stopped, true); store.destroy();
+});

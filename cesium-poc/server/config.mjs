@@ -19,13 +19,13 @@ export function loadConfig(env = process.env) {
     lang: env.FL511_LANG || 'en-US',
     // Identify ourselves honestly rather than imitating a browser.
     userAgent: env.FL511_USER_AGENT || 'i595-digital-twin/1.0 (live road-event viewer)',
-    refreshSeconds: number(env.FL511_REFRESH_SECONDS, 60),
+    refreshSeconds: 60,
     requestTimeoutMs: number(env.FL511_TIMEOUT_MS, 10_000),
     // One retry after a short pause; a failed poll falls back to cache rather than hammering FL511.
     retryAttempts: number(env.FL511_RETRY_ATTEMPTS, 2),
     retryDelayMs: number(env.FL511_RETRY_DELAY_MS, 750),
-    // Details change far more slowly than marker positions, and only corridor events are enriched.
-    detailTtlSeconds: number(env.FL511_DETAIL_TTL_SECONDS, 300),
+    // Refresh details on the same minute cadence; only corridor events are enriched.
+    detailTtlSeconds: 60,
     // Cached data older than this is served but labelled STALE.
     staleAfterSeconds: number(env.FL511_STALE_AFTER_SECONDS, 180),
     bufferMeters: number(env.I595_LIVE_EVENT_BUFFER_METERS, 250),

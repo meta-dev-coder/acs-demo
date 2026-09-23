@@ -18,8 +18,9 @@ import {
   liveEventStatusText, liveEventTooltip,
 } from './liveEventsData.js';
 
-export const LIVE_EVENTS_API = import.meta.env?.VITE_LIVE_EVENTS_API || '/api/i595/live-events';
-const REFRESH_MS = Number(import.meta.env?.VITE_LIVE_EVENTS_REFRESH_MS) || 60_000;
+// Vite mounts the API locally; a production override must not bypass it in development.
+export const LIVE_EVENTS_API = import.meta.env.DEV ? '/api/i595/live-events' : (import.meta.env.VITE_LIVE_EVENTS_API || '/api/i595/live-events');
+const REFRESH_MS = 60_000;
 
 // Same 4× rasterised pin as the CCTV and signal badges so the corridor markers read as one family.
 const pin = (accent, tint, glyph) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="176" height="208" viewBox="0 0 44 52">
@@ -227,17 +228,19 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
     applyVisibility();
   }
 
+  const updateListeners = new Set();
   async function load() {
     controller?.abort();
     controller = new AbortController();
     try {
-      const response = await fetchImpl(endpoint, { signal: controller.signal, headers: { accept: 'application/json' } });
+      const response = await fetchImpl(endpoint, { signal: controller.signal, cache: 'no-store', headers: { accept: 'application/json' } });
       const body = await response.json().catch(() => null);
       if (disposed) return;
       if (!body || !Array.isArray(body.events)) throw new Error(`Live events request failed: ${response.status}`);
       payload = body;
       receivedAt = Date.now();
       render(body.events);
+      for (const listener of updateListeners) listener();
       status.textContent = liveEventStatusText(body);
       // A stale or unavailable source is stated, never hidden behind an empty-looking layer.
       const notice = liveEventNotice(body);
@@ -308,6 +311,7 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
 
   return {
     ready, entityById, refresh: load,
+    onUpdate(fn) { updateListeners.add(fn); return () => updateListeners.delete(fn); },
     records,
     /** Select a live event by id — its own panel, provenance and framing, driven from the explorer. */
     selectById(id) {
@@ -326,7 +330,7 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
     get events() { return events; },
     get payload() { return payload; },
     destroy() {
-      disposed = true;
+      disposed = true; updateListeners.clear();
       if (timer) clearInterval(timer);
       controller?.abort();
       removeMove(); viewer.canvas.removeEventListener('mouseleave', leave);

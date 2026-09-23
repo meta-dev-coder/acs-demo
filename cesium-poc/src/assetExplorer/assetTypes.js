@@ -18,6 +18,12 @@ export const ASSET_CAMERA_PRESETS = Object.freeze({
   camera: Object.freeze({ rangeM: 46, pitchDeg: -22 }),
   // A light is a pole-top fixture: close enough to pick out the pole, as for a camera.
   lighting: Object.freeze({ rangeM: 55, pitchDeg: -24 }),
+  // Maintenance records are shown at the asset they belong to, framed like that asset.
+  workOrder: Object.freeze({ rangeM: 70, pitchDeg: -26 }),
+  ticket: Object.freeze({ rangeM: 70, pitchDeg: -26 }),
+  task: Object.freeze({ rangeM: 70, pitchDeg: -26 }),
+  incidentRecord: Object.freeze({ rangeM: 90, pitchDeg: -28 }),
+  inspection: Object.freeze({ rangeM: 70, pitchDeg: -26 }),
   // A bridge is an extended structure, so its span drives the distance rather than a fixed range.
   // The multiplier is generous on purpose: Cesium's default range just fits a sphere head-on, and
   // at a -28° pitch that leaves the far end of a long span off screen.
@@ -88,7 +94,134 @@ export function lightingDetails(record, asset) {
   ];
 }
 
+/**
+ * A maintenance record's details: what the record's own DataConnect class carries, in the order an
+ * operator reads it. detailRows() drops anything absent, and a record the map cannot place says so
+ * rather than pretending to a position.
+ */
+const MAINTENANCE_ROWS = Object.freeze({
+  WORK_ORDER: item => [
+    ['Status', item.status], ['Priority', item.priority], ['Work type', item.title],
+    ['Repair category', item.related?.repairCategory],
+    ['Opened', maintenanceDate(item.createdDate)], ['Closed', maintenanceDate(item.closedDate)],
+    ['Ticket', item.related?.ticketId], ['Task', item.related?.taskId],
+  ],
+  TICKET: item => [
+    ['Status', item.status], ['Priority', item.priority], ['Issue', item.title],
+    ['Category', item.related?.issueCategory], ['Reported by', item.related?.sourceSignal],
+    ['Opened', maintenanceDate(item.createdDate)],
+  ],
+  TASK: item => [
+    ['Status', item.status], ['Task type', item.title], ['Assigned team', item.related?.assignedTeam],
+    ['Ticket', item.related?.ticketId], ['Date', maintenanceDate(item.createdDate)],
+  ],
+  INCIDENT: item => [
+    ['Type', item.title], ['Date', maintenanceDate(item.createdDate)],
+    ['Injuries', item.related?.injuries], ['Fatalities', item.related?.fatalities == null ? null : String(item.related.fatalities)],
+    ['Lane closure', item.related?.laneClosure], ['Root cause', item.related?.rootCause],
+  ],
+  INSPECTION: item => [
+    ['Result', item.status], ['Risk rating', item.priority == null ? null : `${item.priority} of 5`],
+    ['Form', item.title], ['Inspection ref', item.related?.inspectionRef], ['Inspector', item.related?.inspector],
+    ['Recommended action', item.related?.recommendedAction], ['Risk reason', item.related?.riskReason],
+    ['Date', maintenanceDate(item.createdDate)],
+  ],
+});
+
+export function maintenanceDetails(item) {
+  if (!item) return [];
+  const place = item.locationSource === 'asset' ? `From asset ${item.assetId}`
+    : item.locationSource === 'record' ? 'From the record'
+      : 'Location unavailable';
+  return [
+    ...(MAINTENANCE_ROWS[item.type]?.(item) ?? []).map(([label, value]) => [label, text(value)]),
+    ['Asset', text(item.assetId)],
+    ['Asset type', text(item.assetType)],
+    ['System class', text(item.systemClass)],
+    ['Segment', text(item.segmentName)],
+    ['Description', text(item.description)],
+    ['Location', place],
+  ];
+}
+
+/** What a search in the explorer matches against — the record's own words, nothing derived. */
+export function maintenanceSearchText(asset) {
+  const item = asset?.source;
+  if (!item) return asset?.id ?? '';
+  return [item.id, item.title, item.status, item.priority, item.assetId, item.assetType, item.segmentName, item.description]
+    .filter(Boolean).join(' ').toLowerCase();
+}
+
+/**
+ * The filters a set of maintenance records actually supports. Offered only where the records have
+ * the field: a class with no priority gets no priority filter.
+ */
+export function maintenanceFilters(assets) {
+  const items = assets.map(asset => asset.source).filter(Boolean);
+  const has = predicate => items.some(predicate);
+  const isOpen = item => item.status && !/closed|completed|resolved/i.test(item.status);
+  return [
+    ...(has(isOpen) ? [{ id: 'open', label: 'Open', match: asset => isOpen(asset.source ?? {}) }] : []),
+    ...(has(item => item.priority === 'High') ? [{ id: 'high', label: 'High priority', match: asset => asset.source?.priority === 'High' }] : []),
+    ...(has(item => /fail/i.test(item.status ?? '')) ? [{ id: 'failed', label: 'Failed', match: asset => /fail/i.test(asset.source?.status ?? '') }] : []),
+    ...(has(item => !Number.isFinite(item.latitude)) ? [{ id: 'unplaced', label: 'No location', match: asset => !asset.coordinates }] : []),
+  ];
+}
+
+/** DataConnect writes "2024-04-16T00:00:00"; the time of day is always midnight, so it is dropped. */
+export function maintenanceDate(value) {
+  const string = text(value);
+  if (!string) return null;
+  const date = new Date(string);
+  return Number.isNaN(date.getTime()) ? string
+    : date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+/** One entry per maintenance class; everything else about them is identical. */
+const MAINTENANCE_TYPE = ({ id, label, singular, title = singular, icon, statusTone }) => Object.freeze({
+  id, label, singular, detailsTitle: `${title} Details`, icon,
+  // Not a map layer: the Maintenance workspace decides what is loaded and drawn.
+  layerId: null,
+  emptyMessage: `No ${label.toLowerCase()} found.`,
+  errorMessage: `Unable to load ${label.toLowerCase()} from DataConnect.`,
+  getTitle: asset => asset.id,
+  getSubtitle: asset => [text(asset.source?.assetType), text(asset.source?.title)].filter(Boolean).join(' · ') || null,
+  getCardStatus: asset => statusTone(asset.source ?? {}),
+  getStatus: () => null,
+  details: asset => maintenanceDetails(asset.source),
+  getSearchText: maintenanceSearchText,
+  getFilters: maintenanceFilters,
+});
+
+const workTone = item => {
+  const status = text(item.status);
+  if (!status) return null;
+  const tone = /awaiting|pending|assigned/i.test(status) ? 'warn' : /closed|completed/i.test(status) ? 'ok' : 'muted';
+  return { label: item.priority === 'High' ? `${status} · High priority` : status, tone };
+};
+
 export const ASSET_TYPES = Object.freeze({
+  workOrder: MAINTENANCE_TYPE({ id: 'workOrder', label: 'Work Orders', singular: 'Work order', title: 'Work Order', icon: 'workOrder', statusTone: workTone }),
+  ticket: MAINTENANCE_TYPE({ id: 'ticket', label: 'Tickets', singular: 'Ticket', icon: 'ticket', statusTone: workTone }),
+  task: MAINTENANCE_TYPE({ id: 'task', label: 'Tasks', singular: 'Task', icon: 'task', statusTone: workTone }),
+  incidentRecord: MAINTENANCE_TYPE({
+    id: 'incidentRecord', label: 'Incidents', singular: 'Incident', icon: 'incidentRecord',
+    // An incident has no status; what matters is whether it closed lanes or hurt anyone.
+    statusTone: item => {
+      const harm = /^y/i.test(item.related?.injuries ?? '') || Number(item.related?.fatalities) > 0;
+      const closure = /^y/i.test(item.related?.laneClosure ?? '');
+      return harm ? { label: 'Injuries reported', tone: 'warn' } : closure ? { label: 'Lane closure', tone: 'warn' } : null;
+    },
+  }),
+  inspection: MAINTENANCE_TYPE({
+    id: 'inspection', label: 'Inspections', singular: 'Inspection', icon: 'inspection',
+    statusTone: item => {
+      const status = text(item.status);
+      if (!status) return null;
+      const failed = /fail/i.test(status);
+      return { label: item.priority ? `${status} · risk ${item.priority}` : status, tone: failed ? 'warn' : 'ok' };
+    },
+  }),
   lighting: Object.freeze({
     id: 'lighting', label: 'Lighting', singular: 'Lighting asset', detailsTitle: 'Lighting Asset Details', icon: 'lighting', layerId: 'lighting',
     emptyMessage: 'No lighting assets in the selected categories.', errorMessage: 'Unable to load lighting. Use Retry lighting in All layers.',

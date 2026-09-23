@@ -158,3 +158,21 @@ test('a source that never answered is UNAVAILABLE, not empty-but-live', async ()
   assert.equal(payload.lastSuccessfulUpdate, null);
   assert.equal(payload.diagnostics.lastError, 'FL511 down');
 });
+
+test('Davie Road screenshot incident stays inside the I595 corridor filter', async () => {
+  const { loadI595Network } = await import('../server/i595Network.mjs');
+  const { fileURLToPath } = await import('node:url');
+  const network = await loadI595Network(fileURLToPath(new URL('../public/data/', import.meta.url)));
+  const { normalizeEvent } = await import('../server/liveEvents.mjs');
+  const event = normalizeEvent({ itemId: '868702', latitude: 26.093417, longitude: -80.226583 }, 'INCIDENT', network,
+    { bufferMeters: 250, segmentToleranceMeters: 120 });
+  assert.equal(event.nearestFacility, 'I595_WB');
+  assert.ok(event.distanceToI595NetworkM < 15);
+});
+
+test('live feed and detail refresh use the requested one-minute cadence', async () => {
+  const { loadConfig } = await import('../server/config.mjs');
+  const config = loadConfig({ FL511_REFRESH_SECONDS: '600', FL511_DETAIL_TTL_SECONDS: '300' });
+  assert.equal(config.refreshSeconds, 60);
+  assert.equal(config.detailTtlSeconds, 60);
+});

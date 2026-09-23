@@ -33,6 +33,9 @@ import { createStreetViewPlacement } from "./streetViewPlacement.js";
 import { installMapExplorer } from "./mapExplorer.js";
 import { createThemeMode } from "./themeMode.js";
 import { installAppNav } from "./appNav.js";
+import { installMaintenanceLayer } from "./maintenance/maintenanceLayer.js";
+import { installMaintenanceWorkspace } from "./maintenance/maintenanceWorkspace.js";
+import { installSafetyWorkspace } from "./safetyWorkspace.js";
 import { getTrafficColor } from "./corridorVisualConfig.js";
 import { installI595RoadShields } from "./i595RoadShields.js";
 import { installI595ContextLabels } from "./i595ContextLabels.js";
@@ -212,6 +215,9 @@ try {
     return result;
   };
   const lightingControls = installLighting(document.querySelector(".its-group"), viewer);
+  // Maintenance records are drawn by their own layer and browsed through the Asset Explorer, so the
+  // layer is created before the explorer adapts it into a source.
+  const maintenanceLayer = installMaintenanceLayer(viewer);
   const messageSignControls = installMessageSigns(document.querySelector(".its-group"), viewer);
   const cameraControls = installCctvCameras(document.querySelector(".its-group"), viewer, { onStreetView: streetViewEnabled ? openStreetView : undefined });
 
@@ -380,6 +386,7 @@ try {
     cameras: cameraControls,
     messageSigns: messageSignControls,
     lighting: lightingControls,
+    maintenance: maintenanceLayer,
     bridges: bridgeControls,
     signals: signalControls,
     liveEvents: liveEventControls,
@@ -394,7 +401,22 @@ try {
       ? asset => (asset?.coordinates ? openStreetView({ ...asset.coordinates, label: asset.name }) : undefined)
       : null,
   });
-  if (import.meta.env.DEV) window.__assetExplorer = assetExplorer;
+  if (import.meta.env.DEV) { window.__assetExplorer = assetExplorer; window.__viewer = viewer; }
+
+  const maintenance = installMaintenanceWorkspace(viewer, { assetExplorer, maintenanceLayer });
+  // Safety reads the FL511 feed the app already runs and drives the existing incident and closure
+  // layers; it owns no data and no layer of its own.
+  const safety = installSafetyWorkspace({ assetExplorer, liveEvents: liveEventControls, layerStore });
+  // Maintenance is a workspace over the same map: the KPI strip and its list appear, everything
+  // else — camera, layers, Ask the Twin — carries on untouched.
+  const workspaces = { maintenance, safety };
+  appNav.onSelect(section => {
+    for (const [name, workspace] of Object.entries(workspaces)) {
+      if (name === section) workspace.activate(); else workspace.deactivate();
+    }
+  });
+  workspaces[appNav.section]?.activate();
+  if (import.meta.env.DEV) { window.__maintenance = maintenance; window.__safety = safety; }
 
   explorerToggle = document.querySelector("#menu-toggle");
   // A fresh load opens on the map, not on the layer tree; the quick rail keeps the common
@@ -403,7 +425,7 @@ try {
 
   // Operational strip: corridor facts and the live-event feed, with gaps stated rather than filled.
   const askTwin = installAskTheTwin(viewer, { cameraControls, assetExplorer, segments: mainlineSegments, layerStore, centerline: corridor });
-  if (import.meta.hot) import.meta.hot.dispose(() => { appNav.destroy(); assetExplorer.destroy(); lightingControls.destroy(); messageSignControls.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
+  if (import.meta.hot) import.meta.hot.dispose(() => { safety.destroy(); maintenance.destroy(); maintenanceLayer.destroy(); appNav.destroy(); assetExplorer.destroy(); lightingControls.destroy(); messageSignControls.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
   for (const input of inputs) {
     // Layers with their own loader, plus display options that are not data layers at all: this loop
     // fetches `data/<id>.geojson`, and "flow-direction" has no such file — being swept up here

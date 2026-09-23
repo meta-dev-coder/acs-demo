@@ -62,6 +62,8 @@ export function installAppNav(host, {
   host.append(nav);
 
   const buttons = new Map([...nav.querySelectorAll('[data-section]')].map(button => [button.dataset.section, button]));
+  // The bar mounts before the map does, so listeners are added rather than passed in at install.
+  const listeners = new Set(onSelect ? [onSelect] : []);
   const layersButton = buttons.get('layers');
   let current = resolveSection(section, sections);
   let open = Boolean(layersOpen);
@@ -80,12 +82,14 @@ export function installAppNav(host, {
 
   function select(id, { notify = true } = {}) {
     const next = resolveSection(id, sections);
-    if (next === current) { if (notify) onSelect?.(next); return next; }
+    if (next === current) { if (notify) announce(next); return next; }
     current = next;
     render();
-    if (notify) onSelect?.(next);
+    if (notify) announce(next);
     return next;
   }
+
+  const announce = section => { for (const listener of [...listeners]) listener(section); };
 
   function setLayersOpen(next, { notify = true } = {}) {
     const wanted = Boolean(next);
@@ -107,6 +111,8 @@ export function installAppNav(host, {
     get layersOpen() { return open; },
     select,
     setLayersOpen,
+    /** Called whenever a workspace is chosen. Returns an unsubscribe. */
+    onSelect(listener) { listeners.add(listener); return () => listeners.delete(listener); },
     destroy() { nav.remove(); delete document.body.dataset.section; delete document.body.dataset.layersOpen; },
   };
 }

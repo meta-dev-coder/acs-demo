@@ -745,3 +745,33 @@ body[data-layers-open="false"] .layers { display: none; }
   .app-nav-item { font-size: 0; gap: 0; padding: 10px 2px; }
   .app-nav-item svg { width: 20px; height: 20px; }
 }
+
+/* ==========================================================================================
+   Workspace KPI strip — shared by Maintenance and Safety. Deliberately plain: the map is the
+   workspace, this is an instrument over it, and every colour is a theme token.
+   ========================================================================================== */
+.maintenance-workspace, .safety-workspace { position: absolute; inset: 0; pointer-events: none; z-index: 22; }
+.ws-kpis { position: absolute; top: 16px; left: calc(var(--app-nav-w) + 16px); display: flex; align-items: stretch; gap: 8px;
+  max-width: calc(100vw - var(--app-nav-w) - 560px); pointer-events: auto; }
+.ws-kpi { display: flex; flex-direction: column; gap: 2px; min-width: 122px; padding: 8px 12px 9px;
+  border: 1px solid var(--ui-border); border-radius: 10px; background: var(--ui-surface-translucent);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); color: var(--ui-text); font: inherit; text-align: left; cursor: pointer;
+  transition: border-color .15s ease, background .15s ease; }
+.ws-kpi:hover { border-color: var(--ui-border-strong); }
+.ws-kpi:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: -2px; }
+.ws-kpi[aria-pressed="true"] { border-color: var(--ui-border-strong); background: var(--ui-surface-solid);
+  box-shadow: inset 3px 0 0 var(--ui-accent-strong); }
+.ws-kpi[aria-pressed="true"] .ws-kpi-head { color: var(--ui-text); }
+.ws-kpi[data-browsable="false"] { cursor: default; }
+.ws-kpi-head { display: flex; align-items: center; gap: 6px; color: var(--ui-text-secondary); font-size: 11px; }
+.ws-kpi-head svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.ws-kpi-count { font-size: 21px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.ws-kpi-note { font-size: 10.5px; color: var(--ui-text-muted); }
+.ws-kpi[data-state="error"] .ws-kpi-count, .ws-kpi[data-state="unavailable"] .ws-kpi-count { color: var(--ui-text-muted); font-weight: 500; }
+.ws-source { align-self: center; margin-left: 4px; padding: 4px 8px; border-radius: 999px; background: var(--ui-surface-sunken);
+  color: var(--ui-text-muted); font-size: 10px; letter-spacing: .02em; white-space: nowrap; }
+.ws-source[data-live="true"] { color: var(--ui-accent); }
+
+@media (max-width: 1100px) {
+  .ws-kpis { max-width: calc(100vw - var(--app-nav-w) - 32px); overflow-x: auto; }
+}

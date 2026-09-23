@@ -76,6 +76,9 @@ export const handler = async (_event) => {
 
     // 1. Fetch live events from FL511 via the service layer
     const svc = await getService();
+    // Lambda timers do not run while an execution environment is frozen.
+    // Each scheduled invocation must explicitly fetch fresh upstream data.
+    await svc.refresh();
     const payload = await svc.getI595LiveEvents();
 
     // 2. Build new-state Map from payload — keyed by event.id (the stable sorted key)

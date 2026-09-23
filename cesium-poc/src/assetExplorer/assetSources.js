@@ -20,7 +20,7 @@ const layerLabel = layerId => MODEL_LAYERS.find(layer => layer.id === layerId)?.
  * @returns {{assetType: string, read: () => object[], highlight: (id: string|null) => void,
  *            listen: (report: (asset: object|null) => void) => void, own: (owned: boolean) => void}[]}
  */
-export function createAssetSources({ corridorModels, cameras, bridges, signals, messageSigns, lighting, liveEvents, signStructures, centerline, modelConfigs = [] }) {
+export function createAssetSources({ corridorModels, cameras, bridges, signals, messageSigns, lighting, maintenance, liveEvents, signStructures, centerline, modelConfigs = [] }) {
   const distances = centerline?.length ? centerlineDistances(centerline) : null;
   const normalize = input => normalizeAsset(input, centerline, distances);
   const sources = [];
@@ -87,6 +87,25 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
       layerFor: asset => asset.source?.categoryId ?? 'lighting',
       highlight: id => lighting.highlightById(id),
       listen: report => lighting.onSelection(report), own: () => {}, silence: () => lighting.onSelection(null),
+    });
+  }
+
+  // Maintenance records (work orders today; the other DataConnect classes take the same path).
+  // The workspace decides what is loaded; this only presents it as assets so the carousel, the
+  // details panel, the mini-map and Cesium share one selection with everything else on the map.
+  for (const assetType of maintenance ? ['workOrder', 'ticket', 'task', 'incidentRecord', 'inspection'] : []) {
+    sources.push({
+      assetType, group: 'maintenance',
+      read: () => maintenance.recordsFor(assetType).map(item => normalize({
+        id: item.id, assetType, name: item.id,
+        longitude: item.longitude, latitude: item.latitude,
+        source: item,
+      })),
+      highlight: id => maintenance.highlightById(id),
+      // One layer serves every maintenance type; a report for another type is not ours.
+      listen: report => maintenance.onSelection((type, id) => { if (type === assetType) report(id); }),
+      own: () => {},
+      silence: () => maintenance.onSelection(null),
     });
   }
 
@@ -190,6 +209,7 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
       assetType,
       usesLegacyPanel: true,
       group: 'liveEvents',
+      subscribeChanges: fn => liveEvents.onUpdate(fn),
       read: () => [...liveEvents.entityById.entries()]
         .map(([id, entity]) => [id, entity, liveEvents.records.get(entity)])
         .filter(([, , event]) => event?.type === eventType)
@@ -308,6 +328,8 @@ export function connectAssetSources(store, sources, { logger = console } = {}) {
     });
   }
 
+  const dataSubscriptions = sources.filter(source => source.subscribeChanges)
+    .map(source => source.subscribeChanges(() => refreshAssets(store, [source], { logger })));
   let lastSelectedId = null;
   const unsubscribe = store.subscribe(state => {
     const selected = state.selectedAsset;
@@ -334,6 +356,7 @@ export function connectAssetSources(store, sources, { logger = console } = {}) {
 
   return () => {
     unsubscribe();
+    for (const stop of dataSubscriptions) stop();
     for (const source of byType.values()) { source.own(false); source.silence(); }
   };
 }
