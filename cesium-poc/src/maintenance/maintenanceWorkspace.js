@@ -11,7 +11,7 @@
 import { SELECTION_SOURCES } from '../assetExplorer/assetSelectionStore.js';
 import { assetTypeConfig, maintenanceDate } from '../assetExplorer/assetTypes.js';
 import { installWorkspaceStrip } from '../workspaceStrip.js';
-import { getCuratedData, isLive, MissingClassError, sourceLabel, debugEnabled } from './dataConnectService.js';
+import { clearCache, DataConnectError, getCuratedData, isLive, MissingClassError, needsSignIn, signIn, sourceLabel, debugEnabled } from './dataConnectService.js';
 import { assetIndex, normalizeAll, resolveLocations, summarize } from './maintenanceRecords.js';
 
 /** The classes the strip shows, in order. `assetType` is set for the ones the map can browse. */
@@ -23,9 +23,8 @@ export const KPI_CARDS = Object.freeze([
   Object.freeze({ key: 'inspections', label: 'Inspections', icon: 'inspection', assetType: 'inspection' }),
 ]);
 
-/** URL slugs, so a view can be linked to and survive a refresh. */
+/** URL slugs, so the current view is readable in the address bar. It is never replayed on load. */
 export const TYPE_SLUGS = Object.freeze({ incidents: 'incidents', tickets: 'tickets', tasks: 'tasks', workOrders: 'work-orders', inspections: 'inspections' });
-export const keyFromSlug = slug => Object.keys(TYPE_SLUGS).find(key => TYPE_SLUGS[key] === slug) ?? null;
 
 
 /**
@@ -66,10 +65,14 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
         });
       }
     } catch (error) {
-      // A class the deployment does not carry is unavailable, not broken.
+      // A class the deployment does not carry is unavailable, not broken; a DataConnect failure
+      // says which failure it was. Nothing falls back to the export.
       const missing = error instanceof MissingClassError;
-      Object.assign(entry, { state: missing ? 'unavailable' : 'error', error });
-      console.warn(`[maintenance] ${key} ${missing ? 'unavailable' : 'failed'}`, error);
+      // A failure a sign-in would fix says so, because the card is also the button that fixes it.
+      const note = needsSignIn(error) ? `${error.note} — click to sign in`
+        : error instanceof DataConnectError ? error.note : null;
+      Object.assign(entry, { state: missing ? 'unavailable' : 'error', error, note });
+      console.warn(`[maintenance] ${key} ${missing ? 'unavailable' : 'failed'}:`, error?.message ?? error);
     }
     renderStrip();
     if (activeKey === key) applyRecords();
@@ -79,7 +82,7 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
   function renderStrip() {
     for (const card of KPI_CARDS) {
       const entry = datasets.get(card.key);
-      if (entry.state !== 'ready') { strip.set(card.key, { state: entry.state }); continue; }
+      if (entry.state !== 'ready') { strip.set(card.key, { state: entry.state, note: entry.note }); continue; }
       const unplaced = entry.records.length - entry.summary.located;
       strip.set(card.key, {
         state: 'ready',
@@ -142,7 +145,7 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
     writeUrl();
   }
 
-  // ── URL, so a view survives a refresh ───────────────────────────────────────────────────────
+  // ── URL: a readable record of the current view, never a source of one ───────────────────────
   function writeUrl() {
     if (!active) return;
     const url = new URL(window.location.href);
@@ -154,21 +157,53 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
     window.history.replaceState(null, '', url);
   }
 
-  function readUrl() {
-    const params = new URLSearchParams(window.location.search);
-    return { key: keyFromSlug(params.get('maintenance')), selected: params.get('selected') };
+  /** Drop any view left in the URL by a previous visit, so a refresh cannot reopen it. */
+  function clearUrl() {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('maintenance') && !url.searchParams.has('selected')) return;
+    url.searchParams.delete('maintenance');
+    url.searchParams.delete('selected');
+    window.history.replaceState(null, '', url);
   }
 
-  // Only what the page was OPENED with restores a view. Coming back to Maintenance later starts on
-  // the map with nothing chosen, rather than reopening whatever was last looked at.
-  const openedWith = readUrl();
-  let restored = false;
-
   function choose(key) {
+    const entry = datasets.get(key);
+    // While a sign-in is what the card is asking for, that is what clicking it does.
+    if (entry?.state === 'error' && needsSignIn(entry.error)) { void startSignIn(); return; }
     if (activeKey === key) { closeType(); return; }
     openType(key);
     writeUrl();
   }
+  /**
+   * Sign in, then reload every class that was blocked on it.
+   *
+   * The popup is opened here, synchronously inside the click, or the browser treats it as unsolicited.
+   */
+  let signingIn = false;
+  async function startSignIn() {
+    if (signingIn) return;
+    signingIn = true;
+    const popup = window.open('', 'dataconnect-signin', 'width=520,height=680');
+    for (const card of KPI_CARDS) {
+      if (datasets.get(card.key).state === 'error') strip.set(card.key, { state: 'error', note: 'Signing in…' });
+    }
+    try {
+      await signIn(popup);
+      // The cached rejections are what "failed" means to the service; drop them and ask again.
+      clearCache();
+      for (const card of KPI_CARDS) Object.assign(datasets.get(card.key), { state: 'loading', error: null, note: null });
+      renderStrip();
+      await Promise.all(KPI_CARDS.map(card => load(card.key)));
+    } catch (error) {
+      popup?.close();
+      for (const card of KPI_CARDS) {
+        const entry = datasets.get(card.key);
+        if (entry.state === 'error') entry.note = `${error?.message ?? 'Sign-in failed'} — click to retry`;
+      }
+      renderStrip();
+    } finally { signingIn = false; }
+  }
+
   const unsubscribe = store.subscribe(onStoreChange);
 
   return {
@@ -176,6 +211,34 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
     get activeKey() { return activeKey; },
     /** Diagnostics/tests: the normalized records for one class. */
     recordsOf: key => datasets.get(key)?.records ?? [],
+    /** Every loaded record of one asset type, whether or not that type is the one on screen. */
+    recordsForType: assetType => {
+      const card = KPI_CARDS.find(item => item.assetType === assetType);
+      return card ? datasets.get(card.key)?.records ?? [] : [];
+    },
+    /**
+     * Make one maintenance type the workspace's current view, loading it first if need be.
+     *
+     * This is what "fly to WO-900461" needs: a maintenance type is drawn only while its card is
+     * chosen, so searching across all five is useless unless the match can also be shown.
+     *
+     * @returns {Promise<boolean>} whether the type is now the one on screen
+     */
+    async reveal(assetType) {
+      const card = KPI_CARDS.find(item => item.assetType === assetType);
+      if (!card) return false;
+      const entry = datasets.get(card.key);
+      if (entry.state === 'loading') await load(card.key);
+      if (datasets.get(card.key).state !== 'ready') return false;
+      if (activeKey !== card.key) { openType(card.key); writeUrl(); }
+      return true;
+    },
+    /** Load every class without showing any of them, so a search can see records first. */
+    preload() {
+      return Promise.all(KPI_CARDS
+        .filter(card => datasets.get(card.key).state === 'loading')
+        .map(card => load(card.key)));
+    },
     activate() {
       if (active) return;
       active = true;
@@ -183,20 +246,10 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
       renderStrip();
       strip.measure();
       for (const card of KPI_CARDS) if (datasets.get(card.key).state === 'loading') void load(card.key);
-      const wanted = restored ? { key: null, selected: null } : openedWith;
-      restored = true;
-      if (wanted.key) {
-        openType(wanted.key);
-        if (wanted.selected) {
-          // The records may still be loading; take the selection when they arrive.
-          const take = () => {
-            const assetType = KPI_CARDS.find(card => card.key === wanted.key)?.assetType;
-            const asset = (store.getState().assetsByType[assetType] ?? []).find(candidate => candidate.id === wanted.selected);
-            if (asset) store.selectAsset(asset, SELECTION_SOURCES.SEARCH);
-          };
-          datasets.get(wanted.key).state === 'ready' ? take() : void Promise.resolve(load(wanted.key)).then(take);
-        }
-      }
+      // Maintenance always opens on the map: the KPI strip, nothing chosen, no browser. The current
+      // view is still written to the URL (below) so it can be read or shared, but it is never
+      // replayed on load — arriving here, refreshing, or coming back later all start the same way.
+      clearUrl();
     },
     deactivate() {
       if (!active) return;

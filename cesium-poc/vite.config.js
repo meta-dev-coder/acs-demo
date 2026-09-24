@@ -1,4 +1,10 @@
+import { loadServerEnv } from './server/loadEnv.mjs';
 import { createMessageSignsApi } from './server/messageSigns.mjs';
+import { createDataConnectApi } from './server/dataConnect.mjs';
+
+// Before any plugin reads process.env: Vite only exposes VITE_-prefixed variables, and the
+// server-side credentials are deliberately not prefixed, so nothing else would load them.
+loadServerEnv();
 import { defineConfig } from "vite";
 import cesium from "vite-plugin-cesium";
 import { createRequire } from "node:module";
@@ -31,6 +37,16 @@ const messageSignsApi = () => {
   };
 };
 
+// DataConnect, same-origin. The credentials and the token stay on this side: DC_* variables are
+// deliberately NOT VITE_-prefixed, so they are never compiled into the browser bundle.
+const dataConnectApi = () => {
+  const api = createDataConnectApi();
+  return { name: 'i595-dataconnect-api',
+    configureServer(server) { server.middlewares.use(api.middleware); },
+    configurePreviewServer(server) { server.middlewares.use(api.middleware); },
+  };
+};
+
 // CCTV snapshot proxy — pipes DIVAS JPEG bytes through same-origin to avoid CORS issues.
 const snapshotApi = () => {
   const api = createSnapshotApi();
@@ -53,7 +69,7 @@ export default defineConfig({
   // automatic runtime is enough for it — no fast-refresh plugin, so the rest of the app's plain
   // HMR is untouched.
   esbuild: { jsx: 'automatic' },
-  plugins: [cesium({ cesiumBuildRootPath, cesiumBuildPath: join(cesiumBuildRootPath, "Cesium") }), liveEventsApi(), snapshotApi(), messageSignsApi()],
+  plugins: [cesium({ cesiumBuildRootPath, cesiumBuildPath: join(cesiumBuildRootPath, "Cesium") }), liveEventsApi(), snapshotApi(), messageSignsApi(), dataConnectApi()],
   // Port 5188 (not the default 5180) keeps this NTTA worktree isolated from a sibling session's
   // dev server sharing localhost. Disable auto-open under headless e2e.
   server: { port: 5188, open: false, strictPort: true },

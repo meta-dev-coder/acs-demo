@@ -1,8 +1,9 @@
 /**
- * The Safety workspace: two live KPI cards over the map, each opening the bottom browser for the
- * layer that already draws it.
+ * The Safety workspace: the live incident card over the map, opening the bottom browser for the
+ * layer that already draws it. Closures and construction are restrictions on traffic and belong to
+ * the Traffic workspace — `e2e/traffic.smoke.mjs` covers those.
  *
- * The FL511 feed is live, so the corridor may genuinely hold no incidents or closures right now.
+ * The FL511 feed is live, so the corridor may genuinely hold no incidents right now.
  * Expectations are taken from what the app received, never written here, and the empty case is
  * checked as its own behaviour rather than skipped.
  */
@@ -22,10 +23,11 @@ try {
 
   // Each workspace has its own strip, so everything here is scoped to Safety's.
   const kpi = key => page.locator(`.safety-workspace .ws-kpi[data-kpi="${key}"]`);
-  // 1. Safety shows the two cards, counted from the live feed, and nothing is chosen on arrival.
+  // 1. Safety shows its cards, counted from the live feed, and nothing is chosen on arrival.
   await page.locator('.app-nav [data-section="safety"]').click();
   await page.locator('.safety-workspace .ws-kpis').waitFor();
-  assert.deepEqual(await page.locator('.safety-workspace .ws-kpi-label').allInnerTexts(), ['Active incidents', 'Lane closures']);
+  // Closures and construction are restrictions on traffic, and live on the Traffic workspace.
+  assert.deepEqual(await page.locator('.safety-workspace .ws-kpi-label').allInnerTexts(), ['Active incidents']);
   assert.equal(await page.locator('.safety-workspace .ws-kpi[aria-pressed="true"]').count(), 0, 'nothing chosen on arrival');
   assert.equal(await page.locator('[role="region"][aria-label$="explorer"]').count(), 0, 'and no browser until asked for');
 
@@ -33,15 +35,15 @@ try {
   // their own.
   const expected = await page.evaluate(() => {
     const read = key => Number(document.querySelector(`.safety-workspace .ws-kpi[data-kpi="${key}"] [data-count]`).textContent.replace(/,/g, ''));
-    return { incidents: read('incidents'), closures: read('closures'), installed: Boolean(window.__safety) };
+    return { incidents: read('incidents'), installed: Boolean(window.__safety) };
   });
   assert.ok(expected.installed, 'the workspace is installed');
   assert.match(await page.locator('.safety-workspace .ws-source').innerText(), /FL511/);
-  console.log(`✓ Safety: Active incidents ${expected.incidents}, Lane closures ${expected.closures}, source ${await page.locator('.safety-workspace .ws-source').innerText()}`);
+  console.log(`✓ Safety: Active incidents ${expected.incidents}, source ${await page.locator('.safety-workspace .ws-source').innerText()}`);
 
   // 2. Choosing a card switches its layer on and opens the bottom browser for it — or says the
   //    corridor has none, which is an answer rather than an error.
-  for (const [key, layerControl, label] of [['closures', '#live-events-closure', 'Closures'], ['incidents', '#live-events-incident', 'Incidents']]) {
+  for (const [key, layerControl, label] of [['incidents', '#live-events-incident', 'Incidents']]) {
     const count = Number((await kpi(key).locator('[data-count]').innerText()).replace(/,/g, ''));
     await kpi(key).click();
     await page.waitForTimeout(2500);
@@ -49,8 +51,7 @@ try {
     assert.equal(await page.locator(layerControl).isChecked(), true, `${label} layer switched on`);
     if (count > 0) {
       await page.getByRole('region', { name: `${label} explorer`, exact: true }).waitFor({ timeout: 30000 });
-      const inExplorer = await page.evaluate(type => window.__assetExplorer.store.getState().assetsByType[type]?.length ?? 0,
-        key === 'closures' ? 'closure' : 'incident');
+      const inExplorer = await page.evaluate(() => window.__assetExplorer.store.getState().assetsByType.incident?.length ?? 0);
       assert.equal(inExplorer, count, `${label}: the browser holds the same ${count} the card counts`);
       // Card → selection → map, the same interaction the other workspaces use.
       await page.getByRole('region', { name: `${label} explorer`, exact: true }).locator('.MuiCardActionArea-root').first().click();
@@ -70,12 +71,12 @@ try {
   }
 
   // 3. Leaving Safety puts back what it drew, and the map is never taken away.
-  await kpi('closures').click();
+  await kpi('incidents').click();
   await page.waitForTimeout(1500);
   await page.locator('.app-nav [data-section="overview"]').click();
   await page.waitForTimeout(1500);
   assert.equal(await page.locator('.safety-workspace .ws-kpis').isVisible(), false, 'the strip goes with the workspace');
-  assert.equal(await page.locator('#live-events-closure').isChecked(), false, 'and so does its layer');
+  assert.equal(await page.locator('#live-events-incident').isChecked(), false, 'and so does its layer');
   const controls = await page.evaluate(() => { const c = window.__viewer.scene.screenSpaceCameraController; return [c.enableRotate, c.enableTranslate, c.enableZoom, c.enableTilt]; });
   assert.ok(controls.every(Boolean), 'pan, zoom, rotate and tilt are never taken away');
 
@@ -107,8 +108,7 @@ try {
   await page.waitForFunction(() => document.querySelector('.safety-workspace .ws-kpi[data-kpi="incidents"] [data-count]')?.textContent === '2', null, { timeout: 60000 });
   assert.equal(await kpi('incidents').locator('[data-count]').innerText(), '2');
   assert.equal(await kpi('incidents').locator('[data-note]').innerText(), '1 major', 'the note counts what FL511 called major');
-  assert.equal(await kpi('closures').locator('[data-count]').innerText(), '1');
-  console.log('✓ with a live feed carrying events, the cards count them by type and note the severe ones');
+  console.log('✓ with a live feed carrying events, the card counts them by type and notes the severe ones');
 
   await kpi('incidents').click();
   await page.getByRole('region', { name: 'Incidents explorer', exact: true }).waitFor({ timeout: 30000 });

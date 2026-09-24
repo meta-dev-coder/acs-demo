@@ -93,3 +93,123 @@ test('asset activity joins on identifiers the records carry', () => {
   const related = relatedRecords(order, { tickets });
   assert.equal(related.ticket.id, order.related.ticketId);
 });
+
+test('a DataConnect record normalizes exactly as the same record from the export', () => {
+  const exportRow = read('work_orders').find(row => row['Work Order ID'] === 'WO-900551');
+  // The shape DataConnect returns: fields inside `attributes`, with the envelope around them.
+  const apiRecord = {
+    id: 'c0ffee', classId: 'class-work-orders', className: 'work_orders',
+    keyInSource: 'WO-900551', valid: true, attributes: { ...exportRow },
+  };
+  const fromExport = normalizeAll('workOrders', [exportRow])[0];
+  const fromApi = normalizeAll('workOrders', [apiRecord])[0];
+  for (const key of ['id', 'type', 'title', 'status', 'priority', 'assetId', 'assetType', 'systemClass',
+    'segmentName', 'createdDate', 'closedDate', 'description']) {
+    assert.equal(fromApi[key], fromExport[key], key);
+  }
+  assert.deepEqual(fromApi.related, fromExport.related);
+  // The whole DataConnect record is kept for debugging, envelope and all.
+  assert.equal(fromApi.raw.classId, 'class-work-orders');
+  assert.equal(fromApi.raw.keyInSource, 'WO-900551');
+});
+
+test('DataConnect spellings of the same field are the same field', () => {
+  const snake = { attributes: { work_order_id: 'WO-1', work_order_status: 'Open', priority: 'High',
+    asset_id: '11905', work_type: 'Field Restoration', related_ticket_id: 'TIC-1' } };
+  const camel = { attributes: { workOrderId: 'WO-2', workOrderStatus: 'Closed', priority: 'Low', assetId: '12029' } };
+  const [first, second] = normalizeAll('workOrders', [snake, camel]);
+  assert.deepEqual([first.id, first.status, first.priority, first.assetId, first.title, first.related.ticketId],
+    ['WO-1', 'Open', 'High', '11905', 'Field Restoration', 'TIC-1']);
+  assert.deepEqual([second.id, second.status, second.assetId], ['WO-2', 'Closed', '12029']);
+});
+
+test('a record identified only by keyInSource still counts', () => {
+  const record = normalizeAll('workOrders', [{ keyInSource: 'WO-ONLY', attributes: { 'Work Order Status': 'Open' } }])[0];
+  assert.equal(record.id, 'WO-ONLY');
+  assert.equal(record.status, 'Open');
+});
+
+test('an asset from DataConnect indexes and resolves a work order the same way', () => {
+  const apiAssets = [{ id: 'a1', keyInSource: '11905', attributes: { 'Asset ID': '11905', 'Asset Category': 'Access Gate',
+    'X Coordinates': -80.25, 'Y Coordinates': 26.1 } }];
+  const index = assetIndex(apiAssets);
+  assert.equal(index.get('11905').longitude, -80.25);
+  const [order] = resolveLocations(normalizeAll('workOrders', [{ attributes: { 'Work Order ID': 'WO-9', 'Asset ID': '11905' } }]), index);
+  assert.deepEqual([order.longitude, order.latitude, order.locationSource], [-80.25, 26.1, 'asset']);
+});
+
+test('a day-first date is read as written, not as a US month-first date', async () => {
+  const { maintenanceDate } = await import('../src/assetExplorer/assetTypes.js');
+  // The live classes write day-first. 04/11/2024 is 4 November; reading it as 11 April would be
+  // silently wrong and is exactly what `new Date` does.
+  assert.equal(maintenanceDate('04/11/2024'), 'Nov 4, 2024');
+  assert.equal(maintenanceDate('17/11/2024'), 'Nov 17, 2024');
+  assert.equal(maintenanceDate('23/01/2026'), 'Jan 23, 2026');
+  // The committed export's ISO spelling still works.
+  assert.equal(maintenanceDate('2024-04-16T00:00:00'), 'Apr 16, 2024');
+  // Neither format: left exactly as written rather than reinterpreted.
+  assert.equal(maintenanceDate('13/13/2024'), '13/13/2024');
+  assert.equal(maintenanceDate(''), null);
+});
+
+test('inspections keep every class: identity falls back to the code each sheet does carry', () => {
+  // The roadway and safety classes have no record_id — only the ITS sheet does.
+  const rows = [
+    { attributes: { record_id: 'ITSV3-1', inspection_form_family: 'ITS' }, keyInSource: 'ITSV3-1' },
+    { attributes: { code: 'INSP-100098', inspection_form_family: 'Roadway' }, keyInSource: 'INSP-100098' },
+    { attributes: { code: 'SAFE-000251', inspection_form_family: 'Safety' }, keyInSource: 'SAFE-000251' },
+  ];
+  const records = normalizeAll('inspections', rows);
+  assert.deepEqual(records.map(r => r.id), ['ITSV3-1', 'INSP-100098', 'SAFE-000251']);
+});
+
+test('a reference shared by two classes still yields two distinct map keys', () => {
+  // 115 roadway codes repeat in the ITS class; a repeated id would silently replace a marker.
+  const rows = [
+    { attributes: { code: 'INSP-100098', inspection_form_family: 'Roadway' }, keyInSource: 'INSP-100098' },
+    { attributes: { code: 'INSP-100098', inspection_form_family: 'ITS' }, keyInSource: 'INSP-100098' },
+    { attributes: { code: 'INSP-999', inspection_form_family: 'Roadway' }, keyInSource: 'INSP-999' },
+  ];
+  const records = normalizeAll('inspections', rows);
+  assert.equal(new Set(records.map(r => r.id)).size, 3, 'every record has its own key');
+  assert.deepEqual(records.map(r => r.sourceId), ['INSP-100098', 'INSP-100098', 'INSP-999'],
+    'the shared reference is preserved');
+  assert.equal(records[2].id, 'INSP-999', 'a record that does not clash is left untouched');
+});
+
+test('a calendar date does not shift with the machine timezone', async () => {
+  const { maintenanceDate } = await import('../src/assetExplorer/assetTypes.js');
+  // The export's ISO values carry no zone. Read as a local instant they slide a day either side of
+  // Greenwich, so the same record would show two different dates on two developers' machines.
+  for (const tz of ['UTC', 'Asia/Kolkata', 'Pacific/Kiritimati', 'America/Los_Angeles']) {
+    process.env.TZ = tz;
+    assert.equal(maintenanceDate('2024-04-16T00:00:00'), 'Apr 16, 2024', `ISO in ${tz}`);
+    assert.equal(maintenanceDate('04/11/2024'), 'Nov 4, 2024', `day-first in ${tz}`);
+  }
+});
+
+test('a class shipping x and y the wrong way round is read the only way that makes sense', async () => {
+  const { coordinateSwaps, resetCoordinateSwaps } = await import('../src/maintenance/maintenanceRecords.js');
+  resetCoordinateSwaps();
+  const inspection = (x, y) => normalizeAll('inspections', [{ attributes: { record_id: 'R', x_coordinates: x, y_coordinates: y } }])[0];
+
+  // The safety and ITS classes are correct and must be left alone.
+  const correct = inspection(-80.3295, 26.1177);
+  assert.deepEqual([correct.longitude, correct.latitude], [-80.3295, 26.1177]);
+  assert.equal(coordinateSwaps(), 0, 'a correct pair is not touched');
+
+  // The roadway class holds latitude in x. Read as written it is off Antarctica; only the swap is
+  // on the corridor, so only the swap can be what was meant.
+  const swapped = inspection(26.1177, -80.3295);
+  assert.deepEqual([swapped.longitude, swapped.latitude], [-80.3295, 26.1177]);
+  assert.equal(coordinateSwaps(), 1, 'and the correction is counted, not silent');
+
+  // Somewhere genuinely elsewhere is left exactly as written — this corrects a known column defect,
+  // it does not drag every far-away record onto the corridor.
+  const elsewhere = inspection(-0.1276, 51.5072);          // London
+  assert.deepEqual([elsewhere.longitude, elsewhere.latitude], [-0.1276, 51.5072]);
+  // A pair that reads sensibly both ways is never second-guessed.
+  const ambiguous = inspection(-80.2, 26.1);
+  assert.deepEqual([ambiguous.longitude, ambiguous.latitude], [-80.2, 26.1]);
+  assert.equal(coordinateSwaps(), 1, 'nothing else was swapped');
+});

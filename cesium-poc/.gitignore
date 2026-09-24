@@ -1,6 +1,9 @@
 node_modules/
 dist/
+# Local env files hold the DataConnect credentials (DC_USERNAME / DC_PASSWORD); never commit them.
 .env
+.env.local
+.env.*.local
 test-results/
 playwright-report/
 .playwright/
@@ -9,3 +12,7 @@ playwright-report/
 # toll-gantry and lane-barrier layers. Kept locally; config/cesiumModels.json still points at them,
 # so a clone without the files lists those layers and logs the URL it could not load.
 public/models/i595/*.glb
+
+# The rotated DataConnect refresh token (server-side credential).
+.dc-refresh-token
+.dc-access-token

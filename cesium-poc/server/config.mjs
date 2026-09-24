@@ -14,6 +14,7 @@ export function loadConfig(env = process.env) {
     incidentsPath: env.FL511_INCIDENTS_PATH || '/map/mapIcons/Incidents',
     messageSignsPath: env.FL511_MESSAGE_SIGNS_PATH || '/map/mapIcons/MessageSigns',
     closuresPath: env.FL511_CLOSURES_PATH || '/map/mapIcons/Closures',
+    constructionPath: env.FL511_CONSTRUCTION_PATH || '/map/mapIcons/Construction',
     // Declared by FL511's own map markup as data-tooltipbaseurl; {layerId}/{id}/{lang} are theirs.
     detailPath: env.FL511_DETAIL_PATH || '/tooltip/{layerId}/{id}?lang={lang}',
     lang: env.FL511_LANG || 'en-US',

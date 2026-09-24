@@ -35,7 +35,7 @@ import { createThemeMode } from "./themeMode.js";
 import { installAppNav } from "./appNav.js";
 import { installMaintenanceLayer } from "./maintenance/maintenanceLayer.js";
 import { installMaintenanceWorkspace } from "./maintenance/maintenanceWorkspace.js";
-import { installSafetyWorkspace } from "./safetyWorkspace.js";
+import { installSafetyWorkspace, installTrafficWorkspace } from "./safetyWorkspace.js";
 import { getTrafficColor } from "./corridorVisualConfig.js";
 import { installI595RoadShields } from "./i595RoadShields.js";
 import { installI595ContextLabels } from "./i595ContextLabels.js";
@@ -361,6 +361,7 @@ try {
       // became its own layer.
       incidents: () => liveEventControls.events.filter(event => event.type === LIVE_EVENT_TYPES.INCIDENT).length,
       closures: () => liveEventControls.events.filter(event => event.type === LIVE_EVENT_TYPES.CLOSURE).length,
+      construction: () => liveEventControls.events.filter(event => event.type === LIVE_EVENT_TYPES.CONSTRUCTION).length,
       structures: () => bridgeControls.bridgeById.size,
       // One entry per registered structure type, so a new type gets its badge for free.
       ...Object.fromEntries(SIGN_STRUCTURE_TYPES.map(type => [type.id, () => signStructureControls.countFor(type.id)])),
@@ -379,8 +380,17 @@ try {
 
   // Asset Explorer: one selection shared by the map, the bottom carousel, the mini-map and the
   // details panel. Layer visibility stays the Map Explorer's job — this only browses what is on.
+  // The maintenance workspace is built after the explorer (it needs it), but the explorer must be
+  // able to search and reveal maintenance records. Late-bound rather than reordered: the workspace
+  // genuinely depends on the explorer, so the cycle is resolved here instead of pretended away.
+  let maintenanceWorkspace = null;
   const assetExplorer = installAssetExplorer(document.body, viewer, {
     centerline: corridor,
+    maintenanceRecords: assetType => maintenanceWorkspace?.recordsForType(assetType) ?? [],
+    revealMaintenance: async assetType => {
+      appNav.select('maintenance');
+      return (await maintenanceWorkspace?.reveal(assetType)) ?? false;
+    },
     layerStore,
     corridorModels: corridorModelLayers,
     cameras: cameraControls,
@@ -404,19 +414,26 @@ try {
   if (import.meta.env.DEV) { window.__assetExplorer = assetExplorer; window.__viewer = viewer; }
 
   const maintenance = installMaintenanceWorkspace(viewer, { assetExplorer, maintenanceLayer });
-  // Safety reads the FL511 feed the app already runs and drives the existing incident and closure
-  // layers; it owns no data and no layer of its own.
-  const safety = installSafetyWorkspace({ assetExplorer, liveEvents: liveEventControls, layerStore });
+  maintenanceWorkspace = maintenance;
+  // Ask the Twin can be asked for a ticket before Maintenance has ever been opened, so the classes
+  // load in the background rather than only on arrival.
+  void maintenance.preload();
+  // Safety and Traffic both read the FL511 feed the app already runs and drive layers that already
+  // exist; neither owns data or a layer of its own. Safety is what is happening to the corridor,
+  // Traffic is the planned work restricting it.
+  const liveEventDeps = { assetExplorer, liveEvents: liveEventControls, layerStore };
+  const safety = installSafetyWorkspace(liveEventDeps);
+  const traffic = installTrafficWorkspace(liveEventDeps);
   // Maintenance is a workspace over the same map: the KPI strip and its list appear, everything
   // else — camera, layers, Ask the Twin — carries on untouched.
-  const workspaces = { maintenance, safety };
+  const workspaces = { maintenance, safety, traffic };
   appNav.onSelect(section => {
     for (const [name, workspace] of Object.entries(workspaces)) {
       if (name === section) workspace.activate(); else workspace.deactivate();
     }
   });
   workspaces[appNav.section]?.activate();
-  if (import.meta.env.DEV) { window.__maintenance = maintenance; window.__safety = safety; }
+  if (import.meta.env.DEV) { window.__maintenance = maintenance; window.__safety = safety; window.__traffic = traffic; }
 
   explorerToggle = document.querySelector("#menu-toggle");
   // A fresh load opens on the map, not on the layer tree; the quick rail keeps the common
@@ -425,7 +442,7 @@ try {
 
   // Operational strip: corridor facts and the live-event feed, with gaps stated rather than filled.
   const askTwin = installAskTheTwin(viewer, { cameraControls, assetExplorer, segments: mainlineSegments, layerStore, centerline: corridor });
-  if (import.meta.hot) import.meta.hot.dispose(() => { safety.destroy(); maintenance.destroy(); maintenanceLayer.destroy(); appNav.destroy(); assetExplorer.destroy(); lightingControls.destroy(); messageSignControls.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
+  if (import.meta.hot) import.meta.hot.dispose(() => { traffic.destroy(); safety.destroy(); maintenance.destroy(); maintenanceLayer.destroy(); appNav.destroy(); assetExplorer.destroy(); lightingControls.destroy(); messageSignControls.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
   for (const input of inputs) {
     // Layers with their own loader, plus display options that are not data layers at all: this loop
     // fetches `data/<id>.geojson`, and "flow-direction" has no such file — being swept up here

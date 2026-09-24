@@ -20,7 +20,8 @@ const layerLabel = layerId => MODEL_LAYERS.find(layer => layer.id === layerId)?.
  * @returns {{assetType: string, read: () => object[], highlight: (id: string|null) => void,
  *            listen: (report: (asset: object|null) => void) => void, own: (owned: boolean) => void}[]}
  */
-export function createAssetSources({ corridorModels, cameras, bridges, signals, messageSigns, lighting, maintenance, liveEvents, signStructures, centerline, modelConfigs = [] }) {
+export function createAssetSources({ corridorModels, cameras, bridges, signals, messageSigns, lighting, maintenance,
+  maintenanceRecords = null, revealMaintenance = null, liveEvents, signStructures, centerline, modelConfigs = [] }) {
   const distances = centerline?.length ? centerlineDistances(centerline) : null;
   const normalize = input => normalizeAsset(input, centerline, distances);
   const sources = [];
@@ -101,6 +102,16 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
         longitude: item.longitude, latitude: item.latitude,
         source: item,
       })),
+      // What is DRAWN is one maintenance type at a time, but what is SEARCHABLE is all of them:
+      // "fly to TIC-500464" must work without first opening the Tickets card. The workspace keeps
+      // every class it has loaded, so search reads from there rather than from the layer.
+      readAll: () => (maintenanceRecords?.(assetType) ?? maintenance.recordsFor(assetType)).map(item => normalize({
+        id: item.id, assetType, name: item.id,
+        longitude: item.longitude, latitude: item.latitude,
+        source: item,
+      })),
+      // These types have no layer of their own to switch on; the workspace shows them instead.
+      reveal: revealMaintenance ? () => revealMaintenance(assetType) : null,
       highlight: id => maintenance.highlightById(id),
       // One layer serves every maintenance type; a report for another type is not ours.
       listen: report => maintenance.onSelection((type, id) => { if (type === assetType) report(id); }),
@@ -202,9 +213,10 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
     });
   }
 
-  // Incidents and closures come from one feed but are separate layers and separate asset types.
+  // Incidents, closures and construction come from one feed but are separate layers and separate
+  // asset types, so each browses on its own.
   for (const [assetType, eventType] of liveEvents
-    ? [['incident', 'INCIDENT'], ['closure', 'CLOSURE']] : []) {
+    ? [['incident', 'INCIDENT'], ['closure', 'CLOSURE'], ['construction', 'CONSTRUCTION']] : []) {
     sources.push({
       assetType,
       usesLegacyPanel: true,

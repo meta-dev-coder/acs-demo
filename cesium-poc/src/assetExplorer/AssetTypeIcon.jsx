@@ -8,6 +8,7 @@ import ChecklistOutlinedIcon from '@mui/icons-material/ChecklistOutlined';
 import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined';
 import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
+import EngineeringOutlinedIcon from '@mui/icons-material/EngineeringOutlined';
 import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined';
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import HorizontalRuleOutlinedIcon from '@mui/icons-material/HorizontalRuleOutlined';
@@ -25,6 +26,7 @@ const ICONS = {
   bridge: HorizontalRuleOutlinedIcon,
   incident: WarningAmberOutlinedIcon,
   closure: BlockOutlinedIcon,
+  construction: EngineeringOutlinedIcon,
 };
 
 export function AssetTypeIcon({ assetType, ...props }) {

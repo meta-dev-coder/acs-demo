@@ -24,7 +24,9 @@ try {
   const networkNoise = /Failed to load resource|net::ERR|CORS policy|Failed to fetch|live-events|snapshot/;
   page.on('pageerror', e => problems.push(`pageerror: ${e.message}`));
   page.on('console', m => { if (m.type() === 'error' && !networkNoise.test(m.text())) problems.push(`console: ${m.text()}`); });
-  await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off&debug=1');
+  // `data=mock` is explicit: this suite checks the committed export against its own expected
+  // counts, so it must not follow whatever VITE_DATA_SOURCE the machine happens to set.
+  await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off&debug=1&data=mock');
   await page.locator('body[data-startup="ready"]').waitFor({ timeout: 90000 });
 
   // Each workspace has its own strip; these are Maintenance's.
@@ -73,7 +75,7 @@ try {
   assert.equal(await page.locator('.mx-list').count(), 0, 'no permanent side panel — the browser is the list');
   assert.equal(await page.locator('.maintenance-workspace .ws-kpi[aria-pressed="true"]').count(), 0, 'nothing is chosen on arrival');
   assert.equal(await page.locator('[role="region"][aria-label$="explorer"]').count(), 0, 'and the browser stays away until asked for');
-  console.log(`✓ KPI strip from DataConnect: work orders ${workOrders.length} (${note}), tickets ${tickets}`);
+  console.log(`✓ KPI strip from the mock export: work orders ${workOrders.length} (${note}), tickets ${tickets}`);
 
   // A class this deployment does not carry says so rather than showing a made-up number.
   await page.waitForFunction(() => ['ready', 'unavailable', 'error'].includes(document.querySelector('.maintenance-workspace .ws-kpi[data-kpi="tasks"]')?.dataset.state), null, { timeout: 60000 });
@@ -83,7 +85,9 @@ try {
     assert.match(await kpi('tasks').locator('[data-note]').innerText(), /Unavailable|Failed/);
     console.log(`✓ Tasks are ${tasksState} in this deployment, and say so (no invented count)`);
   }
-  assert.match(await page.locator('.maintenance-workspace .ws-source').innerText(), /DataConnect/);
+  // This run uses the default source — the committed export — and the strip says so plainly rather
+  // than claiming to be the live API. `e2e/maintenance-dataconnect.smoke.mjs` covers the live path.
+  assert.match(await page.locator('.maintenance-workspace .ws-source').innerText(), /^Mock data/);
 
   // 2. Clicking the KPI opens the list, the markers and the bottom explorer together.
   await kpi('workOrders').click();
@@ -193,6 +197,26 @@ try {
   assert.match(page.url(), new RegExp(`selected=${target.id}`));
   console.log(`✓ map → ${target.id}: list and bottom explorer both followed, URL carries the view`);
 
+  // 6b. Reloading that very URL must NOT reopen the view: Maintenance always starts on the map.
+  const carried = page.url();
+  assert.match(carried, /maintenance=work-orders/, 'the URL under test really does carry a view');
+  await page.goto(carried);
+  await page.locator('body[data-startup="ready"]').waitFor({ timeout: 90000 });
+  await page.locator('.app-nav [data-section="maintenance"]').click();
+  await page.waitForFunction(() => document.querySelector('.maintenance-workspace .ws-kpi[data-kpi="workOrders"]')?.dataset.state === 'ready', null, { timeout: 60000 });
+  assert.equal(await page.locator('.maintenance-workspace .ws-kpi[aria-pressed="true"]').count(), 0,
+    'no KPI is chosen after reloading a URL that named one');
+  assert.equal(await page.locator('[role="region"][aria-label$="explorer"]').count(), 0,
+    'and the bottom browser stays closed');
+  assert.equal((await state()).id, null, 'nothing is selected');
+  assert.ok(!/maintenance=|selected=/.test(page.url()), 'the stale view is cleared from the URL too');
+  console.log('✓ reloading a URL that names a view still opens Maintenance clean');
+
+  // Reopen for the remaining checks, which need the browser on screen.
+  await kpi('workOrders').click();
+  await page.getByRole('region', { name: 'Work Orders explorer', exact: true }).waitFor({ timeout: 60000 });
+  await page.waitForFunction(n => window.__assetExplorer.store.getState().assetsByType.workOrder?.length === n, workOrders.length, { timeout: 60000 });
+
   // 7. Search and filters are on the browser, and everything follows them: cards, list and map.
   const explorer = page.getByRole('region', { name: 'Work Orders explorer', exact: true });
   const search = explorer.getByRole('textbox', { name: 'Search work orders' });
@@ -260,6 +284,37 @@ try {
     assert.ok(details.split('\n').length > 4, `${label} details show real fields`);
     console.log(`✓ ${label}: ${count} loaded, ${shown} on the map, card → marker → list in step (${selected.id})`);
   }
+
+  // 9. The details panel floats: a record's details can be moved off whatever they cover, the way
+  //    every other details panel on this map already could.
+  await kpi('workOrders').click();
+  await page.getByRole('region', { name: 'Work Orders explorer', exact: true }).locator('.MuiCardActionArea-root').first().click();
+  const detailsPanel = page.getByRole('complementary', { name: 'Work Order Details' });
+  await detailsPanel.waitFor({ timeout: 30000 });
+  assert.equal(await detailsPanel.locator('.panel-drag-handle').count(), 1, 'its heading is the grab handle');
+  const startedAt = await detailsPanel.boundingBox();
+  const grab = await detailsPanel.locator('h2').boundingBox();
+  await page.mouse.move(grab.x + 10, grab.y + 8);
+  await page.mouse.down();
+  await page.mouse.move(grab.x + 10 - 380, grab.y + 8 + 110, { steps: 12 });
+  await page.mouse.up();
+  await page.waitForTimeout(400);
+  const droppedAt = await detailsPanel.boundingBox();
+  // Exactly the gesture, not merely "somewhere else": a mismatched offset parent would make the
+  // panel jump to the pointer on the first move instead of following it.
+  assert.equal(Math.round(droppedAt.x - startedAt.x), -380, 'the panel follows the pointer horizontally');
+  assert.equal(Math.round(droppedAt.y - startedAt.y), 110, 'and vertically');
+  // The arrangement is the user's, so choosing another record must not undo it.
+  await page.getByRole('region', { name: 'Work Orders explorer', exact: true }).locator('.MuiCardActionArea-root').nth(1).click();
+  await page.waitForTimeout(1800);
+  const afterSwitch = await detailsPanel.boundingBox();
+  assert.equal(Math.round(afterSwitch.x), Math.round(droppedAt.x), 'it stays where it was put');
+  assert.equal(Math.round(afterSwitch.y), Math.round(droppedAt.y));
+  // A drag must never swallow the control inside the handle.
+  await detailsPanel.getByRole('button', { name: 'Close asset details' }).click();
+  await page.waitForTimeout(600);
+  assert.equal(await detailsPanel.count(), 0, 'Close inside the heading still closes');
+  console.log('✓ details panel floats: dragged by its heading, keeps its place, Close still works');
 
   assert.deepEqual(problems, []);
   console.log('✓ no page or console errors');

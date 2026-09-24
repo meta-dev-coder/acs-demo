@@ -12,6 +12,7 @@
 const ICONS = Object.freeze({
   incident: '<path d="M10 3 2 17h16L10 3Z"/><path d="M10 8v4M10 14.5v.5"/>',
   closure: '<path d="M3 6h14v8H3z"/><path d="m6 6 3 8M11 6l3 8"/>',
+  construction: '<path d="M4 16h12"/><path d="M10 4 6.5 16h7L10 4Z"/><path d="M8.4 10h3.2"/>',
   ticket: '<rect x="2.5" y="5" width="15" height="10" rx="2"/><path d="M7 5v10"/><path d="M11 8.5h4M11 11.5h4"/>',
   task: '<rect x="4" y="3" width="12" height="14" rx="2"/><path d="m7 9.5 2 2 4-4"/>',
   workOrder: '<path d="M12.6 3.4a3.8 3.8 0 0 0-4.9 4.8l-4 4a1.6 1.6 0 0 0 2.2 2.3l4-4a3.8 3.8 0 0 0 4.8-4.9l-2 2-1.8-.4-.4-1.8z"/>',
@@ -65,7 +66,8 @@ export function installWorkspaceStrip(host, { cards, label, onSelect }) {
       if (state === 'loading') { countEl.textContent = '…'; noteEl.textContent = 'Loading…'; return; }
       if (state !== 'ready') {
         countEl.textContent = '—';
-        noteEl.textContent = state === 'unavailable' ? 'Unavailable' : 'Failed to load';
+        // A failure says what actually happened — "Sign-in required" is not "Unavailable".
+        noteEl.textContent = note ?? (state === 'unavailable' ? 'Unavailable' : 'Failed to load');
         return;
       }
       countEl.textContent = Number(count ?? 0).toLocaleString('en-US');

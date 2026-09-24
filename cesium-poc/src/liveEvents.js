@@ -32,6 +32,8 @@ const pin = (accent, tint, glyph) => `data:image/svg+xml;charset=utf-8,${encodeU
 const ICONS = {
   [LIVE_EVENT_TYPES.INCIDENT]: pin('#ffc65c', '#4a3211', '<path d="M22 12.5 34.5 32.5H9.5Z"/><path d="M22 20v5.5"/><path d="M22 29.2v.2"/>'),
   [LIVE_EVENT_TYPES.CLOSURE]: pin('#ff8a8a', '#4d1c22', '<rect x="9" y="18.5" width="26" height="9.5" rx="2"/><path d="m14 28 4.5-9.5M21 28l4.5-9.5M28 28l4.5-9.5"/><path d="M11.5 28v4.5M32.5 28v4.5"/>'),
+  // FL511 draws construction in orange; the pin keeps that association while matching our family.
+  [LIVE_EVENT_TYPES.CONSTRUCTION]: pin('#ffab5c', '#4a2f11', '<path d="M11 27.5h22v5H11z"/><path d="M15 27.5V16h14v11.5"/><path d="m15 21.5 14-5.5"/>'),
 };
 const CONNECTOR_COLOR = Color.fromCssColorString('#ff8a8a');
 
@@ -56,6 +58,7 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
     <div class="live-event-children">
       <div class="segment-row"><input type="checkbox" id="live-events-incident" data-live-type="INCIDENT" aria-label="Incidents"><button class="segment-select" data-live-type="INCIDENT">Incidents</button><span class="badge" data-live-count="INCIDENT">0</span></div>
       <div class="segment-row"><input type="checkbox" id="live-events-closure" data-live-type="CLOSURE" aria-label="Closures"><button class="segment-select" data-live-type="CLOSURE">Closures</button><span class="badge" data-live-count="CLOSURE">0</span></div>
+      <div class="segment-row"><input type="checkbox" id="live-events-construction" data-live-type="CONSTRUCTION" aria-label="Construction"><button class="segment-select" data-live-type="CONSTRUCTION">Construction</button><span class="badge" data-live-count="CONSTRUCTION">0</span></div>
     </div>
     <p class="live-event-source" hidden></p>
     <p class="ramp-status" role="status">Loading live events…</p>
@@ -72,7 +75,9 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
   // Both feeds start hidden, matching every other layer in this explorer (roads, ramps, bridges,
   // signals, cameras): the map opens quiet and the operator chooses what to show. Data still loads
   // on startup, so the badges show live corridor counts before either feed is switched on.
-  const visible = { [LIVE_EVENT_TYPES.INCIDENT]: false, [LIVE_EVENT_TYPES.CLOSURE]: false };
+  // Derived from the type list, not written out: a missing key here reads as `undefined`, and
+  // Cesium rejects a non-boolean `show` with a bare DeveloperError that names nothing.
+  const visible = Object.fromEntries(Object.values(LIVE_EVENT_TYPES).map(type => [type, false]));
   let events = [], payload = null, receivedAt = null, selected = null, hovered = null, timer = null, controller = null, disposed = false, added = false;
 
   const panel = createMapDetailsPanel({

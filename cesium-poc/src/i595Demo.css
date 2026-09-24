@@ -750,7 +750,7 @@ body[data-layers-open="false"] .layers { display: none; }
    Workspace KPI strip — shared by Maintenance and Safety. Deliberately plain: the map is the
    workspace, this is an instrument over it, and every colour is a theme token.
    ========================================================================================== */
-.maintenance-workspace, .safety-workspace { position: absolute; inset: 0; pointer-events: none; z-index: 22; }
+.maintenance-workspace, .safety-workspace, .traffic-workspace { position: absolute; inset: 0; pointer-events: none; z-index: 22; }
 .ws-kpis { position: absolute; top: 16px; left: calc(var(--app-nav-w) + 16px); display: flex; align-items: stretch; gap: 8px;
   max-width: calc(100vw - var(--app-nav-w) - 560px); pointer-events: auto; }
 .ws-kpi { display: flex; flex-direction: column; gap: 2px; min-width: 122px; padding: 8px 12px 9px;

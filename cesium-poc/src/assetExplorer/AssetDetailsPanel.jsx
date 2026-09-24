@@ -5,17 +5,31 @@
  * carry is dropped rather than rendered empty. Actions are likewise only rendered when the asset can
  * actually support them — no disabled buttons padding out the panel.
  */
-import { Fragment } from 'react';
+import { Fragment, useEffect, useRef } from 'react';
 import { Box, Button, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import MyLocationOutlinedIcon from '@mui/icons-material/MyLocationOutlined';
 import ArrowBackOutlinedIcon from '@mui/icons-material/ArrowBackOutlined';
 import VideocamOutlinedIcon from '@mui/icons-material/VideocamOutlined';
 import { assetTypeConfig, detailRows } from './assetTypes.js';
+import { makeDraggable } from '../draggablePanel.js';
 
 export const DETAILS_WIDTH = 310;
 
 export function AssetDetailsPanel({ asset, inspecting, onClose, onInspect, onReturn, onViewCamera, top = 220, bottom = 16, right = 16 }) {
+  const panelRef = useRef(null);
+  const headingRef = useRef(null);
+
+  // Every details panel on this map floats — the corridor ones already did (mapDetailsPanel.js), and
+  // this one is the same family. The heading is the grab handle, so a record's details can be moved
+  // off whatever they are covering; the Close button inside it stays clickable. Hooks run before the
+  // early return below, because a hook may not sit behind a condition.
+  useEffect(() => {
+    if (!panelRef.current || !headingRef.current) return undefined;
+    const drag = makeDraggable(panelRef.current, headingRef.current);
+    return () => drag.destroy();
+  }, [Boolean(asset)]);
+
   if (!asset) return null;
   const config = assetTypeConfig(asset.assetType);
   const status = config?.getStatus(asset) ?? null;
@@ -27,6 +41,7 @@ export function AssetDetailsPanel({ asset, inspecting, onClose, onInspect, onRet
 
   return (
     <Paper
+      ref={panelRef}
       elevation={4}
       sx={{
         // Matches the existing corridor details panels (.camera-details and friends): same column,
@@ -39,7 +54,7 @@ export function AssetDetailsPanel({ asset, inspecting, onClose, onInspect, onRet
       role="complementary"
       aria-label={title}
     >
-      <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
+      <Stack ref={headingRef} direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
         {/* The title takes the remaining width so the close button sits hard against the top-right
             corner, whatever the title's length. */}
         <Typography component="h2" sx={{ flex: 1, minWidth: 0, fontSize: 17, fontWeight: 600, lineHeight: 1.25 }}>

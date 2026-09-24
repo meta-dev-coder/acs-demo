@@ -11,11 +11,19 @@
 import { LIVE_EVENT_TYPES } from './liveEventsData.js';
 import { installWorkspaceStrip } from './workspaceStrip.js';
 
-/** The two cards, each naming the Map Explorer layer that already draws it. */
-export const SAFETY_CARDS = Object.freeze([
-  Object.freeze({ key: 'incidents', label: 'Active incidents', icon: 'incident', layerId: 'incidents', type: LIVE_EVENT_TYPES.INCIDENT }),
-  Object.freeze({ key: 'closures', label: 'Lane closures', icon: 'closure', layerId: 'closures', type: LIVE_EVENT_TYPES.CLOSURE }),
-]);
+/**
+ * The live-event cards, each naming the Map Explorer layer that already draws it.
+ *
+ * They are split across two workspaces by what an operator is doing, not by where the data comes
+ * from — all three are one FL511 feed. Safety is what is happening TO the corridor; Traffic is
+ * planned work that is restricting it.
+ */
+const INCIDENT_CARD = Object.freeze({ key: 'incidents', label: 'Active incidents', icon: 'incident', layerId: 'incidents', type: LIVE_EVENT_TYPES.INCIDENT });
+const CLOSURE_CARD = Object.freeze({ key: 'closures', label: 'Lane closures', icon: 'closure', layerId: 'closures', type: LIVE_EVENT_TYPES.CLOSURE });
+const CONSTRUCTION_CARD = Object.freeze({ key: 'construction', label: 'Construction', icon: 'construction', layerId: 'construction', type: LIVE_EVENT_TYPES.CONSTRUCTION });
+
+export const SAFETY_CARDS = Object.freeze([INCIDENT_CARD]);
+export const TRAFFIC_CARDS = Object.freeze([CLOSURE_CARD, CONSTRUCTION_CARD]);
 
 const time = value => {
   const date = value ? new Date(value) : null;
@@ -38,7 +46,9 @@ export function safetyCard(events, card, payload = {}) {
   if (!mine.length) return { state: 'ready', count: 0, note: 'None on the corridor now' };
   const severe = mine.filter(event => /major|severe|high/i.test(String(event.severity ?? ''))).length;
   const updated = time(payload.lastUpdated);
-  const note = severe ? `${severe} major` : updated ? `Updated ${updated}` : `On I-595 now`;
+  // Planned roadwork has no useful severity, so it reports when the feed last spoke instead.
+  const note = card.type !== LIVE_EVENT_TYPES.CONSTRUCTION && severe ? `${severe} major`
+    : updated ? `Updated ${updated}` : 'On I-595 now';
   return { state: 'ready', count: mine.length, note };
 }
 
@@ -52,17 +62,23 @@ export function sourceNote(payload = {}) {
 }
 
 /**
- * @param {{assetExplorer: object, liveEvents: object, layerStore: object, host?: HTMLElement}} deps
+ * One live-event workspace: a KPI strip whose cards switch the map layers that already draw them.
+ *
+ * Safety and Traffic are the same thing over different cards, so they share this rather than
+ * diverging — a fix to one is a fix to both.
+ *
+ * @param {{cards: object[], className: string, label: string, assetExplorer: object,
+ *          liveEvents: object, layerStore: object, host?: HTMLElement}} deps
  */
-export function installSafetyWorkspace({ assetExplorer, liveEvents, layerStore, host = document.body }) {
+export function installLiveEventsWorkspace({ cards, className, label, assetExplorer, liveEvents, layerStore, host = document.body }) {
   const store = assetExplorer.store;
   const root = document.createElement('div');
-  root.className = 'safety-workspace';
+  root.className = className;
   root.hidden = true;
   host.append(root);
 
   const strip = installWorkspaceStrip(root, {
-    cards: SAFETY_CARDS, label: 'Corridor safety', onSelect: key => void choose(key),
+    cards, label, onSelect: key => void choose(key),
   });
 
   let activeKey = null, active = false;
@@ -70,7 +86,7 @@ export function installSafetyWorkspace({ assetExplorer, liveEvents, layerStore, 
   function render() {
     const events = liveEvents?.events ?? [];
     const payload = liveEvents?.payload ?? {};
-    for (const card of SAFETY_CARDS) strip.set(card.key, safetyCard(events, card, payload));
+    for (const card of cards) strip.set(card.key, safetyCard(events, card, payload));
     strip.setActive(activeKey);
     const note = sourceNote(payload);
     strip.setSource(note.text, { live: note.live });
@@ -78,7 +94,7 @@ export function installSafetyWorkspace({ assetExplorer, liveEvents, layerStore, 
 
   /** Choosing a card is switching its layer on — the same control the Map Explorer offers. */
   async function choose(key) {
-    const card = SAFETY_CARDS.find(item => item.key === key);
+    const card = cards.find(item => item.key === key);
     if (!card) return;
     if (activeKey === key) {
       activeKey = null;
@@ -96,7 +112,7 @@ export function installSafetyWorkspace({ assetExplorer, liveEvents, layerStore, 
   const stopUpdates = liveEvents?.onUpdate?.(() => render()) ?? (() => {});
   // The Map Explorer can switch these same layers off, so the cards read the layer, not their memory.
   const unsubscribeLayers = layerStore?.subscribe?.(() => {
-    const on = SAFETY_CARDS.find(card => ['on', 'partial'].includes(layerStore.stateOf(card.layerId)));
+    const on = cards.find(card => ['on', 'partial'].includes(layerStore.stateOf(card.layerId)));
     const next = on?.key ?? null;
     if (next === activeKey) return;
     activeKey = next;
@@ -119,7 +135,7 @@ export function installSafetyWorkspace({ assetExplorer, liveEvents, layerStore, 
       active = false;
       root.hidden = true;
       // The layers belong to the map, not to this panel: switching workspace puts back what it drew.
-      const card = SAFETY_CARDS.find(item => item.key === activeKey);
+      const card = cards.find(item => item.key === activeKey);
       activeKey = null;
       if (card) void layerStore.setVisible(card.layerId, false);
       if (store.getState().activeExplorerType) store.setActiveExplorerType(null);
@@ -128,3 +144,11 @@ export function installSafetyWorkspace({ assetExplorer, liveEvents, layerStore, 
     destroy() { stopUpdates(); unsubscribeLayers(); strip.destroy(); root.remove(); },
   };
 }
+
+/** Safety: what is happening to the corridor right now. */
+export const installSafetyWorkspace = deps =>
+  installLiveEventsWorkspace({ ...deps, cards: SAFETY_CARDS, className: 'safety-workspace', label: 'Corridor safety' });
+
+/** Traffic: the planned work restricting it. */
+export const installTrafficWorkspace = deps =>
+  installLiveEventsWorkspace({ ...deps, cards: TRAFFIC_CARDS, className: 'traffic-workspace', label: 'Corridor traffic' });

@@ -8,10 +8,17 @@
 import { LAYERS } from './fl511Client.mjs';
 import { FACILITY_LABELS } from './i595Network.mjs';
 
-/** @typedef {'INCIDENT'|'CLOSURE'} LiveRoadEventType */
+/** @typedef {'INCIDENT'|'CLOSURE'|'CONSTRUCTION'} LiveRoadEventType */
 
-export const EVENT_TYPES = Object.freeze({ INCIDENT: 'INCIDENT', CLOSURE: 'CLOSURE' });
-export const layerIdFor = type => type === EVENT_TYPES.CLOSURE ? LAYERS.CLOSURE : LAYERS.INCIDENT;
+export const EVENT_TYPES = Object.freeze({ INCIDENT: 'INCIDENT', CLOSURE: 'CLOSURE', CONSTRUCTION: 'CONSTRUCTION' });
+
+/** Which FL511 layer a type's markers and detail fragments come from. */
+const LAYER_BY_TYPE = Object.freeze({
+  [EVENT_TYPES.CLOSURE]: LAYERS.CLOSURE,
+  [EVENT_TYPES.CONSTRUCTION]: LAYERS.CONSTRUCTION,
+  [EVENT_TYPES.INCIDENT]: LAYERS.INCIDENT,
+});
+export const layerIdFor = type => LAYER_BY_TYPE[type] ?? LAYERS.INCIDENT;
 
 // FL511 prints these labels in its detail table; each maps to one model field. Anything else it
 // prints is preserved verbatim in detailFields rather than dropped or reinterpreted.

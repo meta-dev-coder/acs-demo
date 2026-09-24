@@ -28,6 +28,10 @@ export function installAssetExplorer(container, viewer, {
   messageSigns = null,
   lighting = null,
   maintenance = null,
+  /** Every loaded record of one maintenance type, drawn or not — what search reads. */
+  maintenanceRecords = null,
+  /** Put one maintenance type on screen; these types have no layer of their own. */
+  revealMaintenance = null,
   bridges = null,
   signals = null,
   liveEvents = null,
@@ -64,7 +68,8 @@ export function installAssetExplorer(container, viewer, {
     return list;
   });
 
-  const sources = createAssetSources({ corridorModels, cameras, bridges, signals, messageSigns, lighting, maintenance, liveEvents, signStructures, centerline, modelConfigs });
+  const sources = createAssetSources({ corridorModels, cameras, bridges, signals, messageSigns, lighting, maintenance,
+    maintenanceRecords, revealMaintenance, liveEvents, signStructures, centerline, modelConfigs });
   const navigation = createAssetNavigation(viewer, { logger });
   const disconnect = connectAssetSources(store, sources, { logger });
 
@@ -305,8 +310,16 @@ export function installAssetExplorer(container, viewer, {
   async function flyToAsset(asset) {
     const source = sources.find(candidate => candidate.assetType === asset.assetType);
     const layerId = source?.layerFor?.(asset) ?? assetTypeConfig(asset.assetType)?.layerId;
-    if (!layerId || !layerStore) return null;
-    await layerStore.setVisible(layerId, true);
+    // A workspace-owned type (the maintenance classes) has no layer to switch on: its own workspace
+    // puts it on screen instead. Without this, searching found the record and nothing happened.
+    if (!layerId) {
+      if (!source?.reveal) return null;
+      const shown = await source.reveal(asset);
+      if (!shown) return null;
+    } else {
+      if (!layerStore) return null;
+      await layerStore.setVisible(layerId, true);
+    }
     const live = await waitForState(state => (state.assetsByType[asset.assetType] ?? []).find(candidate => candidate.id === asset.id), 10000);
     if (!live) { logger.warn?.(`[asset-explorer] ${asset.assetType} ${asset.id} did not appear after enabling ${layerId}`); return null; }
     store.selectAsset(live, SELECTION_SOURCES.SEARCH);

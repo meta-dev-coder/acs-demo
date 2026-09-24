@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "e2e": "playwright test",
     "api": "node server/index.mjs",
-    "test:unit": "node --test tests/**/*.test.mjs"
+    "test:unit": "node --test tests/**/*.test.mjs",
+    "dc:classes": "node tools/dc-classes.mjs",
+    "dc:login": "node tools/dc-login.mjs"
   },
   "dependencies": {
     "@arcgis/core": "^5.1.9",

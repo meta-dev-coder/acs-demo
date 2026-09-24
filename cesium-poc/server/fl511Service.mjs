@@ -14,6 +14,7 @@ export function createFl511Service({ config, network, client = createFl511Client
   const feeds = {
     [EVENT_TYPES.INCIDENT]: { items: null, at: null, error: null },
     [EVENT_TYPES.CLOSURE]: { items: null, at: null, error: null },
+    [EVENT_TYPES.CONSTRUCTION]: { items: null, at: null, error: null },
   };
   const details = new Map(); // itemId -> { detail, at }
   let result = null;         // last successfully composed payload body
@@ -23,7 +24,14 @@ export function createFl511Service({ config, network, client = createFl511Client
   async function fetchFeed(type) {
     const feed = feeds[type];
     try {
-      feed.items = type === EVENT_TYPES.INCIDENT ? await client.fetchIncidents() : await client.fetchClosures();
+      const fetchers = {
+        [EVENT_TYPES.INCIDENT]: client.fetchIncidents,
+        [EVENT_TYPES.CLOSURE]: client.fetchClosures,
+        [EVENT_TYPES.CONSTRUCTION]: client.fetchConstruction,
+      };
+      // A client without this feed (an older build, a stub) reports nothing rather than failing the
+      // poll: one absent feed must not take the other two down with it.
+      feed.items = fetchers[type] ? await fetchers[type]() : [];
       feed.at = now(); feed.error = null;
     } catch (error) {
       feed.error = error.message;
@@ -52,12 +60,16 @@ export function createFl511Service({ config, network, client = createFl511Client
   }
 
   async function refresh() {
-    const [incidents, closures] = await Promise.all([fetchFeed(EVENT_TYPES.INCIDENT), fetchFeed(EVENT_TYPES.CLOSURE)]);
-    if (!incidents && !closures) return; // Nothing ever fetched; keep whatever we last served.
+    const [incidents, closures, construction] = await Promise.all([
+      fetchFeed(EVENT_TYPES.INCIDENT), fetchFeed(EVENT_TYPES.CLOSURE), fetchFeed(EVENT_TYPES.CONSTRUCTION),
+    ]);
+    // Nothing ever fetched; keep whatever we last served.
+    if (!incidents && !closures && !construction) return;
     const options = { bufferMeters: config.bufferMeters, segmentToleranceMeters: config.segmentToleranceMeters };
     const corridor = [
       ...normalizeFeed(incidents ?? [], EVENT_TYPES.INCIDENT, network, options, logger),
       ...normalizeFeed(closures ?? [], EVENT_TYPES.CLOSURE, network, options, logger),
+      ...normalizeFeed(construction ?? [], EVENT_TYPES.CONSTRUCTION, network, options, logger),
     ];
     const events = await enrich(corridor);
     events.sort((a, b) => a.id.localeCompare(b.id));
@@ -71,10 +83,11 @@ export function createFl511Service({ config, network, client = createFl511Client
         total: events.length,
         incidents: events.filter(event => event.type === EVENT_TYPES.INCIDENT).length,
         closures: events.filter(event => event.type === EVENT_TYPES.CLOSURE).length,
+        construction: events.filter(event => event.type === EVENT_TYPES.CONSTRUCTION).length,
       },
     };
     // Only a poll where both feeds answered counts as fully up to date.
-    if (!feeds[EVENT_TYPES.INCIDENT].error && !feeds[EVENT_TYPES.CLOSURE].error) {
+    if (!feeds[EVENT_TYPES.INCIDENT].error && !feeds[EVENT_TYPES.CLOSURE].error && !feeds[EVENT_TYPES.CONSTRUCTION].error) {
       lastSuccessfulUpdate = now();
       lastError = null;
     }
@@ -129,6 +142,7 @@ export function createFl511Service({ config, network, client = createFl511Client
           feeds: {
             incidents: feedDiagnostics(feeds[EVENT_TYPES.INCIDENT]),
             closures: feedDiagnostics(feeds[EVENT_TYPES.CLOSURE]),
+            construction: feedDiagnostics(feeds[EVENT_TYPES.CONSTRUCTION]),
           },
         },
       };

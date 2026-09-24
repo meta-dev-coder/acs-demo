@@ -168,10 +168,33 @@ export function maintenanceFilters(assets) {
   ];
 }
 
-/** DataConnect writes "2024-04-16T00:00:00"; the time of day is always midnight, so it is dropped. */
+/**
+ * A record's date, however its class spells it. The time of day is always midnight, so it is dropped.
+ *
+ * Two spellings are in play: the committed export writes ISO ("2024-04-16T00:00:00"), the live
+ * classes write day-first ("17/11/2024"). `new Date` reads a slashed date as US month-FIRST, which
+ * turns 4 November into 11 April without complaining — wrong for every value whose day happens to
+ * be 12 or less. Day-first is therefore parsed explicitly rather than left to the engine. (Verified
+ * against the instance: of 1,554 work-order dates, 936 have a first component above 12 and none
+ * has a second above 12.)
+ */
 export function maintenanceDate(value) {
   const string = text(value);
   if (!string) return null;
+  const dayFirst = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(string);
+  // An ISO value here carries no timezone ("2024-04-16T00:00:00"), so `new Date` reads it as LOCAL
+  // midnight and formatting it in UTC moves it a day west of Greenwich. These are calendar dates,
+  // not instants, so the components are taken as written in both formats.
+  const iso = /^(\d{4})-(\d{2})-(\d{2})(?:[T ]|$)/.exec(string);
+  if (dayFirst || iso) {
+    const [year, month, day] = dayFirst
+      ? [Number(dayFirst[3]), Number(dayFirst[2]), Number(dayFirst[1])]
+      : [Number(iso[1]), Number(iso[2]), Number(iso[3])];
+    // Anything that is not a real date is left exactly as written rather than reinterpreted.
+    if (month < 1 || month > 12 || day < 1 || day > 31) return string;
+    return new Date(Date.UTC(year, month - 1, day))
+      .toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
+  }
   const date = new Date(string);
   return Number.isNaN(date.getTime()) ? string
     : date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
@@ -412,6 +435,28 @@ export const ASSET_TYPES = Object.freeze({
     details: asset => [
       ['Roadway', text(asset.source?.roadway)],
       ['Severity', text(asset.source?.severity)],
+      ['Status', text(asset.source?.status)],
+    ],
+  }),
+
+  construction: Object.freeze({
+    id: 'construction',
+    label: 'Construction',
+    singular: 'Work zone',
+    icon: 'construction',
+    layerId: 'construction',
+    legacyDetailsPanel: true,
+    emptyMessage: 'No construction is reported on the corridor right now.',
+    errorMessage: 'Unable to load construction.',
+    getTitle: asset => asset.name,
+    getSubtitle: asset => text(asset.source?.roadway) ?? positionLabel(asset),
+    getStatus: asset => {
+      const status = text(asset.source?.status);
+      return status ? { label: status, tone: 'warn' } : null;
+    },
+    details: asset => [
+      ['Roadway', text(asset.source?.roadway)],
+      ['Direction', text(asset.source?.direction)],
       ['Status', text(asset.source?.status)],
     ],
   }),
