@@ -458,7 +458,9 @@ export const ASSET_TYPES = Object.freeze({
     emptyMessage: 'No incidents are reported on the corridor right now.',
     errorMessage: 'Unable to load incidents.',
     getTitle: asset => asset.name,
-    getSubtitle: asset => text(asset.source?.roadway) ?? positionLabel(asset),
+    // Live Ops resolves the carriageway and section; that is what an operator scans a card for.
+    // Without it (an event the classifier could not place) the corridor position is still shown.
+    getSubtitle: asset => liveOpsPlace(asset) ?? text(asset.source?.roadway) ?? positionLabel(asset),
     getStatus: asset => {
       const severity = text(asset.source?.severity);
       return severity ? { label: severity, tone: 'warn' } : null;
@@ -480,6 +482,8 @@ export const ASSET_TYPES = Object.freeze({
     emptyMessage: 'No construction is reported on the corridor right now.',
     errorMessage: 'Unable to load construction.',
     getTitle: asset => asset.name,
+    // Live Ops resolves the carriageway and section; that is what an operator scans a card for.
+    // Without it (an event the classifier could not place) the corridor position is still shown.
     getSubtitle: asset => text(asset.source?.roadway) ?? positionLabel(asset),
     getStatus: asset => {
       const status = text(asset.source?.status);
@@ -501,6 +505,8 @@ export const ASSET_TYPES = Object.freeze({
     emptyMessage: 'No congestion is reported on the corridor right now.',
     errorMessage: 'Unable to load congestion.',
     getTitle: asset => asset.name,
+    // Live Ops resolves the carriageway and section; that is what an operator scans a card for.
+    // Without it (an event the classifier could not place) the corridor position is still shown.
     getSubtitle: asset => text(asset.source?.roadway) ?? positionLabel(asset),
     getStatus: asset => {
       const status = text(asset.source?.status);
@@ -522,6 +528,8 @@ export const ASSET_TYPES = Object.freeze({
     emptyMessage: 'No disabled vehicles are reported on the corridor right now.',
     errorMessage: 'Unable to load disabled vehicles.',
     getTitle: asset => asset.name,
+    // Live Ops resolves the carriageway and section; that is what an operator scans a card for.
+    // Without it (an event the classifier could not place) the corridor position is still shown.
     getSubtitle: asset => text(asset.source?.roadway) ?? positionLabel(asset),
     getStatus: asset => {
       const status = text(asset.source?.status);
@@ -546,6 +554,8 @@ export const ASSET_TYPES = Object.freeze({
     emptyMessage: 'No closures are reported on the corridor right now.',
     errorMessage: 'Unable to load closures.',
     getTitle: asset => asset.name,
+    // Live Ops resolves the carriageway and section; that is what an operator scans a card for.
+    // Without it (an event the classifier could not place) the corridor position is still shown.
     getSubtitle: asset => text(asset.source?.roadway) ?? positionLabel(asset),
     getStatus: asset => {
       const status = text(asset.source?.status);
@@ -689,6 +699,19 @@ export function normalizeAsset({ id, assetType, name, longitude, latitude, milep
 }
 
 /** The corridor position to show, labelled for whichever measurement it actually is. */
+/**
+ * Where a live event sits on the corridor, in Live Ops terms: the carriageway the source named and
+ * the section it resolved to. Null when the event carries no enrichment, so callers keep whatever
+ * they showed before.
+ */
+export function liveOpsPlace(asset) {
+  const ops = asset?.source?.liveOps;
+  if (!ops) return null;
+  if (ops.carriageway === 'EXPRESS') return ops.direction ? `I-595 Express · ${ops.direction}` : 'I-595 Express';
+  if (ops.carriageway === 'UNKNOWN') return 'Carriageway unresolved';
+  return ops.sectionLabel ?? null;
+}
+
 export function positionLabel(asset) {
   if (asset?.milepost != null) return `MP ${asset.milepost.toFixed(1)}`;
   if (asset?.corridorMiles != null) return `${asset.corridorMiles.toFixed(1)} mi along corridor`;

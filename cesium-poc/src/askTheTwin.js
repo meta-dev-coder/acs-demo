@@ -63,7 +63,7 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
   const btn = document.createElement('button');
   btn.className = 'ask-twin-btn';
   btn.setAttribute('aria-label', 'Ask the Digital Twin');
-  btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Ask the Twin`;
+  btn.innerHTML = `<svg class="ask-twin-chat-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><svg class="ask-twin-sparkle-icon" aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="m9 3 2.5 6.5L18 12l-6.5 2.5L9 21l-2.5-6.5L0 12l6.5-2.5L9 3Zm10-2 1.1 3L23 5l-2.9 1L19 9l-1.1-3L15 5l2.9-1L19 1Zm1 13 1.1 3L24 18l-2.9 1L20 22l-1.1-3L16 18l2.9-1L20 14Z"/></svg>Ask the Twin`;
   document.body.appendChild(btn);
 
   // ── Panel ─────────────────────────────────────────────────────────────

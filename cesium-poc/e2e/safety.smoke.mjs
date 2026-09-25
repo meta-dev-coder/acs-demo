@@ -17,7 +17,7 @@ try {
   const networkNoise = /Failed to load resource|net::ERR|CORS policy|Failed to fetch|live-events|snapshot/;
   page.on('pageerror', e => problems.push(`pageerror: ${e.message}`));
   page.on('console', m => { if (m.type() === 'error' && !networkNoise.test(m.text())) problems.push(`console: ${m.text()}`); });
-  await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
+  await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off&data=mock');
   await page.locator('body[data-startup="ready"]').waitFor({ timeout: 90000 });
   await page.waitForTimeout(4000);   // the feed's first fetch
 
@@ -107,7 +107,7 @@ try {
     ],
   };
   await page.route('**/api/i595/live-events*', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(stub) }));
-  await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
+  await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off&data=mock');
   await page.locator('body[data-startup="ready"]').waitFor({ timeout: 90000 });
   await page.locator('.app-nav [data-section="safety"]').click();
   await page.waitForFunction(() => document.querySelector('.safety-workspace .ws-kpi[data-kpi="incidents"] [data-count]')?.textContent === '2', null, { timeout: 60000 });

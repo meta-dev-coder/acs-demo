@@ -1,5 +1,5 @@
 import { CustomDataSource, Cartesian3, HeightReference, NearFarScalar, ScreenSpaceEventHandler, ScreenSpaceEventType, VerticalOrigin } from 'cesium';
-import { assetIdMarker } from './assetIdMarker.js';
+import { assetIdMarker, assetIconMarker } from './assetIdMarker.js';
 import { createMapDetailsPanel } from './mapDetailsPanel.js';
 
 const endpoint = import.meta.env.VITE_MESSAGE_SIGNS_API || '/api/i595/message-signs';
@@ -14,6 +14,7 @@ export function installMessageSigns(container, viewer) {
   source.show = false;
   const added = viewer.dataSources.add(source);
   const signById = new Map(), records = new Map(), listeners = new Set();
+  let iconMarkers = false;
   let selected = null, disposed = false, pending = null, loaded = false, loadError = null, requestId = 0;
   const panel = createMapDetailsPanel({ title: 'Message Sign Details', className: 'signal-details message-sign-details',
     details: record => [
@@ -28,7 +29,7 @@ export function installMessageSigns(container, viewer) {
   const report = record => { for (const listener of listeners) listener(record); };
   function style(entity) {
     if (!entity) return;
-    const marker = assetIdMarker({ id: records.get(entity).id, selected: entity === selected });
+    const marker = iconMarkers ? assetIconMarker('messageSign', entity === selected) : assetIdMarker({ id: records.get(entity).id, selected: entity === selected });
     entity.billboard.image = marker.image;
     entity.billboard.width = marker.width;
     entity.billboard.height = marker.height;
@@ -75,7 +76,7 @@ export function installMessageSigns(container, viewer) {
       for (const record of payload.signs) {
         const entity = source.entities.add({ id: `message-sign-${record.id}`, name: record.title,
           position: Cartesian3.fromDegrees(record.longitude, record.latitude),
-          billboard: { ...assetIdMarker({ id: record.id }), verticalOrigin: VerticalOrigin.BOTTOM,
+          billboard: { ...(iconMarkers ? assetIconMarker('messageSign') : assetIdMarker({ id: record.id })), verticalOrigin: VerticalOrigin.BOTTOM,
             heightReference: HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: Infinity,
             scaleByDistance: new NearFarScalar(400, 1, 12000, 0.7) } });
         signById.set(record.id, entity); records.set(entity, record);
@@ -121,6 +122,7 @@ export function installMessageSigns(container, viewer) {
   viewer.canvas.addEventListener('mouseleave', leave);
   return {
     signById, records,
+    setIconMarkers(on) { iconMarkers = Boolean(on); for (const entity of signById.values()) style(entity); viewer.scene.requestRender(); },
     get error() { return loadError; },
     selectById(id) { const entity = signById.get(String(id)); if (entity) select(entity); },
     clearSelection() { if (selected) select(null); },

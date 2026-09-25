@@ -23,7 +23,7 @@ try {
   const panel = page.locator('.layers');
 
   // 1. The four workspaces, with Layers kept separate at the foot.
-  assert.deepEqual(await items.allInnerTexts(), ['Overview', 'Traffic', 'Maintenance', 'Safety']);
+  assert.deepEqual(await items.allInnerTexts(), ['Overview', 'Traffic', 'Maintenance', 'Safety', 'Live Ops']);
   assert.equal(await layers.innerText(), 'Layers');
   assert.ok((await layers.boundingBox()).y > (await items.last().boundingBox()).y, 'Layers sits at the bottom');
   assert.equal(await items.first().getAttribute('aria-current'), 'page', 'Overview is chosen on load');

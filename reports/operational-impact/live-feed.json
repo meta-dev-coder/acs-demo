@@ -1,0 +1,349 @@
+{
+  "source": "FL511",
+  "sourceStatus": "LIVE",
+  "lastUpdated": "2026-09-25T07:52:40.815Z",
+  "lastSuccessfulUpdate": "2026-09-25T07:52:40.815Z",
+  "dataFreshness": {
+    "ageSeconds": 47,
+    "refreshSeconds": 60,
+    "staleAfterSeconds": 180
+  },
+  "bufferMeters": 250,
+  "segmentToleranceMeters": 120,
+  "counts": {
+    "total": 4,
+    "incidents": 0,
+    "closures": 4,
+    "construction": 0,
+    "congestion": 0,
+    "disabledVehicles": 0
+  },
+  "events": [
+    {
+      "id": "FL511-CLOSURE-871832",
+      "source": "FL511",
+      "type": "CLOSURE",
+      "latitude": 26.118721,
+      "longitude": -80.347609,
+      "detailsAvailable": true,
+      "detailFields": [
+        {
+          "label": "Severity",
+          "value": "Major"
+        },
+        {
+          "label": "Region",
+          "value": "Southeast"
+        },
+        {
+          "label": "Start Time",
+          "value": "Sep 24 2026, 7:17 PM"
+        },
+        {
+          "label": "Last Updated",
+          "value": "Sep 24 2026, 7:22 PM"
+        }
+      ],
+      "distanceToI595NetworkM": 23.3,
+      "nearestFacility": "SR84_EB",
+      "nearestFacilityLabel": "SR 84 Eastbound",
+      "distanceToNearestFacilityM": 23.3,
+      "nearestSegmentId": null,
+      "nearestSegmentLabel": null,
+      "distanceToSegmentM": null,
+      "rawSourceId": "871832",
+      "title": "Closure",
+      "description": "Planned construction in Broward County on 75 Express South, ramp from I-75 Mainline/I-595/SR-869. On-ramp closed. Last updated at 07:22 PM.",
+      "severity": "Major",
+      "region": "Southeast",
+      "startTime": "Sep 24 2026, 7:17 PM",
+      "lastUpdated": "Sep 24 2026, 7:22 PM",
+      "liveOps": {
+        "corridor": "I-595",
+        "carriageway": "UNKNOWN",
+        "carriagewayLabel": "Unresolved",
+        "direction": null,
+        "sectionId": null,
+        "sectionIndex": null,
+        "sectionLabel": null,
+        "segmentId": null,
+        "spatialMatch": {
+          "method": "names-another-road",
+          "distanceMeters": null,
+          "confidence": "LOW",
+          "classification": {
+            "method": "names-another-road",
+            "confidence": "LOW",
+            "evidence": "Closure \u00b7 Planned construction in Broward County on 75 Express South, ramp from I-75 Mainline/I-595/SR-869. On-ramp closed. Last updated at \u2026"
+          },
+          "section": {
+            "method": "carriageway-unknown",
+            "candidateCount": 0,
+            "runnerUpMeters": null
+          }
+        },
+        "laneImpact": {
+          "blockedLanes": null,
+          "fullClosure": false,
+          "rampClosure": true,
+          "shoulderOnly": false,
+          "source": "parsed"
+        },
+        "laneImpactLabel": "Ramp closed",
+        "contributesToImpact": false
+      }
+    },
+    {
+      "id": "FL511-CLOSURE-871879",
+      "source": "FL511",
+      "type": "CLOSURE",
+      "latitude": 26.075094,
+      "longitude": -80.167558,
+      "detailsAvailable": true,
+      "detailFields": [
+        {
+          "label": "Severity",
+          "value": "Minor"
+        },
+        {
+          "label": "Region",
+          "value": "Southeast"
+        },
+        {
+          "label": "Start Time",
+          "value": "Sep 24 2026, 8:08 PM"
+        },
+        {
+          "label": "Last Updated",
+          "value": "Sep 24 2026, 8:09 PM"
+        }
+      ],
+      "distanceToI595NetworkM": 51.6,
+      "nearestFacility": "RAMP_CONNECTOR",
+      "nearestFacilityLabel": "I-595 Ramp / Connector",
+      "distanceToNearestFacilityM": 51.6,
+      "nearestSegmentId": null,
+      "nearestSegmentLabel": null,
+      "distanceToSegmentM": null,
+      "rawSourceId": "871879",
+      "title": "Closure",
+      "description": "Planned construction in Broward County on I-95 North, ramp to Exit 24: I-595. Off-ramp closed. Last updated at 08:09 PM.",
+      "severity": "Minor",
+      "region": "Southeast",
+      "startTime": "Sep 24 2026, 8:08 PM",
+      "lastUpdated": "Sep 24 2026, 8:09 PM",
+      "liveOps": {
+        "corridor": "I-595",
+        "carriageway": "UNKNOWN",
+        "carriagewayLabel": "Unresolved",
+        "direction": null,
+        "sectionId": null,
+        "sectionIndex": null,
+        "sectionLabel": null,
+        "segmentId": null,
+        "spatialMatch": {
+          "method": "names-another-road",
+          "distanceMeters": null,
+          "confidence": "LOW",
+          "classification": {
+            "method": "names-another-road",
+            "confidence": "LOW",
+            "evidence": "Closure \u00b7 Planned construction in Broward County on I-95 North, ramp to Exit 24: I-595. Off-ramp closed. Last updated at 08:09 PM. \u00b7 Severit\u2026"
+          },
+          "section": {
+            "method": "carriageway-unknown",
+            "candidateCount": 0,
+            "runnerUpMeters": null
+          }
+        },
+        "laneImpact": {
+          "blockedLanes": null,
+          "fullClosure": false,
+          "rampClosure": true,
+          "shoulderOnly": false,
+          "source": "parsed"
+        },
+        "laneImpactLabel": "Ramp closed",
+        "contributesToImpact": false
+      }
+    },
+    {
+      "id": "FL511-CLOSURE-871942",
+      "source": "FL511",
+      "type": "CLOSURE",
+      "latitude": 26.082668,
+      "longitude": -80.16906,
+      "detailsAvailable": true,
+      "detailFields": [
+        {
+          "label": "Severity",
+          "value": "Major"
+        },
+        {
+          "label": "Region",
+          "value": "Southeast"
+        },
+        {
+          "label": "Start Time",
+          "value": "Sep 24 2026, 8:56 PM"
+        },
+        {
+          "label": "Last Updated",
+          "value": "Sep 24 2026, 8:58 PM"
+        }
+      ],
+      "distanceToI595NetworkM": 18.7,
+      "nearestFacility": "RAMP_CONNECTOR",
+      "nearestFacilityLabel": "I-595 Ramp / Connector",
+      "distanceToNearestFacilityM": 18.7,
+      "nearestSegmentId": "I595-WB-FDOT-010380-012579",
+      "nearestSegmentLabel": "Westbound Segment 7",
+      "distanceToSegmentM": 42.5,
+      "rawSourceId": "871942",
+      "title": "Closure",
+      "description": "Planned construction in Broward County on 95 Express North, ramp from I-595 Mainline/Tpk/US-441. On-ramp closed. Last updated at 08:58 PM.",
+      "severity": "Major",
+      "region": "Southeast",
+      "startTime": "Sep 24 2026, 8:56 PM",
+      "lastUpdated": "Sep 24 2026, 8:58 PM",
+      "liveOps": {
+        "corridor": "I-595",
+        "carriageway": "UNKNOWN",
+        "carriagewayLabel": "Unresolved",
+        "direction": null,
+        "sectionId": null,
+        "sectionIndex": null,
+        "sectionLabel": null,
+        "segmentId": null,
+        "spatialMatch": {
+          "method": "names-another-road",
+          "distanceMeters": null,
+          "confidence": "LOW",
+          "classification": {
+            "method": "names-another-road",
+            "confidence": "LOW",
+            "evidence": "Closure \u00b7 Planned construction in Broward County on 95 Express North, ramp from I-595 Mainline/Tpk/US-441. On-ramp closed. Last updated at 0\u2026"
+          },
+          "section": {
+            "method": "carriageway-unknown",
+            "candidateCount": 0,
+            "runnerUpMeters": null
+          }
+        },
+        "laneImpact": {
+          "blockedLanes": null,
+          "fullClosure": false,
+          "rampClosure": true,
+          "shoulderOnly": false,
+          "source": "parsed"
+        },
+        "laneImpactLabel": "Ramp closed",
+        "contributesToImpact": false
+      }
+    },
+    {
+      "id": "FL511-CLOSURE-872105",
+      "source": "FL511",
+      "type": "CLOSURE",
+      "latitude": 26.118799,
+      "longitude": -80.333147,
+      "detailsAvailable": true,
+      "detailFields": [
+        {
+          "label": "Severity",
+          "value": "Major"
+        },
+        {
+          "label": "Region",
+          "value": "Southeast"
+        },
+        {
+          "label": "Start Time",
+          "value": "Sep 24 2026, 10:56 PM"
+        },
+        {
+          "label": "Last Updated",
+          "value": "Sep 24 2026, 10:58 PM"
+        }
+      ],
+      "distanceToI595NetworkM": 2.6,
+      "nearestFacility": "RAMP_CONNECTOR",
+      "nearestFacilityLabel": "I-595 Ramp / Connector",
+      "distanceToNearestFacilityM": 2.6,
+      "nearestSegmentId": null,
+      "nearestSegmentLabel": null,
+      "distanceToSegmentM": null,
+      "rawSourceId": "872105",
+      "title": "Closure",
+      "description": "Planned construction in Broward County on Sawgrass Expressway South, ramp to I-595. Off-ramp closed. Last updated at 10:58 PM.",
+      "severity": "Major",
+      "region": "Southeast",
+      "startTime": "Sep 24 2026, 10:56 PM",
+      "lastUpdated": "Sep 24 2026, 10:58 PM",
+      "liveOps": {
+        "corridor": "I-595",
+        "carriageway": "UNKNOWN",
+        "carriagewayLabel": "Unresolved",
+        "direction": null,
+        "sectionId": null,
+        "sectionIndex": null,
+        "sectionLabel": null,
+        "segmentId": null,
+        "spatialMatch": {
+          "method": "names-another-road",
+          "distanceMeters": null,
+          "confidence": "LOW",
+          "classification": {
+            "method": "names-another-road",
+            "confidence": "LOW",
+            "evidence": "Closure \u00b7 Planned construction in Broward County on Sawgrass Expressway South, ramp to I-595. Off-ramp closed. Last updated at 10:58 PM. \u00b7 S\u2026"
+          },
+          "section": {
+            "method": "carriageway-unknown",
+            "candidateCount": 0,
+            "runnerUpMeters": null
+          }
+        },
+        "laneImpact": {
+          "blockedLanes": null,
+          "fullClosure": false,
+          "rampClosure": true,
+          "shoulderOnly": false,
+          "source": "parsed"
+        },
+        "laneImpactLabel": "Ramp closed",
+        "contributesToImpact": false
+      }
+    }
+  ],
+  "diagnostics": {
+    "lastError": null,
+    "feeds": {
+      "incidents": {
+        "itemCount": 1,
+        "lastSuccess": "2026-09-25T07:52:40.465Z",
+        "error": null
+      },
+      "closures": {
+        "itemCount": 24,
+        "lastSuccess": "2026-09-25T07:52:40.727Z",
+        "error": null
+      },
+      "construction": {
+        "itemCount": 110,
+        "lastSuccess": "2026-09-25T07:52:40.792Z",
+        "error": null
+      },
+      "congestion": {
+        "itemCount": 0,
+        "lastSuccess": "2026-09-25T07:52:40.746Z",
+        "error": null
+      },
+      "disabledVehicles": {
+        "itemCount": 4,
+        "lastSuccess": "2026-09-25T07:52:40.763Z",
+        "error": null
+      }
+    }
+  }
+}

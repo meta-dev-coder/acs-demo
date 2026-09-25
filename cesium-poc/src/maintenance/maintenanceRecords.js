@@ -127,10 +127,12 @@ const ownCoordinates = (row, lonKey, latKey) => {
     swappedCount += 1;
     return { longitude: latitude, latitude: longitude, locationSource: 'record' };
   }
-  // Neither reading is local: keep it as written if it is a coordinate at all, and let the corridor
-  // filter downstream decide. Nothing is invented and nothing is silently moved.
-  return Math.abs(longitude) <= 180 && Math.abs(latitude) <= 90
-    ? { longitude, latitude, locationSource: 'record' } : NO_LOCATION;
+  // Neither reading puts the record near the corridor this application covers, so the pair is
+  // unusable rather than merely surprising. The committed export contains such rows — a safety
+  // inspection whose longitude lost a digit, -8.33 instead of -80.33 — and placing one puts a
+  // Broward inspection in the Gulf of Guinea. The record is kept and listed; only its position is
+  // dropped, which is how every other unplaceable record behaves.
+  return NO_LOCATION;
 };
 
 export const WORK_ORDER_FIELDS = Object.freeze(['Work Order ID', 'Work Type', 'Work Order Status', 'Priority',

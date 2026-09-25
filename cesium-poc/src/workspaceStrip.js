@@ -31,11 +31,18 @@ export function installWorkspaceStrip(host, { cards, label, onSelect }) {
   const root = document.createElement('section');
   root.className = 'ws-kpis';
   root.setAttribute('aria-label', label);
+  // Icon on the left in its own tinted chip, then label, value and note stacked beside it — the
+  // arrangement reads as one figure with a heading rather than three loose lines.
   root.innerHTML = `${cards.map(card => `
-    <button class="ws-kpi" type="button" data-kpi="${card.key}" aria-pressed="false">
-      <span class="ws-kpi-head">${icon(card.icon)}<span class="ws-kpi-label">${card.label}</span></span>
-      <span class="ws-kpi-count" data-count>…</span>
-      <span class="ws-kpi-note" data-note>Loading…</span>
+    <button class="ws-kpi" type="button" data-kpi="${card.key}" aria-pressed="false"
+      ${card.color ? `style="--kpi-tone:${card.color}"` : ''}>
+      <span class="ws-kpi-icon">${icon(card.icon)}</span>
+      <span class="ws-kpi-body">
+        <span class="ws-kpi-label">${card.label}</span>
+        <span class="ws-kpi-count" data-count>…</span>
+        <span class="ws-kpi-note" data-note>Loading…</span>
+      </span>
+      <span class="ws-kpi-chevron" aria-hidden="true">›</span>
     </button>`).join('')}
     <span class="ws-source" data-source role="status"></span>`;
   host.append(root);

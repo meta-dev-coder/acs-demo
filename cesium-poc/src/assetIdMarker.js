@@ -188,3 +188,19 @@ export const MARKER_LABELS = Object.freeze({
     return text.split(/\s+[—–-]\s+/)[0] || text;
   },
 });
+
+/** Live Ops pictograms, retaining the yellow selected state used by the explorer. */
+export function assetIconMarker(type, selected = false) {
+  const key = `icon:${type}:${selected}`;
+  if (cache.has(key)) return cache.get(key);
+  const fill = selected ? '#F5B51B' : type === 'camera' ? '#2563eb' : '#16a34a';
+  const ink = selected ? '#172033' : '#fff';
+  const glyph = type === 'camera'
+    ? '<rect x="9" y="13" width="17" height="14" rx="3"/><path d="m27 17 8-4v14l-8-4z"/>'
+    : '<rect x="8" y="10" width="28" height="21" rx="2"/><path d="M20 31h4v6h-4z"/>';
+  const lines = type === 'camera' ? '' : `<path d="M12 16h12M12 22h19" stroke="${fill}" stroke-width="2.5" stroke-linecap="round"/>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="176" height="208" viewBox="0 0 44 52"><path d="M10 2h24a8 8 0 0 1 8 8v26a8 8 0 0 1-8 8h-7l-5 6-5-6h-7a8 8 0 0 1-8-8V10a8 8 0 0 1 8-8Z" fill="${fill}" stroke="#fff" stroke-width="2"/><g fill="${ink}">${glyph}</g>${lines}</svg>`;
+  const marker = Object.freeze({ image: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`, width: 36, height: 43 });
+  cache.set(key, marker);
+  return marker;
+}

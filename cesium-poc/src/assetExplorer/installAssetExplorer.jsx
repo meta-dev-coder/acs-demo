@@ -219,6 +219,12 @@ export function installAssetExplorer(container, viewer, {
   // store still keeps visibility, the browsed type and the selection as three separate facts, and
   // non-asset layers (traffic flow, the road network) are untouched by it.
   let enforcing = false;
+  /**
+   * Live Ops turns this off while it is open. A control room needs incidents, closures and
+   * construction on screen together, and switching one on must not take the others away; every
+   * other workspace keeps the one-tool-at-a-time rule.
+   */
+  let exclusiveLayers = true;
 
   function syncLayers() {
     // Re-entrant guard: switching layers off below makes the layer store notify again.
@@ -236,6 +242,21 @@ export function installAssetExplorer(container, viewer, {
       return;
     }
     const next = nextExplorerType(visibleTypes, previousTypes, current);
+
+    // Several layers on at once: keep them all, and leave the browsed type alone unless it has
+    // gone off the map entirely. Visibility and the browsed category are separate facts here.
+    if (!exclusiveLayers) {
+      store.setVisibleAssetLayers(visibleTypes);
+      previousTypes = visibleTypes;
+      // Never choose a category on the operator's behalf: with six layers on, "the one that
+      // happened to become visible" is not a choice, and it opened the tray on an empty list.
+      // The current one is kept while it is still on the map, and dropped when it is not.
+      const keep = current && visibleTypes.includes(current) ? current : null;
+      if (keep !== current) store.setActiveExplorerType(keep);
+      for (const source of sources) source.own(source.assetType === keep && !source.usesLegacyPanel);
+      if (keep) refreshAssets(store, sources.filter(source => source.assetType === keep), { logger });
+      return;
+    }
 
     const strays = Object.entries(LAYER_TO_ASSET_TYPE)
       .filter(([layerId, assetType]) => assetType !== next && VISIBLE_STATES.has(layerStore.stateOf(layerId)));
@@ -363,6 +384,15 @@ export function installAssetExplorer(container, viewer, {
     navigation,
     sources,
     searchableAssets,
+    /**
+     * Whether switching one asset layer on switches the others off. True everywhere except Live
+     * Ops, which shows the whole operational picture at once.
+     */
+    setExclusiveLayers(on) {
+      if (exclusiveLayers === on) return;
+      exclusiveLayers = on;
+      syncLayers();
+    },
     flyToAsset,
     flyToPlace,
     showAssetType,

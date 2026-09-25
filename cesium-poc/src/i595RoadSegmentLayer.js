@@ -1,6 +1,6 @@
 import { ROAD_STYLE, corridorVisualConfig as config, corridorLOD, getTrafficColor, getFlowAnimationSpeed } from './corridorVisualConfig.js';
 import { TrafficFlowMaterial } from './trafficFlowMaterial.js';
-import { GeoJsonDataSource, Color, Cartographic, ScreenSpaceEventType } from 'cesium';
+import { GeoJsonDataSource, Color, ColorMaterialProperty, Cartographic, ScreenSpaceEventType } from 'cesium';
 import { createMapDetailsPanel } from './mapDetailsPanel.js';
 import { MAINLINE_COLORS, roadSegmentFromProperties, roadSegmentDetails, roadSegmentTooltip, segmentDirectionLabel } from './i595RoadSegmentData.js';
 
@@ -33,24 +33,47 @@ export function createI595RoadSegmentLayer(viewer) {
   const enabled = new Set();
   const visibleSegments = new Set();
   const colors = new Map(Object.entries(MAINLINE_COLORS).map(([direction, color]) => [direction, Color.fromCssColorString(color)]));
-  let source, loading, disposed = false, selected = null, hovered = null, colorResolver = null;
+  let source, loading, disposed = false, selected = null, hovered = null, colorResolver = null, impactResolver = null, impactEmphasis = false;
+  // Live Ops adds its own rows and tooltip lines while it is open, rather than opening a second
+  // panel over this one. Unset everywhere else, so the segment panel is exactly what it always was.
+  let detailsExtra = null, tooltipExtra = null;
   const panel = createMapDetailsPanel({
-    title: 'Road Segment Details', className: 'segment-details', details: segment => roadSegmentDetails(segment, segmentsByDirection.get(segment.direction).length),
-    tooltipText: roadSegmentTooltip, onClose: () => select(null),
+    title: 'Road Segment Details', className: 'segment-details',
+    details: segment => [
+      ...(detailsExtra?.(segment) ?? []),
+      ...roadSegmentDetails(segment, segmentsByDirection.get(segment.direction).length),
+    ],
+    tooltipText: segment => tooltipExtra?.(segment) ?? roadSegmentTooltip(segment),
+    onClose: () => select(null),
   });
   // A route overlay, not a GIS trace: thin and part-transparent at rest so the physical roadway
   // stays visible through it, with brightness and weight reserved for hover and selection.
   function style(entity) {
     if (!entity) return;
     const segment = records.get(entity);
-    const base = colorResolver?.(segment, segmentStatus.get(segment.segmentId)) ?? Color.fromCssColorString(getTrafficColor(segmentStatus.get(segment.segmentId), segment.direction));
+    // Two independent tints can be in play: Live Ops' Operational Impact, and the startup fade.
+    // They compose rather than override — the fade's alpha is applied to whatever colour the
+    // overlay chose — so enabling Live Ops during the intro neither cancels the fade nor is
+    // cancelled by it. With neither set, this is the route colour exactly as before.
+    const status = segmentStatus.get(segment.segmentId);
+    const impact = impactResolver?.(segment, status);
+    const faded = colorResolver?.(segment, status);
+    const base = impact && faded ? impact.withAlpha(faded.alpha)
+      : impact ?? faded ?? Color.fromCssColorString(getTrafficColor(status, segment.direction));
     const emphasis = entity === selected ? 'SELECTED' : entity === hovered ? 'HOVERED' : 'RESTING';
     entity.polyline.width = config.lineWidth[lod] + (config.casing.enabled ? config.casing.pixels : 0);
     // Selection is a GIS selection: a stronger transportation blue, not the road lerped toward
     // white. Lightening it made a selected road paler than its neighbours rather than firmer.
-    const opacity = { SELECTED: ROAD_STYLE.selected.opacity, HOVERED: ROAD_STYLE.hoverOpacity,
+    let opacity = { SELECTED: ROAD_STYLE.selected.opacity, HOVERED: ROAD_STYLE.hoverOpacity,
       RESTING: ROAD_STYLE.generalPurposeEB.opacity }[emphasis];
-    const color = emphasis === 'SELECTED' ? Color.fromCssColorString(ROAD_STYLE.selected.color) : base;
+    // A data overlay has to survive photorealistic imagery. At rest the route line is deliberately
+    // faint so the road shows through it; a coloured section is the opposite — it is the message —
+    // so while the overlay is on, a section it has coloured is drawn opaque and wider.
+    const overlaid = impactEmphasis && Boolean(impact);
+    if (overlaid) opacity = 1;
+    // Draw impact above adjacent normal ground lines at corridor overview scale.
+    entity.polyline.zIndex = overlaid ? 10 : 0;
+    const color = !impact && emphasis === 'SELECTED' ? Color.fromCssColorString(ROAD_STYLE.selected.color) : base;
     let material=materials.get(entity);
     if(!material){
       const points=entity.polyline.positions.getValue(viewer.clock.currentTime);
@@ -58,9 +81,17 @@ export function createI595RoadSegmentLayer(viewer) {
       material=new TrafficFlowMaterial(increasing === (segment.direction==='EB') ? 1 : -1);
       materials.set(entity,material);entity.polyline.material=material;
     }
-    material.tint=color.withAlpha(color.alpha*opacity);material.width=config.lineWidth[lod];
+    if (overlaid) entity.polyline.width = Math.max(10, (config.lineWidth[lod] + (config.casing.enabled ? config.casing.pixels : 0)) * 1.9) + (emphasis === 'RESTING' ? 0 : 2);
+    material.tint=color.withAlpha(color.alpha*opacity);
+    material.width=config.lineWidth[lod] * (overlaid ? 1.9 : 1);
     material.speed=getFlowAnimationSpeed(segmentStatus.get(segment.segmentId));
-    material.arrows=config.arrow.enabled && lod!=='overview';
+    material.arrows=!overlaid && config.arrow.enabled && lod!=='overview';
+    // Use Cesium's solid material for heat instead of the directional-flow shader.
+    // This also isolates the opaque operational color from route arrows/casing.
+    if (overlaid) {
+      if (!(entity.polyline.material instanceof ColorMaterialProperty)) entity.polyline.material = new ColorMaterialProperty();
+      entity.polyline.material.color = color.withAlpha(1);
+    } else entity.polyline.material = material;
   }
   function select(entity) {
     const previous = selected; selected = entity; style(previous); style(selected);
@@ -179,6 +210,28 @@ export function createI595RoadSegmentLayer(viewer) {
     /** Future visualization hook: return a Cesium Color, or undefined to use the route color. */
     setColorResolver(resolver) {
       colorResolver = resolver;
+      for (const entity of segmentById.values()) style(entity);
+      viewer.scene.requestRender();
+    },
+    /**
+     * A data overlay's colour, kept apart from `setColorResolver` so the two cannot clobber one
+     * another — the startup fade owns that one. Return a Cesium Color per segment, or undefined to
+     * leave a segment to the route colour. Pass null to take the overlay away.
+     */
+    setImpactResolver(resolver) {
+      impactResolver = resolver;
+      for (const entity of segmentById.values()) style(entity);
+      viewer.scene.requestRender();
+    },
+    /**
+     * Rows an overlay wants above the segment's own, and the lines it wants in the hover tooltip.
+     * Pass null to take them away.
+     */
+    setOverlayDetails(details, tooltip) { detailsExtra = details; tooltipExtra = tooltip; },
+    /** Draw overlaid sections wide and opaque, so a data overlay reads over Google's imagery. */
+    setImpactEmphasis(on) {
+      if (impactEmphasis === on) return;
+      impactEmphasis = on;
       for (const entity of segmentById.values()) style(entity);
       viewer.scene.requestRender();
     },

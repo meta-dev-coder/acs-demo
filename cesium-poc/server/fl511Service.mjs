@@ -5,7 +5,7 @@
  * emptying the map. Nothing here touches the simulation; live events are visualisation only.
  */
 import { createFl511Client } from './fl511Client.mjs';
-import { EVENT_TYPES, attachDetails, layerIdFor, normalizeFeed } from './liveEvents.mjs';
+import { EVENT_TYPES, attachDetails, enrichForLiveOps, layerIdFor, normalizeFeed } from './liveEvents.mjs';
 
 export const SOURCE_STATUS = Object.freeze({ LIVE: 'LIVE', STALE: 'STALE', UNAVAILABLE: 'UNAVAILABLE' });
 
@@ -63,6 +63,23 @@ export function createFl511Service({ config, network, client = createFl511Client
     }));
   }
 
+  /**
+   * One line per poll: how the corridor's incidents classified, and how many may move a score.
+   * Counts and ids only — never a URL, a token or a credential.
+   */
+  function logLiveOpsResolution(events, log) {
+    const incidents = events.filter(event => event.type === EVENT_TYPES.INCIDENT);
+    if (!incidents.length) return;
+    const by = key => incidents.filter(event => event.liveOps?.carriageway === key).length;
+    log?.info?.('[LiveOps][Incidents]', {
+      total: incidents.length,
+      EB_GENERAL: by('EB_GENERAL'), WB_GENERAL: by('WB_GENERAL'),
+      EXPRESS: by('EXPRESS'), UNKNOWN: by('UNKNOWN'),
+      sectionResolved: incidents.filter(event => event.liveOps?.sectionId).length,
+      contributingToImpact: incidents.filter(event => event.liveOps?.contributesToImpact).length,
+    });
+  }
+
   async function refresh() {
     const [incidents, closures, construction, congestion, disabled] = await Promise.all([
       fetchFeed(EVENT_TYPES.INCIDENT), fetchFeed(EVENT_TYPES.CLOSURE), fetchFeed(EVENT_TYPES.CONSTRUCTION),
@@ -78,8 +95,12 @@ export function createFl511Service({ config, network, client = createFl511Client
       ...normalizeFeed(congestion ?? [], EVENT_TYPES.CONGESTION, network, options, logger),
       ...normalizeFeed(disabled ?? [], EVENT_TYPES.DISABLED, network, options, logger),
     ];
-    const events = await enrich(corridor);
+    // Carriageway and section are added after the detail fragments, because the prose they are
+    // read from arrives with those fragments. Additive: nothing existing is altered.
+    const events = (await enrich(corridor))
+      .map(event => enrichForLiveOps(event, network, { sectionToleranceMeters: config.segmentToleranceMeters }));
     events.sort((a, b) => a.id.localeCompare(b.id));
+    logLiveOpsResolution(events, logger);
     // Drop detail entries for events that have left the corridor so the cache cannot grow forever.
     const live = new Set(events.map(event => event.rawSourceId));
     for (const key of details.keys()) if (!live.has(key)) details.delete(key);

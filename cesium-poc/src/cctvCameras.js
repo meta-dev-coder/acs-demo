@@ -1,16 +1,16 @@
 import { corridorVisualConfig as config } from './corridorVisualConfig.js';
 import { CustomDataSource, Cartesian3, Color, DistanceDisplayCondition, HeightReference, NearFarScalar, ScreenSpaceEventType, VerticalOrigin } from 'cesium';
 import { createMapDetailsPanel } from './mapDetailsPanel.js';
-import { assetIdMarker } from './assetIdMarker.js';
+import { assetIdMarker, assetIconMarker } from './assetIdMarker.js';
 import { focusMapPoints } from './bridgeCamera.js';
 
 // Cameras are marked on the map by their own ID rather than by a camera pictogram: the layer
 // already tells you these are cameras, so the marker answers "which one". See assetIdMarker.js.
 
 // Returns the snapshot proxy URL for the DIVAS JPEG snapshot, or null when the
-// camera has no divas_chan_id. Uses VITE_SNAPSHOT_BASE when set (e.g. CloudFront),
-// otherwise falls back to the same-origin dev-server proxy.
-const SNAPSHOT_BASE = (import.meta.env?.VITE_SNAPSHOT_BASE ?? '').replace(/\/$/, '');
+// camera has no divas_chan_id. Development uses the same-origin Vite proxy;
+// deployed builds can use VITE_SNAPSHOT_BASE (e.g. CloudFront).
+const SNAPSHOT_BASE = (import.meta.env?.DEV ? '' : (import.meta.env?.VITE_SNAPSHOT_BASE ?? '')).replace(/\/$/, '');
 export function getCameraStreamUrl(camera) {
   const id = camera?.divas_chan_id;
   if (typeof id !== 'string' || id.length === 0) return null;
@@ -96,6 +96,7 @@ export function installCctvCameras(container, viewer, { onStreetView } = {}) {
   const expressIds = new Set(), mainlineIds = new Set();
 
   const source = new CustomDataSource('I-595 Corridor CCTV Cameras');
+  let iconMarkers = false;
   let selected, hovered, disposed = false, loading;
   let snapshotInterval = null;
 
@@ -110,7 +111,7 @@ export function installCctvCameras(container, viewer, { onStreetView } = {}) {
     if (!entity) return;
     // Two cached textures per camera — charcoal and yellow — swapped on selection. Nothing is
     // redrawn per frame, and the marker's own colours carry the state rather than a tint.
-    const marker = idMarkerGraphics(records.get(entity)?.camera_id ?? entity.id, entity === selected);
+    const marker = iconMarkers ? assetIconMarker('camera', entity === selected) : idMarkerGraphics(records.get(entity)?.camera_id ?? entity.id, entity === selected);
     entity.billboard.image = marker.image;
     entity.billboard.width = marker.width;
     entity.billboard.height = marker.height;
@@ -262,7 +263,7 @@ export function installCctvCameras(container, viewer, { onStreetView } = {}) {
         const entity = source.entities.add({
           id: String(p.camera_id), name: cameraLabel(p), show: false,
           position: Cartesian3.fromDegrees(...f.geometry.coordinates), properties: p,
-          billboard: { ...idMarkerGraphics(p.camera_id, false), scale: 1,
+          billboard: { ...(iconMarkers ? assetIconMarker('camera') : idMarkerGraphics(p.camera_id, false)), scale: 1,
             verticalOrigin: VerticalOrigin.BOTTOM, heightReference: HeightReference.CLAMP_TO_GROUND,
             disableDepthTestDistance: Number.POSITIVE_INFINITY,
             distanceDisplayCondition: new DistanceDisplayCondition(0, config.lod.corridorDistance),
@@ -331,6 +332,7 @@ export function installCctvCameras(container, viewer, { onStreetView } = {}) {
   function clearSelection() { select(null); }
 
   return { cameraById, records, selectCamera, highlightById, clearSelection,
+    setIconMarkers(on) { iconMarkers = Boolean(on); for (const entity of cameraById.values()) style(entity); viewer.scene.requestRender(); },
     setExternallyOwned(owned) { externallyOwned = Boolean(owned); },
     onSelection(callback) {
       // null clears every listener, which is what teardown wants.

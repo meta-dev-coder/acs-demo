@@ -17,28 +17,17 @@ import {
   liveEventAssociationRows, liveEventLabel, liveEventNotice, liveEventSourceRows,
   liveEventStatusText, liveEventTooltip,
 } from './liveEventsData.js';
+import { ICON_FOR_EVENT_TYPE, OPS_ICONS, opsIconMarkup, opsPinDataUrl } from './liveOps/opsIcons.js';
 
 // Vite mounts the API locally; a production override must not bypass it in development.
 export const LIVE_EVENTS_API = import.meta.env.DEV ? '/api/i595/live-events' : (import.meta.env.VITE_LIVE_EVENTS_API || '/api/i595/live-events');
 const REFRESH_MS = 60_000;
 
-// Same 4× rasterised pin as the CCTV and signal badges so the corridor markers read as one family.
-const pin = (accent, tint, glyph) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="176" height="208" viewBox="0 0 44 52">
-<path d="M17 40 22 49 27 40" fill="#0b1729" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/>
-<rect x="2" y="2" width="40" height="40" rx="12" fill="#0b1729" stroke="white" stroke-width="2.5"/>
-<rect x="5" y="5" width="34" height="34" rx="9" fill="${tint}"/>
-<g fill="none" stroke="${accent}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">${glyph}</g></svg>`)}`;
+// The markers come from the same definitions as the Live Ops layers panel, so the row an operator
+// ticks and the pin they then look for are the same icon in the same colour.
+const ICONS = Object.fromEntries(Object.entries(ICON_FOR_EVENT_TYPE)
+  .map(([type, iconId]) => [type, opsPinDataUrl(iconId)]));
 
-const ICONS = {
-  [LIVE_EVENT_TYPES.INCIDENT]: pin('#ffc65c', '#4a3211', '<path d="M22 12.5 34.5 32.5H9.5Z"/><path d="M22 20v5.5"/><path d="M22 29.2v.2"/>'),
-  [LIVE_EVENT_TYPES.CLOSURE]: pin('#ff8a8a', '#4d1c22', '<rect x="9" y="18.5" width="26" height="9.5" rx="2"/><path d="m14 28 4.5-9.5M21 28l4.5-9.5M28 28l4.5-9.5"/><path d="M11.5 28v4.5M32.5 28v4.5"/>'),
-  // FL511 draws construction in orange; the pin keeps that association while matching our family.
-  [LIVE_EVENT_TYPES.CONSTRUCTION]: pin('#ffab5c', '#4a2f11', '<path d="M11 27.5h22v5H11z"/><path d="M15 27.5V16h14v11.5"/><path d="m15 21.5 14-5.5"/>'),
-  // FL511 draws congestion as a queue marker; amber keeps it distinct from a red closure.
-  [LIVE_EVENT_TYPES.CONGESTION]: pin('#ffd66b', '#4a3a11', '<path d="M11 13h18v6H11z"/><path d="M11 22h18v6H11z"/><path d="M33 12v18"/><path d="m29.5 26.5 3.5 3.5 3.5-3.5"/>'),
-  // A stopped vehicle is a hazard rather than a restriction: blue-grey, distinct from the warnings.
-  [LIVE_EVENT_TYPES.DISABLED]: pin('#9fc4ff', '#1d2c4a', '<path d="M10 25.5h20v4H10z"/><path d="M12.5 25.5 14.5 18h11l2 7.5"/><circle cx="14.5" cy="29.5" r="1.8"/><circle cx="25.5" cy="29.5" r="1.8"/><path d="M20 9v4.5M20 15.2v.3"/>'),
-};
 const CONNECTOR_COLOR = Color.fromCssColorString('#ff8a8a');
 
 export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_API, refreshMs = REFRESH_MS, fetchImpl = fetch } = {}) {
@@ -101,6 +90,32 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
     const details = document.querySelector('.live-event-details');
     details?.querySelectorAll('.live-event-extra').forEach(node => node.remove());
     if (!event || !details) return;
+    // A header the way an operator reads one: what it is, how bad, and where — before the field
+    // list. Built only from what the feed and our own enrichment actually carry; there is no
+    // estimated delay or vehicle count in this data, so none is shown.
+    const hero = document.createElement('section');
+    hero.className = 'live-event-extra live-event-hero';
+    const ops = event.liveOps ?? {};
+    const place = [ops.carriagewayLabel, ops.sectionLabel].filter(Boolean).join(' · ')
+      || event.nearestFacilityLabel || null;
+    const severity = event.severity ? String(event.severity) : null;
+    const tone = OPS_ICONS[ICON_FOR_EVENT_TYPE[event.type]]?.color ?? 'var(--ui-accent)';
+    hero.style.setProperty('--event-tone', tone);
+    hero.innerHTML = `
+      <div class="live-event-hero-top">
+        <span class="live-event-hero-icon">${opsIconMarkup(ICON_FOR_EVENT_TYPE[event.type], 20)}</span>
+        <h3 class="live-event-hero-title"></h3>
+        ${severity ? '<span class="live-event-hero-severity"></span>' : ''}
+      </div>
+      ${place ? '<p class="live-event-hero-place"></p>' : ''}
+      ${ops.laneImpactLabel ? '<p class="live-event-hero-lanes"></p>' : ''}`;
+    // Text is assigned, never interpolated: these strings are FL511's, not ours.
+    hero.querySelector('.live-event-hero-title').textContent = liveEventLabel(event);
+    if (severity) hero.querySelector('.live-event-hero-severity').textContent = severity;
+    if (place) hero.querySelector('.live-event-hero-place').textContent = place;
+    if (ops.laneImpactLabel) hero.querySelector('.live-event-hero-lanes').textContent = ops.laneImpactLabel;
+    details.querySelector('dl').before(hero);
+
     const caption = document.createElement('p');
     caption.className = 'live-event-extra live-event-caption';
     caption.textContent = `Source data · ${event.source ?? 'FL511'}`;

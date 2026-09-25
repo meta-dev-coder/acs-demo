@@ -6,6 +6,9 @@
  * never allowed to become a roadway or direction claim.
  */
 import { LAYERS } from './fl511Client.mjs';
+import { CARRIAGEWAY_LABELS, classifyCarriageway, sourceText } from './carriageway.mjs';
+import { resolveSection } from './corridorSections.mjs';
+import { laneImpactLabel, parseLaneImpact } from './laneImpact.mjs';
 import { FACILITY_LABELS } from './i595Network.mjs';
 
 /** @typedef {'INCIDENT'|'CLOSURE'|'CONSTRUCTION'|'CONGESTION'|'DISABLED'} LiveRoadEventType */
@@ -89,6 +92,66 @@ export function attachDetails(event, detail) {
   // FL511 publishes roadway, direction and lanes blocked only inside the prose description, never
   // as structured values, so roadway/direction/lanesBlocked stay undefined rather than parsed.
   return enriched;
+}
+
+/**
+ * Live Ops enrichment, added BESIDE the existing association rather than replacing it.
+ *
+ * `nearestFacility` / `nearestSegmentId` stay exactly as they were — Traffic and Safety read them,
+ * and they are a spatial inference by their own documentation. The `liveOps` block is the evidenced
+ * one: the carriageway comes from FL511's words, and only then does geometry pick a section within
+ * that carriageway.
+ *
+ * Runs after `attachDetails`, because the detail fragment is where most of the prose lives.
+ *
+ * @param {object} event
+ * @param {{segments: object[]}} network
+ */
+export function enrichForLiveOps(event, network, { sectionToleranceMeters } = {}) {
+  const classification = classifyCarriageway(event);
+  const laneImpact = parseLaneImpact(sourceText(event));
+  const section = resolveSection(
+    { longitude: event.longitude, latitude: event.latitude },
+    classification.carriageway,
+    network?.segments ?? [],
+    sectionToleranceMeters ? { toleranceMeters: sectionToleranceMeters } : {},
+  );
+  return {
+    ...event,
+    liveOps: {
+      corridor: 'I-595',
+      carriageway: classification.carriageway,
+      carriagewayLabel: CARRIAGEWAY_LABELS[classification.carriageway] ?? null,
+      /** Only what the source stated. Express is reversible and is never given a default. */
+      direction: classification.direction,
+      sectionId: section.sectionId,
+      sectionIndex: section.sectionIndex,
+      sectionLabel: section.sectionLabel,
+      segmentId: section.segmentId,
+      spatialMatch: {
+        method: section.sectionId ? `${classification.method}+${section.method}` : classification.method,
+        distanceMeters: section.distanceMeters,
+        // The weaker of the two steps: a section is only as trustworthy as the carriageway it was
+        // searched within, so classification confidence caps the pair.
+        confidence: classification.confidence,
+        classification: {
+          method: classification.method,
+          confidence: classification.confidence,
+          evidence: classification.evidence,
+        },
+        section: {
+          method: section.method,
+          candidateCount: section.candidateCount,
+          runnerUpMeters: section.runnerUpMeters,
+        },
+      },
+      /** What the source said about lanes. `source: 'none'` when it said nothing. */
+      laneImpact,
+      laneImpactLabel: laneImpactLabel(laneImpact),
+      /** Whether this event may move a section's operational score. */
+      contributesToImpact: Boolean(section.sectionId),
+    },
+  };
 }
 
 /**

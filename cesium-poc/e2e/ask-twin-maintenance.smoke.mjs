@@ -21,7 +21,7 @@ try {
   page.on('pageerror', e => problems.push(`pageerror: ${e.message}`));
   page.on('console', m => { if (m.type() === 'error' && !networkNoise.test(m.text())) problems.push(`console: ${m.text()}`); });
 
-  await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off');
+  await page.goto('http://127.0.0.1:5188/?demo=i595&intro=off&data=mock');
   await page.locator('body[data-startup="ready"]').waitFor({ timeout: 90000 });
   await page.waitForFunction(() => (window.__maintenance?.recordsForType('inspection')?.length ?? 0) > 0, null, { timeout: 90000 });
   assert.equal(await page.evaluate(() => document.body.dataset.section), 'overview', 'Maintenance was never opened');
@@ -60,7 +60,14 @@ try {
     assert.equal(flown.kind, 'fly', `"fly to ${id}" resolves to one ${type}`);
     assert.equal(flown.flown, id, `${type}: flyToAsset delivered it (a workspace type has no layer to switch on)`);
 
-    await page.waitForTimeout(4500);   // the flight settles
+    // Wait for the camera to ARRIVE rather than for a fixed interval: the flight's duration varies
+    // with distance, and a fixed pause occasionally measured it mid-flight.
+    await page.waitForFunction(target => {
+      const c = window.__viewer.camera.positionCartographic;
+      const dLat = (c.latitude * 180 / Math.PI - target.lat) * 111000;
+      const dLon = (c.longitude * 180 / Math.PI - target.lon) * 111000 * Math.cos(target.lat * Math.PI / 180);
+      return Math.hypot(dLat, dLon) < 400;
+    }, { lat, lon }, { timeout: 30000, polling: 300 }).catch(() => {});
     const camera = await page.evaluate(() => {
       const c = window.__viewer.camera.positionCartographic;
       return { lat: c.latitude * 180 / Math.PI, lon: c.longitude * 180 / Math.PI };

@@ -19,6 +19,8 @@ const ICONS = Object.freeze({
   traffic: '<path d="M3.5 13.5h13M4.5 13.5V10l1.8-3.6A1 1 0 0 1 7.2 6h5.6a1 1 0 0 1 .9.6L15.5 10v3.5"/><path d="M3.5 10h13"/><circle cx="6.5" cy="15.5" r="1.2"/><circle cx="13.5" cy="15.5" r="1.2"/>',
   maintenance: '<path d="M12.6 3.4a3.8 3.8 0 0 0-4.9 4.8l-4 4a1.6 1.6 0 0 0 2.2 2.3l4-4a3.8 3.8 0 0 0 4.8-4.9l-2 2-1.8-.4-.4-1.8z"/>',
   safety: '<path d="M10 3.2 4.6 5.4v4.1c0 3.2 2.2 6.1 5.4 7.3 3.2-1.2 5.4-4.1 5.4-7.3V5.4z"/><path d="m7.8 10.2 1.6 1.6 3-3.4"/>',
+  // A radar sweep over the corridor: live watching, distinct from Traffic's road glyph.
+  liveOps: '<circle cx="10" cy="10" r="6.8"/><circle cx="10" cy="10" r="2.6"/><path d="M10 10 14.8 5.2"/><path d="M10 3.2v1.6M10 15.2v1.6M3.2 10h1.6M15.2 10h1.6"/>',
   layers: '<path d="m10 3.2 6.6 3.4L10 10 3.4 6.6z"/><path d="m3.4 10 6.6 3.4L16.6 10"/><path d="m3.4 13.4 6.6 3.4 6.6-3.4"/>',
 });
 
@@ -28,6 +30,7 @@ export const NAV_SECTIONS = Object.freeze([
   Object.freeze({ id: 'traffic', label: 'Traffic', icon: 'traffic' }),
   Object.freeze({ id: 'maintenance', label: 'Maintenance', icon: 'maintenance' }),
   Object.freeze({ id: 'safety', label: 'Safety', icon: 'safety' }),
+  Object.freeze({ id: 'liveOps', label: 'Live Ops', icon: 'liveOps' }),
 ]);
 
 export const DEFAULT_SECTION = NAV_SECTIONS[0].id;

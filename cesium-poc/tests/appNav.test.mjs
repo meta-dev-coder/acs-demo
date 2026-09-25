@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_SECTION, NAV_SECTIONS, resolveSection } from '../src/appNav.js';
 
-test('the bar offers the four workspaces, in order, each with its own icon', () => {
-  assert.deepEqual(NAV_SECTIONS.map(section => section.id), ['overview', 'traffic', 'maintenance', 'safety']);
-  assert.deepEqual(NAV_SECTIONS.map(section => section.label), ['Overview', 'Traffic', 'Maintenance', 'Safety']);
+test('the bar offers the workspaces, in order, each with its own icon', () => {
+  assert.deepEqual(NAV_SECTIONS.map(section => section.id), ['overview', 'traffic', 'maintenance', 'safety', 'liveOps']);
+  assert.deepEqual(NAV_SECTIONS.map(section => section.label), ['Overview', 'Traffic', 'Maintenance', 'Safety', 'Live Ops']);
   assert.equal(new Set(NAV_SECTIONS.map(section => section.icon)).size, NAV_SECTIONS.length);
   assert.equal(DEFAULT_SECTION, 'overview');
 });

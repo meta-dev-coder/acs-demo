@@ -36,6 +36,7 @@ import { installAppNav } from "./appNav.js";
 import { installMaintenanceLayer } from "./maintenance/maintenanceLayer.js";
 import { installMaintenanceWorkspace } from "./maintenance/maintenanceWorkspace.js";
 import { installSafetyWorkspace, installTrafficWorkspace } from "./safetyWorkspace.js";
+import { installLiveOpsWorkspace } from "./liveOps/liveOpsWorkspace.js";
 import { getTrafficColor } from "./corridorVisualConfig.js";
 import { installI595RoadShields } from "./i595RoadShields.js";
 import { installI595ContextLabels } from "./i595ContextLabels.js";
@@ -437,14 +438,23 @@ try {
   const traffic = installTrafficWorkspace(liveEventDeps);
   // Maintenance is a workspace over the same map: the KPI strip and its list appear, everything
   // else — camera, layers, Ask the Twin — carries on untouched.
-  const workspaces = { maintenance, safety, traffic };
+  // Live Ops reads the same FL511 feed and colours the corridor's own FDOT segments; it owns no
+  // data and no geometry of its own.
+  const liveOps = installLiveOpsWorkspace(viewer, {
+    assetExplorer, liveEvents: liveEventControls, layerStore, segments: mainlineSegments,
+  });
+  const workspaces = { maintenance, safety, traffic, liveOps };
   appNav.onSelect(section => {
+    cameraControls.setIconMarkers(section === "liveOps");
+    messageSignControls.setIconMarkers(section === "liveOps");
     for (const [name, workspace] of Object.entries(workspaces)) {
       if (name === section) workspace.activate(); else workspace.deactivate();
     }
   });
+  cameraControls.setIconMarkers(appNav.section === "liveOps");
+  messageSignControls.setIconMarkers(appNav.section === "liveOps");
   workspaces[appNav.section]?.activate();
-  if (import.meta.env.DEV) { window.__maintenance = maintenance; window.__safety = safety; window.__traffic = traffic; }
+  if (import.meta.env.DEV) { window.__maintenance = maintenance; window.__safety = safety; window.__traffic = traffic; window.__liveOps = liveOps; window.__liveEvents = liveEventControls; }
 
   explorerToggle = document.querySelector("#menu-toggle");
   // A fresh load opens on the map, not on the layer tree; the quick rail keeps the common
@@ -453,7 +463,7 @@ try {
 
   // Operational strip: corridor facts and the live-event feed, with gaps stated rather than filled.
   const askTwin = installAskTheTwin(viewer, { cameraControls, assetExplorer, segments: mainlineSegments, layerStore, centerline: corridor });
-  if (import.meta.hot) import.meta.hot.dispose(() => { traffic.destroy(); safety.destroy(); maintenance.destroy(); maintenanceLayer.destroy(); appNav.destroy(); assetExplorer.destroy(); lightingControls.destroy(); messageSignControls.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
+  if (import.meta.hot) import.meta.hot.dispose(() => { liveOps.destroy(); traffic.destroy(); safety.destroy(); maintenance.destroy(); maintenanceLayer.destroy(); appNav.destroy(); assetExplorer.destroy(); lightingControls.destroy(); messageSignControls.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
   for (const input of inputs) {
     // Layers with their own loader, plus display options that are not data layers at all: this loop
     // fetches `data/<id>.geojson`, and "flow-direction" has no such file — being swept up here

@@ -144,7 +144,9 @@ export function AssetExplorer({ store, centerline, leftInset = 16, rightInset: d
         >
           {/* Column 1, pushed to its right edge so it sits immediately beside the browser. */}
           <Box sx={{ justifySelf: 'end', pointerEvents: 'auto' }}>
-            {showMiniMap && explorerExpanded && (
+            {/* Live Ops gives the lower-left corner back to the map: the Cesium view already
+                provides the spatial context a second map would repeat. */}
+            {showMiniMap && explorerExpanded && document.body.dataset.section !== 'liveOps' && (
               <AssetMiniMap
                 centerline={centerline}
                 assets={assets}

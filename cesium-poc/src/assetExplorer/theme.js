@@ -23,7 +23,9 @@ export const UI_TOKENS = Object.freeze({
     accent: ROAD_STYLE.generalPurposeEB.color, accentBright: '#5C9EE0', accentContrast: '#ffffff',
   }),
   light: Object.freeze({
-    surface: '#ffffff', surfaceRaised: '#f8fafc', canvas: '#eef2f7',
+    // Pure white throughout in light mode: the explorer, its cards and the details panel are one
+    // white surface, separated by lines rather than by tints.
+    surface: '#ffffff', surfaceRaised: '#ffffff', canvas: '#ffffff',
     text: '#172033', textSecondary: '#5f6b7a',
     line: '#d8dee6',
     // Darkened for legibility on white; the dark mode keeps the brighter corridor teal.

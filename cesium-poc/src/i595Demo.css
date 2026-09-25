@@ -54,10 +54,13 @@
 }
 
 :root[data-theme="light"] {
-  --ui-surface: #ffffffF2;
+  /* Pure white throughout: a translucent or tinted white reads grey over photogrammetry, and the
+     panels are meant to be white. Separation comes from the borders and the shadow, not from a
+     tint. `sunken` keeps the faintest wash so an inset area is still distinguishable. */
+  --ui-surface: #ffffff;
   --ui-surface-solid: #ffffff;
-  --ui-surface-raised: #f8fafc;
-  --ui-surface-sunken: #eef2f7;
+  --ui-surface-raised: #ffffff;
+  --ui-surface-sunken: #f4f7fa;
 
   --ui-text: #172033;
   --ui-text-secondary: #5f6b7a;
@@ -78,7 +81,7 @@
   --ui-accent-soft: #e6f6f4;
   --ui-accent-contrast: #ffffff;
 
-  --ui-surface-translucent: #ffffffee;
+  --ui-surface-translucent: #ffffff;
   --ui-accent-tint: #0f8d8214;
   --ui-accent-line: #0f8d8266;
   --ui-status-express: #8a5a10;
@@ -165,7 +168,9 @@ input { width: 17px; height: 17px; margin: 0; accent-color: var(--road); cursor:
 :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .gantry-details, .live-event-details, .model-details, .structure-details) dl { display: grid; grid-template-columns: 90px 1fr; gap: 12px; font-size: 12px; line-height: 1.5; }
 :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .gantry-details, .live-event-details, .model-details, .structure-details) dt { color: var(--ui-text-secondary); }
 :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .gantry-details, .live-event-details, .model-details, .structure-details) dd { margin: 0; overflow-wrap: anywhere; }
-.ramp-tooltip { position: fixed; pointer-events: none; z-index: 10; max-width: min(290px, calc(100vw - 16px)); padding: 10px 13px; border: 1px solid #ffffff35; border-radius: 8px; background: #0b1423f5; color: var(--ui-text); font-size: 12px; line-height: 1.7; white-space: pre-line; box-shadow: 0 6px 20px var(--ui-shadow-color); }
+/* Themed, not a hardcoded navy: the background was fixed dark while the text followed the theme,
+   so in light mode this was dark text on a dark box — unreadable, which is exactly how it looked. */
+.ramp-tooltip { position: fixed; pointer-events: none; z-index: 10; max-width: min(290px, calc(100vw - 16px)); padding: 10px 13px; border: 1px solid var(--ui-border-strong); border-radius: 8px; background: var(--ui-surface-solid); color: var(--ui-text); font-size: 12px; line-height: 1.7; white-space: pre-line; box-shadow: 0 6px 20px var(--ui-shadow-color); }
 @media (max-width: 700px) {
   :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .gantry-details, .live-event-details, .model-details, .structure-details) { top: auto; bottom: 42px; left: 10px; right: 10px; width: auto; max-height: 40dvh; }
   body:has(:is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .gantry-details, .live-event-details, .model-details, .structure-details):not([hidden])) .layers #layer-content { max-height: calc(60dvh - 155px); }
@@ -342,6 +347,7 @@ body:has(.layers:not(.collapsed)) .corridor-status { left: calc(var(--app-nav-w)
 /* `display: flex` above beats the hidden attribute on its own, so the strip needs this to be able
    to stand aside for the Asset Explorer. Same trap as .street-view and .ask-twin-panel. */
 .corridor-status[hidden] { display: none; }
+body[data-section="liveOps"] .corridor-status { display: none; }
 .corridor-status-toggle { flex: none; padding: 0 12px; border: 0; border-right: 1px solid var(--ui-border-soft); background: transparent; color: var(--ui-text-secondary); font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; cursor: pointer; }
 .corridor-status-toggle span { color: var(--ui-accent); }
 .corridor-status-toggle:hover { background: var(--ui-hover); }
@@ -511,6 +517,13 @@ body:has(.street-view[data-state="active"]) :is(.ramp-details, .road-details, .s
 .ask-twin-btn { position: absolute; bottom: 56px; right: 120px; display: flex; align-items: center; gap: 7px; padding: 9px 16px; background: var(--ui-surface-solid); border: 1px solid var(--ui-accent-line); border-radius: 22px; color: var(--ui-accent); font-size: 12px; font-weight: 600; letter-spacing: 0.03em; box-shadow: 0 4px 16px var(--ui-shadow-color); cursor: pointer; z-index: 20; transition: background 0.15s, border-color 0.15s, box-shadow 0.15s; }
 .ask-twin-btn:hover { background: var(--ui-surface-raised); border-color: var(--ui-accent-line); box-shadow: 0 4px 20px var(--ui-accent-tint); }
 .ask-twin-btn.active { background: var(--ui-accent-soft); border-color: var(--ui-accent-strong); }
+.ask-twin-sparkle-icon { display: none; }
+:root[data-theme="light"] .ask-twin-btn { background: #005cff; border-color: #005cff; border-radius: 12px; color: #fff; padding: 13px 22px; gap: 12px; font-size: 14px; letter-spacing: 0; box-shadow: 0 4px 16px #005cff26; }
+:root[data-theme="light"] .ask-twin-btn:hover,
+:root[data-theme="light"] .ask-twin-btn.active { background: #004fe0; border-color: #004fe0; }
+:root[data-theme="light"] .ask-twin-btn:focus-visible { outline: 3px solid #80b0ff; outline-offset: 3px; }
+:root[data-theme="light"] .ask-twin-chat-icon { display: none; }
+:root[data-theme="light"] .ask-twin-sparkle-icon { display: block; flex-shrink: 0; }
 @media (max-width: 700px) { .ask-twin-btn { right: 16px; bottom: 110px; } }
 
 .ask-twin-panel { position: absolute; bottom: 108px; right: 16px; width: min(380px, calc(100vw - 32px)); max-height: 500px; display: flex; flex-direction: column; background: #0a1525f8; border: 1px solid var(--ui-accent-tint); border-radius: 14px; box-shadow: 0 20px 60px var(--ui-shadow-color), 0 0 0 1px var(--ui-accent-tint); z-index: 21; overflow: hidden; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
@@ -582,6 +595,40 @@ body:has(.street-view[data-state="active"]) :is(.ramp-details, .road-details, .s
 .ask-twin-send { background: #0e3040; border: 1px solid var(--ui-accent-line); border-radius: 9px; color: var(--ui-accent-strong); padding: 8px 11px; cursor: pointer; display: flex; align-items: center; flex-shrink: 0; transition: background 0.12s; }
 .ask-twin-send:hover:not(:disabled) { background: #174d60; }
 .ask-twin-send:disabled { opacity: 0.35; cursor: default; }
+
+/* Light-theme conversation uses the launch button's blue palette. */
+:root[data-theme="light"] .ask-twin-panel {
+  --ui-accent-strong: #005cff;
+  --ui-accent-line: #b6ceff;
+  --ui-accent-tint: #eaf1ff;
+  background: #fff;
+  border-color: #c9d9f5;
+  box-shadow: 0 16px 48px #163b7029;
+}
+:root[data-theme="light"] .ask-twin-header { background: #005cff; border-bottom-color: #005cff; }
+:root[data-theme="light"] .ask-twin-title,
+:root[data-theme="light"] .ask-twin-icon-btn { color: #fff; }
+:root[data-theme="light"] .ask-twin-icon-btn:hover { background: #ffffff26; }
+:root[data-theme="light"] .ask-twin-indicator { background: #fff; --ui-accent-strong: #fff; }
+:root[data-theme="light"] .ask-twin-body { background: #f7faff; }
+:root[data-theme="light"] .ask-twin-msg--user .ask-twin-bubble { background: #005cff; border-color: #005cff; color: #fff; }
+:root[data-theme="light"] .ask-twin-msg--assistant .ask-twin-bubble { background: #fff; border-color: #dce6f5; color: #182b49; }
+:root[data-theme="light"] .ask-twin-suggestions,
+:root[data-theme="light"] .ask-twin-form { border-top-color: #dce6f5; }
+:root[data-theme="light"] .ask-twin-chip,
+:root[data-theme="light"] .ask-twin-fly-btn { background: #eaf1ff; border-color: #c9daff; color: #004acb; }
+:root[data-theme="light"] .ask-twin-chip:hover,
+:root[data-theme="light"] .ask-twin-fly-btn:hover:not(:disabled) { background: #dae7ff; border-color: #80aaff; color: #003da8; }
+:root[data-theme="light"] .ask-twin-fly-btn:disabled { color: #526782; border-color: #dce6f5; }
+:root[data-theme="light"] .ask-twin-form { background: #fff; }
+:root[data-theme="light"] .ask-twin-input { min-width: 0; background: #f7faff; border-color: #c9d9f5; color: #182b49; }
+:root[data-theme="light"] .ask-twin-input:focus { border-color: #005cff; box-shadow: 0 0 0 2px #005cff1a; }
+:root[data-theme="light"] .ask-twin-send { background: #005cff; border-color: #005cff; color: #fff; }
+:root[data-theme="light"] .ask-twin-send:hover:not(:disabled) { background: #004fe0; border-color: #004fe0; }
+:root[data-theme="light"] .ask-twin-confidence--high { background: #ecfdf3; color: #166534; border-color: #bbf7d0; }
+:root[data-theme="light"] .ask-twin-confidence--medium { background: #fffbeb; color: #92400e; border-color: #fde68a; }
+:root[data-theme="light"] .ask-twin-confidence--low { background: #fff1f2; color: #be123c; border-color: #fecdd3; }
+:root[data-theme="light"] .ask-twin-panel button:focus-visible { outline: 2px solid #80aaff; outline-offset: 2px; }
 
 /* Floating panels: the heading is the grab handle, and a dragged panel lifts above its neighbours. */
 .panel-drag-handle { cursor: grab; user-select: none; touch-action: none; }
@@ -750,23 +797,95 @@ body[data-layers-open="false"] .layers { display: none; }
    Workspace KPI strip — shared by Maintenance and Safety. Deliberately plain: the map is the
    workspace, this is an instrument over it, and every colour is a theme token.
    ========================================================================================== */
-.maintenance-workspace, .safety-workspace, .traffic-workspace { position: absolute; inset: 0; pointer-events: none; z-index: 22; }
+.maintenance-workspace, .safety-workspace, .traffic-workspace, .liveops-workspace { position: absolute; inset: 0; pointer-events: none; z-index: 22; }
+
+/* Live Ops chips: shorter and lighter than the workspace KPI cards, because five of them sit over
+   the map. One line for the label, one for the number. */
+/* Restrained, not a heavy border: a rule under the chosen card, in that card's own tone. */
+.ws-kpi[aria-pressed="true"] { box-shadow: inset 0 -2px 0 var(--kpi-tone); border-color: var(--kpi-tone); }
+.ws-kpi-icon {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 30px; height: 30px; border-radius: 9px;
+  background: color-mix(in srgb, var(--kpi-tone) 14%, transparent); color: var(--kpi-tone);
+}
+.ws-kpi-icon svg { width: 17px; height: 17px; }
+.ws-kpi-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ws-kpi-chevron { margin-left: auto; color: var(--ui-text-muted); font-size: 15px; line-height: 1; }
+.ws-kpi[aria-pressed="true"] .ws-kpi-chevron { color: var(--kpi-tone); }
+
+/* Layers is a button; the list only appears when asked for. */
+.liveops-workspace .ws-source { display: none; }
+.liveops-layers { position: absolute; top: 90px; right: 16px; pointer-events: auto; z-index: 3; }
+.liveops-layers-trigger {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px;
+  border: 1px solid var(--ui-border); border-radius: 8px; background: var(--ui-surface-translucent);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  color: var(--ui-text); font: inherit; font-size: 12px; cursor: pointer;
+}
+.liveops-layers-trigger svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
+.liveops-layers-badge:not(:empty) {
+  min-width: 16px; padding: 0 4px; border-radius: 8px; background: var(--ui-accent);
+  color: var(--ui-accent-contrast, #04211d); font-size: 10.5px; font-weight: 600; text-align: center;
+}
+.liveops-layers-panel {
+  position: absolute; top: calc(100% + 6px); right: 0; width: 268px; padding: 0 12px 10px;
+  background: var(--ui-surface-translucent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--ui-border); border-radius: 10px; box-shadow: var(--ui-shadow);
+  color: var(--ui-text); font-size: 12px;
+}
+.liveops-layers-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 11px 0 8px;
+  font-size: 13.5px; font-weight: 650; color: var(--ui-text);
+}
+.liveops-layers-head em { font-style: normal; font-size: 11.5px; font-weight: 500; color: var(--ui-text-secondary); }
+.liveops-layers-close { background: none; border: 0; color: var(--ui-text-dim); font-size: 16px; line-height: 1; cursor: pointer; }
+.liveops-layer-group + .liveops-layer-group { margin-top: 8px; }
+.liveops-layer-title {
+  margin: 0 0 4px; font-size: 10px; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ui-text-dim);
+}
+/* Checkbox, icon, label — the icon carries the category, so a row is recognisable before it is read.
+   The global `label:has(input:checked)` highlight is for the Map Explorer's tree, where a label IS
+   the control; here the checkbox already says what is on, and a filled row per tick made the panel
+   look like five selected cards. */
+.liveops-layer-row,
+.liveops-layer-row:has(input:checked) { background: none; border-color: transparent; }
+.liveops-layer-row { display: flex; align-items: center; gap: 10px; padding: 5px 4px; border-radius: 7px; cursor: pointer; }
+.liveops-layer-row:hover { background: var(--ui-hover); }
+.liveops-layer-row input { width: 15px; height: 15px; margin: 0; accent-color: var(--ui-accent); flex: none; }
+.liveops-layer-icon { display: inline-flex; align-items: center; justify-content: center; width: 20px; flex: none; }
+.liveops-layer-label { flex: 1; min-width: 0; font-size: 12.5px; }
+.liveops-layer-count { color: var(--ui-text-dim); font-variant-numeric: tabular-nums; }
+
+/* Just below the KPI cards, only while the overlay is on. */
+.liveops-legend {
+  position: absolute; left: calc(var(--app-nav-w) + 16px); top: var(--liveops-kpi-bottom, 100px); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; max-width: calc(100vw - var(--app-nav-w) - 48px);
+  padding: 6px 10px; border: 1px solid var(--ui-border); border-radius: 8px;
+  background: var(--ui-surface-translucent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  color: var(--ui-text); font-size: 11px; pointer-events: none;
+}
+.liveops-legend-title { font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--ui-text-dim); }
+.liveops-legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.liveops-legend-item i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
 .ws-kpis { position: absolute; top: 16px; left: calc(var(--app-nav-w) + 16px); display: flex; align-items: stretch; gap: 8px;
   max-width: calc(100vw - var(--app-nav-w) - 560px); pointer-events: auto; }
-.ws-kpi { display: flex; flex-direction: column; gap: 2px; min-width: 122px; padding: 8px 12px 9px;
-  border: 1px solid var(--ui-border); border-radius: 10px; background: var(--ui-surface-translucent);
+/* A figure with a heading: tinted icon chip, then label, value and note. The tone comes from the
+   card when it names one, so an operational category keeps its colour here too. */
+.ws-kpi { --kpi-tone: var(--ui-accent);
+  display: flex; align-items: center; gap: 10px; min-width: 148px; padding: 9px 12px;
+  border: 1px solid var(--ui-border); border-radius: 12px; background: var(--ui-surface-translucent);
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); color: var(--ui-text); font: inherit; text-align: left; cursor: pointer;
   transition: border-color .15s ease, background .15s ease; }
 .ws-kpi:hover { border-color: var(--ui-border-strong); }
 .ws-kpi:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: -2px; }
-.ws-kpi[aria-pressed="true"] { border-color: var(--ui-border-strong); background: var(--ui-surface-solid);
-  box-shadow: inset 3px 0 0 var(--ui-accent-strong); }
-.ws-kpi[aria-pressed="true"] .ws-kpi-head { color: var(--ui-text); }
+.ws-kpi[aria-pressed="true"] { background: var(--ui-surface-solid); }
 .ws-kpi[data-browsable="false"] { cursor: default; }
-.ws-kpi-head { display: flex; align-items: center; gap: 6px; color: var(--ui-text-secondary); font-size: 11px; }
-.ws-kpi-head svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-.ws-kpi-count { font-size: 21px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.ws-kpi-note { font-size: 10.5px; color: var(--ui-text-muted); }
+.ws-kpi[data-browsable="false"] .ws-kpi-chevron { visibility: hidden; }
+.ws-kpi-label { color: var(--ui-text-secondary); font-size: 11px; white-space: nowrap; }
+.ws-kpi-icon svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.ws-kpi-count { font-size: 22px; font-weight: 650; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.ws-kpi-note { font-size: 10.5px; color: var(--ui-text-muted); white-space: nowrap; }
 .ws-kpi[data-state="error"] .ws-kpi-count, .ws-kpi[data-state="unavailable"] .ws-kpi-count { color: var(--ui-text-muted); font-weight: 500; }
 .ws-source { align-self: center; margin-left: 4px; padding: 4px 8px; border-radius: 999px; background: var(--ui-surface-sunken);
   color: var(--ui-text-muted); font-size: 10px; letter-spacing: .02em; white-space: nowrap; }
@@ -775,3 +894,38 @@ body[data-layers-open="false"] .layers { display: none; }
 @media (max-width: 1100px) {
   .ws-kpis { max-width: calc(100vw - var(--app-nav-w) - 32px); overflow-x: auto; }
 }
+
+
+/* ── Live Ops: a compact operational tray ──────────────────────────────────────────────────────
+   The bottom explorer is shared with every other workspace, so it is tightened here by section
+   rather than changed for everyone. Same component, same behaviour, less height. */
+body[data-section="liveOps"] [role="region"][aria-label$="explorer"] .MuiCardActionArea-root { padding: 6px 10px; }
+body[data-section="liveOps"] [role="region"][aria-label$="explorer"] .MuiCard-root { min-height: 0; }
+body[data-section="liveOps"] [role="region"][aria-label$="explorer"] .MuiTypography-root { line-height: 1.3; }
+
+
+/* ── Live event details: a header before the field list ────────────────────────────────────────
+   Icon, title and severity on one line, then where it is and what it blocks. Everything here comes
+   from the feed or from the corridor enrichment; nothing is shown that the data does not carry. */
+.live-event-hero { --event-tone: var(--ui-accent); margin: 2px 0 10px; }
+.live-event-hero-top { display: flex; align-items: center; gap: 9px; }
+.live-event-hero-icon {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 32px; height: 32px; border-radius: 9px;
+  background: color-mix(in srgb, var(--event-tone) 15%, transparent);
+}
+.live-event-hero-title { flex: 1; min-width: 0; margin: 0; font-size: 15px; font-weight: 650; line-height: 1.25; }
+.live-event-hero-severity {
+  flex: none; padding: 2px 9px; border-radius: 999px;
+  background: color-mix(in srgb, var(--event-tone) 14%, transparent);
+  color: var(--event-tone); font-size: 10.5px; font-weight: 600; text-transform: capitalize;
+}
+.live-event-hero-place { margin: 7px 0 0; color: var(--ui-text-secondary); font-size: 12px; }
+.live-event-hero-lanes {
+  display: inline-block; margin: 8px 0 0; padding: 3px 9px; border-radius: 7px;
+  background: color-mix(in srgb, var(--event-tone) 12%, transparent);
+  color: var(--event-tone); font-size: 12px; font-weight: 600;
+}
+
+.liveops-impact-notice { position: absolute; bottom: 88px; left: calc(var(--app-nav-w) + 16px); max-width: min(460px, 70vw); padding: 10px 14px; border: 1px solid var(--ui-border); border-radius: 10px; background: var(--ui-surface-solid); color: var(--ui-text-secondary); font-size: 12px; pointer-events: auto; }
+.liveops-impact-notice[hidden] { display: none; }

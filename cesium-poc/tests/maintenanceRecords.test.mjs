@@ -204,10 +204,14 @@ test('a class shipping x and y the wrong way round is read the only way that mak
   assert.deepEqual([swapped.longitude, swapped.latitude], [-80.3295, 26.1177]);
   assert.equal(coordinateSwaps(), 1, 'and the correction is counted, not silent');
 
-  // Somewhere genuinely elsewhere is left exactly as written — this corrects a known column defect,
-  // it does not drag every far-away record onto the corridor.
+  // A pair that reads as nowhere near I-595 either way is unusable: this is a corridor application,
+  // and the export really does contain a longitude that lost a digit (-8.33 for -80.33). The record
+  // is still listed; it simply has no position, like any other unplaceable one.
   const elsewhere = inspection(-0.1276, 51.5072);          // London
-  assert.deepEqual([elsewhere.longitude, elsewhere.latitude], [-0.1276, 51.5072]);
+  assert.equal(elsewhere.longitude, null);
+  assert.equal(elsewhere.latitude, null);
+  const truncated = inspection(26.1176701, -8.32952785);   // the real defect, from the export
+  assert.equal(truncated.latitude, null, 'a corrupt coordinate is dropped, not drawn 9,000 km away');
   // A pair that reads sensibly both ways is never second-guessed.
   const ambiguous = inspection(-80.2, 26.1);
   assert.deepEqual([ambiguous.longitude, ambiguous.latitude], [-80.2, 26.1]);
