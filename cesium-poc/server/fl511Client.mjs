@@ -8,7 +8,7 @@ import { detailUrl } from './config.mjs';
 import { isValidLatLon } from './geo.mjs';
 import { parseTooltipHtml } from './fl511Tooltip.mjs';
 
-export const LAYERS = Object.freeze({ INCIDENT: 'Incidents', CLOSURE: 'Closures', CONSTRUCTION: 'Construction' });
+export const LAYERS = Object.freeze({ INCIDENT: 'Incidents', CLOSURE: 'Closures', CONSTRUCTION: 'Construction', CONGESTION: 'Congestion', DISABLED: 'DisabledVehicles' });
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -90,6 +90,8 @@ export function createFl511Client(config, { fetchImpl = fetch, logger = console 
     fetchIncidents: () => fetchLayer(config.incidentsPath, LAYERS.INCIDENT),
     fetchClosures: () => fetchLayer(config.closuresPath, LAYERS.CLOSURE),
     fetchConstruction: () => fetchLayer(config.constructionPath, LAYERS.CONSTRUCTION),
+    fetchCongestion: () => fetchLayer(config.congestionPath, LAYERS.CONGESTION),
+    fetchDisabledVehicles: () => fetchLayer(config.disabledVehiclesPath, LAYERS.DISABLED),
     /**
      * Marker detail, from the endpoint FL511's own map declares as data-tooltipbaseurl.
      * Returns null (never a partial guess) when the fragment cannot be recognised.

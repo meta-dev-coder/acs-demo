@@ -216,7 +216,8 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
   // Incidents, closures and construction come from one feed but are separate layers and separate
   // asset types, so each browses on its own.
   for (const [assetType, eventType] of liveEvents
-    ? [['incident', 'INCIDENT'], ['closure', 'CLOSURE'], ['construction', 'CONSTRUCTION']] : []) {
+    ? [['incident', 'INCIDENT'], ['closure', 'CLOSURE'], ['construction', 'CONSTRUCTION'], ['congestion', 'CONGESTION'],
+      ['disabledVehicle', 'DISABLED']] : []) {
     sources.push({
       assetType,
       usesLegacyPanel: true,

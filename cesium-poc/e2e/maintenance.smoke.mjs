@@ -285,6 +285,34 @@ try {
     console.log(`✓ ${label}: ${count} loaded, ${shown} on the map, card → marker → list in step (${selected.id})`);
   }
 
+  // 8b. The same crash-type filter is on the Maintenance slider, not only on Safety: it belongs to
+  //     the incident type itself, so both workspaces get it from one definition.
+  await kpi('incidents').click();
+  const incidentList = page.getByRole('region', { name: 'Incidents explorer', exact: true });
+  await incidentList.waitFor({ timeout: 30000 });
+  const incidentTotal = await page.evaluate(() => window.__assetExplorer.store.getState().assetsByType.incidentRecord.length);
+  const typeSelect = incidentList.locator('[aria-label="Incident type"]');
+  assert.equal(await typeSelect.count(), 1, 'Maintenance offers the incident-type filter too');
+  await typeSelect.click();
+  const typeOptions = await page.locator('li[role="option"]').allInnerTexts();
+  await page.locator('li[role="option"]').nth(1).click();
+  await page.waitForTimeout(1500);
+  const narrowed = await page.evaluate(() => window.__assetExplorer.store.filteredAssets().length);
+  assert.ok(narrowed > 0 && narrowed < incidentTotal, `narrowed ${incidentTotal} → ${narrowed}`);
+  // The map follows the filter, as it does for the chips.
+  const drawnNow = await page.evaluate(() => {
+    const ds = window.__viewer.dataSources.getByName('Maintenance Records')[0];
+    const sel = window.__viewer.dataSources.getByName('Maintenance Selection')[0];
+    return ds.entities.values.filter(e => e.show).length + sel.entities.values.length;
+  });
+  assert.ok(drawnNow <= narrowed, `the map shows only the filtered records (${drawnNow} drawn)`);
+  await typeSelect.click();
+  await page.locator('li[role="option"]').first().click();   // back to every type
+  await page.waitForTimeout(1200);
+  assert.equal(await page.evaluate(() => window.__assetExplorer.store.filteredAssets().length), incidentTotal,
+    '"All incident types" restores them');
+  console.log(`✓ Maintenance has the same crash-type filter: ${typeOptions.length - 1} types, ${incidentTotal} → ${narrowed} → ${incidentTotal}`);
+
   // 9. The details panel floats: a record's details can be moved off whatever they cover, the way
   //    every other details panel on this map already could.
   await kpi('workOrders').click();

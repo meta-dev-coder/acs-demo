@@ -8,14 +8,16 @@
 import { LAYERS } from './fl511Client.mjs';
 import { FACILITY_LABELS } from './i595Network.mjs';
 
-/** @typedef {'INCIDENT'|'CLOSURE'|'CONSTRUCTION'} LiveRoadEventType */
+/** @typedef {'INCIDENT'|'CLOSURE'|'CONSTRUCTION'|'CONGESTION'|'DISABLED'} LiveRoadEventType */
 
-export const EVENT_TYPES = Object.freeze({ INCIDENT: 'INCIDENT', CLOSURE: 'CLOSURE', CONSTRUCTION: 'CONSTRUCTION' });
+export const EVENT_TYPES = Object.freeze({ INCIDENT: 'INCIDENT', CLOSURE: 'CLOSURE', CONSTRUCTION: 'CONSTRUCTION', CONGESTION: 'CONGESTION', DISABLED: 'DISABLED' });
 
 /** Which FL511 layer a type's markers and detail fragments come from. */
 const LAYER_BY_TYPE = Object.freeze({
   [EVENT_TYPES.CLOSURE]: LAYERS.CLOSURE,
   [EVENT_TYPES.CONSTRUCTION]: LAYERS.CONSTRUCTION,
+  [EVENT_TYPES.CONGESTION]: LAYERS.CONGESTION,
+  [EVENT_TYPES.DISABLED]: LAYERS.DISABLED,
   [EVENT_TYPES.INCIDENT]: LAYERS.INCIDENT,
 });
 export const layerIdFor = type => LAYER_BY_TYPE[type] ?? LAYERS.INCIDENT;

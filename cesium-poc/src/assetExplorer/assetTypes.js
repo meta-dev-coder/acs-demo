@@ -156,6 +156,35 @@ export function maintenanceSearchText(asset) {
  * The filters a set of maintenance records actually supports. Offered only where the records have
  * the field: a class with no priority gets no priority filter.
  */
+/**
+ * One filter per distinct value a record carries, built from the data rather than listed here.
+ *
+ * These carry a `group`, which tells the explorer to offer them as a dropdown instead of chips: a
+ * class like the incidents has fifteen types, and fifteen chips would push the cards off the screen.
+ * Ordered by how many records each value has, so the common ones are reachable first.
+ *
+ * @param {object[]} assets
+ * @param {{group: string, prefix: string, read: (item: object) => string|null}} spec
+ */
+export function valueFilters(assets, { group, prefix, read }) {
+  const counts = new Map();
+  for (const asset of assets) {
+    const value = text(read(asset.source ?? {}));
+    if (value) counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([value, count]) => ({
+      id: `${prefix}:${value.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+      label: value, group, count,
+      match: asset => text(read(asset.source ?? {})) === value,
+    }));
+}
+
+/** The crash taxonomy the incident class carries — "Multi-vehicle crash", "Rear-end crash", … */
+export const incidentTypeFilters = assets =>
+  valueFilters(assets, { group: 'Incident type', prefix: 'incident-type', read: item => item.title });
+
 export function maintenanceFilters(assets) {
   const items = assets.map(asset => asset.source).filter(Boolean);
   const has = predicate => items.some(predicate);
@@ -201,7 +230,7 @@ export function maintenanceDate(value) {
 }
 
 /** One entry per maintenance class; everything else about them is identical. */
-const MAINTENANCE_TYPE = ({ id, label, singular, title = singular, icon, statusTone }) => Object.freeze({
+const MAINTENANCE_TYPE = ({ id, label, singular, title = singular, icon, statusTone, extraFilters = null }) => Object.freeze({
   id, label, singular, detailsTitle: `${title} Details`, icon,
   // Not a map layer: the Maintenance workspace decides what is loaded and drawn.
   layerId: null,
@@ -213,7 +242,7 @@ const MAINTENANCE_TYPE = ({ id, label, singular, title = singular, icon, statusT
   getStatus: () => null,
   details: asset => maintenanceDetails(asset.source),
   getSearchText: maintenanceSearchText,
-  getFilters: maintenanceFilters,
+  getFilters: assets => [...maintenanceFilters(assets), ...(extraFilters?.(assets) ?? [])],
 });
 
 const workTone = item => {
@@ -229,6 +258,8 @@ export const ASSET_TYPES = Object.freeze({
   task: MAINTENANCE_TYPE({ id: 'task', label: 'Tasks', singular: 'Task', icon: 'task', statusTone: workTone }),
   incidentRecord: MAINTENANCE_TYPE({
     id: 'incidentRecord', label: 'Incidents', singular: 'Incident', icon: 'incidentRecord',
+    // 178 crash records across fifteen types: the type is the first thing an operator narrows by.
+    extraFilters: incidentTypeFilters,
     // An incident has no status; what matters is whether it closed lanes or hurt anyone.
     statusTone: item => {
       const harm = /^y/i.test(item.related?.injuries ?? '') || Number(item.related?.fatalities) > 0;
@@ -460,6 +491,50 @@ export const ASSET_TYPES = Object.freeze({
       ['Status', text(asset.source?.status)],
     ],
   }),
+  congestion: Object.freeze({
+    id: 'congestion',
+    label: 'Congestion',
+    singular: 'Queue',
+    icon: 'congestion',
+    layerId: 'congestion',
+    legacyDetailsPanel: true,
+    emptyMessage: 'No congestion is reported on the corridor right now.',
+    errorMessage: 'Unable to load congestion.',
+    getTitle: asset => asset.name,
+    getSubtitle: asset => text(asset.source?.roadway) ?? positionLabel(asset),
+    getStatus: asset => {
+      const status = text(asset.source?.status);
+      return status ? { label: status, tone: 'warn' } : null;
+    },
+    details: asset => [
+      ['Roadway', text(asset.source?.roadway)],
+      ['Direction', text(asset.source?.direction)],
+      ['Status', text(asset.source?.status)],
+    ],
+  }),
+  disabledVehicle: Object.freeze({
+    id: 'disabledVehicle',
+    label: 'Disabled Vehicles',
+    singular: 'Disabled vehicle',
+    icon: 'disabledVehicle',
+    layerId: 'disabled-vehicles',
+    legacyDetailsPanel: true,
+    emptyMessage: 'No disabled vehicles are reported on the corridor right now.',
+    errorMessage: 'Unable to load disabled vehicles.',
+    getTitle: asset => asset.name,
+    getSubtitle: asset => text(asset.source?.roadway) ?? positionLabel(asset),
+    getStatus: asset => {
+      const status = text(asset.source?.status);
+      return status ? { label: status, tone: 'warn' } : null;
+    },
+    details: asset => [
+      ['Roadway', text(asset.source?.roadway)],
+      ['Direction', text(asset.source?.direction)],
+      ['Status', text(asset.source?.status)],
+    ],
+  }),
+
+
 
   closure: Object.freeze({
     id: 'closure',

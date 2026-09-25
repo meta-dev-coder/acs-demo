@@ -22,8 +22,21 @@ const INCIDENT_CARD = Object.freeze({ key: 'incidents', label: 'Active incidents
 const CLOSURE_CARD = Object.freeze({ key: 'closures', label: 'Lane closures', icon: 'closure', layerId: 'closures', type: LIVE_EVENT_TYPES.CLOSURE });
 const CONSTRUCTION_CARD = Object.freeze({ key: 'construction', label: 'Construction', icon: 'construction', layerId: 'construction', type: LIVE_EVENT_TYPES.CONSTRUCTION });
 
-export const SAFETY_CARDS = Object.freeze([INCIDENT_CARD]);
-export const TRAFFIC_CARDS = Object.freeze([CLOSURE_CARD, CONSTRUCTION_CARD]);
+/**
+ * The recorded crash history, which is not a live event at all: it comes from DataConnect and is
+ * drawn by the Maintenance workspace. It sits here because it answers a safety question — what has
+ * happened on this corridor — beside the one about what is happening now.
+ */
+const CRASH_CARD = Object.freeze({
+  key: 'crashes', label: 'Recorded crashes', icon: 'incident', assetType: 'incidentRecord', source: 'maintenance',
+});
+
+const DISABLED_CARD = Object.freeze({ key: 'disabledVehicles', label: 'Disabled vehicles', icon: 'disabledVehicle', layerId: 'disabled-vehicles', type: LIVE_EVENT_TYPES.DISABLED });
+
+export const SAFETY_CARDS = Object.freeze([INCIDENT_CARD, DISABLED_CARD, CRASH_CARD]);
+const CONGESTION_CARD = Object.freeze({ key: 'congestion', label: 'Congestion', icon: 'congestion', layerId: 'congestion', type: LIVE_EVENT_TYPES.CONGESTION });
+
+export const TRAFFIC_CARDS = Object.freeze([CLOSURE_CARD, CONSTRUCTION_CARD, CONGESTION_CARD]);
 
 const time = value => {
   const date = value ? new Date(value) : null;
@@ -52,6 +65,23 @@ export function safetyCard(events, card, payload = {}) {
   return { state: 'ready', count: mine.length, note };
 }
 
+/**
+ * A card counting a DataConnect class rather than the live feed.
+ *
+ * The note says what a safety reader wants first — how many of those crashes hurt somebody — and a
+ * class that has not loaded says so rather than showing a zero it does not know to be true.
+ */
+export function maintenanceCard(maintenance, card) {
+  const records = maintenance?.recordsForType?.(card.assetType) ?? [];
+  if (!records.length) return { state: 'loading' };
+  const harmed = records.filter(item =>
+    /^y/i.test(item.related?.injuries ?? '') || Number(item.related?.fatalities) > 0).length;
+  const fatal = records.reduce((total, item) => total + (Number(item.related?.fatalities) || 0), 0);
+  const note = fatal ? `${harmed} with injuries · ${fatal} fatal`
+    : harmed ? `${harmed} with injuries` : 'None with injuries';
+  return { state: 'ready', count: records.length, note };
+}
+
 /** "FL511 · live" while the feed is current; what it really is otherwise. */
 export function sourceNote(payload = {}) {
   const source = payload.source ?? 'FL511';
@@ -70,7 +100,7 @@ export function sourceNote(payload = {}) {
  * @param {{cards: object[], className: string, label: string, assetExplorer: object,
  *          liveEvents: object, layerStore: object, host?: HTMLElement}} deps
  */
-export function installLiveEventsWorkspace({ cards, className, label, assetExplorer, liveEvents, layerStore, host = document.body }) {
+export function installLiveEventsWorkspace({ cards, className, label, assetExplorer, liveEvents, layerStore, maintenance = null, host = document.body }) {
   const store = assetExplorer.store;
   const root = document.createElement('div');
   root.className = className;
@@ -86,25 +116,46 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
   function render() {
     const events = liveEvents?.events ?? [];
     const payload = liveEvents?.payload ?? {};
-    for (const card of cards) strip.set(card.key, safetyCard(events, card, payload));
+    for (const card of cards) {
+      strip.set(card.key, card.source === 'maintenance'
+        ? maintenanceCard(maintenance, card)
+        : safetyCard(events, card, payload));
+    }
     strip.setActive(activeKey);
     const note = sourceNote(payload);
     strip.setSource(note.text, { live: note.live });
   }
 
-  /** Choosing a card is switching its layer on — the same control the Map Explorer offers. */
+  /**
+   * Choosing a card shows what it counts. A live-event card switches its map layer on — the same
+   * control the Map Explorer offers — while a DataConnect card asks the Maintenance workspace to
+   * put its class on the map, because those records have no layer of their own.
+   */
   async function choose(key) {
     const card = cards.find(item => item.key === key);
     if (!card) return;
+    const put = async on => {
+      if (card.source === 'maintenance') {
+        if (on) await maintenance?.reveal(card.assetType); else maintenance?.hide();
+        return;
+      }
+      await layerStore.setVisible(card.layerId, on);
+    };
     if (activeKey === key) {
       activeKey = null;
-      await layerStore.setVisible(card.layerId, false);
+      await put(false);
       render();
       return;
     }
+    // One card at a time: whatever the last one put on the map comes off first.
+    const previous = cards.find(item => item.key === activeKey);
     activeKey = key;
     render();
-    await layerStore.setVisible(card.layerId, true);
+    if (previous) {
+      if (previous.source === 'maintenance') maintenance?.hide();
+      else await layerStore.setVisible(previous.layerId, false);
+    }
+    await put(true);
     render();
   }
 
@@ -112,7 +163,10 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
   const stopUpdates = liveEvents?.onUpdate?.(() => render()) ?? (() => {});
   // The Map Explorer can switch these same layers off, so the cards read the layer, not their memory.
   const unsubscribeLayers = layerStore?.subscribe?.(() => {
-    const on = cards.find(card => ['on', 'partial'].includes(layerStore.stateOf(card.layerId)));
+    const on = cards.find(card => card.layerId && ['on', 'partial'].includes(layerStore.stateOf(card.layerId)));
+    // A DataConnect card is not in the layer store, so its choice is this workspace's to remember.
+    const active = cards.find(card => card.key === activeKey);
+    if (!on && active?.source === 'maintenance') return;
     const next = on?.key ?? null;
     if (next === activeKey) return;
     activeKey = next;
@@ -128,6 +182,8 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
       active = true;
       root.hidden = false;
       render();
+      // A DataConnect class may still be loading when this opens; show its count as soon as it has one.
+      if (cards.some(card => card.source === 'maintenance')) void maintenance?.whenReady?.().then(() => { if (active) render(); });
       strip.measure();
     },
     deactivate() {
@@ -137,7 +193,8 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
       // The layers belong to the map, not to this panel: switching workspace puts back what it drew.
       const card = cards.find(item => item.key === activeKey);
       activeKey = null;
-      if (card) void layerStore.setVisible(card.layerId, false);
+      if (card?.source === 'maintenance') maintenance?.hide();
+      else if (card) void layerStore.setVisible(card.layerId, false);
       if (store.getState().activeExplorerType) store.setActiveExplorerType(null);
       render();
     },

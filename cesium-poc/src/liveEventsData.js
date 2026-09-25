@@ -7,10 +7,10 @@
  * built separately so the details panel can label them separately.
  */
 
-/** @typedef {'INCIDENT'|'CLOSURE'|'CONSTRUCTION'} LiveRoadEventType */
+/** @typedef {'INCIDENT'|'CLOSURE'|'CONSTRUCTION'|'CONGESTION'|'DISABLED'} LiveRoadEventType */
 
-export const LIVE_EVENT_TYPES = Object.freeze({ INCIDENT: 'INCIDENT', CLOSURE: 'CLOSURE', CONSTRUCTION: 'CONSTRUCTION' });
-export const LIVE_EVENT_LABELS = Object.freeze({ INCIDENT: 'Incident', CLOSURE: 'Closure', CONSTRUCTION: 'Construction' });
+export const LIVE_EVENT_TYPES = Object.freeze({ INCIDENT: 'INCIDENT', CLOSURE: 'CLOSURE', CONSTRUCTION: 'CONSTRUCTION', CONGESTION: 'CONGESTION', DISABLED: 'DISABLED' });
+export const LIVE_EVENT_LABELS = Object.freeze({ INCIDENT: 'Incident', CLOSURE: 'Closure', CONSTRUCTION: 'Construction', CONGESTION: 'Congestion', DISABLED: 'Disabled vehicle' });
 
 const present = value => value != null && String(value).trim() !== '';
 const rows = entries => entries.filter(([, value]) => present(value)).map(([label, value]) => [label, String(value)]);

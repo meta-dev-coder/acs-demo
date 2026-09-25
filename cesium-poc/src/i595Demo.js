@@ -362,6 +362,8 @@ try {
       incidents: () => liveEventControls.events.filter(event => event.type === LIVE_EVENT_TYPES.INCIDENT).length,
       closures: () => liveEventControls.events.filter(event => event.type === LIVE_EVENT_TYPES.CLOSURE).length,
       construction: () => liveEventControls.events.filter(event => event.type === LIVE_EVENT_TYPES.CONSTRUCTION).length,
+      congestion: () => liveEventControls.events.filter(event => event.type === LIVE_EVENT_TYPES.CONGESTION).length,
+      disabledVehicles: () => liveEventControls.events.filter(event => event.type === LIVE_EVENT_TYPES.DISABLED).length,
       structures: () => bridgeControls.bridgeById.size,
       // One entry per registered structure type, so a new type gets its badge for free.
       ...Object.fromEntries(SIGN_STRUCTURE_TYPES.map(type => [type.id, () => signStructureControls.countFor(type.id)])),
@@ -421,7 +423,16 @@ try {
   // Safety and Traffic both read the FL511 feed the app already runs and drive layers that already
   // exist; neither owns data or a layer of its own. Safety is what is happening to the corridor,
   // Traffic is the planned work restricting it.
-  const liveEventDeps = { assetExplorer, liveEvents: liveEventControls, layerStore };
+  // Safety also carries the recorded crash history, which is a DataConnect class drawn by the
+  // Maintenance workspace rather than a live layer — so it is handed that workspace to show it with.
+  // Late-bound for the same reason as above: the workspace is built after the explorer it needs.
+  const liveEventDeps = { assetExplorer, liveEvents: liveEventControls, layerStore,
+    maintenance: {
+      reveal: type => maintenanceWorkspace?.reveal(type),
+      hide: () => maintenanceWorkspace?.hide(),
+      recordsForType: type => maintenanceWorkspace?.recordsForType(type) ?? [],
+      whenReady: () => maintenanceWorkspace?.preload() ?? Promise.resolve(),
+    } };
   const safety = installSafetyWorkspace(liveEventDeps);
   const traffic = installTrafficWorkspace(liveEventDeps);
   // Maintenance is a workspace over the same map: the KPI strip and its list appear, everything

@@ -1,21 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SAFETY_CARDS, TRAFFIC_CARDS, safetyCard, sourceNote } from '../src/safetyWorkspace.js';
+import { SAFETY_CARDS, TRAFFIC_CARDS, maintenanceCard, safetyCard, sourceNote } from '../src/safetyWorkspace.js';
 
 const [incidents] = SAFETY_CARDS;
 const [closures, construction] = TRAFFIC_CARDS;
 
 test('the cards name the layers that already draw them, split by what an operator is doing', () => {
   // Safety is what is happening TO the corridor; Traffic is the planned work restricting it.
-  assert.deepEqual(SAFETY_CARDS.map(card => [card.key, card.label, card.layerId, card.type]), [
+  assert.deepEqual(SAFETY_CARDS.map(card => [card.key, card.label, card.layerId ?? card.assetType, card.type ?? card.source]), [
     ['incidents', 'Active incidents', 'incidents', 'INCIDENT'],
+    ['disabledVehicles', 'Disabled vehicles', 'disabled-vehicles', 'DISABLED'],
+    // Not a live event: the recorded crash history, from DataConnect, drawn by the Maintenance
+    // workspace. It sits on Safety because it answers a safety question.
+    ['crashes', 'Recorded crashes', 'incidentRecord', 'maintenance'],
   ]);
   assert.deepEqual(TRAFFIC_CARDS.map(card => [card.key, card.label, card.layerId, card.type]), [
     ['closures', 'Lane closures', 'closures', 'CLOSURE'],
     ['construction', 'Construction', 'construction', 'CONSTRUCTION'],
+    ['congestion', 'Congestion', 'congestion', 'CONGESTION'],
   ]);
   // One feed, one card each: no layer is driven from two workspaces at once.
-  const all = [...SAFETY_CARDS, ...TRAFFIC_CARDS].map(card => card.layerId);
+  const all = [...SAFETY_CARDS, ...TRAFFIC_CARDS].map(card => card.layerId).filter(Boolean);
   assert.equal(new Set(all).size, all.length);
 });
 
@@ -69,4 +74,24 @@ test('construction is a card of its own, counted from the same feed', () => {
   assert.equal(safetyCard(events, TRAFFIC_CARDS.find(c => c.key === 'closures'), {}).note, '1 major');
   // Nothing on the corridor still says so rather than showing a bare zero.
   assert.deepEqual(safetyCard([], card, {}), { state: 'ready', count: 0, note: 'None on the corridor now' });
+});
+
+test('the crash card counts a DataConnect class, and says how many were harmful', () => {
+  const card = SAFETY_CARDS.find(item => item.key === 'crashes');
+  const records = [
+    { related: { injuries: 'Yes', fatalities: 1 } },
+    { related: { injuries: 'Yes', fatalities: 0 } },
+    { related: { injuries: 'No', fatalities: 0 } },
+  ];
+  const maintenance = { recordsForType: type => (type === 'incidentRecord' ? records : []) };
+  assert.deepEqual(maintenanceCard(maintenance, card),
+    { state: 'ready', count: 3, note: '2 with injuries · 1 fatal' });
+
+  // No fatalities is worth saying plainly rather than printing "0 fatal".
+  assert.equal(maintenanceCard({ recordsForType: () => [{ related: { injuries: 'Yes' } }] }, card).note, '1 with injuries');
+  assert.equal(maintenanceCard({ recordsForType: () => [{ related: {} }] }, card).note, 'None with injuries');
+
+  // A class that has not loaded says nothing rather than a zero it cannot vouch for.
+  assert.deepEqual(maintenanceCard({ recordsForType: () => [] }, card), { state: 'loading' });
+  assert.deepEqual(maintenanceCard(null, card), { state: 'loading' });
 });

@@ -103,6 +103,8 @@ function stubClient({ incidents = [RAMP_CLOSURE], closures = [], detail = null, 
     fetchIncidents: async () => { calls.feeds++; if (fail) throw new Error('FL511 down'); return incidents; },
     fetchClosures: async () => { calls.feeds++; if (fail) throw new Error('FL511 down'); return closures; },
     fetchConstruction: async () => { calls.feeds++; if (fail) throw new Error('FL511 down'); return []; },
+    fetchCongestion: async () => { calls.feeds++; if (fail) throw new Error('FL511 down'); return []; },
+    fetchDisabledVehicles: async () => { calls.feeds++; if (fail) throw new Error('FL511 down'); return []; },
     fetchEventDetails: async () => { calls.details++; if (fail) throw new Error('FL511 down'); return detail; },
   };
 }
@@ -134,6 +136,8 @@ test('an FL511 outage serves the last good data as STALE instead of emptying the
     fetchIncidents: async () => { if (failing) throw new Error('FL511 down'); return [RAMP_CLOSURE]; },
     fetchClosures: async () => { if (failing) throw new Error('FL511 down'); return []; },
     fetchConstruction: async () => { if (failing) throw new Error('FL511 down'); return []; },
+    fetchCongestion: async () => { if (failing) throw new Error('FL511 down'); return []; },
+    fetchDisabledVehicles: async () => { if (failing) throw new Error('FL511 down'); return []; },
     fetchEventDetails: async () => null,
   };
   const service = createFl511Service({ config, network, client, logger: silent, now: () => clock });

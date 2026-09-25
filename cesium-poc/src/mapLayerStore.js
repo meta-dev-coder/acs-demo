@@ -44,6 +44,8 @@ export const CORRIDOR_LAYERS = Object.freeze([
   Object.freeze({ id: 'incidents', label: 'Incidents', category: 'traffic', icon: 'incident', control: '#live-events-incident', count: 'incidents' }),
   Object.freeze({ id: 'closures', label: 'Closures', category: 'traffic', icon: 'closure', control: '#live-events-closure', count: 'closures' }),
   Object.freeze({ id: 'construction', label: 'Construction', category: 'traffic', icon: 'construction', control: '#live-events-construction', count: 'construction' }),
+  Object.freeze({ id: 'congestion', label: 'Congestion', category: 'traffic', icon: 'congestion', control: '#live-events-congestion', count: 'congestion' }),
+  Object.freeze({ id: 'disabled-vehicles', label: 'Disabled Vehicles', short: 'Disabled', category: 'traffic', icon: 'disabledVehicle', control: '#live-events-disabled', count: 'disabledVehicles' }),
   Object.freeze({ id: 'message-signs', label: 'Message Signs', category: 'infrastructure', icon: 'messageSign', control: '#message-signs-all', count: 'messageSigns' }),
   Object.freeze({ id: 'signals', label: 'Traffic Signals', category: 'infrastructure', icon: 'signal', control: '#signals-all', count: 'signals' }),
   // CCTV is two groups on the corridor — express-lane cameras on the gantries, and the mainline —
@@ -63,7 +65,7 @@ export const CORRIDOR_LAYERS = Object.freeze([
  * The tools on the quick rail — the one-click surface. Mile markers are absent because the corridor
  * has no such layer.
  */
-export const RAIL_LAYER_IDS = Object.freeze(['traffic-flow', 'direction', 'incidents', 'closures', 'construction', 'signals', 'cameras', 'lighting', 'message-signs', 'structures',
+export const RAIL_LAYER_IDS = Object.freeze(['traffic-flow', 'direction', 'incidents', 'closures', 'construction', 'congestion', 'disabled-vehicles', 'signals', 'cameras', 'lighting', 'message-signs', 'structures',
   ...SIGN_STRUCTURE_LAYERS.map(layer => layer.id), 'gantries', 'lane-barriers']);
 
 export const LAYER_CATEGORIES = Object.freeze([

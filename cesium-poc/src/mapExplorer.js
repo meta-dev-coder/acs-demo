@@ -23,6 +23,8 @@ const ICONS = {
   incident: '<path d="M10 3 2 17h16L10 3Z"/><path d="M10 8v4M10 14.5v.5"/>',
   closure: '<path d="M3 6h14v8H3z"/><path d="m6 6 3 8M11 6l3 8"/>',
   construction: '<path d="M4 16h12"/><path d="M10 4 6.5 16h7L10 4Z"/><path d="M8.4 10h3.2"/>',
+  congestion: '<path d="M4.5 5.5h7v3.5h-7z"/><path d="M4.5 12h7v3.5h-7z"/><path d="M14.5 6.5v8"/><path d="m12.8 12.8 1.7 1.7 1.7-1.7"/>',
+  disabledVehicle: '<path d="M3.5 13.5h13v2.5h-13z"/><path d="M5 13.5 6.5 9h7l1.5 4.5"/><circle cx="6.5" cy="16" r="1.2"/><circle cx="13.5" cy="16" r="1.2"/><path d="M10 3v3M10 7.2v.3"/>',
   signal: '<rect x="6" y="2" width="8" height="13" rx="3"/><path d="M10 15v3"/><circle cx="10" cy="5.5" r="1.2"/><circle cx="10" cy="9" r="1.2"/><circle cx="10" cy="12.5" r="1.2"/>',
   camera: '<path d="M2.6 6.4h3l1.3-2h6.2l1.3 2h3a1.1 1.1 0 0 1 1.1 1.1v7.4a1.1 1.1 0 0 1-1.1 1.1H2.6a1.1 1.1 0 0 1-1.1-1.1V7.5a1.1 1.1 0 0 1 1.1-1.1Z"/><circle cx="10" cy="11.2" r="3.1"/>',
   bridge: '<path d="M2 8v7M18 8v7M2 11c5-5 11-5 16 0"/><path d="M7 11v4M13 11v4"/>',

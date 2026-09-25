@@ -8,6 +8,8 @@ import ChecklistOutlinedIcon from '@mui/icons-material/ChecklistOutlined';
 import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined';
 import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
+import CarRepairOutlinedIcon from '@mui/icons-material/CarRepairOutlined';
+import TrafficOutlinedIcon from '@mui/icons-material/TrafficOutlined';
 import EngineeringOutlinedIcon from '@mui/icons-material/EngineeringOutlined';
 import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined';
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
@@ -27,6 +29,8 @@ const ICONS = {
   incident: WarningAmberOutlinedIcon,
   closure: BlockOutlinedIcon,
   construction: EngineeringOutlinedIcon,
+  congestion: TrafficOutlinedIcon,
+  disabledVehicle: CarRepairOutlinedIcon,
 };
 
 export function AssetTypeIcon({ assetType, ...props }) {

@@ -213,3 +213,29 @@ test('a class shipping x and y the wrong way round is read the only way that mak
   assert.deepEqual([ambiguous.longitude, ambiguous.latitude], [-80.2, 26.1]);
   assert.equal(coordinateSwaps(), 1, 'nothing else was swapped');
 });
+
+test('incident type filters are built from the data, ordered by how many records carry each', async () => {
+  const { incidentTypeFilters, assetTypeConfig } = await import('../src/assetExplorer/assetTypes.js');
+  const asset = (title, id) => ({ id, source: { title }, coordinates: { latitude: 26.1, longitude: -80.3 } });
+  const assets = [
+    asset('Vehicle fire', 'A'), asset('Vehicle fire', 'B'), asset('Vehicle fire', 'C'),
+    asset('Rear-end crash', 'D'), asset('Multi-vehicle crash', 'E'), asset(null, 'F'),
+  ];
+  const filters = incidentTypeFilters(assets);
+  // Commonest first, so the types worth looking at are reachable without scrolling. A record with
+  // no type contributes no filter rather than an empty one.
+  assert.deepEqual(filters.map(f => [f.label, f.count]),
+    [['Vehicle fire', 3], ['Multi-vehicle crash', 1], ['Rear-end crash', 1]]);
+  assert.deepEqual(filters.map(f => f.id),
+    ['incident-type:vehicle-fire', 'incident-type:multi-vehicle-crash', 'incident-type:rear-end-crash']);
+  // The `group` is what makes the explorer offer these as a dropdown instead of fifteen chips.
+  assert.ok(filters.every(f => f.group === 'Incident type'));
+  assert.deepEqual(assets.filter(filters[0].match).map(a => a.id), ['A', 'B', 'C']);
+
+  // They reach the incident type's own filter list, alongside the plain chips.
+  const all = assetTypeConfig('incidentRecord').getFilters(assets);
+  assert.ok(all.some(f => f.id === 'incident-type:vehicle-fire'), 'incidents offer their types');
+  assert.ok(all.some(f => f.id === 'unplaced' || !f.group), 'and still offer the shared filters');
+  // Other maintenance classes are unchanged: no type dropdown where there is no taxonomy.
+  assert.deepEqual(assetTypeConfig('workOrder').getFilters(assets).filter(f => f.group), []);
+});

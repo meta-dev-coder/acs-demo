@@ -15,6 +15,8 @@ export function createFl511Service({ config, network, client = createFl511Client
     [EVENT_TYPES.INCIDENT]: { items: null, at: null, error: null },
     [EVENT_TYPES.CLOSURE]: { items: null, at: null, error: null },
     [EVENT_TYPES.CONSTRUCTION]: { items: null, at: null, error: null },
+    [EVENT_TYPES.CONGESTION]: { items: null, at: null, error: null },
+    [EVENT_TYPES.DISABLED]: { items: null, at: null, error: null },
   };
   const details = new Map(); // itemId -> { detail, at }
   let result = null;         // last successfully composed payload body
@@ -28,6 +30,8 @@ export function createFl511Service({ config, network, client = createFl511Client
         [EVENT_TYPES.INCIDENT]: client.fetchIncidents,
         [EVENT_TYPES.CLOSURE]: client.fetchClosures,
         [EVENT_TYPES.CONSTRUCTION]: client.fetchConstruction,
+        [EVENT_TYPES.CONGESTION]: client.fetchCongestion,
+        [EVENT_TYPES.DISABLED]: client.fetchDisabledVehicles,
       };
       // A client without this feed (an older build, a stub) reports nothing rather than failing the
       // poll: one absent feed must not take the other two down with it.
@@ -60,16 +64,19 @@ export function createFl511Service({ config, network, client = createFl511Client
   }
 
   async function refresh() {
-    const [incidents, closures, construction] = await Promise.all([
+    const [incidents, closures, construction, congestion, disabled] = await Promise.all([
       fetchFeed(EVENT_TYPES.INCIDENT), fetchFeed(EVENT_TYPES.CLOSURE), fetchFeed(EVENT_TYPES.CONSTRUCTION),
+      fetchFeed(EVENT_TYPES.CONGESTION), fetchFeed(EVENT_TYPES.DISABLED),
     ]);
     // Nothing ever fetched; keep whatever we last served.
-    if (!incidents && !closures && !construction) return;
+    if (!incidents && !closures && !construction && !congestion && !disabled) return;
     const options = { bufferMeters: config.bufferMeters, segmentToleranceMeters: config.segmentToleranceMeters };
     const corridor = [
       ...normalizeFeed(incidents ?? [], EVENT_TYPES.INCIDENT, network, options, logger),
       ...normalizeFeed(closures ?? [], EVENT_TYPES.CLOSURE, network, options, logger),
       ...normalizeFeed(construction ?? [], EVENT_TYPES.CONSTRUCTION, network, options, logger),
+      ...normalizeFeed(congestion ?? [], EVENT_TYPES.CONGESTION, network, options, logger),
+      ...normalizeFeed(disabled ?? [], EVENT_TYPES.DISABLED, network, options, logger),
     ];
     const events = await enrich(corridor);
     events.sort((a, b) => a.id.localeCompare(b.id));
@@ -84,10 +91,12 @@ export function createFl511Service({ config, network, client = createFl511Client
         incidents: events.filter(event => event.type === EVENT_TYPES.INCIDENT).length,
         closures: events.filter(event => event.type === EVENT_TYPES.CLOSURE).length,
         construction: events.filter(event => event.type === EVENT_TYPES.CONSTRUCTION).length,
+        congestion: events.filter(event => event.type === EVENT_TYPES.CONGESTION).length,
+        disabledVehicles: events.filter(event => event.type === EVENT_TYPES.DISABLED).length,
       },
     };
     // Only a poll where both feeds answered counts as fully up to date.
-    if (!feeds[EVENT_TYPES.INCIDENT].error && !feeds[EVENT_TYPES.CLOSURE].error && !feeds[EVENT_TYPES.CONSTRUCTION].error) {
+    if (!feeds[EVENT_TYPES.INCIDENT].error && !feeds[EVENT_TYPES.CLOSURE].error && !feeds[EVENT_TYPES.CONSTRUCTION].error && !feeds[EVENT_TYPES.CONGESTION].error && !feeds[EVENT_TYPES.DISABLED].error) {
       lastSuccessfulUpdate = now();
       lastError = null;
     }
@@ -143,6 +152,8 @@ export function createFl511Service({ config, network, client = createFl511Client
             incidents: feedDiagnostics(feeds[EVENT_TYPES.INCIDENT]),
             closures: feedDiagnostics(feeds[EVENT_TYPES.CLOSURE]),
             construction: feedDiagnostics(feeds[EVENT_TYPES.CONSTRUCTION]),
+            congestion: feedDiagnostics(feeds[EVENT_TYPES.CONGESTION]),
+            disabledVehicles: feedDiagnostics(feeds[EVENT_TYPES.DISABLED]),
           },
         },
       };

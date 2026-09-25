@@ -8,7 +8,7 @@
  * when it is open, so nothing is ever parked underneath it.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Box, Chip, IconButton, InputBase, Paper, Stack, ThemeProvider, Tooltip, Typography, useMediaQuery } from '@mui/material';
+import { Box, Chip, IconButton, InputBase, MenuItem, Paper, Select, Stack, ThemeProvider, Tooltip, Typography, useMediaQuery } from '@mui/material';
 import CssBaseline from '@mui/material/CssBaseline';
 import CloseIcon from '@mui/icons-material/Close';
 import SearchIcon from '@mui/icons-material/SearchOutlined';
@@ -46,6 +46,17 @@ export function AssetExplorer({ store, centerline, leftInset = 16, rightInset: d
   // the map are all looking at the same narrowed set.
   const assets = store.filteredAssets();
   const filters = useMemo(() => config?.getFilters?.(all) ?? [], [config, all]);
+  // A filter with a `group` is one of many values of the same field — offered as a dropdown, because
+  // a class like the incidents has fifteen types and that many chips would push the cards off screen.
+  const chipFilters = useMemo(() => filters.filter(filter => !filter.group), [filters]);
+  const groupedFilters = useMemo(() => {
+    const groups = new Map();
+    for (const filter of filters.filter(entry => entry.group)) {
+      if (!groups.has(filter.group)) groups.set(filter.group, []);
+      groups.get(filter.group).push(filter);
+    }
+    return [...groups.entries()];
+  }, [filters]);
   const status = state.statusByType[activeExplorerType] ?? { loading: false, error: null };
   const corridorMiles = useMemo(() => corridorLengthMiles(centerline), [centerline]);
 
@@ -201,7 +212,7 @@ export function AssetExplorer({ store, centerline, leftInset = 16, rightInset: d
                   onClick={() => store.setFilter({ id: null })}
                   aria-pressed={state.filter.id === null}
                 />
-                {filters.map(filter => (
+                {chipFilters.map(filter => (
                   <Chip
                     key={filter.id}
                     label={filter.label}
@@ -212,6 +223,26 @@ export function AssetExplorer({ store, centerline, leftInset = 16, rightInset: d
                     aria-pressed={state.filter.id === filter.id}
                   />
                 ))}
+                {groupedFilters.map(([group, entries]) => {
+                  const chosen = entries.some(entry => entry.id === state.filter.id) ? state.filter.id : '';
+                  return (
+                    <Select
+                      key={group}
+                      size="small"
+                      displayEmpty
+                      value={chosen}
+                      onChange={event => store.setFilter({ id: event.target.value || null })}
+                      inputProps={{ 'aria-label': group }}
+                      sx={{ height: 24, fontSize: 13, '& .MuiSelect-select': { py: 0, pl: 1 } }}
+                    >
+                      {/* Choosing nothing is choosing every type, and is named so rather than blank. */}
+                      <MenuItem value="">{`All ${group.toLowerCase()}s`}</MenuItem>
+                      {entries.map(entry => (
+                        <MenuItem key={entry.id} value={entry.id}>{`${entry.label} (${entry.count})`}</MenuItem>
+                      ))}
+                    </Select>
+                  );
+                })}
               </Stack>
             )}
             {explorerExpanded && (

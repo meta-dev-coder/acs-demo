@@ -233,6 +233,8 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
       if (activeKey !== card.key) { openType(card.key); writeUrl(); }
       return true;
     },
+    /** Put away whatever this workspace is drawing, without changing which tab is open. */
+    hide() { if (activeKey) closeType(); },
     /** Load every class without showing any of them, so a search can see records first. */
     preload() {
       return Promise.all(KPI_CARDS

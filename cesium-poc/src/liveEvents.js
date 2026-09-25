@@ -34,6 +34,10 @@ const ICONS = {
   [LIVE_EVENT_TYPES.CLOSURE]: pin('#ff8a8a', '#4d1c22', '<rect x="9" y="18.5" width="26" height="9.5" rx="2"/><path d="m14 28 4.5-9.5M21 28l4.5-9.5M28 28l4.5-9.5"/><path d="M11.5 28v4.5M32.5 28v4.5"/>'),
   // FL511 draws construction in orange; the pin keeps that association while matching our family.
   [LIVE_EVENT_TYPES.CONSTRUCTION]: pin('#ffab5c', '#4a2f11', '<path d="M11 27.5h22v5H11z"/><path d="M15 27.5V16h14v11.5"/><path d="m15 21.5 14-5.5"/>'),
+  // FL511 draws congestion as a queue marker; amber keeps it distinct from a red closure.
+  [LIVE_EVENT_TYPES.CONGESTION]: pin('#ffd66b', '#4a3a11', '<path d="M11 13h18v6H11z"/><path d="M11 22h18v6H11z"/><path d="M33 12v18"/><path d="m29.5 26.5 3.5 3.5 3.5-3.5"/>'),
+  // A stopped vehicle is a hazard rather than a restriction: blue-grey, distinct from the warnings.
+  [LIVE_EVENT_TYPES.DISABLED]: pin('#9fc4ff', '#1d2c4a', '<path d="M10 25.5h20v4H10z"/><path d="M12.5 25.5 14.5 18h11l2 7.5"/><circle cx="14.5" cy="29.5" r="1.8"/><circle cx="25.5" cy="29.5" r="1.8"/><path d="M20 9v4.5M20 15.2v.3"/>'),
 };
 const CONNECTOR_COLOR = Color.fromCssColorString('#ff8a8a');
 
@@ -59,6 +63,8 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
       <div class="segment-row"><input type="checkbox" id="live-events-incident" data-live-type="INCIDENT" aria-label="Incidents"><button class="segment-select" data-live-type="INCIDENT">Incidents</button><span class="badge" data-live-count="INCIDENT">0</span></div>
       <div class="segment-row"><input type="checkbox" id="live-events-closure" data-live-type="CLOSURE" aria-label="Closures"><button class="segment-select" data-live-type="CLOSURE">Closures</button><span class="badge" data-live-count="CLOSURE">0</span></div>
       <div class="segment-row"><input type="checkbox" id="live-events-construction" data-live-type="CONSTRUCTION" aria-label="Construction"><button class="segment-select" data-live-type="CONSTRUCTION">Construction</button><span class="badge" data-live-count="CONSTRUCTION">0</span></div>
+      <div class="segment-row"><input type="checkbox" id="live-events-congestion" data-live-type="CONGESTION" aria-label="Congestion"><button class="segment-select" data-live-type="CONGESTION">Congestion</button><span class="badge" data-live-count="CONGESTION">0</span></div>
+      <div class="segment-row"><input type="checkbox" id="live-events-disabled" data-live-type="DISABLED" aria-label="Disabled vehicles"><button class="segment-select" data-live-type="DISABLED">Disabled Vehicles</button><span class="badge" data-live-count="DISABLED">0</span></div>
     </div>
     <p class="live-event-source" hidden></p>
     <p class="ramp-status" role="status">Loading live events…</p>

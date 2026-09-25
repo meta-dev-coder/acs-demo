@@ -28,22 +28,23 @@ try {
   // 1. Traffic carries the restriction cards, and nothing is chosen on arrival.
   await page.locator('.app-nav [data-section="traffic"]').click();
   await page.locator('.traffic-workspace .ws-kpis').waitFor();
-  assert.deepEqual(await page.locator('.traffic-workspace .ws-kpi-label').allInnerTexts(), ['Lane closures', 'Construction']);
+  assert.deepEqual(await page.locator('.traffic-workspace .ws-kpi-label').allInnerTexts(), ['Lane closures', 'Construction', 'Congestion']);
   assert.equal(await page.locator('.traffic-workspace .ws-kpi[aria-pressed="true"]').count(), 0, 'nothing chosen on arrival');
   assert.equal(await page.locator('[role="region"][aria-label$="explorer"]').count(), 0, 'and no browser until asked for');
   assert.match(await page.locator('.traffic-workspace .ws-source').innerText(), /FL511/);
   const counts = await page.evaluate(() => {
     const read = key => Number(document.querySelector(`.traffic-workspace .ws-kpi[data-kpi="${key}"] [data-count]`).textContent.replace(/,/g, ''));
-    return { closures: read('closures'), construction: read('construction'), installed: Boolean(window.__traffic) };
+    return { closures: read('closures'), construction: read('construction'), congestion: read('congestion'), installed: Boolean(window.__traffic) };
   });
   assert.ok(counts.installed, 'the workspace is installed');
-  console.log(`✓ Traffic: Lane closures ${counts.closures}, Construction ${counts.construction}, source ${await page.locator('.traffic-workspace .ws-source').innerText()}`);
+  console.log(`✓ Traffic: Lane closures ${counts.closures}, Construction ${counts.construction}, Congestion ${counts.congestion}, source ${await page.locator('.traffic-workspace .ws-source').innerText()}`);
 
   // 2. Each card switches its own layer on and opens the browser for it — or says the corridor has
   //    none, which is an answer rather than an error.
   for (const [key, layerControl, label, assetType] of [
     ['closures', '#live-events-closure', 'Closures', 'closure'],
     ['construction', '#live-events-construction', 'Construction', 'construction'],
+    ['congestion', '#live-events-congestion', 'Congestion', 'congestion'],
   ]) {
     const count = Number((await kpi(key).locator('[data-count]').innerText()).replace(/,/g, ''));
     await kpi(key).click();
@@ -73,8 +74,9 @@ try {
   // 3. Safety no longer carries these: one layer, one workspace.
   await page.locator('.app-nav [data-section="safety"]').click();
   await page.locator('.safety-workspace .ws-kpis').waitFor();
-  assert.deepEqual(await page.locator('.safety-workspace .ws-kpi-label').allInnerTexts(), ['Active incidents'],
-    'closures and construction moved off Safety');
+  // Safety keeps the live incidents and the recorded crash history; neither is a restriction.
+  assert.deepEqual(await page.locator('.safety-workspace .ws-kpi-label').allInnerTexts(),
+    ['Active incidents', 'Disabled vehicles', 'Recorded crashes'], 'closures and construction moved off Safety');
   assert.equal(await page.locator('.traffic-workspace .ws-kpis').isVisible(), false, 'only one strip is on screen at a time');
   console.log('✓ closures and construction are on Traffic only; Safety keeps incidents');
 
