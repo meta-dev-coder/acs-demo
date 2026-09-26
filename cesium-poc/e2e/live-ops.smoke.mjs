@@ -79,12 +79,14 @@ try {
   await page.locator('.liveops-workspace .ws-kpis').waitFor({ timeout: 30000 });
   await page.waitForFunction(() => window.__liveOps?.impact?.size === 16, null, { timeout: 60000 });
   console.log('✓ Live Ops opens: five KPI cards over the map, 16 corridor sections scored');
-  assert.equal(await page.locator('[data-liveops-layer="operationalImpact"]').isChecked(), false,
-    'road highlighting starts off in Live Ops');
-  // The remaining overlay checks exercise the operator explicitly enabling it.
-  await page.locator('.liveops-layers-trigger').click();
-  await page.locator('[data-liveops-layer="operationalImpact"]').check();
-  await page.locator('.liveops-layers-close').click();
+  // Operational Impact is on when the workspace opens, as the brief specifies, and the corridor's
+  // own carriageways are drawn with it — the overlay colours those lines, so with them off it
+  // scored correctly and painted nothing.
+  assert.equal(await page.locator('[data-liveops-layer="operationalImpact"]').isChecked(), true,
+    'Operational Impact is on by default');
+  await page.waitForFunction(() => window.__viewer.dataSources.getByName('I-595 FDOT Traffic Segments')[0]
+    .entities.values.filter(entity => entity.show).length === 16, null, { timeout: 30000 });
+  console.log('✓ Operational Impact on by default, with all 16 carriageway sections drawn');
 
   // 2. The KPI counts the live feed, and says what the corridor model could not place.
   const kpi = key => page.locator(`.liveops-workspace .ws-kpi[data-kpi="${key}"]`);
@@ -234,6 +236,52 @@ try {
   await page.locator('.liveops-impact-notice:not([hidden])').waitFor();
   await page.waitForTimeout(1500);
   await page.screenshot({ path: '../reports/operational-impact/live-impact-on.png' });
+  // 8. The pulsing circles at event locations.
+  await page.waitForFunction(() => (window.__viewer.dataSources.getByName('Live Ops event pulses')[0]?.entities.values.length ?? 0) > 0,
+    null, { timeout: 30000 });
+  // Long enough for the ring to restart from the centre several times — the moment the first
+  // implementation threw `semiMajorAxis must be greater than or equal to the semiMinorAxis`.
+  await page.waitForTimeout(9000);
+  const pulses = await page.evaluate(() => {
+    const ds = window.__viewer.dataSources.getByName('Live Ops event pulses')[0];
+    const time = window.__viewer.clock.currentTime;
+    // The source also holds each event's static 100 m ground ring, which has no `point`.
+    const rings = ds.entities.values.filter(entity => entity.point);
+    const groundRings = ds.entities.values.filter(entity => entity.ellipse);
+    let bad = 0;
+    for (let pass = 0; pass < 25; pass++) {
+      for (const ring of rings) {
+        // Drawn in screen space, so there is no second axis left to disagree with the first —
+        // which is what used to stop rendering outright.
+        if (ring.ellipse) { bad += 1; continue; }
+        const pixels = ring.point?.pixelSize?.getValue(time);
+        if (!(Number.isFinite(pixels) && pixels > 0)) bad += 1;
+      }
+    }
+    const colors = rings.map(ring => ring.point.color.getValue(time)).map(c => c.alpha);
+    return { rings: rings.length, bad, shown: rings.filter(r => r.show).length,
+      fading: new Set(colors.map(a => a.toFixed(3))).size > 1,
+      groundRings: groundRings.length,
+      groundRadii: [...new Set(groundRings.map(r => r.ellipse.semiMajorAxis.getValue(time)))],
+      errorPanel: Boolean(document.querySelector('.cesium-widget-errorPanel')) };
+  });
+  assert.ok(pulses.rings > 0, 'events are pulsing');
+  assert.equal(pulses.bad, 0, 'every ring reports a usable size across 25 samples');
+  assert.ok(pulses.fading, 'the rings are at different points of their travel, so they animate');
+  assert.equal(pulses.errorPanel, false, 'and rendering has not stopped');
+  // Each event also carries a true 100 m ring on the ground, so that once an operator has flown to
+  // one, the circle is a distance they can measure other assets against rather than a screen shape.
+  assert.equal(pulses.groundRings, pulses.rings / 2, 'one ground ring per event');
+  assert.deepEqual(pulses.groundRadii, [100], 'and it is a real 100 m radius');
+  console.log(`✓ event pulses: ${pulses.rings} screen-space rings + ${pulses.groundRings} × 100 m ground rings, animating, no render error`);
+
+  // Leaving the workspace takes them away and stops the animation loop.
+  await page.locator('.app-nav [data-section="overview"]').click();
+  await page.waitForTimeout(1200);
+  assert.equal(await page.evaluate(() => window.__viewer.dataSources.getByName('Live Ops event pulses')[0].show), false,
+    'the pulses go with the workspace');
+  console.log('✓ leaving Live Ops puts the pulses away');
+
   assert.deepEqual(problems, []);
   console.log('✓ no page or console errors');
 } finally { await browser.close(); }

@@ -79,6 +79,31 @@ export function corridorOverview(centerline) {
 }
 
 /**
+ * Operations view: the whole corridor, obliquely, from beyond its western end.
+ *
+ * What a road operator opens onto — all 15 miles of I-595 in one frame, seen along the road rather
+ * than straight down, so the two carriageways and the express lanes read as separate ribbons and
+ * the impact colouring can be told apart. Reset view stays what it is: straight down, north up.
+ *
+ * Everything is derived from the centerline: the heading is the corridor's own west-to-east
+ * bearing, and the eye stands back along it by the distance the tilt needs to reach the far end.
+ */
+export function corridorOperationsView(centerline, { pitchDeg = -34, yawOffsetDeg = -42 } = {}) {
+  const points = assertCenterline(centerline);
+  const west = points.reduce((a, b) => (a.lon <= b.lon ? a : b));
+  const east = points.reduce((a, b) => (a.lon >= b.lon ? a : b));
+  const length = metresBetween(west, east);
+  const focus = { lon: (west.lon + east.lon) / 2, lat: (west.lat + east.lat) / 2 };
+  // Turned off the corridor's own axis on purpose. Looking straight down the road foreshortens all
+  // fifteen miles into a short vertical sliver; at forty degrees off it crosses the frame corner to
+  // corner and its length is legible.
+  const headingDeg = (bearingDegrees(west, east) + yawOffsetDeg + 360) % 360;
+  const height = Math.round(length * 0.58);
+  const eye = offsetBy(focus, (headingDeg + 180) % 360, height / Math.tan(-pitchDeg * Math.PI / 180));
+  return { lon: eye.lon, lat: eye.lat, height, headingDeg, pitchDeg, rollDeg: 0, focus, lengthM: length };
+}
+
+/**
  * Hero view: a low oblique over the I-75 / Sawgrass interchange at the western end of I-595.
  *
  * That interchange is chosen deliberately — its stacked ramps give far more perceptible elevation

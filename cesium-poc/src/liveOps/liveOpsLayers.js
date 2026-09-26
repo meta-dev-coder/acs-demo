@@ -37,12 +37,12 @@ const GROUPS = Object.freeze([
 ]);
 
 /**
- * What Live Ops opens with: every operational event. An operator needs the
+ * What Live Ops opens with: the impact overlay and every operational event. An operator needs the
  * whole picture at once — that is the point of the workspace. Cameras and message signs stay off,
  * because 74 camera pins is the statewide-map clutter this view exists to avoid.
  */
 export const DEFAULT_VISIBLE = Object.freeze([
-  'incidents', 'closures', 'disabledVehicles', 'construction', 'congestion',
+  'operationalImpact', 'incidents', 'closures', 'disabledVehicles', 'construction', 'congestion',
 ]);
 
 export const LIVE_OPS_LAYER_GROUPS = GROUPS;

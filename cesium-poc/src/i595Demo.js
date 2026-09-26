@@ -1,3 +1,4 @@
+import { installEventPulses } from './liveOps/eventPulses.js';
 import { installLighting } from './lighting.js';
 import { LIGHTING_CATEGORIES } from './lightingData.js';
 import { installMessageSigns } from './messageSigns.js';
@@ -46,7 +47,7 @@ import { installCorridorModelLayers } from "./corridorModelLayers.js";
 import { installAssetExplorer } from "./assetExplorer/installAssetExplorer.jsx";
 import { createPhotorealisticClipping } from "./photorealisticClipping.js";
 import { installAskTheTwin } from "./askTheTwin.js";
-import { corridorOverview, heroView } from "./i595CorridorViews.js";
+import { corridorOverview, heroView, corridorOperationsView } from "./i595CorridorViews.js";
 import "./i595Demo.css";
 
 document.title = "I-595-DEMO · System-of-record";
@@ -443,8 +444,19 @@ try {
   const liveOps = installLiveOpsWorkspace(viewer, {
     assetExplorer, liveEvents: liveEventControls, layerStore, segments: mainlineSegments,
   });
+  const eventPulses = installEventPulses(viewer, { liveEvents: liveEventControls, cameras: cameraControls, messageSigns: messageSignControls });
+  // Live Ops opens on the whole corridor: an operator watching for what is happening needs all
+  // fifteen miles in frame, not the close hero shot the rest of the app opens on. Derived from the
+  // centerline, and only applied on arrival — it never fights the camera afterwards.
+  const opsView = corridorOperationsView(corridor);
+  const flyToOperationsView = () => viewer.camera.flyTo({
+    destination: Cartesian3.fromDegrees(opsView.lon, opsView.lat, opsView.height),
+    orientation: orientationOf(opsView), duration: 1.6,
+  });
   const workspaces = { maintenance, safety, traffic, liveOps };
   appNav.onSelect(section => {
+    eventPulses.setActive(section === "liveOps");
+    if (section === "liveOps") flyToOperationsView();
     cameraControls.setIconMarkers(section === "liveOps");
     messageSignControls.setIconMarkers(section === "liveOps");
     for (const [name, workspace] of Object.entries(workspaces)) {
@@ -454,7 +466,8 @@ try {
   cameraControls.setIconMarkers(appNav.section === "liveOps");
   messageSignControls.setIconMarkers(appNav.section === "liveOps");
   workspaces[appNav.section]?.activate();
-  if (import.meta.env.DEV) { window.__maintenance = maintenance; window.__safety = safety; window.__traffic = traffic; window.__liveOps = liveOps; window.__liveEvents = liveEventControls; }
+  eventPulses.setActive(appNav.section === "liveOps");
+  if (import.meta.env.DEV) { window.__maintenance = maintenance; window.__safety = safety; window.__traffic = traffic; window.__liveOps = liveOps; window.__liveEvents = liveEventControls; window.__layerStore = layerStore; window.__segments = mainlineSegments; }
 
   explorerToggle = document.querySelector("#menu-toggle");
   // A fresh load opens on the map, not on the layer tree; the quick rail keeps the common
@@ -463,7 +476,7 @@ try {
 
   // Operational strip: corridor facts and the live-event feed, with gaps stated rather than filled.
   const askTwin = installAskTheTwin(viewer, { cameraControls, assetExplorer, segments: mainlineSegments, layerStore, centerline: corridor });
-  if (import.meta.hot) import.meta.hot.dispose(() => { liveOps.destroy(); traffic.destroy(); safety.destroy(); maintenance.destroy(); maintenanceLayer.destroy(); appNav.destroy(); assetExplorer.destroy(); lightingControls.destroy(); messageSignControls.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
+  if (import.meta.hot) import.meta.hot.dispose(() => { eventPulses.destroy(); liveOps.destroy(); traffic.destroy(); safety.destroy(); maintenance.destroy(); maintenanceLayer.destroy(); appNav.destroy(); assetExplorer.destroy(); lightingControls.destroy(); messageSignControls.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
   for (const input of inputs) {
     // Layers with their own loader, plus display options that are not data layers at all: this loop
     // fetches `data/<id>.geojson`, and "flow-direction" has no such file — being swept up here

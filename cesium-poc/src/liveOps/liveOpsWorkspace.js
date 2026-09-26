@@ -22,7 +22,6 @@ import { DEFAULT_VISIBLE, installLiveOpsLayers } from './liveOpsLayers.js';
 import { OPS_ICONS } from './opsIcons.js';
 
 /** The corridor's own carriageway lines — what Operational Impact paints. */
-const CORRIDOR_LAYER = 'traffic-flow';
 const IMPACT_ROAD_LAYERS = ['mainline-eb', 'mainline-wb'];
 
 /**
@@ -94,6 +93,10 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
     onToggle: (id, on) => { if (id === 'operationalImpact') applyImpact(on); },
   });
 
+  /** The overlay must never fail quietly: a corridor with no colour looks like a corridor at rest. */
+  const reportFailure = promise =>
+    Promise.resolve(promise).catch(error => console.warn('[LiveOps] operational impact overlay failed', error));
+
   let activeExplorer = null, active = false;
   /** Whether Live Ops was the one that switched the corridor lines on, so it can put them back. */
   let borrowedCorridor = false;
@@ -162,7 +165,6 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
    * nothing. Live Ops switches it on and remembers that it did.
    */
   async function applyImpact(on) {
-    const version = ++impactVersion;
     legend.hidden = !on;
     const mapped = [...impact.values()].reduce((sum, section) => sum + section.events.length, 0);
     notice.hidden = !on || mapped > 0;
@@ -171,14 +173,18 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
     if (on) {
       // Enable only the EB/WB geometry this overlay scores. The composite Traffic Flow switch
       // also enables Express, whose blue line can cover GP heat at overview scale.
+      // Switching the geometry on is idempotent and must always finish. It used to sit behind the
+      // same supersede-check as the styling below, so each fresh call abandoned the previous one
+      // mid-await and the carriageways never came on at all — Operational Impact then scored
+      // correctly and had nothing to paint.
       for (const id of IMPACT_ROAD_LAYERS) {
-        if (layerStore.stateOf(id) !== 'on') {
-          borrowedCorridor = true;
-          await layerStore.setVisible(id, true);
-          if (version !== impactVersion) return;
-        }
+        if (layerStore.stateOf(id) === 'on') continue;
+        borrowedCorridor = true;
+        await layerStore.setVisible(id, true);
       }
     }
+    // Only the styling is superseded by a newer call; the version is taken after the awaits above.
+    const version = ++impactVersion;
     if (version !== impactVersion || !segments?.setImpactResolver) return;
     if (!on) { segments.setImpactResolver(null); segments.setImpactEmphasis?.(false); return; }
     // Over photorealistic tiles a thin translucent line disappears. The overlay asks the segment
@@ -264,11 +270,6 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
       root.hidden = false;
       // A control room shows everything at once; every other workspace keeps one tool at a time.
       assetExplorer.setExclusiveLayers?.(false);
-      // Start Live Ops without road highlighting, including a previous workspace's Traffic Flow.
-      layers.set('operationalImpact', false);
-      void applyImpact(false);
-      borrowedCorridor = false;
-      void layerStore.setVisible(CORRIDOR_LAYER, false);
       segments?.setOverlayDetails?.(overlayDetails, overlayTooltip);
       for (const id of DEFAULT_VISIBLE) layers.set(id, true);
       layers.syncFromLayers();
@@ -288,7 +289,10 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
       layers.setOpen(false);
       // The corridor's own colours come back; Live Ops borrowed them, it does not own them.
       void applyImpact(false);
-      if (borrowedCorridor) { borrowedCorridor = false; void layerStore.setVisible(CORRIDOR_LAYER, false); }
+      if (borrowedCorridor) {
+        borrowedCorridor = false;
+        for (const id of IMPACT_ROAD_LAYERS) void layerStore.setVisible(id, false);
+      }
       if (store.getState().activeExplorerType) store.setActiveExplorerType(null);
     },
     destroy() { legendPosition.disconnect(); stopUpdates(); layers.destroy(); strip.destroy(); root.remove(); },

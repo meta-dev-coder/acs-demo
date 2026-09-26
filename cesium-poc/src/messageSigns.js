@@ -121,7 +121,7 @@ export function installMessageSigns(container, viewer) {
   const leave = () => panel.hover(null);
   viewer.canvas.addEventListener('mouseleave', leave);
   return {
-    signById, records,
+    signById, records, load,
     setIconMarkers(on) { iconMarkers = Boolean(on); for (const entity of signById.values()) style(entity); viewer.scene.requestRender(); },
     get error() { return loadError; },
     selectById(id) { const entity = signById.get(String(id)); if (entity) select(entity); },
