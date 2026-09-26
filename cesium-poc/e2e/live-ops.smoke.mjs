@@ -275,12 +275,31 @@ try {
   assert.deepEqual(pulses.groundRadii, [100], 'and it is a real 100 m radius');
   console.log(`✓ event pulses: ${pulses.rings} screen-space rings + ${pulses.groundRings} × 100 m ground rings, animating, no render error`);
 
+  // Only the two ends of I-595 are signed here: a shield at every interchange repeats the same
+  // route number across a corridor-wide frame. Every other workspace keeps the full set.
+  const shieldsDrawn = () => page.evaluate(() => {
+    const ds = window.__viewer.dataSources.getByName('I-595 Route Shields')[0];
+    const time = window.__viewer.clock.currentTime;
+    const all = ds.entities.values;
+    // `billboard.show` is a Cesium property, not a boolean — reading it raw is always truthy.
+    const visible = entity => entity.billboard.show?.getValue?.(time) ?? true;
+    return { total: all.length, drawn: all.filter(visible).length };
+  });
+  // The suite has moved on to Traffic by this point; come back so the check is made where it counts.
+  await page.locator('.app-nav [data-section="liveOps"]').click();
+  await page.waitForTimeout(2500);
+  const liveOpsShields = await shieldsDrawn();
+  assert.ok(liveOpsShields.total > 2, 'the corridor has more shields than its two ends');
+  assert.equal(liveOpsShields.drawn, 2, 'and Live Ops draws only the beginning and the end');
+  console.log(`✓ route shields: ${liveOpsShields.drawn} of ${liveOpsShields.total} — the corridor's two ends only`);
+
   // Leaving the workspace takes them away and stops the animation loop.
   await page.locator('.app-nav [data-section="overview"]').click();
   await page.waitForTimeout(1200);
   assert.equal(await page.evaluate(() => window.__viewer.dataSources.getByName('Live Ops event pulses')[0].show), false,
     'the pulses go with the workspace');
-  console.log('✓ leaving Live Ops puts the pulses away');
+  assert.equal((await shieldsDrawn()).drawn, liveOpsShields.total, 'and every route shield comes back');
+  console.log('✓ leaving Live Ops puts the pulses away and restores every shield');
 
   assert.deepEqual(problems, []);
   console.log('✓ no page or console errors');

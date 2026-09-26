@@ -57,7 +57,7 @@ export function liveOpsCard(events, card) {
  * @param {{assetExplorer: object, liveEvents: object, layerStore: object, segments: object,
  *          host?: HTMLElement}} deps
  */
-export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, layerStore, segments, host = document.body }) {
+export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, layerStore, segments, roadShields, host = document.body }) {
   const store = assetExplorer.store;
   const root = document.createElement('div');
   root.className = 'liveops-workspace';
@@ -271,6 +271,9 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
       // A control room shows everything at once; every other workspace keeps one tool at a time.
       assetExplorer.setExclusiveLayers?.(false);
       segments?.setOverlayDetails?.(overlayDetails, overlayTooltip);
+      // Only the shields at either end of I-595; the interchanges between them repeat the same
+      // route number across a corridor-wide frame.
+      roadShields?.setEndpointsOnly?.(true);
       for (const id of DEFAULT_VISIBLE) layers.set(id, true);
       layers.syncFromLayers();
       recompute();
@@ -285,6 +288,7 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
       root.hidden = true;
       activeExplorer = null;
       assetExplorer.setExclusiveLayers?.(true);
+      roadShields?.setEndpointsOnly?.(false);
       segments?.setOverlayDetails?.(null, null);
       layers.setOpen(false);
       // The corridor's own colours come back; Live Ops borrowed them, it does not own them.

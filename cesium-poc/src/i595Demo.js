@@ -443,6 +443,7 @@ try {
   // data and no geometry of its own.
   const liveOps = installLiveOpsWorkspace(viewer, {
     assetExplorer, liveEvents: liveEventControls, layerStore, segments: mainlineSegments,
+    roadShields,
   });
   const eventPulses = installEventPulses(viewer, { liveEvents: liveEventControls, cameras: cameraControls, messageSigns: messageSignControls });
   // Live Ops opens on the whole corridor: an operator watching for what is happening needs all

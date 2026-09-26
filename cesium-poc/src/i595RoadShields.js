@@ -56,6 +56,13 @@ export function installI595RoadShields(viewer, centerline) {
   // corridor; without a depth test nothing hides the far ones. Nearest shield keeps the screen.
   const declutter = installMarkerDeclutter(viewer, shields, { graphic: 'billboard' });
 
+  // The two ends of the corridor: the westernmost and easternmost shields. Everything between
+  // them is an intermediate interchange.
+  const endpointIds = new Set([
+    placements.reduce((west, p) => (p.lon < west.lon ? p : west), placements[0])?.id,
+    placements.reduce((east, p) => (p.lon > east.lon ? p : east), placements[0])?.id,
+  ].filter(Boolean));
+
   const added = viewer.dataSources.add(source).then(() => viewer.scene.requestRender());
   return {
     /** @type {Map<string, import('cesium').Entity>} */
@@ -64,6 +71,25 @@ export function installI595RoadShields(viewer, centerline) {
     ready: added,
     /** Which shields are currently standing down behind a nearer one. */
     hiddenIds: () => declutter.hiddenIds(),
+    /**
+     * Show only the shields at the start and the end of I-595.
+     *
+     * Live Ops watches all fifteen miles at once, where a shield at every interchange repeats the
+     * same fact six times across the frame. The two ends still say which road this is and where it
+     * begins and finishes; the ones between are noise at that scale. Every other workspace keeps
+     * the full set.
+     *
+     * Hidden through the billboard rather than `entity.show`, because the declutter pass owns that
+     * and reassigns it every frame — setting it here would simply be overwritten.
+     */
+    setEndpointsOnly(on) {
+      for (const entity of shields) {
+        entity.billboard.show = on ? endpointIds.has(entity.id) : true;
+      }
+      viewer.scene.requestRender();
+    },
+    /** Which shields the corridor begins and ends with. */
+    endpointIds: () => new Set(endpointIds),
     /** Shields ride with the road network; no separate checkbox in the layer tree. */
     setVisible(show) {
       source.show = show;
