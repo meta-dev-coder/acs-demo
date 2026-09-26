@@ -1,0 +1,37 @@
+{
+  "timeZone": "America/New_York",
+  "spawnTypes": ["INCIDENT", "DISABLED"],
+  "defaultProfile": "demo",
+  "profiles": {
+    "demo":      { "assignAfterSeconds": 60,  "workOrderAfterSeconds": 120,  "inspectionAfterClearSeconds": 120,   "closeAfterInspectionSeconds": 300 },
+    "realistic": { "assignAfterSeconds": 900, "workOrderAfterSeconds": 3600, "inspectionAfterClearSeconds": 86400, "closeAfterInspectionSeconds": 259200 }
+  },
+  "damage": { "radiusMeters": 400, "rate": 1.0 },
+  "tasks": {
+    "INCIDENT": [
+      { "seq": 1, "type": "Dispatch Field Crew",  "team": "Roadway Response", "start": "assign",    "complete": "cleared" },
+      { "seq": 2, "type": "Temporary Mitigation", "team": "Field Ops A",      "start": "workOrder", "complete": "cleared" },
+      { "seq": 3, "type": "Inspect and Verify",   "team": "Roadway Response", "start": "cleared",   "complete": "inspection" }
+    ],
+    "DISABLED": [
+      { "seq": 1, "type": "Dispatch Field Crew",  "team": "Field Ops B",      "start": "assign",    "complete": "cleared" },
+      { "seq": 2, "type": "Inspect and Verify",   "team": "Roadway Response", "start": "cleared",   "complete": "inspection" }
+    ],
+    "default": [
+      { "seq": 1, "type": "Inspect and Verify",   "team": "Field Ops A",      "start": "cleared",   "complete": "inspection" }
+    ]
+  },
+  "subtypes": [
+    { "id": "fire",          "label": "Vehicle fire",        "keywords": ["fire", "burn", "smoke"],               "categories": ["Lighting", "Lighting - Under Deck", "Detector", "Fire Suppression System (FSS)", "Drainage"], "issueCategory": "impact repair",    "repairCategory": "impact repair" },
+    { "id": "rollover",      "label": "Rollover",            "keywords": ["rollover", "roll over", "overturn"],   "categories": ["Lighting", "Sign structures", "Landscape"], "issueCategory": "knockdown repair", "repairCategory": "knockdown repair" },
+    { "id": "debris",        "label": "Debris",              "keywords": ["debris", "spill", "object in road"],   "categories": ["Drainage", "Landscape"], "issueCategory": "debris blockage", "repairCategory": "debris blockage" },
+    { "id": "flood",         "label": "Flooding",            "keywords": ["flood", "standing water", "water on"], "categories": ["Drainage"], "issueCategory": "debris blockage", "repairCategory": "debris blockage" },
+    { "id": "crash_express", "label": "Express lanes crash", "facility": "EXPRESS", "keywords": ["crash", "collision", "accident", "barrier", "guardrail", "incident"], "categories": ["WGT", "DFBR", "Trinity EAG", "Access Gate", "LCS", "Attenuetors"], "issueCategory": "impact repair", "repairCategory": "impact repair" },
+    { "id": "crash",         "label": "Crash",               "keywords": ["crash", "collision", "accident", "barrier", "guardrail", "wreck"], "categories": ["Attenuetors", "Lighting", "Delineators", "Sign structures", "Drainage"], "issueCategory": "impact repair", "repairCategory": "impact repair" },
+    { "id": "disabled",      "label": "Disabled vehicle",    "keywords": [], "categories": [], "issueCategory": "roadside assistance", "repairCategory": "roadside assistance" },
+    { "id": "no_damage",     "label": "Road event",          "keywords": [], "categories": [], "issueCategory": "incident follow-up", "repairCategory": "incident follow-up" }
+  ],
+  "inspectors": ["Steven Gerard", "Jose Patino", "Antonieta Egoavil", "JJ Patino", "Miguel Bautista", "Laura Bedoya", "Ismael Rivera", "Oscar Sosa"],
+  "inspectionFormFamily": "Live Post-Incident Inspection",
+  "sourceSignal": "incident follow-up"
+}

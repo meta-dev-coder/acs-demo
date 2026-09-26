@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SAFETY_CARDS, TRAFFIC_CARDS, maintenanceCard, safetyCard, sourceNote } from '../src/safetyWorkspace.js';
+import * as safetyWorkspace from '../src/safetyWorkspace.js';
+import { SAFETY_CARDS, TRAFFIC_CARDS, maintenanceCard, safetyCard } from '../src/safetyWorkspace.js';
+import { liveEventSourceNote as sourceNote } from '../src/liveEventsData.js';
 
 const [incidents] = SAFETY_CARDS;
 const [closures, construction] = TRAFFIC_CARDS;
@@ -50,6 +52,7 @@ test('the source is only called live when the feed says it is', () => {
   assert.deepEqual(sourceNote({ source: 'FL511', sourceStatus: 'LIVE' }), { text: 'FL511 · live', live: true });
   assert.deepEqual(sourceNote({ source: 'FL511', sourceStatus: 'STALE' }), { text: 'FL511 · stale', live: false });
   assert.deepEqual(sourceNote({}), { text: 'FL511', live: false });
+  assert.equal(safetyWorkspace.sourceNote, undefined, 'the strips use liveEventSourceNote directly, no wrapper');
 });
 
 test('construction is a card of its own, counted from the same feed', () => {
@@ -94,4 +97,23 @@ test('the crash card counts a DataConnect class, and says how many were harmful'
   // A class that has not loaded says nothing rather than a zero it cannot vouch for.
   assert.deepEqual(maintenanceCard({ recordsForType: () => [] }, card), { state: 'loading' });
   assert.deepEqual(maintenanceCard(null, card), { state: 'loading' });
+});
+
+test('the recorded-crash card counts and reveals the same historical records', async () => {
+  const { historicalMaintenance } = await import('../src/safetyWorkspace.js');
+  const { shownRecords } = await import('../src/maintenance/maintenanceWorkspace.js');
+  const historical = [{ id: 'CR-1' }, { id: 'CR-2' }];
+  const entry = { state: 'ready', historical, records: [{ id: 'FL511-1', live: true }, ...historical] };
+  const calls = [];
+  const workspace = {
+    recordsForType: (type, options) => shownRecords(entry, options),
+    reveal: (type, options) => { calls.push(options); return shownRecords(entry, options); },
+    hide() {}, preload: () => Promise.resolve(),
+  };
+  const deps = historicalMaintenance(() => workspace);
+  const [crashes] = SAFETY_CARDS.filter(card => card.source === 'maintenance');
+  const shown = await deps.reveal(crashes.assetType);
+  assert.equal(maintenanceCard(deps, crashes).count, shown.length);
+  assert.deepEqual(calls, [{ live: false }]);
+  assert.equal(historicalMaintenance(() => null).recordsForType('incidentRecord').length, 0);
 });

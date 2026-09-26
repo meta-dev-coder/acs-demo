@@ -36,7 +36,7 @@ import { createThemeMode } from "./themeMode.js";
 import { installAppNav } from "./appNav.js";
 import { installMaintenanceLayer } from "./maintenance/maintenanceLayer.js";
 import { installMaintenanceWorkspace } from "./maintenance/maintenanceWorkspace.js";
-import { installSafetyWorkspace, installTrafficWorkspace } from "./safetyWorkspace.js";
+import { historicalMaintenance, installSafetyWorkspace, installTrafficWorkspace } from "./safetyWorkspace.js";
 import { installLiveOpsWorkspace } from "./liveOps/liveOpsWorkspace.js";
 import { getTrafficColor } from "./corridorVisualConfig.js";
 import { installI595RoadShields } from "./i595RoadShields.js";
@@ -429,12 +429,7 @@ try {
   // Maintenance workspace rather than a live layer — so it is handed that workspace to show it with.
   // Late-bound for the same reason as above: the workspace is built after the explorer it needs.
   const liveEventDeps = { assetExplorer, liveEvents: liveEventControls, layerStore,
-    maintenance: {
-      reveal: type => maintenanceWorkspace?.reveal(type),
-      hide: () => maintenanceWorkspace?.hide(),
-      recordsForType: type => maintenanceWorkspace?.recordsForType(type) ?? [],
-      whenReady: () => maintenanceWorkspace?.preload() ?? Promise.resolve(),
-    } };
+    maintenance: historicalMaintenance(() => maintenanceWorkspace) };
   const safety = installSafetyWorkspace(liveEventDeps);
   const traffic = installTrafficWorkspace(liveEventDeps);
   // Maintenance is a workspace over the same map: the KPI strip and its list appear, everything

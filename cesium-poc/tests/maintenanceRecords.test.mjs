@@ -243,3 +243,8 @@ test('incident type filters are built from the data, ordered by how many records
   // Other maintenance classes are unchanged: no type dropdown where there is no taxonomy.
   assert.deepEqual(assetTypeConfig('workOrder').getFilters(assets).filter(f => f.group), []);
 });
+
+test('a cleared record is not counted as open', () => {
+  const records = [{ id: 'T-1', status: 'Open' }, { id: 'T-2', status: 'Cleared' }];
+  assert.equal(summarize(records, 'tickets').note, '1 open');
+});

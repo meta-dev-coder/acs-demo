@@ -10,18 +10,37 @@ import { readFileSync } from 'node:fs';
 import { loadConfig } from './config.mjs';
 import { loadI595Network } from './i595Network.mjs';
 import { createFl511Service, SOURCE_STATUS } from './fl511Service.mjs';
+import { createLiveDcReadApi } from './liveDc/liveReadApi.mjs';
+import { liveDcUnavailablePayload, readLiveDcEvents } from './liveDc/liveEventsFromDc.mjs';
 
 export const API_BASE = '/api/i595/live-events';
 const DEFAULT_DATA_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'data');
 
-export function createLiveEventsApi({ config = loadConfig(), dataDir = DEFAULT_DATA_DIR, logger = console, service } = {}) {
-  let ready = null;
+export function createLiveEventsApi({ config = loadConfig(), dataDir = DEFAULT_DATA_DIR, logger = console, service, network, liveDc, now = Date.now } = {}) {
+  let ready = null, networkReady = null, dcError = null;
 
+  const loadNetwork = () => (networkReady ??= (network ? Promise.resolve(network) : loadI595Network(dataDir))
+    .catch(error => { networkReady = null; throw error; }));
   const start = () => (ready ??= (async () => {
-    const resolved = service ?? createFl511Service({ config, network: await loadI595Network(dataDir), logger });
+    const resolved = service ?? createFl511Service({ config, network: await loadNetwork(), logger });
     logger.log?.(`FL511 live events: ${config.baseUrl}, ${config.bufferMeters} m corridor buffer, ${config.refreshSeconds}s refresh`);
     return resolved;
   })().catch(error => { ready = null; throw error; }));
+
+  /** `?source=dataconnect`: the Live Events class only. The direct FL511 feed is never a substitute. */
+  async function fromDataConnect() {
+    try {
+      liveDc ??= createLiveDcReadApi({ logger });
+      const payload = await readLiveDcEvents({ readApi: liveDc, network: await loadNetwork(), config, now: now() });
+      dcError = null;
+      return { status: 200, payload };
+    } catch (error) {
+      const reason = String(error?.message || 'DataConnect request failed.').slice(0, 200);
+      if (dcError !== reason) logger.warn?.(`Live events: DataConnect unavailable (${reason})`);
+      dcError = reason;
+      return { status: 503, payload: liveDcUnavailablePayload(reason, { bufferMeters: config.bufferMeters }) };
+    }
+  }
 
   function send(response, statusCode, body) {
     const json = JSON.stringify(body);
@@ -49,12 +68,13 @@ export function createLiveEventsApi({ config = loadConfig(), dataDir = DEFAULT_D
       return true;
     }
     try {
-      const payload = await (await start()).getI595LiveEvents();
-      if (!type) { send(response, 200, payload); return true; }
+      const { status, payload } = url.searchParams.get('source') === 'dataconnect'
+        ? await fromDataConnect() : { status: 200, payload: await (await start()).getI595LiveEvents() };
+      if (!type) { send(response, status, payload); return true; }
       // Sub-resources are the same payload narrowed; the frontend uses the combined one.
       const wanted = type === 'incidents' ? 'INCIDENT' : 'CLOSURE';
       const events = payload.events.filter(event => event.type === wanted);
-      send(response, 200, { ...payload, counts: { ...payload.counts, total: events.length }, events });
+      send(response, status, { ...payload, counts: { ...payload.counts, total: events.length }, events });
     } catch (error) {
       logger.error?.('Live events request failed', error);
       // Never 500 into an empty map without saying why: the layer shows "unavailable", not "none".

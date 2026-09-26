@@ -8,7 +8,7 @@
  *
  * The feed is live, so zero is an answer ("none on the corridor now"), never an error or a blank.
  */
-import { LIVE_EVENT_TYPES } from './liveEventsData.js';
+import { LIVE_EVENT_TYPES, liveEventSourceNote } from './liveEventsData.js';
 import { installWorkspaceStrip } from './workspaceStrip.js';
 
 /**
@@ -82,13 +82,14 @@ export function maintenanceCard(maintenance, card) {
   return { state: 'ready', count: records.length, note };
 }
 
-/** "FL511 · live" while the feed is current; what it really is otherwise. */
-export function sourceNote(payload = {}) {
-  const source = payload.source ?? 'FL511';
-  const status = String(payload.sourceStatus ?? '').toUpperCase();
-  if (status === 'LIVE') return { text: `${source} · live`, live: true };
-  if (status === 'STALE') return { text: `${source} · stale`, live: false };
-  return { text: source, live: false };
+/** The Maintenance workspace as Safety sees it: recorded (historical) records only, counted and revealed alike. */
+export function historicalMaintenance(getWorkspace) {
+  return {
+    reveal: type => getWorkspace()?.reveal(type, { live: false }),
+    hide: () => getWorkspace()?.hide(),
+    recordsForType: type => getWorkspace()?.recordsForType(type, { live: false }) ?? [],
+    whenReady: () => getWorkspace()?.preload() ?? Promise.resolve(),
+  };
 }
 
 /**
@@ -122,8 +123,8 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
         : safetyCard(events, card, payload));
     }
     strip.setActive(activeKey);
-    const note = sourceNote(payload);
-    strip.setSource(note.text, { live: note.live });
+    const note = liveEventSourceNote(payload);
+    strip.setSource(note.text, note);
   }
 
   /**

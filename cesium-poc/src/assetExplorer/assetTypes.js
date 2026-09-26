@@ -9,6 +9,7 @@
  * absent is reported as absent — nothing here invents a value to fill a row.
  */
 import { corridorPositionOf } from './corridorPosition.js';
+import EVENT_FIELDS from '../../config/liveDc/eventFields.json' with { type: 'json' };
 
 /** Framing for the close inspection view, per type. Replaces per-layer magic numbers. */
 export const ASSET_CAMERA_PRESETS = Object.freeze({
@@ -24,6 +25,7 @@ export const ASSET_CAMERA_PRESETS = Object.freeze({
   task: Object.freeze({ rangeM: 70, pitchDeg: -26 }),
   incidentRecord: Object.freeze({ rangeM: 90, pitchDeg: -28 }),
   inspection: Object.freeze({ rangeM: 70, pitchDeg: -26 }),
+  damagedAsset: Object.freeze({ rangeM: 70, pitchDeg: -26 }),
   // A bridge is an extended structure, so its span drives the distance rather than a fixed range.
   // The multiplier is generous on purpose: Cesium's default range just fits a sphere head-on, and
   // at a -28° pitch that leaves the far end of a long span off screen.
@@ -99,6 +101,14 @@ export function lightingDetails(record, asset) {
  * operator reads it. detailRows() drops anything absent, and a record the map cannot place says so
  * rather than pretending to a position.
  */
+/** Labels of the SDNA Live Events enrichment fields (item.related.sdna), in display order. */
+export const LIVE_EVENT_DETAIL_LABELS = Object.freeze(Object.fromEntries(EVENT_FIELDS.enrichmentFields.map(entry => [entry.name, entry.label])));
+// Injuries and fatalities already have incident rows of their own.
+const liveEventRows = item => (item.related?.sdna
+  ? Object.entries(LIVE_EVENT_DETAIL_LABELS).filter(([name]) => name !== 'injuries' && name !== 'fatalities')
+    .map(([name, label]) => [label, item.related.sdna[name]])
+  : []);
+
 const MAINTENANCE_ROWS = Object.freeze({
   WORK_ORDER: item => [
     ['Status', item.status], ['Priority', item.priority], ['Work type', item.title],
@@ -116,15 +126,21 @@ const MAINTENANCE_ROWS = Object.freeze({
     ['Ticket', item.related?.ticketId], ['Date', maintenanceDate(item.createdDate)],
   ],
   INCIDENT: item => [
-    ['Type', item.title], ['Date', maintenanceDate(item.createdDate)],
+    ['Status', item.status], ['Type', item.title], ['Event type', item.related?.eventLabel],
+    ['Date', maintenanceDate(item.createdDate)], ['Cleared', maintenanceDate(item.closedDate)],
+    ['Lane impact', item.related?.laneImpact],
     ['Injuries', item.related?.injuries], ['Fatalities', item.related?.fatalities == null ? null : String(item.related.fatalities)],
     ['Lane closure', item.related?.laneClosure], ['Root cause', item.related?.rootCause],
+    ...liveEventRows(item),
   ],
   INSPECTION: item => [
     ['Result', item.status], ['Risk rating', item.priority == null ? null : `${item.priority} of 5`],
     ['Form', item.title], ['Inspection ref', item.related?.inspectionRef], ['Inspector', item.related?.inspector],
     ['Recommended action', item.related?.recommendedAction], ['Risk reason', item.related?.riskReason],
     ['Date', maintenanceDate(item.createdDate)],
+  ],
+  ASSET_STATUS: item => [
+    ['Status', item.status], ['Damaged', maintenanceDate(item.createdDate)], ['Inspection', item.related?.inspectionId],
   ],
 });
 
@@ -141,6 +157,8 @@ export function maintenanceDetails(item) {
     ['Segment', text(item.segmentName)],
     ['Description', text(item.description)],
     ['Location', place],
+    ['FL511 event', item.related?.eventId],
+    ['Source', item.sourceLabel],
   ];
 }
 
@@ -188,8 +206,9 @@ export const incidentTypeFilters = assets =>
 export function maintenanceFilters(assets) {
   const items = assets.map(asset => asset.source).filter(Boolean);
   const has = predicate => items.some(predicate);
-  const isOpen = item => item.status && !/closed|completed|resolved/i.test(item.status);
+  const isOpen = item => item.status && !/closed|completed|resolved|cleared/i.test(item.status);
   return [
+    ...(has(item => item.live) ? [{ id: 'live', label: 'Live', match: asset => asset.source?.live === true }] : []),
     ...(has(isOpen) ? [{ id: 'open', label: 'Open', match: asset => isOpen(asset.source ?? {}) }] : []),
     ...(has(item => item.priority === 'High') ? [{ id: 'high', label: 'High priority', match: asset => asset.source?.priority === 'High' }] : []),
     ...(has(item => /fail/i.test(item.status ?? '')) ? [{ id: 'failed', label: 'Failed', match: asset => /fail/i.test(asset.source?.status ?? '') }] : []),
@@ -238,12 +257,16 @@ const MAINTENANCE_TYPE = ({ id, label, singular, title = singular, icon, statusT
   errorMessage: `Unable to load ${label.toLowerCase()} from DataConnect.`,
   getTitle: asset => asset.id,
   getSubtitle: asset => [text(asset.source?.assetType), text(asset.source?.title)].filter(Boolean).join(' · ') || null,
-  getCardStatus: asset => statusTone(asset.source ?? {}),
+  getCardStatus: asset => liveTone(statusTone(asset.source ?? {}), asset.source),
   getStatus: () => null,
   details: asset => maintenanceDetails(asset.source),
   getSearchText: maintenanceSearchText,
   getFilters: assets => [...maintenanceFilters(assets), ...(extraFilters?.(assets) ?? [])],
 });
+
+/** Live DataConnect records lead their card status with LIVE; historical ones are unchanged. */
+const liveTone = (tone, item) => (item?.live
+  ? { label: ['LIVE', tone?.label ?? text(item.status)].filter(Boolean).join(' · '), tone: tone?.tone ?? 'warn' } : tone);
 
 const workTone = item => {
   const status = text(item.status);
@@ -275,6 +298,10 @@ export const ASSET_TYPES = Object.freeze({
       const failed = /fail/i.test(status);
       return { label: item.priority ? `${status} · risk ${item.priority}` : status, tone: failed ? 'warn' : 'ok' };
     },
+  }),
+  damagedAsset: MAINTENANCE_TYPE({
+    id: 'damagedAsset', label: 'Damaged Assets', singular: 'Damaged asset', title: 'Damaged Asset', icon: 'damagedAsset',
+    statusTone: item => ({ label: text(item.status) ?? 'Damaged', tone: 'warn' }),
   }),
   lighting: Object.freeze({
     id: 'lighting', label: 'Lighting', singular: 'Lighting asset', detailsTitle: 'Lighting Asset Details', icon: 'lighting', layerId: 'lighting',

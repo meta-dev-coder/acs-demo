@@ -15,7 +15,7 @@
  */
 import { Color } from 'cesium';
 import { installWorkspaceStrip } from '../workspaceStrip.js';
-import { LIVE_EVENT_TYPES } from '../liveEventsData.js';
+import { LIVE_EVENT_TYPES, liveEventSourceNote } from '../liveEventsData.js';
 import { CARRIAGEWAYS, placeLabel } from './carriagewayModel.js';
 import { aggregateImpact, explainImpact, OPERATIONAL_LEVELS, OPERATIONAL_LEVEL_COLORS } from './operationalImpact.js';
 import { DEFAULT_VISIBLE, installLiveOpsLayers } from './liveOpsLayers.js';
@@ -204,9 +204,8 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
     const events = liveEvents?.events ?? [];
     for (const card of LIVE_OPS_CARDS) strip.set(card.key, liveOpsCard(events, card));
     strip.setActive(activeExplorer);
-    const payload = liveEvents?.payload ?? {};
-    const live = String(payload.sourceStatus ?? '').toUpperCase() === 'LIVE';
-    strip.setSource(live ? 'FL511 · live' : payload.source ?? 'FL511', { live });
+    const note = liveEventSourceNote(liveEvents?.payload ?? {});
+    strip.setSource(note.text, note);
     layers.renderCounts();
   }
 

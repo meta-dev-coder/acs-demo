@@ -94,7 +94,7 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
   // Maintenance records (work orders today; the other DataConnect classes take the same path).
   // The workspace decides what is loaded; this only presents it as assets so the carousel, the
   // details panel, the mini-map and Cesium share one selection with everything else on the map.
-  for (const assetType of maintenance ? ['workOrder', 'ticket', 'task', 'incidentRecord', 'inspection'] : []) {
+  for (const assetType of maintenance ? ['workOrder', 'ticket', 'task', 'incidentRecord', 'inspection', 'damagedAsset'] : []) {
     sources.push({
       assetType, group: 'maintenance',
       read: () => maintenance.recordsFor(assetType).map(item => normalize({

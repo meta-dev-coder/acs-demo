@@ -16,3 +16,6 @@ public/models/i595/*.glb
 # The rotated DataConnect refresh token (server-side credential).
 .dc-refresh-token
 .dc-access-token
+
+# State files of the former local DataConnect stand-in (now a test double only).
+.dc-standin/

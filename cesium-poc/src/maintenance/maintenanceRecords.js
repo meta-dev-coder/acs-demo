@@ -325,7 +325,7 @@ export function summarize(records, key) {
   const located = records.filter(hasLocation).length;
   const linked = records.filter(item => item.assetId).length;
   const count = predicate => records.filter(predicate).length;
-  const closed = new Set(['closed', 'completed', 'resolved', 'cancelled']);
+  const closed = new Set(['closed', 'completed', 'resolved', 'cancelled', 'cleared']);
   const open = count(item => item.status && !closed.has(item.status.toLowerCase()));
   const note = key === 'workOrders' ? `${open} open · ${count(item => item.priority === 'High')} high priority`
     : key === 'tickets' ? `${open} open`

@@ -25,6 +25,15 @@ export const MARKER_COLORS = Object.freeze({
     fill: '#F5B51B', text: '#172033', border: 'rgba(23,32,51,0.35)',
     stem: '#F5B51B', dot: '#F5B51B', dotRing: '#FFFFFF',
   }),
+  // Live DataConnect records (red) and live damaged assets (orange).
+  live: Object.freeze({
+    fill: '#C62828', text: '#FFFFFF', border: 'rgba(255,255,255,0.7)',
+    stem: 'rgba(255,255,255,0.8)', dot: '#C62828', dotRing: '#FFFFFF',
+  }),
+  damaged: Object.freeze({
+    fill: '#E65100', text: '#FFFFFF', border: 'rgba(255,255,255,0.7)',
+    stem: 'rgba(255,255,255,0.8)', dot: '#E65100', dotRing: '#FFFFFF',
+  }),
 });
 
 const FONT_PX = 12;
@@ -63,13 +72,14 @@ function roundedRect(ctx, x, y, width, height, radius) {
  * @returns {{image: HTMLCanvasElement, width: number, height: number}} CSS pixel size for the
  *   billboard, so the caller does not have to know about supersampling.
  */
-export function assetIdMarker({ id, selected = false, stem = STEM }) {
+export function assetIdMarker({ id, selected = false, stem = STEM, tone = 'normal' }) {
   const label = String(id ?? '').trim();
-  const key = markerCacheKey(label, selected, stem);
+  const toned = !selected && tone !== 'normal' && MARKER_COLORS[tone];
+  const key = markerCacheKey(label, selected, stem) + (toned ? `:${tone}` : '');
   const hit = cache.get(key);
   if (hit) return hit;
 
-  const colors = selected ? MARKER_COLORS.selected : MARKER_COLORS.normal;
+  const colors = selected ? MARKER_COLORS.selected : toned ? MARKER_COLORS[tone] : MARKER_COLORS.normal;
   const font = `600 ${FONT_PX}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
   const measure = document.createElement('canvas').getContext('2d');
   measure.font = font;
@@ -128,11 +138,11 @@ export function assetIdMarker({ id, selected = false, stem = STEM }) {
  *
  * @returns {{image: HTMLCanvasElement, width: number, height: number}}
  */
-export function assetDotMarker() {
-  const key = 'dot:normal';
+export function assetDotMarker(tone = 'normal') {
+  const colors = MARKER_COLORS[tone] && tone !== 'selected' ? MARKER_COLORS[tone] : MARKER_COLORS.normal;
+  const key = `dot:${colors === MARKER_COLORS.normal ? 'normal' : tone}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const colors = MARKER_COLORS.normal;
   // The full marker's dot centre sits DOT_RADIUS + 2 above its bottom edge; so does this one's.
   const size = DOT_RADIUS * 2 + 4;
   const canvas = document.createElement('canvas');

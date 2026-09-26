@@ -15,12 +15,17 @@ import { focusMapPoints } from './bridgeCamera.js';
 import {
   LIVE_EVENT_LABELS, LIVE_EVENT_SOURCE_STATUS, LIVE_EVENT_TYPES, diffLiveEvents,
   liveEventAssociationRows, liveEventLabel, liveEventNotice, liveEventSourceRows,
-  liveEventStatusText, liveEventTooltip,
+  liveEventStatusText, liveEventTooltip, liveEventsEndpoint,
 } from './liveEventsData.js';
+import { liveDcEnabled } from './maintenance/liveDcSource.js';
 import { ICON_FOR_EVENT_TYPE, OPS_ICONS, opsIconMarkup, opsPinDataUrl } from './liveOps/opsIcons.js';
 
 // Vite mounts the API locally; a production override must not bypass it in development.
-export const LIVE_EVENTS_API = import.meta.env.DEV ? '/api/i595/live-events' : (import.meta.env.VITE_LIVE_EVENTS_API || '/api/i595/live-events');
+// With live DataConnect on (liveDcSource.js flags) the same API reads the Live Events class instead.
+export const LIVE_EVENTS_API = liveEventsEndpoint(
+  import.meta.env.DEV ? '/api/i595/live-events' : (import.meta.env.VITE_LIVE_EVENTS_API || '/api/i595/live-events'),
+  liveDcEnabled(),
+);
 const REFRESH_MS = 60_000;
 
 // The markers come from the same definitions as the Live Ops layers panel, so the row an operator

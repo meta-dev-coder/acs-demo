@@ -1,0 +1,12 @@
+{
+  "codes": ["101", "102", "103", "104", "105", "101E", "102E", "103E", "104E", "105E", "106E", "101W", "102W", "103W", "104W", "105W", "106W"],
+  "bands": [
+    { "number": "101", "minLon": -80.3700, "maxLon": -80.2657 },
+    { "number": "102", "minLon": -80.2657, "maxLon": -80.2511 },
+    { "number": "103", "minLon": -80.2511, "maxLon": -80.2271 },
+    { "number": "104", "minLon": -80.2271, "maxLon": -80.2168 },
+    { "number": "105", "minLon": -80.2168, "maxLon": -80.1848 },
+    { "number": "106", "minLon": -80.1848, "maxLon": -80.1200 }
+  ],
+  "suffixByCarriageway": { "EB_GENERAL": "E", "WB_GENERAL": "W", "EXPRESS": "" }
+}

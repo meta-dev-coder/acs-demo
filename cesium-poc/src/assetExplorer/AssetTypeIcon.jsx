@@ -8,6 +8,7 @@ import ChecklistOutlinedIcon from '@mui/icons-material/ChecklistOutlined';
 import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined';
 import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
+import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
 import CarRepairOutlinedIcon from '@mui/icons-material/CarRepairOutlined';
 import TrafficOutlinedIcon from '@mui/icons-material/TrafficOutlined';
 import EngineeringOutlinedIcon from '@mui/icons-material/EngineeringOutlined';
@@ -21,6 +22,7 @@ const ICONS = {
   task: ChecklistOutlinedIcon,
   inspection: FactCheckOutlinedIcon,
   incidentRecord: WarningAmberOutlinedIcon,
+  damagedAsset: ReportProblemOutlinedIcon,
   lighting: LightbulbOutlinedIcon,
   messageSign: DvrOutlinedIcon,
   gantry: AccountTreeOutlinedIcon,

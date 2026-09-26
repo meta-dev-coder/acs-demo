@@ -56,7 +56,8 @@ export function installMaintenanceLayer(viewer) {
     // it shares a position with.
     entity.show = !isSelected && assetType === active && !hiddenBySelection(layer, id)
       && (!layer.visible || layer.visible.has(id));
-    const marker = state === 'dot' ? assetDotMarker() : assetIdMarker({ id, selected: false });
+    const tone = layer.tones.get(id);
+    const marker = state === 'dot' ? assetDotMarker(tone) : assetIdMarker({ id, selected: false, tone });
     entity.billboard.image = marker.image;
     entity.billboard.width = marker.width;
     entity.billboard.height = marker.height;
@@ -114,16 +115,17 @@ export function installMaintenanceLayer(viewer) {
   function setRecords(assetType, records) {
     const previous = layerOf(assetType);
     if (previous) for (const entity of previous.entities.values()) source.entities.remove(entity);
-    const entities = new Map(), positions = new Map(), drawn = new Map(), atPoint = new Map();
+    const entities = new Map(), positions = new Map(), drawn = new Map(), atPoint = new Map(), tones = new Map();
     source.entities.suspendEvents();
     try {
       for (const item of records) {
         if (!Number.isFinite(item.longitude) || !Number.isFinite(item.latitude)) continue;   // stays in the list only
         if (entities.has(item.id)) continue;   // an id the source repeats: one marker, not a crash
+        tones.set(item.id, item.type === 'ASSET_STATUS' ? 'damaged' : item.live ? 'live' : 'normal');
         const position = Cartesian3.fromDegrees(item.longitude, item.latitude);
         const entity = source.entities.add({
           id: entityId(assetType, item.id), name: item.id, show: assetType === active,
-          position, billboard: { ...BILLBOARD, ...assetDotMarker() },
+          position, billboard: { ...BILLBOARD, ...assetDotMarker(tones.get(item.id)) },
         });
         entities.set(item.id, entity);
         positions.set(item.id, position);
@@ -133,7 +135,7 @@ export function installMaintenanceLayer(viewer) {
         atPoint.set(key, [...(atPoint.get(key) ?? []), item.id]);
       }
     } finally { source.entities.resumeEvents(); }
-    layers.set(assetType, { records, entities, positions, drawn, atPoint });
+    layers.set(assetType, { records, entities, positions, drawn, atPoint, tones });
     if (assetType === active) { labelled = new Set(); updateLabels(); drawSelection(); }
     viewer.scene.requestRender();
   }

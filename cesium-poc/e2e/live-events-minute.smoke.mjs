@@ -78,7 +78,7 @@ try {
       }
     }
   };
-  await page.route('**/api/i595/live-events', route => route.fulfill({ json: captured }));
+  await page.route('**/api/i595/live-events*', route => route.fulfill({ json: captured }));
   const requests = [];
   page.on('request', r => { if (r.url().includes('/api/i595/live-events')) requests.push({ url: r.url(), time: Date.now() }); });
   await page.addInitScript(id => { window.__expectedIncidentId = id; }, captured.events.find(e => e.type === 'INCIDENT').id);

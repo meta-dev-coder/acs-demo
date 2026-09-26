@@ -1,0 +1,80 @@
+{
+  "note": "ADDITIVE delta for the global relationship-type registry. GET /api/data-mgmt/v1/relationship-types, append these entries to the existing list (never remove or rename existing types), PUT with the current version. DataConnect requires order in 1..total: renumber each entry as existingCount + order. Skip entirely when using link mode 'none'.",
+  "relationshipTypes": [
+    {
+      "type": "SDNA_Live_Event_Tickets",
+      "externalLabel": "SDNA Live Event Tickets",
+      "internalLabel": "SDNA Live Tickets of Event",
+      "order": 1
+    },
+    {
+      "type": "SDNA_Live_Event_Tasks",
+      "externalLabel": "SDNA Live Event Tasks",
+      "internalLabel": "SDNA Live Tasks of Event",
+      "order": 2
+    },
+    {
+      "type": "SDNA_Live_Event_Work_Orders",
+      "externalLabel": "SDNA Live Event Work Orders",
+      "internalLabel": "SDNA Live Work Orders of Event",
+      "order": 3
+    },
+    {
+      "type": "SDNA_Live_Event_Inspections",
+      "externalLabel": "SDNA Live Event Inspections",
+      "internalLabel": "SDNA Live Inspections of Event",
+      "order": 4
+    },
+    {
+      "type": "SDNA_Live_Event_Asset_Status",
+      "externalLabel": "SDNA Live Event Asset Status",
+      "internalLabel": "SDNA Live Asset Status of Event",
+      "order": 5
+    },
+    {
+      "type": "SDNA_Live_Ticket_Tasks",
+      "externalLabel": "SDNA Live Ticket Tasks",
+      "internalLabel": "SDNA Live Tasks of Ticket",
+      "order": 6
+    },
+    {
+      "type": "SDNA_Live_Work_Order_Tickets",
+      "externalLabel": "SDNA Live Work Order Tickets",
+      "internalLabel": "SDNA Live Work Orders of Ticket",
+      "order": 7
+    },
+    {
+      "type": "SDNA_Live_Work_Order_Tasks",
+      "externalLabel": "SDNA Live Work Order Tasks",
+      "internalLabel": "SDNA Live Work Orders of Task",
+      "order": 8
+    },
+    {
+      "type": "SDNA_Live_Inspection_Tickets",
+      "externalLabel": "SDNA Live Inspection Tickets",
+      "internalLabel": "SDNA Live Inspections of Ticket",
+      "order": 9
+    },
+    {
+      "type": "SDNA_Live_Inspection_Work_Orders",
+      "externalLabel": "SDNA Live Inspection Work Orders",
+      "internalLabel": "SDNA Live Inspections of Work Order",
+      "order": 10
+    },
+    {
+      "type": "SDNA_Live_Inspection_Asset_Status",
+      "externalLabel": "SDNA Live Inspection Asset Status",
+      "internalLabel": "SDNA Live Asset Status of Inspection",
+      "order": 11
+    }
+  ],
+  "linkedOnlyNote": "Append these as well ONLY when using link mode 'linked' (live-classes.create-requests.linked.json).",
+  "linkedOnly": [
+    {
+      "type": "SDNA_Live_Asset_Status",
+      "externalLabel": "SDNA Live Asset Status",
+      "internalLabel": "SDNA Live Status of Asset",
+      "order": 1012
+    }
+  ]
+}

@@ -18,9 +18,17 @@ const ICONS = Object.freeze({
   ticket: '<rect x="2.5" y="5" width="15" height="10" rx="2"/><path d="M7 5v10"/><path d="M11 8.5h4M11 11.5h4"/>',
   task: '<rect x="4" y="3" width="12" height="14" rx="2"/><path d="m7 9.5 2 2 4-4"/>',
   workOrder: '<path d="M12.6 3.4a3.8 3.8 0 0 0-4.9 4.8l-4 4a1.6 1.6 0 0 0 2.2 2.3l4-4a3.8 3.8 0 0 0 4.8-4.9l-2 2-1.8-.4-.4-1.8z"/>',
+  damagedAsset: '<path d="M10 3 2 17h16L10 3Z"/><path d="m7.5 11 2-2 1 2 2-2"/>',
   inspection: '<rect x="4" y="3.5" width="12" height="13" rx="2"/><path d="M7.5 2.5h5v2.5h-5z"/><path d="M7.5 9h5M7.5 12h3"/>',
 });
 const icon = name => `<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">${ICONS[name] ?? ICONS.workOrder}</svg>`;
+
+/** The warning mark the app already uses in status text (main.js), so a warning needs no new styling. */
+export const WARNING_ICON = '⚠';
+const warned = (text, warning) => (warning && text ? `${WARNING_ICON} ${text}` : text);
+
+/** The source pill's text: a warning leads with the icon; a normal source ends in the live dot. */
+export const sourceLabelText = (text, { warning = false } = {}) => (!text ? '' : warning ? warned(text, true) : `${text} ●`);
 
 /**
  * @param {HTMLElement} host
@@ -64,19 +72,22 @@ export function installWorkspaceStrip(host, { cards, label, onSelect }) {
     measure,
     /**
      * @param {string} key
-     * @param {{state: 'loading'|'ready'|'unavailable'|'error', count?: number, note?: string|null}} card
+     * @param {{state: 'loading'|'ready'|'unavailable'|'error', count?: number, note?: string|null,
+     *          warning?: boolean, title?: string|null}} card
      */
-    set(key, { state, count, note }) {
+    set(key, { state, count, note, warning = false, title = null }) {
       const button = buttons.get(key);
       if (!button) return;
       button.dataset.state = state;
+      button.dataset.warning = String(warning);
+      if (title) button.title = title; else button.removeAttribute('title');
       const countEl = button.querySelector('[data-count]');
       const noteEl = button.querySelector('[data-note]');
       if (state === 'loading') { countEl.textContent = '…'; noteEl.textContent = 'Loading…'; return; }
       if (state !== 'ready') {
         countEl.textContent = '—';
         // A failure says what actually happened — "Sign-in required" is not "Unavailable".
-        noteEl.textContent = note ?? (state === 'unavailable' ? 'Unavailable' : 'Failed to load');
+        noteEl.textContent = warned(note ?? (state === 'unavailable' ? 'Unavailable' : 'Failed to load'), warning);
         return;
       }
       countEl.textContent = Number(count ?? 0).toLocaleString('en-US');
@@ -87,10 +98,12 @@ export function installWorkspaceStrip(host, { cards, label, onSelect }) {
       for (const [id, button] of buttons) button.setAttribute('aria-pressed', String(id === key));
     },
     /** Where the numbers came from. Live sources say so; nothing claims to be live that is not. */
-    setSource(text, { live = false } = {}) {
+    setSource(text, { live = false, warning = false, title = null } = {}) {
       const source = root.querySelector('[data-source]');
-      source.textContent = text ? `${text} ●` : '';
+      source.textContent = sourceLabelText(text, { warning });
       source.dataset.live = String(live);
+      source.dataset.warning = String(warning);
+      if (title) source.title = title; else source.removeAttribute('title');
     },
     destroy() { window.removeEventListener('resize', onResize); root.remove(); },
   };

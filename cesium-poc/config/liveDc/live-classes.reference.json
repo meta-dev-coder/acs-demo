@@ -1,0 +1,1908 @@
+{
+  "_note": "REFERENCE DOCUMENT ONLY - not a payload for /admin/data/import; create classes with live-classes.create-requests.json",
+  "linkMode": "live",
+  "classes": [
+    {
+      "id": "9785676e3a8b0c07bf70a784",
+      "className": "SDNA Florida I595 Live Events",
+      "classType": "DATA_CLASS",
+      "description": "Live FL511 road events on the I-595 corridor, written by the live sync (never historical data).",
+      "status": "Published",
+      "geometryAttributeName": "geometry",
+      "attributes": [
+        {
+          "name": "keyInSource",
+          "displayName": "Key In Source",
+          "description": "ID used in the source system",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "code",
+          "displayName": "Id",
+          "description": "ID required by the client",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "name",
+          "displayName": "Name",
+          "description": "Name of a record",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "description",
+          "displayName": "Description",
+          "description": "Description of the record",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "geometry",
+          "displayName": "geometry",
+          "description": "",
+          "type": "Geospatial",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "event_id",
+          "displayName": "event_id",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "event_type",
+          "displayName": "event_type",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "fl511_item_id",
+          "displayName": "fl511_item_id",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "source",
+          "displayName": "source",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "status",
+          "displayName": "status",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "title",
+          "displayName": "title",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "severity",
+          "displayName": "severity",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "region",
+          "displayName": "region",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "start_time",
+          "displayName": "start_time",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "end_time",
+          "displayName": "end_time",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "last_updated",
+          "displayName": "last_updated",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "comment",
+          "displayName": "comment",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "detour",
+          "displayName": "detour",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "first_seen_at",
+          "displayName": "first_seen_at",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "last_seen_at",
+          "displayName": "last_seen_at",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "cleared_at",
+          "displayName": "cleared_at",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "latitude",
+          "displayName": "latitude",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "longitude",
+          "displayName": "longitude",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "secondary_latitude",
+          "displayName": "secondary_latitude",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "secondary_longitude",
+          "displayName": "secondary_longitude",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "nearest_facility",
+          "displayName": "nearest_facility",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "nearest_facility_label",
+          "displayName": "nearest_facility_label",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "distance_to_network_m",
+          "displayName": "distance_to_network_m",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "fdot_segment_id",
+          "displayName": "fdot_segment_id",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "segment ID",
+          "displayName": "segment ID",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "segment name",
+          "displayName": "segment name",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "carriageway",
+          "displayName": "carriageway",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "direction",
+          "displayName": "direction",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "section_id",
+          "displayName": "section_id",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "section_label",
+          "displayName": "section_label",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "lane_impact_label",
+          "displayName": "lane_impact_label",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "blocked_lanes",
+          "displayName": "blocked_lanes",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "full_closure",
+          "displayName": "full_closure",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "ramp_closure",
+          "displayName": "ramp_closure",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "shoulder_only",
+          "displayName": "shoulder_only",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "spatial_confidence",
+          "displayName": "spatial_confidence",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "reported_at",
+          "displayName": "reported_at",
+          "description": "",
+          "type": "DateTime",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "updated_at",
+          "displayName": "updated_at",
+          "description": "",
+          "type": "DateTime",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "milepost",
+          "displayName": "milepost",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "cross_street",
+          "displayName": "cross_street",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "incident_subtype",
+          "displayName": "incident_subtype",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "vehicles_involved",
+          "displayName": "vehicles_involved",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "impact_level",
+          "displayName": "impact_level",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "est_clearance_at",
+          "displayName": "est_clearance_at",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "primary_camera_id",
+          "displayName": "primary_camera_id",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "nearby_camera_ids",
+          "displayName": "nearby_camera_ids",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "camera_snapshot_url",
+          "displayName": "camera_snapshot_url",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "injuries",
+          "displayName": "injuries",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "fatalities",
+          "displayName": "fatalities",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "weather_at_event",
+          "displayName": "weather_at_event",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "traffic_conditions",
+          "displayName": "traffic_conditions",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "queue_length_mi",
+          "displayName": "queue_length_mi",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "est_delay_min",
+          "displayName": "est_delay_min",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "recovery_eta",
+          "displayName": "recovery_eta",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "responder_status",
+          "displayName": "responder_status",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "responding_units",
+          "displayName": "responding_units",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "nearby_dms_ids",
+          "displayName": "nearby_dms_ids",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "dms_message",
+          "displayName": "dms_message",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "recommended_next_action",
+          "displayName": "recommended_next_action",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "snapshot_archive_url",
+          "displayName": "snapshot_archive_url",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "field_sources",
+          "displayName": "field_sources",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "x_coordinates",
+          "displayName": "x_coordinates",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "y_coordinates",
+          "displayName": "y_coordinates",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "project",
+          "displayName": "project",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        }
+      ]
+    },
+    {
+      "id": "fc3e1f4bb35d95efa4b68fa0",
+      "className": "SDNA Florida I595 Live Tickets",
+      "classType": "DATA_CLASS",
+      "description": "Maintenance tickets generated automatically from live FL511 events (never historical data).",
+      "status": "Published",
+      "geometryAttributeName": "geometry",
+      "attributes": [
+        {
+          "name": "keyInSource",
+          "displayName": "Key In Source",
+          "description": "ID used in the source system",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "code",
+          "displayName": "Id",
+          "description": "ID required by the client",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "name",
+          "displayName": "Name",
+          "description": "Name of a record",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "description",
+          "displayName": "Description",
+          "description": "Description of the record",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "geometry",
+          "displayName": "geometry",
+          "description": "",
+          "type": "Geospatial",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Ticket ID",
+          "displayName": "Ticket ID",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Issue Summary",
+          "displayName": "Issue Summary",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Issue Category",
+          "displayName": "Issue Category",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Ticket Status",
+          "displayName": "Ticket Status",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Priority",
+          "displayName": "Priority",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Asset ID",
+          "displayName": "Asset ID",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Asset Type",
+          "displayName": "Asset Type",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "System Class",
+          "displayName": "System Class",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Segment",
+          "displayName": "Segment",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "segment ID",
+          "displayName": "segment ID",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "segment name",
+          "displayName": "segment name",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Ticket Opened Date",
+          "displayName": "Ticket Opened Date",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Ticket Opened Time",
+          "displayName": "Ticket Opened Time",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Detailed Notes",
+          "displayName": "Detailed Notes",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Source Signal",
+          "displayName": "Source Signal",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "X Coordinate",
+          "displayName": "X Coordinate",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Y Coordinate",
+          "displayName": "Y Coordinate",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "incident_subtype",
+          "displayName": "incident_subtype",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "x_coordinates",
+          "displayName": "x_coordinates",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "y_coordinates",
+          "displayName": "y_coordinates",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "project",
+          "displayName": "project",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "source_event_id",
+          "displayName": "source_event_id",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false,
+          "relatedClassId": "9785676e3a8b0c07bf70a784",
+          "relatedAttributeName": "code",
+          "relationshipType": "SDNA_Live_Event_Tickets"
+        },
+        {
+          "name": "created_at",
+          "displayName": "created_at",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "status_changed_at",
+          "displayName": "status_changed_at",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        }
+      ]
+    },
+    {
+      "id": "81f1e523fa7d3fa709e5cf61",
+      "className": "SDNA Florida I595 Live Tasks",
+      "classType": "DATA_CLASS",
+      "description": "Field tasks generated automatically for live tickets (never historical data).",
+      "status": "Published",
+      "geometryAttributeName": "geometry",
+      "attributes": [
+        {
+          "name": "keyInSource",
+          "displayName": "Key In Source",
+          "description": "ID used in the source system",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "code",
+          "displayName": "Id",
+          "description": "ID required by the client",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "name",
+          "displayName": "Name",
+          "description": "Name of a record",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "description",
+          "displayName": "Description",
+          "description": "Description of the record",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "geometry",
+          "displayName": "geometry",
+          "description": "",
+          "type": "Geospatial",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Task ID",
+          "displayName": "Task ID",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Task Type",
+          "displayName": "Task Type",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Task Status",
+          "displayName": "Task Status",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Related Ticket ID",
+          "displayName": "Related Ticket ID",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false,
+          "relatedClassId": "fc3e1f4bb35d95efa4b68fa0",
+          "relatedAttributeName": "code",
+          "relationshipType": "SDNA_Live_Ticket_Tasks"
+        },
+        {
+          "name": "Assigned Team",
+          "displayName": "Assigned Team",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Task Date",
+          "displayName": "Task Date",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Task Notes",
+          "displayName": "Task Notes",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Asset ID",
+          "displayName": "Asset ID",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Asset Type",
+          "displayName": "Asset Type",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "System Class",
+          "displayName": "System Class",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Segment",
+          "displayName": "Segment",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "segment ID",
+          "displayName": "segment ID",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "segment name",
+          "displayName": "segment name",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "X Coordinate",
+          "displayName": "X Coordinate",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Y Coordinate",
+          "displayName": "Y Coordinate",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "task_seq",
+          "displayName": "task_seq",
+          "description": "",
+          "type": "Integer",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "x_coordinates",
+          "displayName": "x_coordinates",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "y_coordinates",
+          "displayName": "y_coordinates",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "project",
+          "displayName": "project",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "source_event_id",
+          "displayName": "source_event_id",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false,
+          "relatedClassId": "9785676e3a8b0c07bf70a784",
+          "relatedAttributeName": "code",
+          "relationshipType": "SDNA_Live_Event_Tasks"
+        },
+        {
+          "name": "created_at",
+          "displayName": "created_at",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "status_changed_at",
+          "displayName": "status_changed_at",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        }
+      ]
+    },
+    {
+      "id": "1940af8af0696e9045a03a23",
+      "className": "SDNA Florida I595 Live Work Orders",
+      "classType": "DATA_CLASS",
+      "description": "Work orders generated automatically for live tickets (never historical data).",
+      "status": "Published",
+      "geometryAttributeName": "geometry",
+      "attributes": [
+        {
+          "name": "keyInSource",
+          "displayName": "Key In Source",
+          "description": "ID used in the source system",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "code",
+          "displayName": "Id",
+          "description": "ID required by the client",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "name",
+          "displayName": "Name",
+          "description": "Name of a record",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "description",
+          "displayName": "Description",
+          "description": "Description of the record",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "geometry",
+          "displayName": "geometry",
+          "description": "",
+          "type": "Geospatial",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Work Order ID",
+          "displayName": "Work Order ID",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Work Type",
+          "displayName": "Work Type",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Work Order Status",
+          "displayName": "Work Order Status",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Priority",
+          "displayName": "Priority",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Asset ID",
+          "displayName": "Asset ID",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Asset Type",
+          "displayName": "Asset Type",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "System Class",
+          "displayName": "System Class",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Segment",
+          "displayName": "Segment",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "segment ID",
+          "displayName": "segment ID",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "segment name",
+          "displayName": "segment name",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Work Order Open Date",
+          "displayName": "Work Order Open Date",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Close Date",
+          "displayName": "Close Date",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Work Description",
+          "displayName": "Work Description",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "Related Ticket ID",
+          "displayName": "Related Ticket ID",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false,
+          "relatedClassId": "fc3e1f4bb35d95efa4b68fa0",
+          "relatedAttributeName": "code",
+          "relationshipType": "SDNA_Live_Work_Order_Tickets"
+        },
+        {
+          "name": "Related Task ID",
+          "displayName": "Related Task ID",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false,
+          "relatedClassId": "81f1e523fa7d3fa709e5cf61",
+          "relatedAttributeName": "code",
+          "relationshipType": "SDNA_Live_Work_Order_Tasks"
+        },
+        {
+          "name": "Repair Category",
+          "displayName": "Repair Category",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "x_coordinates",
+          "displayName": "x_coordinates",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "y_coordinates",
+          "displayName": "y_coordinates",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "project",
+          "displayName": "project",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "source_event_id",
+          "displayName": "source_event_id",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false,
+          "relatedClassId": "9785676e3a8b0c07bf70a784",
+          "relatedAttributeName": "code",
+          "relationshipType": "SDNA_Live_Event_Work_Orders"
+        },
+        {
+          "name": "created_at",
+          "displayName": "created_at",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "status_changed_at",
+          "displayName": "status_changed_at",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        }
+      ]
+    },
+    {
+      "id": "aa434f1be7dc5058c14184a2",
+      "className": "SDNA Florida I595 Live Inspections",
+      "classType": "DATA_CLASS",
+      "description": "Post-event inspections generated automatically after live events clear (never historical data).",
+      "status": "Published",
+      "geometryAttributeName": "geometry",
+      "attributes": [
+        {
+          "name": "keyInSource",
+          "displayName": "Key In Source",
+          "description": "ID used in the source system",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "code",
+          "displayName": "Id",
+          "description": "ID required by the client",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "name",
+          "displayName": "Name",
+          "description": "Name of a record",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "description",
+          "displayName": "Description",
+          "description": "Description of the record",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "geometry",
+          "displayName": "geometry",
+          "description": "",
+          "type": "Geospatial",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "record_id",
+          "displayName": "record_id",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "inspection_form_family",
+          "displayName": "inspection_form_family",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "inspection_date",
+          "displayName": "inspection_date",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "inspection_time",
+          "displayName": "inspection_time",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "inspected_at",
+          "displayName": "inspected_at",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "inspector_name",
+          "displayName": "inspector_name",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "asset_id",
+          "displayName": "asset_id",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "asset_type",
+          "displayName": "asset_type",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "system class",
+          "displayName": "system class",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "pass_fail",
+          "displayName": "pass_fail",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "inspection_result",
+          "displayName": "inspection_result",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "asset_condition",
+          "displayName": "asset_condition",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "observed_condition",
+          "displayName": "observed_condition",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "recommended_action",
+          "displayName": "recommended_action",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "risk_rating_1_5",
+          "displayName": "risk_rating_1_5",
+          "description": "",
+          "type": "Integer",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "issue_summary",
+          "displayName": "issue_summary",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "related_ticket_id",
+          "displayName": "related_ticket_id",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false,
+          "relatedClassId": "fc3e1f4bb35d95efa4b68fa0",
+          "relatedAttributeName": "code",
+          "relationshipType": "SDNA_Live_Inspection_Tickets"
+        },
+        {
+          "name": "related_work_order_id",
+          "displayName": "related_work_order_id",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false,
+          "relatedClassId": "1940af8af0696e9045a03a23",
+          "relatedAttributeName": "code",
+          "relationshipType": "SDNA_Live_Inspection_Work_Orders"
+        },
+        {
+          "name": "distance_to_event_m",
+          "displayName": "distance_to_event_m",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "segment",
+          "displayName": "segment",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "segment ID",
+          "displayName": "segment ID",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "segment name",
+          "displayName": "segment name",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "x_coordinates",
+          "displayName": "x_coordinates",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "y_coordinates",
+          "displayName": "y_coordinates",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "project",
+          "displayName": "project",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "source_event_id",
+          "displayName": "source_event_id",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false,
+          "relatedClassId": "9785676e3a8b0c07bf70a784",
+          "relatedAttributeName": "code",
+          "relationshipType": "SDNA_Live_Event_Inspections"
+        },
+        {
+          "name": "created_at",
+          "displayName": "created_at",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "status_changed_at",
+          "displayName": "status_changed_at",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        }
+      ]
+    },
+    {
+      "id": "141d3ed7d98b37895cb192f9",
+      "className": "SDNA Florida I595 Live Asset Status",
+      "classType": "DATA_CLASS",
+      "description": "Live damage status of I-595 assets found by live inspections; historical Assets are never modified.",
+      "status": "Published",
+      "geometryAttributeName": "geometry",
+      "attributes": [
+        {
+          "name": "keyInSource",
+          "displayName": "Key In Source",
+          "description": "ID used in the source system",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "code",
+          "displayName": "Id",
+          "description": "ID required by the client",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "name",
+          "displayName": "Name",
+          "description": "Name of a record",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "description",
+          "displayName": "Description",
+          "description": "Description of the record",
+          "type": "String",
+          "mandatory": true,
+          "core": true,
+          "array": false
+        },
+        {
+          "name": "geometry",
+          "displayName": "geometry",
+          "description": "",
+          "type": "Geospatial",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "asset_id",
+          "displayName": "asset_id",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "asset_category",
+          "displayName": "asset_category",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "system class",
+          "displayName": "system class",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "status",
+          "displayName": "status",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "damaged_at",
+          "displayName": "damaged_at",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "source_inspection_id",
+          "displayName": "source_inspection_id",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false,
+          "relatedClassId": "aa434f1be7dc5058c14184a2",
+          "relatedAttributeName": "code",
+          "relationshipType": "SDNA_Live_Inspection_Asset_Status"
+        },
+        {
+          "name": "x_coordinates",
+          "displayName": "x_coordinates",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "y_coordinates",
+          "displayName": "y_coordinates",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "project",
+          "displayName": "project",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "source_event_id",
+          "displayName": "source_event_id",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false,
+          "relatedClassId": "9785676e3a8b0c07bf70a784",
+          "relatedAttributeName": "code",
+          "relationshipType": "SDNA_Live_Event_Asset_Status"
+        },
+        {
+          "name": "created_at",
+          "displayName": "created_at",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        }
+      ]
+    }
+  ]
+}

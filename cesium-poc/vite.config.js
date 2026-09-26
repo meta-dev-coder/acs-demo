@@ -1,6 +1,7 @@
 import { loadServerEnv } from './server/loadEnv.mjs';
 import { createMessageSignsApi } from './server/messageSigns.mjs';
 import { createDataConnectApi } from './server/dataConnect.mjs';
+import { createLiveDcReadApi } from './server/liveDc/liveReadApi.mjs';
 
 // Before any plugin reads process.env: Vite only exposes VITE_-prefixed variables, and the
 // server-side credentials are deliberately not prefixed, so nothing else would load them.
@@ -16,8 +17,8 @@ const cesiumBuildRootPath = join(dirname(createRequire(import.meta.url).resolve(
 // FL511 is never called from the browser. Mounting the live-events API inside the dev server keeps
 // it same-origin for `npm start` and the e2e suite without a second process; deployments that serve
 // the map statically run the identical handler from server/index.mjs instead.
-const liveEventsApi = () => {
-  const api = createLiveEventsApi();
+const liveEventsApi = liveDc => {
+  const api = createLiveEventsApi({ liveDc });
   return {
     name: "i595-live-events-api",
     configureServer(server) {
@@ -47,6 +48,12 @@ const dataConnectApi = () => {
   };
 };
 
+// Live DataConnect classes, read-only and same-origin (LIVE_DC_READ_BASE_URL; unset = not configured).
+const liveDcReadApi = api => ({ name: 'i595-live-dc-read-api',
+  configureServer(server) { server.middlewares.use(api.middleware); },
+  configurePreviewServer(server) { server.middlewares.use(api.middleware); },
+});
+
 // CCTV snapshot proxy — pipes DIVAS JPEG bytes through same-origin to avoid CORS issues.
 const snapshotApi = () => {
   const api = createSnapshotApi();
@@ -56,6 +63,9 @@ const snapshotApi = () => {
     configurePreviewServer(server) { server.middlewares.use(api.middleware); },
   };
 };
+
+// One read proxy serves both /api/live-dc/* and ?source=dataconnect, as in server/index.mjs.
+const liveDc = createLiveDcReadApi();
 
 // vite-plugin-cesium wires up CESIUM_BASE_URL + static asset copying for us.
 export default defineConfig({
@@ -69,7 +79,7 @@ export default defineConfig({
   // automatic runtime is enough for it — no fast-refresh plugin, so the rest of the app's plain
   // HMR is untouched.
   esbuild: { jsx: 'automatic' },
-  plugins: [cesium({ cesiumBuildRootPath, cesiumBuildPath: join(cesiumBuildRootPath, "Cesium") }), liveEventsApi(), snapshotApi(), messageSignsApi(), dataConnectApi()],
+  plugins: [cesium({ cesiumBuildRootPath, cesiumBuildPath: join(cesiumBuildRootPath, "Cesium") }), liveEventsApi(liveDc), snapshotApi(), messageSignsApi(), dataConnectApi(), liveDcReadApi(liveDc)],
   // Port 5188 (not the default 5180) keeps this NTTA worktree isolated from a sibling session's
   // dev server sharing localhost. Disable auto-open under headless e2e.
   server: { port: 5188, open: false, strictPort: true },

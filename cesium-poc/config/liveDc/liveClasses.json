@@ -1,0 +1,448 @@
+{
+  "coreAttributes": [
+    {
+      "name": "keyInSource",
+      "displayName": "Key In Source",
+      "description": "ID used in the source system"
+    },
+    {
+      "name": "code",
+      "displayName": "Id",
+      "description": "ID required by the client"
+    },
+    {
+      "name": "name",
+      "displayName": "Name",
+      "description": "Name of a record"
+    },
+    {
+      "name": "description",
+      "displayName": "Description",
+      "description": "Description of the record"
+    }
+  ],
+  "commonAttributes": {
+    "geometry": {
+      "name": "geometry",
+      "type": "Geospatial"
+    },
+    "x_coordinates": {
+      "name": "x_coordinates",
+      "type": "Decimal"
+    },
+    "y_coordinates": {
+      "name": "y_coordinates",
+      "type": "Decimal"
+    },
+    "project": {
+      "name": "project",
+      "type": "String"
+    },
+    "created_at": {
+      "name": "created_at",
+      "type": "String"
+    },
+    "status_changed_at": {
+      "name": "status_changed_at",
+      "type": "String"
+    }
+  },
+  "relationshipTypes": [
+    {
+      "type": "SDNA_Live_Event_Tickets",
+      "externalLabel": "SDNA Live Event Tickets",
+      "internalLabel": "SDNA Live Tickets of Event",
+      "order": 1001,
+      "linkedOnly": false
+    },
+    {
+      "type": "SDNA_Live_Event_Tasks",
+      "externalLabel": "SDNA Live Event Tasks",
+      "internalLabel": "SDNA Live Tasks of Event",
+      "order": 1002,
+      "linkedOnly": false
+    },
+    {
+      "type": "SDNA_Live_Event_Work_Orders",
+      "externalLabel": "SDNA Live Event Work Orders",
+      "internalLabel": "SDNA Live Work Orders of Event",
+      "order": 1003,
+      "linkedOnly": false
+    },
+    {
+      "type": "SDNA_Live_Event_Inspections",
+      "externalLabel": "SDNA Live Event Inspections",
+      "internalLabel": "SDNA Live Inspections of Event",
+      "order": 1004,
+      "linkedOnly": false
+    },
+    {
+      "type": "SDNA_Live_Event_Asset_Status",
+      "externalLabel": "SDNA Live Event Asset Status",
+      "internalLabel": "SDNA Live Asset Status of Event",
+      "order": 1005,
+      "linkedOnly": false
+    },
+    {
+      "type": "SDNA_Live_Ticket_Tasks",
+      "externalLabel": "SDNA Live Ticket Tasks",
+      "internalLabel": "SDNA Live Tasks of Ticket",
+      "order": 1006,
+      "linkedOnly": false
+    },
+    {
+      "type": "SDNA_Live_Work_Order_Tickets",
+      "externalLabel": "SDNA Live Work Order Tickets",
+      "internalLabel": "SDNA Live Work Orders of Ticket",
+      "order": 1007,
+      "linkedOnly": false
+    },
+    {
+      "type": "SDNA_Live_Work_Order_Tasks",
+      "externalLabel": "SDNA Live Work Order Tasks",
+      "internalLabel": "SDNA Live Work Orders of Task",
+      "order": 1008,
+      "linkedOnly": false
+    },
+    {
+      "type": "SDNA_Live_Inspection_Tickets",
+      "externalLabel": "SDNA Live Inspection Tickets",
+      "internalLabel": "SDNA Live Inspections of Ticket",
+      "order": 1009,
+      "linkedOnly": false
+    },
+    {
+      "type": "SDNA_Live_Inspection_Work_Orders",
+      "externalLabel": "SDNA Live Inspection Work Orders",
+      "internalLabel": "SDNA Live Inspections of Work Order",
+      "order": 1010,
+      "linkedOnly": false
+    },
+    {
+      "type": "SDNA_Live_Inspection_Asset_Status",
+      "externalLabel": "SDNA Live Inspection Asset Status",
+      "internalLabel": "SDNA Live Asset Status of Inspection",
+      "order": 1011,
+      "linkedOnly": false
+    },
+    {
+      "type": "SDNA_Live_Asset_Status",
+      "externalLabel": "SDNA Live Asset Status",
+      "internalLabel": "SDNA Live Status of Asset",
+      "order": 1012,
+      "linkedOnly": true
+    }
+  ],
+  "classes": [
+    {
+      "key": "EVENTS",
+      "className": "SDNA Florida I595 Live Events",
+      "description": "Live FL511 road events on the I-595 corridor, written by the live sync (never historical data).",
+      "attributes": [
+        "geometry",
+        "event_id",
+        "event_type",
+        "fl511_item_id",
+        "source",
+        "status",
+        "title",
+        "severity",
+        "region",
+        "start_time",
+        "end_time",
+        "last_updated",
+        "comment",
+        "detour",
+        "first_seen_at",
+        "last_seen_at",
+        "cleared_at",
+        {
+          "name": "latitude",
+          "type": "Decimal"
+        },
+        {
+          "name": "longitude",
+          "type": "Decimal"
+        },
+        {
+          "name": "secondary_latitude",
+          "type": "Decimal"
+        },
+        {
+          "name": "secondary_longitude",
+          "type": "Decimal"
+        },
+        "nearest_facility",
+        "nearest_facility_label",
+        {
+          "name": "distance_to_network_m",
+          "type": "Decimal"
+        },
+        "fdot_segment_id",
+        "segment ID",
+        "segment name",
+        "carriageway",
+        "direction",
+        "section_id",
+        "section_label",
+        "lane_impact_label",
+        "blocked_lanes",
+        "full_closure",
+        "ramp_closure",
+        "shoulder_only",
+        "spatial_confidence",
+        {
+          "name": "reported_at",
+          "type": "DateTime"
+        },
+        {
+          "name": "updated_at",
+          "type": "DateTime"
+        },
+        "milepost",
+        "cross_street",
+        "incident_subtype",
+        "vehicles_involved",
+        "impact_level",
+        "est_clearance_at",
+        "primary_camera_id",
+        "nearby_camera_ids",
+        "camera_snapshot_url",
+        "injuries",
+        "fatalities",
+        "weather_at_event",
+        "traffic_conditions",
+        "queue_length_mi",
+        "est_delay_min",
+        "recovery_eta",
+        "responder_status",
+        "responding_units",
+        "nearby_dms_ids",
+        "dms_message",
+        "recommended_next_action",
+        "snapshot_archive_url",
+        "field_sources",
+        "x_coordinates",
+        "y_coordinates",
+        "project"
+      ]
+    },
+    {
+      "key": "TICKETS",
+      "className": "SDNA Florida I595 Live Tickets",
+      "description": "Maintenance tickets generated automatically from live FL511 events (never historical data).",
+      "attributes": [
+        "geometry",
+        "Ticket ID",
+        "Issue Summary",
+        "Issue Category",
+        "Ticket Status",
+        "Priority",
+        "Asset ID",
+        "Asset Type",
+        "System Class",
+        "Segment",
+        "segment ID",
+        "segment name",
+        "Ticket Opened Date",
+        "Ticket Opened Time",
+        "Detailed Notes",
+        "Source Signal",
+        {
+          "name": "X Coordinate",
+          "type": "Decimal"
+        },
+        {
+          "name": "Y Coordinate",
+          "type": "Decimal"
+        },
+        "incident_subtype",
+        "x_coordinates",
+        "y_coordinates",
+        "project",
+        {
+          "name": "source_event_id",
+          "relatedClassName": "SDNA Florida I595 Live Events",
+          "relationshipType": "SDNA_Live_Event_Tickets"
+        },
+        "created_at",
+        "status_changed_at"
+      ]
+    },
+    {
+      "key": "TASKS",
+      "className": "SDNA Florida I595 Live Tasks",
+      "description": "Field tasks generated automatically for live tickets (never historical data).",
+      "attributes": [
+        "geometry",
+        "Task ID",
+        "Task Type",
+        "Task Status",
+        {
+          "name": "Related Ticket ID",
+          "relatedClassName": "SDNA Florida I595 Live Tickets",
+          "relationshipType": "SDNA_Live_Ticket_Tasks"
+        },
+        "Assigned Team",
+        "Task Date",
+        "Task Notes",
+        "Asset ID",
+        "Asset Type",
+        "System Class",
+        "Segment",
+        "segment ID",
+        "segment name",
+        {
+          "name": "X Coordinate",
+          "type": "Decimal"
+        },
+        {
+          "name": "Y Coordinate",
+          "type": "Decimal"
+        },
+        {
+          "name": "task_seq",
+          "type": "Integer"
+        },
+        "x_coordinates",
+        "y_coordinates",
+        "project",
+        {
+          "name": "source_event_id",
+          "relatedClassName": "SDNA Florida I595 Live Events",
+          "relationshipType": "SDNA_Live_Event_Tasks"
+        },
+        "created_at",
+        "status_changed_at"
+      ]
+    },
+    {
+      "key": "WORK_ORDERS",
+      "className": "SDNA Florida I595 Live Work Orders",
+      "description": "Work orders generated automatically for live tickets (never historical data).",
+      "attributes": [
+        "geometry",
+        "Work Order ID",
+        "Work Type",
+        "Work Order Status",
+        "Priority",
+        "Asset ID",
+        "Asset Type",
+        "System Class",
+        "Segment",
+        "segment ID",
+        "segment name",
+        "Work Order Open Date",
+        "Close Date",
+        "Work Description",
+        {
+          "name": "Related Ticket ID",
+          "relatedClassName": "SDNA Florida I595 Live Tickets",
+          "relationshipType": "SDNA_Live_Work_Order_Tickets"
+        },
+        {
+          "name": "Related Task ID",
+          "relatedClassName": "SDNA Florida I595 Live Tasks",
+          "relationshipType": "SDNA_Live_Work_Order_Tasks"
+        },
+        "Repair Category",
+        "x_coordinates",
+        "y_coordinates",
+        "project",
+        {
+          "name": "source_event_id",
+          "relatedClassName": "SDNA Florida I595 Live Events",
+          "relationshipType": "SDNA_Live_Event_Work_Orders"
+        },
+        "created_at",
+        "status_changed_at"
+      ]
+    },
+    {
+      "key": "INSPECTIONS",
+      "className": "SDNA Florida I595 Live Inspections",
+      "description": "Post-event inspections generated automatically after live events clear (never historical data).",
+      "attributes": [
+        "geometry",
+        "record_id",
+        "inspection_form_family",
+        "inspection_date",
+        "inspection_time",
+        "inspected_at",
+        "inspector_name",
+        "asset_id",
+        "asset_type",
+        "system class",
+        "pass_fail",
+        "inspection_result",
+        "asset_condition",
+        "observed_condition",
+        "recommended_action",
+        {
+          "name": "risk_rating_1_5",
+          "type": "Integer"
+        },
+        "issue_summary",
+        {
+          "name": "related_ticket_id",
+          "relatedClassName": "SDNA Florida I595 Live Tickets",
+          "relationshipType": "SDNA_Live_Inspection_Tickets"
+        },
+        {
+          "name": "related_work_order_id",
+          "relatedClassName": "SDNA Florida I595 Live Work Orders",
+          "relationshipType": "SDNA_Live_Inspection_Work_Orders"
+        },
+        {
+          "name": "distance_to_event_m",
+          "type": "Decimal"
+        },
+        "segment",
+        "segment ID",
+        "segment name",
+        "x_coordinates",
+        "y_coordinates",
+        "project",
+        {
+          "name": "source_event_id",
+          "relatedClassName": "SDNA Florida I595 Live Events",
+          "relationshipType": "SDNA_Live_Event_Inspections"
+        },
+        "created_at",
+        "status_changed_at"
+      ]
+    },
+    {
+      "key": "ASSET_STATUS",
+      "className": "SDNA Florida I595 Live Asset Status",
+      "description": "Live damage status of I-595 assets found by live inspections; historical Assets are never modified.",
+      "attributes": [
+        "geometry",
+        {
+          "name": "asset_id",
+          "linkedOnly": true,
+          "relatedClassName": "Florida I595 Assets",
+          "relationshipType": "SDNA_Live_Asset_Status"
+        },
+        "asset_category",
+        "system class",
+        "status",
+        "damaged_at",
+        {
+          "name": "source_inspection_id",
+          "relatedClassName": "SDNA Florida I595 Live Inspections",
+          "relationshipType": "SDNA_Live_Inspection_Asset_Status"
+        },
+        "x_coordinates",
+        "y_coordinates",
+        "project",
+        {
+          "name": "source_event_id",
+          "relatedClassName": "SDNA Florida I595 Live Events",
+          "relationshipType": "SDNA_Live_Event_Asset_Status"
+        },
+        "created_at"
+      ]
+    }
+  ]
+}

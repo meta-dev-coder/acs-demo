@@ -99,6 +99,34 @@ const ageSuffix = payload => {
   return Number.isFinite(age) ? ` from ${formatAge(age)} ago` : '';
 };
 
+/** The live-event URL; `?source=dataconnect` reads only the Live Events class, never the direct feed. */
+export const liveEventsEndpoint = (base, dataConnect) =>
+  dataConnect ? `${base}${base.includes('?') ? '&' : '?'}source=dataconnect` : base;
+
+/** "FL511 via DataConnect", or plain "FL511" as the direct feed always was. */
+export const liveEventSourceName = payload => payload?.sourceLabel ?? payload?.source ?? 'FL511';
+
+export const DC_NOT_CONNECTED = 'DataConnect not connected';
+
+/** DataConnect was asked for and could not answer: the server says so instead of serving FL511. */
+export const dataConnectUnavailable = payload =>
+  payload?.source === 'DataConnect' && String(payload?.sourceStatus ?? '').toUpperCase() === LIVE_EVENT_SOURCE_STATUS.UNAVAILABLE;
+
+/**
+ * The workspace strips' source label: "<source> · live", "· stale", or a warning that DataConnect is
+ * not connected, with the server's reason as the tooltip.
+ */
+export function liveEventSourceNote(payload = {}) {
+  if (dataConnectUnavailable(payload)) {
+    return { text: DC_NOT_CONNECTED, live: false, warning: true, title: payload.diagnostics?.lastError || DC_NOT_CONNECTED };
+  }
+  const source = liveEventSourceName(payload);
+  const status = String(payload?.sourceStatus ?? '').toUpperCase();
+  if (status === LIVE_EVENT_SOURCE_STATUS.LIVE) return { text: `${source} · live`, live: true };
+  if (status === LIVE_EVENT_SOURCE_STATUS.STALE) return { text: `${source} · stale`, live: false };
+  return { text: source, live: false };
+}
+
 /** One-line freshness summary for the layer's status row. */
 export function liveEventStatusText(payload) {
   if (!payload) return 'Live events could not load.';
@@ -109,6 +137,7 @@ export function liveEventStatusText(payload) {
       ? `Live-event service unreachable · still showing ${counts.total} event${counts.total === 1 ? '' : 's'}${ageSuffix(payload)}`
       : 'Live-event service unreachable — no FL511 data received yet.';
   }
+  if (dataConnectUnavailable(payload)) return `${DC_NOT_CONNECTED} — no live events.`;
   if (payload.sourceStatus === LIVE_EVENT_SOURCE_STATUS.UNAVAILABLE) {
     return 'FL511 unavailable — no live events cached yet.';
   }
@@ -117,7 +146,7 @@ export function liveEventStatusText(payload) {
     const age = payload.dataFreshness?.ageSeconds;
     return `${summary} · cached data${Number.isFinite(age) ? ` from ${formatAge(age)} ago` : ''}`;
   }
-  return `${summary} · live`;
+  return `${summary} · live${payload.sourceLabel ? ` · ${payload.sourceLabel}` : ''}`;
 }
 
 /**
@@ -128,6 +157,13 @@ export function liveEventStatusText(payload) {
 export function liveEventNotice(payload) {
   const status = payload?.sourceStatus;
   if (status === LIVE_EVENT_SOURCE_STATUS.LIVE) return null;
+  if (dataConnectUnavailable(payload)) {
+    const reason = payload.diagnostics?.lastError;
+    return `DataConnect is not connected${reason ? ` (${reason})` : ''}; live events are not shown.`;
+  }
+  if (status === LIVE_EVENT_SOURCE_STATUS.STALE && payload.source === 'DataConnect') {
+    return `The DataConnect Live sync has not refreshed; showing records last updated${ageSuffix(payload)}.`;
+  }
   if (status === LIVE_EVENT_SOURCE_STATUS.STALE) {
     return `FL511 is not responding; showing the last successful update${ageSuffix(payload)}.`;
   }

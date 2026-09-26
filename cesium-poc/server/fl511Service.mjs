@@ -152,34 +152,40 @@ export function createFl511Service({ config, network, client = createFl511Client
     async getI595LiveEvents() {
       schedule();
       if (!result) await run();
-      const sourceStatus = status();
-      return {
-        source: 'FL511',
-        sourceStatus,
-        lastUpdated: lastSuccessfulUpdate == null ? null : new Date(lastSuccessfulUpdate).toISOString(),
-        lastSuccessfulUpdate: lastSuccessfulUpdate == null ? null : new Date(lastSuccessfulUpdate).toISOString(),
-        dataFreshness: {
-          ageSeconds: lastSuccessfulUpdate == null ? null : Math.round((now() - lastSuccessfulUpdate) / 1000),
-          refreshSeconds: config.refreshSeconds,
-          staleAfterSeconds: config.staleAfterSeconds,
-        },
-        bufferMeters: config.bufferMeters,
-        segmentToleranceMeters: config.segmentToleranceMeters,
-        counts: result?.counts ?? { total: 0, incidents: 0, closures: 0 },
-        events: result?.events ?? [],
-        diagnostics: {
-          lastError,
-          feeds: {
-            incidents: feedDiagnostics(feeds[EVENT_TYPES.INCIDENT]),
-            closures: feedDiagnostics(feeds[EVENT_TYPES.CLOSURE]),
-            construction: feedDiagnostics(feeds[EVENT_TYPES.CONSTRUCTION]),
-            congestion: feedDiagnostics(feeds[EVENT_TYPES.CONGESTION]),
-            disabledVehicles: feedDiagnostics(feeds[EVENT_TYPES.DISABLED]),
-          },
-        },
-      };
+      return payload();
     },
+    /** The last poll's view, without polling or starting the interval (for callers that drive refresh themselves). */
+    async snapshot() { return payload(); },
   };
+
+  function payload() {
+    const sourceStatus = status();
+    return {
+      source: 'FL511',
+      sourceStatus,
+      lastUpdated: lastSuccessfulUpdate == null ? null : new Date(lastSuccessfulUpdate).toISOString(),
+      lastSuccessfulUpdate: lastSuccessfulUpdate == null ? null : new Date(lastSuccessfulUpdate).toISOString(),
+      dataFreshness: {
+        ageSeconds: lastSuccessfulUpdate == null ? null : Math.round((now() - lastSuccessfulUpdate) / 1000),
+        refreshSeconds: config.refreshSeconds,
+        staleAfterSeconds: config.staleAfterSeconds,
+      },
+      bufferMeters: config.bufferMeters,
+      segmentToleranceMeters: config.segmentToleranceMeters,
+      counts: result?.counts ?? { total: 0, incidents: 0, closures: 0 },
+      events: result?.events ?? [],
+      diagnostics: {
+        lastError,
+        feeds: {
+          incidents: feedDiagnostics(feeds[EVENT_TYPES.INCIDENT]),
+          closures: feedDiagnostics(feeds[EVENT_TYPES.CLOSURE]),
+          construction: feedDiagnostics(feeds[EVENT_TYPES.CONSTRUCTION]),
+          congestion: feedDiagnostics(feeds[EVENT_TYPES.CONGESTION]),
+          disabledVehicles: feedDiagnostics(feeds[EVENT_TYPES.DISABLED]),
+        },
+      },
+    };
+  }
 }
 
 const feedDiagnostics = feed => ({

@@ -1,0 +1,30 @@
+{
+  "$comment": "One source for the Live Events type labels and SDNA enrichment fields, read by server/liveDc and src/ alike. pending = no source yet (always NA).",
+  "typeLabels": {"INCIDENT":"Incident","CLOSURE":"Closure","CONSTRUCTION":"Construction","CONGESTION":"Congestion","DISABLED":"Disabled Vehicle"},
+  "enrichmentFields": [
+    {"name":"reported_at","label":"Reported"},
+    {"name":"updated_at","label":"Updated"},
+    {"name":"milepost","label":"Milepost"},
+    {"name":"cross_street","label":"Cross street"},
+    {"name":"incident_subtype","label":"Incident subtype"},
+    {"name":"vehicles_involved","label":"Vehicles involved"},
+    {"name":"impact_level","label":"Impact level"},
+    {"name":"est_clearance_at","label":"Est. clearance"},
+    {"name":"primary_camera_id","label":"Camera"},
+    {"name":"nearby_camera_ids","label":"Nearby cameras"},
+    {"name":"camera_snapshot_url","label":"Camera snapshot"},
+    {"name":"injuries","label":"Injuries","pending":true},
+    {"name":"fatalities","label":"Fatalities","pending":true},
+    {"name":"weather_at_event","label":"Weather","pending":true},
+    {"name":"traffic_conditions","label":"Traffic conditions","pending":true},
+    {"name":"queue_length_mi","label":"Queue length (mi)","pending":true},
+    {"name":"est_delay_min","label":"Est. delay (min)","pending":true},
+    {"name":"recovery_eta","label":"Recovery ETA","pending":true},
+    {"name":"responder_status","label":"Responder status","pending":true},
+    {"name":"responding_units","label":"Responding units","pending":true},
+    {"name":"nearby_dms_ids","label":"Nearby DMS","pending":true},
+    {"name":"dms_message","label":"DMS message","pending":true},
+    {"name":"recommended_next_action","label":"Recommended next action","pending":true},
+    {"name":"snapshot_archive_url","label":"Snapshot archive","pending":true}
+  ]
+}
