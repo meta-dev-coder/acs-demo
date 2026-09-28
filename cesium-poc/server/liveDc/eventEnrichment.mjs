@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { haversineMeters } from '../geo.mjs';
-import { toDcDateTime } from './classes.mjs';
+import { LIVE_CLASS, isHttpUrl, liveClassDefinition, toDcDateTime } from './classes.mjs';
 import EVENT_FIELDS from '../../config/liveDc/eventFields.json' with { type: 'json' };
 import { OPERATIONAL_IMPACT_WEIGHTS, OPERATIONAL_LEVELS, eventScore, levelFor } from '../../src/liveOps/operationalImpact.js';
 
@@ -19,6 +19,79 @@ export const SNAPSHOT_PATH = '/api/i595/camera';
 export const CAMERA_RADIUS_M = 2000;
 export const PENDING_FIELDS = Object.freeze(EVENT_FIELDS.enrichmentFields.filter(entry => entry.pending).map(entry => entry.name));
 export const ENRICHMENT_FIELDS = Object.freeze(EVENT_FIELDS.enrichmentFields.map(entry => entry.name));
+export const SNAPSHOT_FIRST_FIELDS = Object.freeze(['snapshot_first_url', 'snapshot_first_taken_at', 'snapshot_first_camera_id']);
+export const SNAPSHOT_CLEARED_FIELDS = Object.freeze(['snapshot_cleared_url', 'snapshot_cleared_taken_at', 'snapshot_cleared_camera_id']);
+export const WEATHER_FIELDS = Object.freeze([
+  'weather_at_event', 'weather_code', 'temperature_c', 'relative_humidity_pct', 'precipitation_mm', 'wind_speed_kmh',
+  'wind_direction_deg', 'weather_observed_at', 'weather_source',
+]);
+/** Captured once (eventCapture.mjs) and then carried forward unchanged. */
+export const STICKY_FIELDS = Object.freeze([...SNAPSHOT_FIRST_FIELDS, ...SNAPSHOT_CLEARED_FIELDS, ...WEATHER_FIELDS]);
+export const CAPTURE_SOURCES = Object.freeze({
+  ...Object.fromEntries([...SNAPSHOT_FIRST_FIELDS, ...SNAPSHOT_CLEARED_FIELDS, 'snapshot_archive_url'].map(name => [name, 'DIVAS'])),
+  ...Object.fromEntries(WEATHER_FIELDS.map(name => [name, 'Open-Meteo'])),
+});
+
+const ATTRIBUTE_TYPES = new Map(liveClassDefinition(LIVE_CLASS.EVENTS).attributes.map(a => [a.name, a.type]));
+const TEXT_TYPES = new Set(['String']);
+const toNumber = value => (typeof value === 'number' ? value : value === '' || value == null ? NaN : Number(value));
+
+/** A value in its DataConnect type (DateTime in whole seconds, URL absolute http(s)), or null when unset, "NA" or malformed. */
+export function typedValue(name, value) {
+  switch (ATTRIBUTE_TYPES.get(name)) {
+    case 'DateTime': return toDcDateTime(value);
+    case 'Integer': return Number.isInteger(toNumber(value)) ? toNumber(value) : null;
+    case 'Decimal': return Number.isFinite(toNumber(value)) ? toNumber(value) : null;
+    case 'URL': return isHttpUrl(value) ? value : null;
+    default: return value === null || value === undefined || value === '' || value === NA ? null : String(value);
+  }
+}
+
+/** The empty form of a field: "NA" for String, undefined (omitted, never sent) for URL, DateTime and numbers. */
+const emptyValue = name => (TEXT_TYPES.has(ATTRIBUTE_TYPES.get(name) ?? 'String') ? NA : undefined);
+
+const orderedSources = sources => JSON.stringify(Object.fromEntries(ENRICHMENT_FIELDS.map(name => [name, sources[name] ?? NA])));
+const parseSources = text => {
+  try {
+    const parsed = JSON.parse(text ?? '');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch { return {}; }
+};
+
+/** Sets captured values (unset ones are skipped) on `record` in place and updates its field_sources. */
+export function applyCaptured(record, fields) {
+  const sources = parseSources(record.field_sources);
+  for (const [name, value] of Object.entries(fields)) {
+    const typed = typedValue(name, value);
+    if (typed === null) continue;
+    record[name] = typed;
+    sources[name] = CAPTURE_SOURCES[name] ?? 'derived';
+  }
+  record.field_sources = orderedSources(sources);
+  return record;
+}
+
+const NEW_YORK_LOCAL = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true,
+  timeZoneName: 'short',
+});
+
+/** "2026-09-26 12:26 AM EDT": an instant as America/New_York wall time; null when not an instant. */
+export function newYorkLocalTime(value) {
+  const instant = toDcDateTime(value);
+  if (!instant) return null;
+  const p = Object.fromEntries(NEW_YORK_LOCAL.formatToParts(new Date(instant)).map(part => [part.type, part.value]));
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute} ${p.dayPeriod.toUpperCase()} ${p.timeZoneName}`;
+}
+
+/** An http(s) base URL without a trailing slash, or '' when unusable. */
+export function publicBaseUrl(value) {
+  try {
+    const url = new URL(String(value ?? '').trim());
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) return '';
+    return `${url.origin}${url.pathname}`.replace(/\/+$/, '');
+  } catch { return ''; }
+}
 
 const MONTHS = Object.freeze({ jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 });
 const DISPLAY_TIME = /^([a-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4}),?\s+(\d{1,2}):(\d{2})\s*([ap])\.?m\.?$/i;
@@ -150,13 +223,17 @@ export function impactLevel(record) {
 
 const numberOr = value => (value === '' || value == null ? NaN : Number(value));
 
-/** Every ENRICHMENT_FIELDS value (a string, "NA" when unavailable) plus field_sources, in a fixed order. */
-export function enrichEventFields(record, context = loadEnrichmentContext()) {
+/**
+ * Every ENRICHMENT_FIELDS value plus field_sources, in a fixed order. A String is "NA" when unavailable;
+ * URL, DateTime and numeric fields are then undefined (omitted). Captured fields (STICKY_FIELDS) are
+ * carried from `record` as they are.
+ */
+export function enrichEventFields(record, context = loadEnrichmentContext(), { publicApiBase = '' } = {}) {
   const values = {}, sources = {};
   const put = (name, value, source) => {
-    const ok = value !== null && value !== undefined && value !== '';
-    values[name] = ok ? String(value) : NA;
-    sources[name] = ok ? source : NA;
+    const typed = typedValue(name, value);
+    values[name] = typed === null ? emptyValue(name) : typed;
+    sources[name] = typed === null ? NA : source;
   };
   const timed = (name, raw, fallback) => {
     const parsed = parseFl511Time(raw);
@@ -166,6 +243,9 @@ export function enrichEventFields(record, context = loadEnrichmentContext()) {
 
   timed('reported_at', record.start_time, record.first_seen_at);
   timed('updated_at', record.last_updated, record.last_seen_at);
+  put('incident_time_local', newYorkLocalTime(values.reported_at), 'derived');
+  put('first_seen_at_dt', record.first_seen_at, 'derived');
+  put('cleared_at_dt', record.status === 'cleared' ? record.cleared_at : null, 'derived');
   const point = { longitude: numberOr(record.longitude ?? record.x_coordinates), latitude: numberOr(record.latitude ?? record.y_coordinates) };
   const segment = filled(record.fdot_segment_id) ? context.segments.find(s => s.segmentId === record.fdot_segment_id) : null;
   const milepost = milepostAt(point, segment);
@@ -180,10 +260,14 @@ export function enrichEventFields(record, context = loadEnrichmentContext()) {
   const primary = cameras[0];
   put('primary_camera_id', primary?.cameraId, 'derived');
   put('nearby_camera_ids', cameras.map(c => `${c.cameraId}@${c.distanceM}m`).join(','), 'derived');
-  put('camera_snapshot_url', primary?.divasChanId ? `${SNAPSHOT_PATH}/${encodeURIComponent(primary.divasChanId)}/snapshot` : null, 'derived');
+  const snapshotPath = primary?.divasChanId ? `${SNAPSHOT_PATH}/${encodeURIComponent(primary.divasChanId)}/snapshot` : null;
+  put('camera_snapshot_url', snapshotPath && `${publicBaseUrl(publicApiBase)}${snapshotPath}`, 'derived');
+  for (const name of STICKY_FIELDS) put(name, record[name], CAPTURE_SOURCES[name]);
+  put('snapshot_archive_url', record.snapshot_first_url, CAPTURE_SOURCES.snapshot_archive_url);
   for (const name of PENDING_FIELDS) put(name, null, NA);
 
-  return { ...values, field_sources: JSON.stringify(sources) };
+  const ordered = Object.fromEntries(ENRICHMENT_FIELDS.map(name => [name, Object.hasOwn(values, name) ? values[name] : emptyValue(name)]));
+  return { ...ordered, field_sources: orderedSources(sources) };
 }
 
 /** LIVE_DC_DATA_DIR lets the bundled poller lambda point at its own copy of public/data. */

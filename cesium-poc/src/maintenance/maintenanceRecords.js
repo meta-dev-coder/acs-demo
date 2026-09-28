@@ -358,6 +358,39 @@ export function getAssetActivity(assetId, { assets = new Map(), records = {} } =
   });
 }
 
+/*
+ * TODO(Arpana): show the historical incident chain in the Related tab. Comment only; nothing here
+ * changes at runtime.
+ *
+ * Where: the Related tab's grouping lives in src/assetExplorer/relatedRecords.js
+ * (relatedRecordGroups, which produces the "Names this ticket" / "Same asset · <id>" reasons) and
+ * src/assetExplorer/RelatedRecords.jsx. Both are on origin/demo (commit faa6184) but not yet in this
+ * working tree, so this note sits next to the local joins (getAssetActivity / relatedRecords) instead.
+ *
+ * What exists: DataConnect class "SDNA Florida I595 Historical Chain" (server/liveDc/historicalChain.mjs,
+ * loaded by tools/historical-chain.mjs). It has one row per chain step for every Bentley historical
+ * incident: Incident -> Ticket -> Task(s) -> Work Order -> Inspection.
+ *
+ * How to query a chain: POST /class/<id>/curated-data with the filter attributes.chain_id equals
+ * "CHAIN-<incident id>". Use attributes.incident_id to find it from an incident, or attributes.record_id
+ * to find it from a ticket, task, WO or inspection; that row's chain_id gives the whole chain. Sort by
+ * step_order ascending. Bentley reuses 34 incident ids, so one incident_id can have a second chain,
+ * "CHAIN-<id>-DUP2". Group by chain_id, never by incident_id.
+ *
+ * Useful columns: step (incident|ticket|task|work_order|inspection), record_id (the Bentley id, or
+ * TIC-SYN-… / TSK-SYN-…-01 / WO-SYN-… / INSP-SYN-… for synthetic steps), parent_record_id,
+ * record_class (Bentley class name or "synthetic"), step_date, asset_id. On synthetic steps also read
+ * summary / status / priority / assigned_team / work_type / inspection_result / asset_condition
+ * ("NA" = not applicable).
+ *
+ * Label each item from link_method / confidence / is_synthetic:
+ *   root or bentley_link (confidence High)   -> "Linked"
+ *   inferred_same_asset (confidence Medium)  -> "Inferred · <link_detail>"  e.g. "Inferred · same asset, ticket 12 d after"
+ *   synthetic (is_synthetic true)            -> "Synthetic (demo)"  (no Bentley record to open)
+ *
+ * Keep the current "Same asset" items. They answer a different question (anything else on this
+ * asset), so label them "Same asset" and do not merge them into the chain.
+ */
 /** The records a work order names directly, so its details can offer them. */
 export function relatedRecords(item, records = {}) {
   const ticketId = item?.related?.ticketId, taskId = item?.related?.taskId;

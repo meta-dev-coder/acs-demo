@@ -11,7 +11,8 @@ const source = path => readFileSync(join(ROOT, path), 'utf8');
 // module's import.meta.url would resolve outside the bundle. Config is imported (and inlined) instead.
 test('bundle: the liveDc modules the poller bundles read no config relative to import.meta.url', () => {
   for (const path of ['server/liveDc/classes.mjs', 'server/liveDc/workflow.mjs', 'server/liveDc/cycle.mjs',
-    'server/liveDc/eventSync.mjs', 'server/liveDc/dcWriter.mjs', 'server/liveDc/tokenHandoff.mjs', 'infra/lambdas/poller/poller.mjs']) {
+    'server/liveDc/eventSync.mjs', 'server/liveDc/dcWriter.mjs', 'server/liveDc/tokenHandoff.mjs', 'infra/lambdas/poller/poller.mjs',
+    'server/liveDc/eventCapture.mjs', 'server/liveDc/eventSnapshots.mjs', 'server/liveDc/eventWeather.mjs', 'src/weather/weatherText.js']) {
     assert.ok(!/new URL\([^)]*import\.meta\.url/.test(source(path)), path);
   }
 });
@@ -23,7 +24,7 @@ test('bundle: corridor GeoJSON for enrichment follows LIVE_DC_DATA_DIR, else pub
 
 test('bundle: the poller Dockerfile carries everything the Live DataConnect cycle reads', () => {
   const dockerfile = source('infra/lambdas/poller/Dockerfile');
-  for (const needed of ['infra/lambdas/poller/', 'server/', 'config/liveDc/', 'src/liveOps/', 'public/data/']) {
+  for (const needed of ['infra/lambdas/poller/', 'server/', 'config/liveDc/', 'src/liveOps/', 'src/weather/', 'public/data/']) {
     assert.ok(dockerfile.includes(`COPY ${needed}`), needed);
   }
 });

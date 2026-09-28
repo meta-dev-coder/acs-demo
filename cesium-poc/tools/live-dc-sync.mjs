@@ -8,11 +8,12 @@
  * Reads DataConnect at DC_WRITER_BASE_URL and writes through its load service at DC_WRITER_LOAD_BASE_URL
  * (both required) with DC_WRITER_ACCESS_TOKEN,
  * DC_WRITER_ACCESS_TOKEN_FILE (re-read per request) or a client. There is no local target.
- * --feed     replaces FL511 with a JSON fixture (re-read every poll):
+ * --feed     replaces FL511 with a JSON fixture (re-read every poll); no snapshot/weather capture:
  *            {incidents:[{itemId,latitude,longitude,title?}], closures:[], construction:[], congestion:[],
  *             disabledVehicles:[], details:{<itemId>:{title, description, fields:[]}}}
  *
- * Env: see the "Live DataConnect writer" block in .env.example.
+ * Env: see the "Live DataConnect writer" block in .env.example. LIVE_DC_SNAPSHOT_BUCKET + LIVE_DC_SNAPSHOT_PUBLIC_BASE
+ * store event camera snapshots with the AWS CLI; LIVE_DC_PUBLIC_API_BASE makes camera_snapshot_url absolute.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -25,6 +26,9 @@ import { LINK_MODES } from '../server/liveDc/classes.mjs';
 import { WRITER_ERRORS, createDcWriter, loadDcWriterConfig, missingWriterConfig } from '../server/liveDc/dcWriter.mjs';
 import { loadWorkflowConfig } from '../server/liveDc/workflow.mjs';
 import { createAssetCache, createCycleMemory, runLiveDcCycle } from '../server/liveDc/cycle.mjs';
+import { createEventCapture } from '../server/liveDc/eventCapture.mjs';
+import { snapshotStoreFromEnv } from '../server/liveDc/eventSnapshots.mjs';
+import { publicBaseUrl } from '../server/liveDc/eventEnrichment.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const REMOVED_FLAGS = Object.freeze(['--standin', '--remote']);
@@ -103,8 +107,11 @@ export function formatCycleSummary(report) {
       + `damaged=${w.damaged} passed=${w.passed}`
     : 'workflow: -';
   const loads = Object.entries(report.loads).map(([name, l]) => `${shortName(name)}=${l.sent}`).join(' ') || '-';
+  const c = report.capture;
+  const capture = c ? `capture: first=${c.snapshots.first} cleared=${c.snapshots.cleared} failed=${c.snapshots.failed} `
+    + `weather=${c.weather.captured}/${c.weather.failed} | ` : '';
   return `live-dc cycle ${report.at} source=${report.sourceStatus ?? '-'} | ${sync} | ${workflow} | loads: ${loads} `
-    + `| errors=${report.errors.length} warnings=${report.warnings.length}`;
+    + `| ${capture}errors=${report.errors.length} warnings=${report.warnings.length}`;
 }
 
 const MISSING_CLASSES_HINT = 'The Live classes must be created by a DataConnect admin first: see '
@@ -167,6 +174,12 @@ async function main(argv) {
   });
   const memory = createCycleMemory();
   const assetCache = createAssetCache({ writer, refreshSeconds: assetRefreshSeconds });
+  // A fixture feed runs offline: no DIVAS, Open-Meteo or S3 requests.
+  const snapshotStore = feedPath ? null : snapshotStoreFromEnv(env);
+  const capture = feedPath ? null : createEventCapture({ snapshotStore, logger: console });
+  const publicApiBase = publicBaseUrl(env.LIVE_DC_PUBLIC_API_BASE);
+  console.log(`live-dc capture=${capture ? 'on' : 'off (--feed)'} snapshots=${snapshotStore
+    ? `s3://${env.LIVE_DC_SNAPSHOT_BUCKET}/snapshots/ (aws cli)` : 'off'} camera links=${publicApiBase || 'relative'}`);
 
   let stopping = false;
   let wake = null;
@@ -182,7 +195,7 @@ async function main(argv) {
     const started = Date.now();
     try {
       const report = await runLiveDcCycle({
-        writer, service, workflowConfig, profileName, heartbeatSeconds, assetCache, memory, linkMode, logger: console,
+        writer, service, workflowConfig, profileName, heartbeatSeconds, assetCache, memory, linkMode, logger: console, capture, publicApiBase,
       });
       console.log(formatCycleSummary(report));
       if (args.once && report.errors.length) exitCode = 1;

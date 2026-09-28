@@ -32,12 +32,17 @@ const livePayload = events => ({
   diagnostics: { feeds: { incidents: { error: null } } },
 });
 
-test('the class declares the new attributes; times are DateTime, the rest String', () => {
+const FIELD_TYPES = Object.freeze({
+  reported_at: 'DateTime', updated_at: 'DateTime', first_seen_at_dt: 'DateTime', cleared_at_dt: 'DateTime',
+  snapshot_first_url: 'URL', snapshot_first_taken_at: 'DateTime', snapshot_cleared_url: 'URL', snapshot_cleared_taken_at: 'DateTime',
+  weather_code: 'Integer', temperature_c: 'Decimal', relative_humidity_pct: 'Decimal', precipitation_mm: 'Decimal',
+  wind_speed_kmh: 'Decimal', wind_direction_deg: 'Decimal', weather_observed_at: 'DateTime',
+});
+
+test('the class declares the new attributes with their types; the rest are String', () => {
   const byName = new Map(EVENTS_DEF.attributes.map(a => [a.name, a]));
   for (const name of [...ENRICHMENT_FIELDS, 'field_sources']) assert.ok(byName.has(name), name);
-  assert.equal(byName.get('reported_at').type, 'DateTime');
-  assert.equal(byName.get('updated_at').type, 'DateTime');
-  for (const name of ENRICHMENT_FIELDS.filter(n => !['reported_at', 'updated_at'].includes(n))) assert.equal(byName.get(name).type, 'String', name);
+  for (const name of ENRICHMENT_FIELDS) assert.equal(byName.get(name).type, FIELD_TYPES[name] ?? 'String', name);
   assert.equal(byName.get('field_sources').type, 'String');
   for (const name of ['event_id', 'start_time', 'blocked_lanes', 'spatial_confidence']) assert.ok(byName.has(name), `${name} kept`);
 });
@@ -112,7 +117,8 @@ const DC_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 test('every DateTime attribute across the Live classes is emitted without milliseconds', () => {
   const dateTimes = LIVE_CLASS_NAMES.flatMap(name => liveClassDefinition(name).attributes.filter(a => a.type === 'DateTime')
     .map(a => `${name}.${a.name}`));
-  assert.deepEqual(dateTimes, [`${LIVE_CLASS.EVENTS}.reported_at`, `${LIVE_CLASS.EVENTS}.updated_at`]);
+  assert.deepEqual(dateTimes, ['reported_at', 'updated_at', 'first_seen_at_dt', 'cleared_at_dt', 'snapshot_first_taken_at',
+    'snapshot_cleared_taken_at', 'weather_observed_at'].map(name => `${LIVE_CLASS.EVENTS}.${name}`));
   const odd = Date.parse('2026-09-26T08:11:41.238Z');
   for (const detail of [DETAIL, { ...DETAIL, fields: [] }]) {
     const rec = mapEventToRecord(build(detail), { now: odd, firstSeenAt: '2026-09-26T08:10:00.517Z' });
@@ -142,6 +148,21 @@ test('DataConnect refuses milliseconds in DateTime attributes: validateRecord do
   assert.equal(validateRecord(EVENTS_DEF, { ...rec, updated_at: '2026-09-26T08:14:32.000+00:00' }).valid, false);
   // String attributes may carry milliseconds.
   assert.equal(validateRecord(EVENTS_DEF, { ...rec, last_seen_at: '2026-09-26T08:11:41.238Z' }).valid, true);
+});
+
+test('URL attributes must be absolute http(s) URLs: validateRecord refuses "NA" and anything else', () => {
+  const rec = mapEventToRecord(build(), { now: T0 });
+  assert.equal('snapshot_first_url' in rec, false);
+  for (const good of ['https://cdn.example/snapshots/FL511-1/a.jpg', 'http://localhost:5189/x.jpg']) {
+    assert.equal(validateRecord(EVENTS_DEF, { ...rec, snapshot_first_url: good }).valid, true, good);
+  }
+  for (const bad of ['NA', 'na', 'not a url', '/snapshots/a.jpg', 'ftp://cdn.example/a.jpg', 'https://', 42]) {
+    const { valid, failures } = validateRecord(EVENTS_DEF, { ...rec, snapshot_cleared_url: bad });
+    assert.equal(valid, false, String(bad));
+    assert.deepEqual(failures, [{ attribute: 'snapshot_cleared_url', reasonCode: 'Type', reason: 'Value does not match attribute type URL' }]);
+  }
+  // String-typed siblings keep "NA".
+  assert.equal(validateRecord(EVENTS_DEF, { ...rec, snapshot_archive_url: 'NA', camera_snapshot_url: 'NA' }).valid, true);
 });
 
 test('a DataConnect read-back of a DateTime (.000+00:00) is not a change', () => {

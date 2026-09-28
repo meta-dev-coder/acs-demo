@@ -225,3 +225,41 @@ test('poller: a DynamoDB failure does not stop the DataConnect cycle', async () 
 test('poller: status goes to the non-secret status key', () => {
   assert.equal(LIVE_DC_STATUS_KEY, 'status/live-dc-status.json');
 });
+
+test('poller step: the cycle gets the snapshot store, a capture and the public API base, and keeps the capture warm', async () => {
+  const store = { put: async () => {}, url: key => `https://cdn.example/${key}` };
+  const h = stepHarness({ env: { ...ENV, LIVE_DC_PUBLIC_API_BASE: 'https://cdn.example' } });
+  const captures = [];
+  h.input.snapshotStore = store;
+  h.input.createCapture = options => { captures.push(options); return async () => ({}); };
+  h.input.state = {};
+  await runLiveDcStep(h.input);
+  await runLiveDcStep(h.input);
+  assert.equal(captures.length, 1, 'one capture per warm lambda');
+  assert.equal(captures[0].snapshotStore, store);
+  assert.equal(typeof h.cycles[0].capture, 'function');
+  assert.equal(h.cycles[1].capture, h.cycles[0].capture);
+  assert.equal(h.cycles[0].publicApiBase, 'https://cdn.example');
+});
+
+test('poller handler: passes its snapshot store to the DataConnect step', async () => {
+  const store = { put: async () => {}, url: key => key };
+  const cycles = [];
+  const handler = createPollerHandler({
+    getService: async () => ({ refresh: async () => {}, getI595LiveEvents: async () => PAYLOAD }),
+    ddb: { scanAll: async () => [], put: async () => {}, remove: async () => {} },
+    emit: async () => {},
+    tokenStore: { read: async () => tokenExpiringIn(3600_000), writeStatus: async () => {} },
+    snapshotStore: store,
+    env: { ...ENV, LIVE_EVENTS_TABLE: 'events', EVENTS_BUS_ARN: 'bus' },
+    now: () => NOW,
+    logger: silentLogger(),
+    liveDc: {
+      createWriter: () => ({ fake: true }),
+      createCapture: options => Object.assign(async () => ({}), { options }),
+      runCycle: async args => { cycles.push(args); return REPORT; },
+    },
+  });
+  await handler({}, { getRemainingTimeInMillis: () => 50_000 });
+  assert.equal(cycles[0].capture.options.snapshotStore, store);
+});

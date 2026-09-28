@@ -9,7 +9,7 @@
 import {
   LIVE_CLASS, PROJECT_CODE, completeRecord, dcSegmentCodeFor, diffRecords, liveClassDefinition,
 } from './classes.mjs';
-import { enrichEventFields, loadEnrichmentContext } from './eventEnrichment.mjs';
+import { STICKY_FIELDS, enrichEventFields, loadEnrichmentContext, typedValue } from './eventEnrichment.mjs';
 import EVENT_FIELDS from '../../config/liveDc/eventFields.json' with { type: 'json' };
 
 export const TYPE_PRIORITY = Object.freeze(['INCIDENT', 'CLOSURE', 'DISABLED', 'CONSTRUCTION', 'CONGESTION']);
@@ -28,8 +28,16 @@ export const DETAIL_ATTRIBUTES = Object.freeze([
   'lane_impact_label', 'blocked_lanes', 'full_closure', 'ramp_closure', 'shoulder_only', 'spatial_confidence',
 ]);
 const POSITION_SET = new Set(POSITION_ATTRIBUTES);
-/** Re-stamped on every write; updated_at falls back to last_seen_at when FL511 gives no last_updated. */
-const VOLATILE_ATTRIBUTES = Object.freeze(['last_seen_at', 'updated_at']);
+/**
+ * Re-stamped on every write; updated_at falls back to last_seen_at when FL511 gives no last_updated.
+ * cleared_at_dt is only ever set on the (always written) clearing, and an omitted DateTime is not
+ * erased by a merge-semantics load, so a reactivated record may keep a stale one.
+ */
+const VOLATILE_ATTRIBUTES = Object.freeze(['last_seen_at', 'updated_at', 'cleared_at_dt']);
+
+/** Captured snapshot and weather values of an existing record, in their DataConnect types. */
+const stickyOf = previous => Object.fromEntries(STICKY_FIELDS.map(name => [name, typedValue(name, previous?.[name])])
+  .filter(([, value]) => value !== null));
 
 const iso = ms => new Date(ms).toISOString();
 const round = (value, dp) => {
@@ -60,7 +68,9 @@ export function liveEventKey(event) {
  * @param {object} event normalizeEvent + attachDetails + enrichForLiveOps output
  * @param {{now:number, previous?:object|null, firstSeenAt?:string|null, enrichment?:object}} options
  */
-export function mapEventToRecord(event, { now, previous = null, firstSeenAt = null, enrichment = loadEnrichmentContext() }) {
+export function mapEventToRecord(event, {
+  now, previous = null, firstSeenAt = null, enrichment = loadEnrichmentContext(), publicApiBase = '',
+}) {
   const key = liveEventKey(event);
   const liveOps = event.liveOps ?? {};
   const type = event.type;
@@ -114,6 +124,7 @@ export function mapEventToRecord(event, { now, previous = null, firstSeenAt = nu
     x_coordinates: longitude,
     y_coordinates: latitude,
     project: PROJECT_CODE,
+    ...stickyOf(previous),
   };
 
   const impact = liveOps.laneImpact;
@@ -134,7 +145,7 @@ export function mapEventToRecord(event, { now, previous = null, firstSeenAt = nu
   }
 
   // Derived from the final record, so carried-forward details derive the same values.
-  return completeRecord(liveClassDefinition(LIVE_CLASS.EVENTS), { ...rec, ...enrichEventFields(rec, enrichment) });
+  return completeRecord(liveClassDefinition(LIVE_CLASS.EVENTS), { ...rec, ...enrichEventFields(rec, enrichment, { publicApiBase }) });
 }
 
 /** Only a fully healthy LIVE poll is proof that a missing event has really gone. */
@@ -152,11 +163,11 @@ const emptyStats = () => ({
 
 /**
  * @param {{payload:object, existing:object[], now:number, heartbeatSeconds?:number, firstSeenHints?:Map<string,string>,
- *   enrichment?:object}} input
+ *   enrichment?:object, publicApiBase?:string}} input
  * @returns {{skipped:boolean, reason:string|null, upserts:object[], state:object[], stats:object}}
  */
 export function syncLiveEvents({
-  payload, existing, now, heartbeatSeconds = 900, firstSeenHints = new Map(), enrichment = loadEnrichmentContext(),
+  payload, existing, now, heartbeatSeconds = 900, firstSeenHints = new Map(), enrichment = loadEnrichmentContext(), publicApiBase = '',
 }) {
   const existingByKey = new Map();
   for (const record of existing ?? []) {
@@ -182,7 +193,7 @@ export function syncLiveEvents({
   const upserts = [];
   for (const [key, event] of kept) {
     const previous = existingByKey.get(key) ?? null;
-    const candidate = mapEventToRecord(event, { now, previous, firstSeenAt: firstSeenHints.get(key) ?? null, enrichment });
+    const candidate = mapEventToRecord(event, { now, previous, firstSeenAt: firstSeenHints.get(key) ?? null, enrichment, publicApiBase });
     if (!previous) {
       stats.new++;
       upserts.push(candidate);
@@ -206,8 +217,8 @@ export function syncLiveEvents({
     if (canClear(payload)) {
       const def = liveClassDefinition(LIVE_CLASS.EVENTS);
       for (const previous of gone) {
-        const cleared = { ...previous, geometry: pointOf(previous), status: 'cleared', cleared_at: iso(now) };
-        upserts.push(completeRecord(def, { ...cleared, ...enrichEventFields(cleared, enrichment) }));
+        const cleared = { ...previous, ...stickyOf(previous), geometry: pointOf(previous), status: 'cleared', cleared_at: iso(now) };
+        upserts.push(completeRecord(def, { ...cleared, ...enrichEventFields(cleared, enrichment, { publicApiBase }) }));
         stats.cleared++;
       }
     } else {

@@ -51,11 +51,44 @@ export function parseTooltipHtml(html) {
   }
 
   if (!title && !description && fields.length === 0) return null;
+  const cameras = parseCarouselCameras(body);
   return {
     ...(title ? { title } : {}),
     ...(description ? { description } : {}),
     fields,
+    ...(cameras.length ? { cameras } : {}),
   };
+}
+
+const attr = (html, name) => {
+  const match = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, 'i').exec(html);
+  const value = match ? textOf(match[1] ?? match[2]) : '';
+  return value || null;
+};
+
+/**
+ * The cameras FL511 lists in the tooltip's camera carousel, in its order: FL511 camera id, title,
+ * description and the DIVAS channel of its video stream (…/chan-<n>_h/…), null when absent.
+ * @returns {{cameraId: string, title: string|null, description: string|null, divasChanId: string|null}[]}
+ */
+export function parseCarouselCameras(html) {
+  if (typeof html !== 'string') return [];
+  const cameras = [];
+  const seen = new Set();
+  const blocks = html.split(/(?=<div\b[^>]*\bid\s*=\s*["']carouselDiv-)/i);
+  for (const block of blocks) {
+    const cameraId = /^<div\b[^>]*\bid\s*=\s*["']carouselDiv-(\d+)["']/i.exec(block)?.[1];
+    if (!cameraId || seen.has(cameraId)) continue;
+    seen.add(cameraId);
+    const video = attr(block, 'data-videourl');
+    cameras.push({
+      cameraId,
+      title: attr(block, 'data-fs-title'),
+      description: attr(block, 'data-fs-desc'),
+      divasChanId: /\/chan-(\d+)_/i.exec(video ?? '')?.[1] ?? null,
+    });
+  }
+  return cameras;
 }
 
 /** Case-insensitive lookup of one FL511 row, or undefined when FL511 did not print it. */

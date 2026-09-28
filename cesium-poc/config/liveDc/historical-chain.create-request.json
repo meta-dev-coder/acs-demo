@@ -1,0 +1,290 @@
+[
+  {
+    "className": "SDNA Florida I595 Historical Chain",
+    "create": {
+      "className": "SDNA Florida I595 Historical Chain",
+      "description": "One row per step of an Incident -> Ticket -> Task -> Work Order -> Inspection chain built for every Bentley historical incident. Links to Bentley records are plain String ids; synthetic steps are marked.",
+      "status": "Published",
+      "owners": [],
+      "classType": "DATA_CLASS",
+      "displayInExplorer": true,
+      "includeSecuritySettings": false
+    },
+    "update": {
+      "className": "SDNA Florida I595 Historical Chain",
+      "description": "One row per step of an Incident -> Ticket -> Task -> Work Order -> Inspection chain built for every Bentley historical incident. Links to Bentley records are plain String ids; synthetic steps are marked.",
+      "owners": [],
+      "displayInExplorer": true,
+      "includeSecuritySettings": false,
+      "geometryAttributeName": "geometry",
+      "add": [
+        {
+          "name": "geometry",
+          "displayName": "geometry",
+          "description": "",
+          "type": "Geospatial",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "chain_id",
+          "displayName": "chain_id",
+          "description": "CHAIN-<incident id>",
+          "type": "String",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "incident_id",
+          "displayName": "incident_id",
+          "description": "Bentley incident id (Florida I595 Incidents code)",
+          "type": "String",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "step",
+          "displayName": "step",
+          "description": "incident | ticket | task | work_order | inspection",
+          "type": "String",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "step_order",
+          "displayName": "step_order",
+          "description": "Position in the chain, 1 = incident",
+          "type": "Integer",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "record_id",
+          "displayName": "record_id",
+          "description": "Bentley record id, or the synthetic id (…-SYN-…)",
+          "type": "String",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "parent_record_id",
+          "displayName": "parent_record_id",
+          "description": "record_id of the previous step (NA for the incident)",
+          "type": "String",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "record_class",
+          "displayName": "record_class",
+          "description": "Bentley class name, or synthetic",
+          "type": "String",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "link_method",
+          "displayName": "link_method",
+          "description": "root | bentley_link | inferred_same_asset | synthetic",
+          "type": "String",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "link_detail",
+          "displayName": "link_detail",
+          "description": "How the link was made, e.g. same asset, ticket 12 d after",
+          "type": "String",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "confidence",
+          "displayName": "confidence",
+          "description": "High | Medium | Synthetic",
+          "type": "String",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "is_synthetic",
+          "displayName": "is_synthetic",
+          "description": "True when the step has no Bentley record",
+          "type": "Boolean",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "asset_id",
+          "displayName": "asset_id",
+          "description": "Asset code (Florida I595 Assets), NA when none",
+          "type": "String",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "segment",
+          "displayName": "segment",
+          "description": "Corridor segment of the incident",
+          "type": "String",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "step_date",
+          "displayName": "step_date",
+          "description": "When the step happened (UTC, whole seconds); omitted when unknown",
+          "type": "DateTime",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "summary",
+          "displayName": "summary",
+          "description": "Short summary of the step",
+          "type": "String",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "status",
+          "displayName": "status",
+          "description": "Status of the step record",
+          "type": "String",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "priority",
+          "displayName": "priority",
+          "description": "Priority of the step record",
+          "type": "String",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "assigned_team",
+          "displayName": "assigned_team",
+          "description": "Team that did the step",
+          "type": "String",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "work_type",
+          "displayName": "work_type",
+          "description": "Task or work order type",
+          "type": "String",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "inspection_result",
+          "displayName": "inspection_result",
+          "description": "Pass / Fail for an inspection step",
+          "type": "String",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "asset_condition",
+          "displayName": "asset_condition",
+          "description": "Asset condition after an inspection step",
+          "type": "String",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "x_coordinates",
+          "displayName": "x_coordinates",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        },
+        {
+          "name": "y_coordinates",
+          "displayName": "y_coordinates",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "array": false,
+          "core": false,
+          "displayInExplorer": true,
+          "openInIframe": false
+        }
+      ],
+      "modify": [],
+      "remove": []
+    }
+  }
+]

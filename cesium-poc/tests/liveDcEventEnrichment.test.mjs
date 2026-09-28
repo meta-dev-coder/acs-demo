@@ -3,6 +3,7 @@
  * nearby cameras, impact level, "NA" defaults and field_sources. All pure and deterministic.
  */
 import test from 'node:test';
+import { LIVE_CLASS, liveClassDefinition } from '../server/liveDc/classes.mjs';
 import assert from 'node:assert/strict';
 import {
   NA, ENRICHMENT_FIELDS, PENDING_FIELDS, SNAPSHOT_PATH, parseFl511Time, parseCrossStreet, parseIncidentSubtype,
@@ -151,12 +152,20 @@ test('NA everywhere a value is not available; times fall back to first/last seen
   }, CONTEXT);
   assert.equal(out.reported_at, '2026-09-26T04:31:00Z');
   assert.equal(out.updated_at, '2026-09-26T05:00:00Z');
-  for (const name of ENRICHMENT_FIELDS.filter(n => !['reported_at', 'updated_at'].includes(n))) assert.equal(out[name], NA, name);
+  assert.equal(out.incident_time_local, '2026-09-26 12:31 AM EDT');
+  assert.equal(out.first_seen_at_dt, '2026-09-26T04:31:00Z');
+  const derived = ['reported_at', 'updated_at', 'incident_time_local', 'first_seen_at_dt'];
+  const def = liveClassDefinition(LIVE_CLASS.EVENTS);
+  const typeOf = name => def.attributes.find(a => a.name === name).type;
+  for (const name of ENRICHMENT_FIELDS.filter(n => !derived.includes(n))) {
+    assert.equal(out[name], typeOf(name) === 'String' ? NA : undefined, name);
+  }
   const sources = JSON.parse(out.field_sources);
   assert.equal(sources.reported_at, 'derived');
   assert.equal(sources.updated_at, 'derived');
   assert.equal(sources.milepost, 'NA');
-  for (const value of Object.values(out)) assert.equal(typeof value, 'string');
+  assert.equal(sources.temperature_c, 'NA');
+  for (const value of Object.values(out)) assert.ok(value === undefined || typeof value === 'string');
 });
 
 test('a camera without a DIVAS channel has no snapshot url', () => {

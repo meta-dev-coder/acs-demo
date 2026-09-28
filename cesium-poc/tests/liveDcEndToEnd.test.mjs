@@ -20,6 +20,7 @@ import { createDcWriter, loadDcWriterConfig } from '../server/liveDc/dcWriter.mj
 import { createDcStandin } from '../server/liveDc/standin.mjs';
 import { loadWorkflowConfig } from '../server/liveDc/workflow.mjs';
 import { createAssetCache, createCycleMemory, runLiveDcCycle } from '../server/liveDc/cycle.mjs';
+import { createEventCapture } from '../server/liveDc/eventCapture.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const network = await loadI595Network(join(ROOT, 'public', 'data'));
@@ -60,7 +61,7 @@ function stubClient(feed) {
   };
 }
 
-async function createHarness({ incrementalMode }) {
+async function createHarness({ incrementalMode, capture = null, publicApiBase = '' }) {
   const standin = createDcStandin({ processingDelayMs: 1, curationDelayMs: 1, incrementalMode, logger: silent });
   const server = await standin.listen(0);
   const writer = createDcWriter({
@@ -79,7 +80,7 @@ async function createHarness({ incrementalMode }) {
     async cycle(atSeconds) {
       clock.t = T0 + atSeconds * 1000;
       const report = await runLiveDcCycle({
-        writer, service, now, workflowConfig, profileName: 'demo', memory, assetCache, logger: silent,
+        writer, service, now, workflowConfig, profileName: 'demo', memory, assetCache, logger: silent, capture, publicApiBase,
       });
       assert.deepEqual(report.errors, [], `cycle at +${atSeconds}s`);
       return report;
@@ -281,6 +282,68 @@ describe('Live DataConnect end to end (incrementalMode replace)', () => {
   test('re-polling after reactivation writes nothing', () => stepRepollIsIdempotent(h, 210));
 });
 
+for (const incrementalMode of ['merge', 'replace']) {
+  describe(`Live DataConnect end to end with snapshots and weather (incrementalMode ${incrementalMode})`, () => {
+    const BASE = 'https://cdn.example';
+    const puts = [];
+    const media = [];
+    const fetchImpl = async url => {
+      media.push(String(url));
+      if (String(url).startsWith('https://images-dis.divas.cloud/')) {
+        return new Response(new Uint8Array([0xff, 0xd8, 0xff]), { headers: { 'content-type': 'image/jpeg' } });
+      }
+      return Response.json({ current: { time: '2026-09-25T12:00', temperature_2m: 30.1, weather_code: 2, wind_speed_10m: 8, wind_direction_10m: 90 } });
+    };
+    const snapshotStore = { put: async key => { puts.push(key); }, url: key => `${BASE}/${key}` };
+    let h;
+    before(async () => {
+      h = await createHarness({
+        incrementalMode, publicApiBase: BASE, capture: createEventCapture({ snapshotStore, fetchImpl, logger: silent }),
+      });
+    });
+    after(() => h?.close());
+
+    test('first sight stores snapshot links and weather; DataConnect accepts every new attribute', async () => {
+      await h.cycle(0);
+      const crash = (await h.curated(EVENTS))['FL511-868702'].attributes;
+      assert.match(crash.snapshot_first_url, /^https:\/\/cdn\.example\/snapshots\/FL511-868702\/20260925T120000Z_\d+\.jpg$/);
+      assert.equal(crash.snapshot_archive_url, crash.snapshot_first_url);
+      assert.equal(crash.snapshot_first_taken_at, '2026-09-25T12:00:00.000+00:00');
+      assert.equal(crash.weather_at_event, 'Partly cloudy · 30.1 °C · wind 8 km/h E');
+      assert.equal(crash.weather_code, 2);
+      assert.equal(crash.temperature_c, 30.1);
+      assert.equal(crash.incident_time_local, '2026-09-25 8:00 AM EDT');
+      assert.match(crash.camera_snapshot_url, /^https:\/\/cdn\.example\/api\/i595\/camera\/\d+\/snapshot$/);
+      assert.equal(crash.snapshot_cleared_url, undefined);
+      assert.equal(crash.cleared_at_dt, undefined);
+      assert.deepEqual(h.standin.invalidReasons(EVENTS), {});
+      for (const name of LIVE_CLASS_NAMES) assert.deepEqual(h.standin.snapshot(name).filter(r => !r.valid).map(r => r.keyInSource), [], name);
+    });
+
+    test('re-polling writes nothing and captures nothing', async () => {
+      const [before, calls, stored] = [h.rawCounts(), media.length, puts.length];
+      await h.cycle(30);
+      assert.deepEqual(h.rawCounts(), before);
+      assert.equal(media.length, calls);
+      assert.equal(puts.length, stored);
+    });
+
+    test('clearing takes one cleared snapshot, keeps the first one, then stays quiet', async () => {
+      await stepEventsClear(h, 180);
+      const crash = (await h.curated(EVENTS))['FL511-868702'].attributes;
+      assert.match(crash.snapshot_cleared_url, /^https:\/\/cdn\.example\/snapshots\/FL511-868702\/20260925T120300Z_\d+\.jpg$/);
+      assert.equal(crash.cleared_at_dt, '2026-09-25T12:03:00.000+00:00');
+      assert.equal(crash.snapshot_cleared_camera_id, crash.snapshot_first_camera_id);
+      assert.match(crash.snapshot_first_url, /20260925T120000Z/);
+      assert.deepEqual(h.standin.invalidReasons(EVENTS), {});
+      const [before, calls] = [h.rawCounts(), media.length];
+      await h.cycle(240);
+      assert.deepEqual(h.rawCounts(), before);
+      assert.equal(media.length, calls);
+    });
+  });
+}
+
 // ---- CLI smoke: real processes, fixture feed, no FL511 and no real DataConnect ------------------
 
 function run(args, env, { timeoutMs = 20_000 } = {}) {
@@ -304,7 +367,7 @@ const SEALED = Object.freeze(Object.fromEntries([
   'DC_WRITER_TOKEN_URL', 'DC_WRITER_SCOPE', 'DC_WRITER_DATA_MGMT_PREFIX', 'DC_WRITER_ALLOW_REMOTE',
   'DC_WRITER_TIMEOUT_MS', 'DC_WRITER_PROCESS_TIMEOUT_MS', 'DC_WRITER_CURATION_TIMEOUT_MS', 'DC_WRITER_PAGE_SIZE',
   'LIVE_DC_SPAWN_TYPES', 'LIVE_DC_PROFILE', 'LIVE_DC_LINK_MODE', 'LIVE_DC_HEARTBEAT_SECONDS', 'LIVE_DC_ASSET_REFRESH_SECONDS',
-  'LIVE_DC_INTERVAL_SECONDS', 'FL511_BASE_URL',
+  'LIVE_DC_INTERVAL_SECONDS', 'FL511_BASE_URL', 'LIVE_DC_SNAPSHOT_BUCKET', 'LIVE_DC_SNAPSHOT_PUBLIC_BASE', 'LIVE_DC_PUBLIC_API_BASE',
 ].map(name => [name, ''])));
 
 describe('live-dc-sync CLI smoke', () => {

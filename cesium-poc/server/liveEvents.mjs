@@ -85,6 +85,7 @@ export function attachDetails(event, detail) {
   const enriched = { ...event, detailsAvailable: true, detailFields: detail.fields ?? [] };
   if (detail.title) enriched.title = detail.title;
   if (detail.description) enriched.description = detail.description;
+  if (detail.cameras?.length) enriched.fl511Cameras = detail.cameras.map(camera => ({ ...camera }));
   for (const { label, value } of detail.fields ?? []) {
     const key = DETAIL_FIELDS.get(label.toLowerCase());
     if (key && !enriched[key]) enriched[key] = value;

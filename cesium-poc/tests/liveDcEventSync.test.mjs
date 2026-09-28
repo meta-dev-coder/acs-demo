@@ -128,11 +128,15 @@ test('a real incident maps to a complete, valid Live Events record', () => {
   assert.deepEqual(validateRecord(EVENTS_DEF, rec), { valid: true, failures: [] });
   assert.deepEqual(unknownAttributes(EVENTS_DEF, rec), []);
   // Every String-like attribute is present, so a merge-semantics load can't leave a stale value.
+  // A DateTime or URL is never sent as text: a whole-second instant / absolute http(s) URL, or omitted.
   for (const attr of EVENTS_DEF.attributes) {
-    if (['String', 'Date', 'DateTime', 'Timestamp', 'URL'].includes(attr.type)) {
+    if (attr.type === 'URL') assert.equal(attr.name in rec, false, `${attr.name} is omitted until captured`);
+    if (['String', 'Date', 'Timestamp'].includes(attr.type)) {
       assert.equal(typeof rec[attr.name], 'string', `${attr.name} is always emitted`);
     }
+    if (attr.type === 'DateTime' && attr.name in rec) assert.match(rec[attr.name], /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/, attr.name);
   }
+  assert.equal('cleared_at_dt' in rec, false);
 });
 
 test('an unresolved segment is an empty plain attribute and lane flags are omitted without parsed impact', () => {

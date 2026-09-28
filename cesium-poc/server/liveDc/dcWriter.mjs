@@ -8,7 +8,7 @@
  */
 import { readFileSync } from 'node:fs';
 import {
-  LIVE_CLASS_NAMES, isLiveClassName, HISTORICAL_CLASS_IDS, HISTORICAL_NUMERIC_CLASS_IDS,
+  LIVE_CLASS_NAMES, isWritableClassName, HISTORICAL_CLASS_IDS, HISTORICAL_NUMERIC_CLASS_IDS,
   validateRecord, unknownAttributes,
 } from './classes.mjs';
 
@@ -129,10 +129,10 @@ export function formClassId(classDto) {
   return `CL${String(classId).padStart(6, '0')}`;
 }
 
-/** Steps 1-4 of the guard: the class itself is a writable Live data class. */
+/** Steps 1-4 of the guard: the class itself is a writable SDNA data class (a Live class or a standalone one). */
 function assertLiveClass(dto) {
-  if (!isLiveClassName(dto?.className)) {
-    throw new DcWriterError(E.NOT_ALLOWLISTED, `class '${dto?.className}' is not a Live class; refusing to write`);
+  if (!isWritableClassName(dto?.className)) {
+    throw new DcWriterError(E.NOT_ALLOWLISTED, `class '${dto?.className}' is not a writable SDNA class; refusing to write`);
   }
   if (HISTORICAL_CLASS_IDS.has(dto.id)) {
     throw new DcWriterError(E.HISTORICAL_CLASS, `class '${dto.className}' carries historical ObjectId ${dto.id}`);
@@ -330,20 +330,33 @@ export function createDcWriter({
     const map = new Map();
     const ids = new Set();
     for (const name of LIVE_CLASS_NAMES) {
-      const dto = exactlyOne(all, name);
-      assertLiveClass(dto);
-      // classIds are numbered per class type (CL/TS/IC); an untyped entry is treated as a data class.
-      const sameNumeric = all.filter(c => c?.classId === dto.classId && (c.classType ?? 'DATA_CLASS') === 'DATA_CLASS');
-      if (sameNumeric.length !== 1 || sameNumeric[0].id !== dto.id || sameNumeric[0].className !== name) {
-        throw new DcWriterError(E.AMBIGUOUS_CLASS, `classId ${dto.classId} of '${name}' is not unique across DataConnect classes`);
-      }
-      if (ids.has(dto.id)) throw new DcWriterError(E.AMBIGUOUS_CLASS, `ObjectId ${dto.id} is shared by several Live classes`);
-      ids.add(dto.id);
-      const frozen = deepFreeze(structuredClone(dto));
-      resolved.add(frozen);
+      const frozen = resolveFrom(all, name);
+      if (ids.has(frozen.id)) throw new DcWriterError(E.AMBIGUOUS_CLASS, `ObjectId ${frozen.id} is shared by several Live classes`);
+      ids.add(frozen.id);
       map.set(name, frozen);
     }
     return map;
+  }
+
+  function resolveFrom(all, name) {
+    const dto = exactlyOne(all, name);
+    assertLiveClass(dto);
+    // classIds are numbered per class type (CL/TS/IC); an untyped entry is treated as a data class.
+    const sameNumeric = all.filter(c => c?.classId === dto.classId && (c.classType ?? 'DATA_CLASS') === 'DATA_CLASS');
+    if (sameNumeric.length !== 1 || sameNumeric[0].id !== dto.id || sameNumeric[0].className !== name) {
+      throw new DcWriterError(E.AMBIGUOUS_CLASS, `classId ${dto.classId} of '${name}' is not unique across DataConnect classes`);
+    }
+    const frozen = deepFreeze(structuredClone(dto));
+    resolved.add(frozen);
+    return frozen;
+  }
+
+  /** One writable SDNA class outside the live sync (e.g. the Historical Chain), with the same checks. */
+  async function resolveWritableClass(name) {
+    if (!isWritableClassName(name)) {
+      throw new DcWriterError(E.NOT_ALLOWLISTED, `class '${name}' is not a writable SDNA class; refusing to write`);
+    }
+    return resolveFrom(await listClasses(), name);
   }
 
   async function readAll(classDto, { filters = [], pageSize = cfg.pageSize, maxPages = 1000 } = {}) {
@@ -477,7 +490,7 @@ export function createDcWriter({
 
   return {
     config: safeConfig,
-    listClasses, findClassByName, resolveLiveClasses, readAll, rawProcessForLoad, findCurationForLoad,
+    listClasses, findClassByName, resolveLiveClasses, resolveWritableClass, readAll, rawProcessForLoad, findCurationForLoad,
     loadRecords, resetLiveClass,
   };
 }
