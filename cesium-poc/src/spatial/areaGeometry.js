@@ -67,17 +67,18 @@ export function pointInBounds(longitude, latitude, bounds) {
 }
 
 /**
- * Does the segment a→b touch the box?
+ * The part of the segment a→b that lies in the box, as a parameter range along it.
  *
- * Liang–Barsky: clip the segment's parameter range against each of the four edges in turn and see
- * whether anything survives. This is what catches the case a distance test cannot — a line whose
- * endpoints are both outside the box but which crosses it — and it needs no trigonometry, because
- * the box is axis-aligned.
+ * Liang–Barsky: clip the range against each of the four edges in turn and see what survives. This
+ * is what catches the case a distance test cannot — a line whose endpoints are both outside the box
+ * but which crosses it — and it needs no trigonometry, because the box is axis-aligned.
+ *
+ * @returns {{enter: number, exit: number}|null} null when no part of it is in the box
  */
-export function segmentIntersectsBounds(a, b, bounds) {
-  if (!isUsableBounds(bounds)) return false;
-  const [x0, y0] = a, [x1, y1] = b;
-  if (!finite(x0) || !finite(y0) || !finite(x1) || !finite(y1)) return false;
+export function clipSegmentToBounds(a, b, bounds) {
+  if (!isUsableBounds(bounds)) return null;
+  const [x0, y0] = a ?? [], [x1, y1] = b ?? [];
+  if (!finite(x0) || !finite(y0) || !finite(x1) || !finite(y1)) return null;
   const dx = x1 - x0, dy = y1 - y0;
   let enter = 0, exit = 1;
   // One pass per edge: p is the segment's movement across it, q how far inside the box it starts.
@@ -85,14 +86,49 @@ export function segmentIntersectsBounds(a, b, bounds) {
   for (const [p, q] of edges) {
     if (p === 0) {
       // Parallel to this edge: it can only miss if it starts outside it, and then nothing helps.
-      if (q < 0) return false;
+      if (q < 0) return null;
       continue;
     }
     const t = q / p;
-    if (p < 0) { if (t > exit) return false; if (t > enter) enter = t; }
-    else { if (t < enter) return false; if (t < exit) exit = t; }
+    if (p < 0) { if (t > exit) return null; if (t > enter) enter = t; }
+    else { if (t < enter) return null; if (t < exit) exit = t; }
   }
-  return enter <= exit;
+  return enter <= exit ? { enter, exit } : null;
+}
+
+/** Does the segment a→b touch the box? */
+export const segmentIntersectsBounds = (a, b, bounds) => clipSegmentToBounds(a, b, bounds) !== null;
+
+/**
+ * The parts of a LineString that lie inside the box, as separate paths.
+ *
+ * Used to draw the selection highlight. Highlighting the whole of every matched line instead made
+ * a small box over the corridor light up four miles of road in each direction — the highlight then
+ * says "everything here is selected", which is the opposite of what the operator drew.
+ *
+ * Contiguous pieces are joined, so a line crossing many vertices inside the box comes back as one
+ * path rather than as one per vertex pair.
+ *
+ * @returns {number[][][]} zero or more [lon, lat] paths
+ */
+export function clipLineStringToBounds(coordinates, bounds) {
+  const paths = [];
+  if (!Array.isArray(coordinates) || coordinates.length < 2 || !isUsableBounds(bounds)) return paths;
+  const at = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  let current = null;
+  for (let i = 1; i < coordinates.length; i++) {
+    const a = coordinates[i - 1], b = coordinates[i];
+    const clip = clipSegmentToBounds(a, b, bounds);
+    if (!clip) { if (current) { paths.push(current); current = null; } continue; }
+    const start = at(a, b, clip.enter), end = at(a, b, clip.exit);
+    // A piece that begins where the last one ended continues it; anything else starts a new path.
+    if (current && current[current.length - 1][0] === start[0] && current[current.length - 1][1] === start[1]) current.push(end);
+    else { if (current) paths.push(current); current = [start, end]; }
+    // The segment left the box part-way along, so whatever follows is a new path.
+    if (clip.exit < 1) { paths.push(current); current = null; }
+  }
+  if (current) paths.push(current);
+  return paths.filter(path => path.length >= 2);
 }
 
 /** Does any part of this LineString touch the box? A single vertex inside is enough. */

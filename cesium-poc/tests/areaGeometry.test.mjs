@@ -11,8 +11,9 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 import {
-  boundsCenter, boundsFromCorners, boundsSizeMetres, boundsToPolygon, geometryIntersectsBounds,
-  isUsableBounds, lineStringIntersectsBounds, pointInBounds, polygonIntersectsBounds, segmentIntersectsBounds,
+  boundsCenter, boundsFromCorners, boundsSizeMetres, boundsToPolygon, clipLineStringToBounds,
+  geometryIntersectsBounds, isUsableBounds, lineStringIntersectsBounds, pointInBounds,
+  polygonIntersectsBounds, segmentIntersectsBounds,
 } from '../src/spatial/areaGeometry.js';
 
 const read = async name => JSON.parse(await readFile(fileURLToPath(new URL(`../public/data/${name}`, import.meta.url)), 'utf8'));
@@ -120,4 +121,35 @@ test('the reported size is metres, and only ever used for the summary', () => {
   assert.ok(size.heightM > 1100 && size.heightM < 1120, `${size.heightM} m tall`);
   assert.ok(size.widthM > 950 && size.widthM < 1010, `${size.widthM} m wide at 26°N`);
   assert.equal(boundsSizeMetres({ west: 1, south: 1, east: 1, north: 1 }), null);
+});
+
+test('a line is clipped to the part inside the box, so a highlight cannot overrun it', () => {
+  const box = { west: -1, south: -1, east: 1, north: 1 };
+  // Straight through: only the middle survives.
+  assert.deepEqual(clipLineStringToBounds([[-5, 0], [5, 0]], box), [[[-1, 0], [1, 0]]]);
+  // Starting inside and leaving.
+  assert.deepEqual(clipLineStringToBounds([[0, 0], [5, 0]], box), [[[0, 0], [1, 0]]]);
+  // Wholly inside is returned unchanged in extent.
+  assert.deepEqual(clipLineStringToBounds([[-0.5, 0], [0.5, 0]], box), [[[-0.5, 0], [0.5, 0]]]);
+  // Never touching it yields nothing at all.
+  assert.deepEqual(clipLineStringToBounds([[-5, 5], [5, 5]], box), []);
+});
+
+test('a line that leaves the box and comes back gives two paths, not one across the gap', () => {
+  const box = { west: -1, south: -1, east: 1, north: 1 };
+  const paths = clipLineStringToBounds([[-0.5, 0], [0, 5], [0.5, 0]], box);
+  assert.equal(paths.length, 2, 'the excursion outside splits it');
+  assert.ok(paths.every(path => path.every(([, lat]) => lat <= 1.000001)), 'no piece reaches outside the box');
+});
+
+test('clipping a real FDOT section keeps only what the box covers', () => {
+  const section = segments.features.find(feature => geometryIntersectsBounds(feature.geometry, CORRIDOR_BOX));
+  const paths = clipLineStringToBounds(section.geometry.coordinates, CORRIDOR_BOX);
+  assert.ok(paths.length >= 1);
+  const points = paths.flat();
+  assert.ok(points.every(([lon, lat]) => lon >= CORRIDOR_BOX.west - 1e-9 && lon <= CORRIDOR_BOX.east + 1e-9
+    && lat >= CORRIDOR_BOX.south - 1e-9 && lat <= CORRIDOR_BOX.north + 1e-9),
+  'every highlighted point is inside the drawn area');
+  // The whole section is far longer than the box, so clipping must actually have removed something.
+  assert.ok(points.length < section.geometry.coordinates.length, 'the highlight is shorter than the section');
 });

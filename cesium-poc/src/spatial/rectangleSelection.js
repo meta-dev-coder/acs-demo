@@ -16,13 +16,24 @@ import {
   CallbackProperty, Cartesian3, Cartographic, Color, CustomDataSource, Math as CesiumMath,
   Rectangle, ScreenSpaceEventHandler, ScreenSpaceEventType,
 } from 'cesium';
-import { boundsFromCorners, isUsableBounds } from './areaGeometry.js';
+import { boundsFromCorners, boundsToPolygon, clipLineStringToBounds, isUsableBounds } from './areaGeometry.js';
 
 /** Restrained enough to read the corridor through it — §4: never an opaque block over the 3D. */
-const FILL = Color.fromCssColorString('#38c9bf').withAlpha(0.14);
-const OUTLINE = Color.fromCssColorString('#38c9bf').withAlpha(0.95);
-/** The halo added to a matched road section. Drawn under its own colour, never instead of it. */
-const SEGMENT_HALO = Color.fromCssColorString('#38c9bf').withAlpha(0.55);
+const FILL = Color.fromCssColorString('#38c9bf').withAlpha(0.16);
+/**
+ * The border is drawn as its own ground polyline rather than with `rectangle.outline`.
+ *
+ * Cesium ignores `outlineWidth` for clamped geometry on virtually all hardware — WebGL will not
+ * draw a line wider than 1px — so the boundary came out as a hairline that vanished over bright
+ * imagery. A polyline is a ground primitive with real width, and it gets a dark casing underneath
+ * so the edge stays visible over pale concrete as well as over dark water.
+ */
+const EDGE = Color.fromCssColorString('#5FF2E6');
+const EDGE_CASING = Color.fromCssColorString('#04222B').withAlpha(0.85);
+const EDGE_WIDTH = 3;
+const CASING_WIDTH = 7;
+/** The halo added to a matched road section, over the part inside the area only. */
+const SEGMENT_HALO = Color.fromCssColorString('#5FF2E6').withAlpha(0.6);
 
 /**
  * @param {import('cesium').Viewer} viewer
@@ -65,13 +76,27 @@ export function createRectangleSelection(viewer, { onComplete = () => {}, onStar
           ? Rectangle.fromDegrees(bounds.west, bounds.south, bounds.east, bounds.north) : undefined;
       }, false),
       material: FILL,
-      outline: true,
-      outlineColor: OUTLINE,
-      outlineWidth: 2,
       // Clamped so it reads as an area ON the corridor rather than a pane floating above it.
       height: undefined,
     },
   });
+
+  /** The boundary ring, as ground positions — recomputed while the drag is live. */
+  const edgePositions = () => {
+    const bounds = shownBounds();
+    if (!isUsableBounds(bounds)) return [];
+    return boundsToPolygon(bounds).map(([longitude, latitude]) => Cartesian3.fromDegrees(longitude, latitude));
+  };
+  // Casing first so the bright edge sits on top of it.
+  for (const [id, material, width] of [['ask-twin-area-casing', EDGE_CASING, CASING_WIDTH], ['ask-twin-area-edge', EDGE, EDGE_WIDTH]]) {
+    source.entities.add({
+      id,
+      polyline: {
+        positions: new CallbackProperty(edgePositions, false),
+        width, material, clampToGround: true,
+      },
+    });
+  }
 
   /** The camera is borrowed for one drag and handed straight back. */
   function setMapInputs(enabled) {
@@ -145,19 +170,23 @@ export function createRectangleSelection(viewer, { onComplete = () => {}, onStar
      * showing HIGH operational impact has to keep its red while also reading as selected, and
      * repainting it would trade the more important fact for the less important one.
      */
-    highlightSegments(lines = []) {
+    highlightSegments(lines = [], bounds = committed) {
       for (const entity of [...source.entities.values]) {
-        if (entity.id !== 'ask-twin-area') source.entities.remove(entity);
+        if (entity.id?.startsWith('ask-twin-area-segment-')) source.entities.remove(entity);
       }
-      for (const [index, line] of lines.entries()) {
-        const positions = (line?.coordinates ?? [])
-          .filter(point => Number.isFinite(point?.[0]) && Number.isFinite(point?.[1]))
-          .map(([longitude, latitude]) => Cartesian3.fromDegrees(longitude, latitude));
-        if (positions.length < 2) continue;
-        source.entities.add({
-          id: `ask-twin-area-segment-${index}`,
-          polyline: { positions, width: 16, material: SEGMENT_HALO, clampToGround: true },
-        });
+      let index = 0;
+      for (const line of lines) {
+        // Only the stretch inside the area. Highlighting the whole matched section lit four miles
+        // of corridor for a box a few hundred metres across, and the highlight then swamped the
+        // very thing it was meant to point at.
+        for (const path of clipLineStringToBounds(line?.coordinates ?? [], bounds)) {
+          const positions = path.map(([longitude, latitude]) => Cartesian3.fromDegrees(longitude, latitude));
+          if (positions.length < 2) continue;
+          source.entities.add({
+            id: `ask-twin-area-segment-${index++}`,
+            polyline: { positions, width: 14, material: SEGMENT_HALO, clampToGround: true },
+          });
+        }
       }
       viewer.scene.requestRender();
     },

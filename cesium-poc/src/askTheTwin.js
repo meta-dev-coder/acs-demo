@@ -630,7 +630,7 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     });
     // §20: the sections the area crosses get a halo, drawn under whatever colour they already have.
     selection.highlightSegments(lines.filter(line =>
-      geometryIntersectsBounds({ type: 'LineString', coordinates: line.coordinates }, bounds)));
+      geometryIntersectsBounds({ type: 'LineString', coordinates: line.coordinates }, bounds)), bounds);
     updateAreaBar();
     renderSuggestions();
     suggestEl.hidden = false;
