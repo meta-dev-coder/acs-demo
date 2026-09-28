@@ -586,6 +586,21 @@ body:has(.street-view[data-state="active"]) :is(.ramp-details, .road-details, .s
 .ask-twin-chip { background: var(--ui-surface); border: 1px solid var(--ui-border-soft); border-radius: 16px; color: #6b8aa8; font-size: 11px; padding: 4px 10px; cursor: pointer; transition: all 0.12s; }
 .ask-twin-chip:hover { background: #142032; color: var(--ui-text); border-color: var(--ui-accent-line); }
 
+/* Area selection: one quiet row above the transcript, in the panel's own vocabulary — the chips'
+   pill shape, the accent only where it carries meaning (armed, or an area currently scoping). */
+.ask-twin-area-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 7px 10px; border-bottom: 1px solid var(--ui-border-soft); flex-shrink: 0; }
+.ask-twin-area-btn { display: inline-flex; align-items: center; gap: 5px; background: var(--ui-surface);
+  border: 1px solid var(--ui-border-soft); border-radius: 16px; color: #6b8aa8; font: inherit; font-size: 11px;
+  padding: 4px 10px; cursor: pointer; transition: all 0.12s; }
+.ask-twin-area-btn:hover { background: #142032; color: var(--ui-text); border-color: var(--ui-accent-line); }
+.ask-twin-area-btn.is-armed { color: var(--ui-accent); border-color: var(--ui-accent-line); background: #142032; }
+/* The scope indicator: small, and the only thing here that is ever accent-coloured at rest, because
+   it is the one that changes what the next question means. */
+.ask-twin-area-state { font-size: 10.5px; color: #6b8aa8; min-width: 0; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.ask-twin-panel--area .ask-twin-area-state { color: var(--ui-accent); }
+
 /* Input form */
 .ask-twin-form { display: flex; gap: 7px; padding: 9px 10px; border-top: 1px solid var(--ui-border-soft); flex-shrink: 0; }
 .ask-twin-input { flex: 1; background: #0c1825; border: 1px solid var(--ui-border); border-radius: 9px; color: var(--ui-text); font-size: 12.5px; padding: 8px 11px; outline: none; transition: border-color 0.15s; }

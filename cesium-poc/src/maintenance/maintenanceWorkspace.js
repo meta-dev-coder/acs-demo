@@ -383,6 +383,14 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
     get activeKey() { return activeKey; },
     /** Diagnostics/tests: the normalized records for one class. */
     recordsOf: key => datasets.get(key)?.records ?? [],
+    /**
+     * The asset registry, indexed by asset id.
+     *
+     * A maintenance record rarely has coordinates of its own — the position of the work IS the
+     * position of the asset — so anything asking "what is in this area" needs the registry to
+     * resolve the rest.
+     */
+    assetIndex: () => assets,
     /** Every loaded record of one asset type, whether or not that type is the one on screen. */
     recordsForType: (assetType, options) => {
       const card = cards.find(item => item.assetType === assetType);

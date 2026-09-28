@@ -3,6 +3,11 @@ import { makeDraggable } from './draggablePanel.js';
 import { eventPlace, isBareSegmentRequest, MAX_REMOTE_OFFSET_M, parseFlyRequest, parseRoadRequest, parseSegmentFollowUp, parseSegmentRequests, parseTourCommand, parseTypeBrowse, resolveFlyTarget, searchAssets, segmentPoint, typeHints } from './assetExplorer/assetSearch.js';
 import { corridorPositionOf } from './assetExplorer/corridorPosition.js';
 import { assetTypeConfig } from './assetExplorer/assetTypes.js';
+import { carriagewayLines, loadCorridorContext } from './assetExplorer/incidentContext.js';
+import { createRectangleSelection } from './spatial/rectangleSelection.js';
+import { buildSpatialContext } from './spatial/spatialQuery.js';
+import { AREA_SUGGESTIONS, answerAreaQuestion, areaIndicatorText, areaSummaryLines, parseAreaQuestion } from './spatial/areaAnswers.js';
+import { geometryIntersectsBounds } from './spatial/areaGeometry.js';
 
 const ASK_URL = (import.meta.env?.VITE_ASK_THE_TWIN_API ?? '').replace(/\/$/, '')
   || 'https://d3syo4sqvwi009.cloudfront.net/api/i595/ask';
@@ -58,7 +63,14 @@ export function describeAsset(asset) {
  * @param {object} [deps.layerStore]   switches a segment's carriageway on through its own control
  * @param {{lon: number, lat: number}[]} [deps.centerline]  remote locations far from it are not flown to
  */
-export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segments, layerStore, centerline = [] } = {}) {
+/**
+ * @param {object} [deps.liveEvents]   the FL511 layer — its current events are what an area reports
+ * @param {(assetType: string) => object[]} [deps.maintenanceRecords]  loaded maintenance records
+ * @param {() => Map<string, object>} [deps.assetIndex]  the asset registry, for records with no
+ *   coordinates of their own: the position of the work IS the position of its asset
+ */
+export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segments, layerStore, centerline = [],
+  liveEvents = null, maintenanceRecords = null, assetIndex = null } = {}) {
   // ── Toggle button ──────────────────────────────────────────────────────
   const btn = document.createElement('button');
   btn.className = 'ask-twin-btn';
@@ -83,6 +95,14 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
       </div>
     </div>
     <div class="ask-twin-body">
+      <div class="ask-twin-area-bar">
+        <button type="button" class="ask-twin-area-btn ask-twin-area-select">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1" stroke-dasharray="3 2"/></svg>
+          Select Area
+        </button>
+        <button type="button" class="ask-twin-area-btn ask-twin-area-clear" hidden>Clear Area</button>
+        <span class="ask-twin-area-state" role="status"></span>
+      </div>
       <div class="ask-twin-messages"></div>
       <div class="ask-twin-suggestions"></div>
       <form class="ask-twin-form">
@@ -102,16 +122,24 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
   const input    = panel.querySelector('.ask-twin-input');
   const sendBtn  = panel.querySelector('.ask-twin-send');
   const minBtn   = panel.querySelector('.ask-twin-minimize');
+  const areaSelectBtn = panel.querySelector('.ask-twin-area-select');
+  const areaClearBtn  = panel.querySelector('.ask-twin-area-clear');
+  const areaStateEl   = panel.querySelector('.ask-twin-area-state');
 
   // ── Suggestion chips ──────────────────────────────────────────────────
-  SUGGESTIONS.forEach(s => {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'ask-twin-chip';
-    chip.textContent = s;
-    chip.onclick = () => { input.value = s; submit(); };
-    suggestEl.appendChild(chip);
-  });
+  // Rebuilt rather than written once: with an area selected the useful questions are about the
+  // area, and offering "Which cameras are near the Turnpike?" then would be offering to leave it.
+  function renderSuggestions() {
+    suggestEl.replaceChildren();
+    for (const text of (activeSpatialContext ? AREA_SUGGESTIONS : SUGGESTIONS)) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'ask-twin-chip';
+      chip.textContent = text;
+      chip.onclick = () => { input.value = text; submit(); };
+      suggestEl.appendChild(chip);
+    }
+  }
 
   // ── Drag ──────────────────────────────────────────────────────────────
   // Shared with every details panel, so the whole map drags the same way — and so a panel cannot
@@ -507,6 +535,9 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
 
   /** @returns {Promise<boolean>} true when the question was about a map asset and is answered. */
   async function answerLocally(question) {
+    // The drawn area comes first: with one up, "any incidents here?" is a question about it, and
+    // every other route below would answer about the corridor instead.
+    if (answerAboutArea(question)) return true;
     if (!assetExplorer) return false;
     const step = tour ? parseTourCommand(question) : null;
     if (step) { await followTour(step); return true; }
@@ -556,6 +587,101 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     })));
   }
 
+  // ── Area selection ────────────────────────────────────────────────────
+  //
+  // The drawn area is conversation context, which is why it lives here: it belongs to the questions
+  // being asked, not to the map. Everything it needs is already loaded — the corridor geometry the
+  // incident panel reads, the events the map is drawing, the assets the explorer can search, the
+  // maintenance the workspace holds — so a selection asks nothing of the network.
+  /** @type {object|null} the resolved context for the box currently drawn, or null for none. */
+  let activeSpatialContext = null;
+  let corridorLines = null;
+
+  const selection = createRectangleSelection(viewer, {
+    onStart: () => {
+      areaStateEl.textContent = 'Click and drag on the map to select an area';
+      areaSelectBtn.classList.add('is-armed');
+    },
+    onCancel: () => { areaSelectBtn.classList.remove('is-armed'); updateAreaBar(); },
+    onComplete: bounds => { void applyArea(bounds); },
+  });
+
+  /** The 16 FDOT sections and the express geometry, loaded once and shared with the incident panel. */
+  async function corridorGeometry() {
+    if (corridorLines) return corridorLines;
+    const context = await loadCorridorContext().catch(() => null);
+    corridorLines = context?.lines ?? [];
+    return corridorLines;
+  }
+
+  /** The live events the map currently holds — never a second call to FL511. */
+  const currentEvents = () => (liveEvents?.events ?? []);
+
+  async function applyArea(bounds) {
+    areaSelectBtn.classList.remove('is-armed');
+    const lines = await corridorGeometry();
+    activeSpatialContext = buildSpatialContext({
+      bounds,
+      lines,
+      liveEvents: currentEvents(),
+      assetEntries: assetExplorer?.searchableAssets?.() ?? [],
+      maintenanceLookup: maintenanceRecords,
+      assetIndex: assetIndex?.() ?? new Map(),
+    });
+    // §20: the sections the area crosses get a halo, drawn under whatever colour they already have.
+    selection.highlightSegments(lines.filter(line =>
+      geometryIntersectsBounds({ type: 'LineString', coordinates: line.coordinates }, bounds)));
+    updateAreaBar();
+    renderSuggestions();
+    suggestEl.hidden = false;
+    showAreaSummary();
+    toggle(true);
+  }
+
+  /** §18: what was selected, before a single question is asked. */
+  function showAreaSummary() {
+    if (!activeSpatialContext) return;
+    addLocalMsg(['AREA SELECTED', '', ...areaSummaryLines(activeSpatialContext)].join('\n'), [
+      { label: 'Ask about this area', onClick: () => { input.value = 'What is happening in this area?'; submit(); } },
+      { label: 'Clear area', onClick: () => clearArea() },
+    ]);
+  }
+
+  /** §38: the operator must be able to see that their next question is scoped. */
+  function updateAreaBar() {
+    areaClearBtn.hidden = !activeSpatialContext;
+    areaSelectBtn.textContent = activeSpatialContext ? 'Select New Area' : 'Select Area';
+    areaStateEl.textContent = activeSpatialContext ? `📍 ${areaIndicatorText(activeSpatialContext)}` : '';
+    panel.classList.toggle('ask-twin-panel--area', Boolean(activeSpatialContext));
+  }
+
+  /** §29: the area goes, and nothing else does. */
+  function clearArea() {
+    activeSpatialContext = null;
+    selection.clear();
+    updateAreaBar();
+    renderSuggestions();
+    addLocalMsg('Area cleared. Questions are about the whole I-595 corridor again.');
+  }
+
+  areaSelectBtn.onclick = () => { selection.start(); updateAreaBar(); areaStateEl.textContent = 'Click and drag on the map to select an area'; };
+  areaClearBtn.onclick = () => clearArea();
+
+  /**
+   * An area question, answered from the resolved context.
+   *
+   * Deterministic on purpose: what is inside the box is already known exactly, and handing that
+   * question to a language model would turn a fact into a guess.
+   */
+  function answerAboutArea(question) {
+    const intent = parseAreaQuestion(question, Boolean(activeSpatialContext));
+    if (!intent) return false;
+    const answer = answerAreaQuestion(intent, activeSpatialContext);
+    if (!answer) return false;
+    addLocalMsg(answer);
+    return true;
+  }
+
   // ── Thinking with step labels ─────────────────────────────────────────
   function addThinking() {
     const wrap = document.createElement('div');
@@ -597,7 +723,10 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
       const res = await fetch(ASK_URL, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ question }),
+        // The structured context rides along for the free-form questions this does not answer
+        // locally. A service that does not know the field ignores it; one that does gets the
+        // resolved geometry rather than a rectangle to reason about.
+        body: JSON.stringify({ question, ...(activeSpatialContext ? { spatialContext: activeSpatialContext } : {}) }),
       });
       const data = await res.json();
       thinking.clear();
@@ -645,7 +774,13 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
 
   form.onsubmit = e => { e.preventDefault(); submit(); };
 
+  renderSuggestions();
+
   return {
-    destroy() { btn.remove(); panel.remove(); },
+    /** Test/diagnostic hook: the area currently scoping the conversation. */
+    get spatialContext() { return activeSpatialContext; },
+    selectArea: () => { selection.start(); updateAreaBar(); },
+    clearArea,
+    destroy() { selection.destroy(); btn.remove(); panel.remove(); },
   };
 }

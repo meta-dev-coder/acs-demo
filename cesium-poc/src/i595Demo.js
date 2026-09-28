@@ -482,7 +482,15 @@ try {
   setExplorerCollapsed(true);
 
   // Operational strip: corridor facts and the live-event feed, with gaps stated rather than filled.
-  const askTwin = installAskTheTwin(viewer, { cameraControls, assetExplorer, segments: mainlineSegments, layerStore, centerline: corridor });
+  const askTwin = installAskTheTwin(viewer, {
+    cameraControls, assetExplorer, segments: mainlineSegments, layerStore, centerline: corridor,
+    // What a drawn area reports on: the events the map already holds, the maintenance the workspace
+    // already loaded, and the asset registry that gives a work order its position.
+    liveEvents: liveEventControls,
+    maintenanceRecords: assetType => maintenanceWorkspace?.recordsForType(assetType) ?? [],
+    assetIndex: () => maintenanceWorkspace?.assetIndex?.() ?? new Map(),
+  });
+  if (import.meta.env.DEV) window.__askTwin = askTwin;
   if (import.meta.hot) import.meta.hot.dispose(() => { eventPulses.destroy(); liveOps.destroy(); traffic.destroy(); safety.destroy(); maintenance.destroy(); maintenanceLayer.destroy(); appNav.destroy(); assetExplorer.destroy(); lightingControls.destroy(); messageSignControls.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
   for (const input of inputs) {
     // Layers with their own loader, plus display options that are not data layers at all: this loop
