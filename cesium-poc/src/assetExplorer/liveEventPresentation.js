@@ -15,7 +15,10 @@
  * Pure: event in, plain data out.
  */
 
-import { LIVE_EVENT_LABELS, liveEventAssociationRows, liveEventLabel, liveEventSourceRows } from '../liveEventsData.js';
+import {
+  LIVE_EVENT_LABELS, liveEventAssociationRows, liveEventConditionsRows, liveEventLabel,
+  liveEventSnapshots, liveEventSourceRows, liveEventWeatherLine,
+} from '../liveEventsData.js';
 import { OPS_ICONS } from '../liveOps/opsIcons.js';
 import { incidentVisual } from './incidentTypes.js';
 import { carriagewayLabel } from './incidentContext.js';
@@ -101,6 +104,14 @@ export function liveEventFacts(event) {
   };
 }
 
+/**
+ * The stored camera photographs DataConnect kept for this event, and the one-line weather summary.
+ *
+ * Re-exported rather than re-derived: these are the same helpers the layer's own details panel uses,
+ * so the two surfaces cannot drift apart on what a snapshot is or when a cleared one may be shown.
+ */
+export { liveEventSnapshots, liveEventWeatherLine };
+
 /** When the event was reported, as one line: FL511's start time, or its last update. */
 export const liveEventReportedAt = facts => facts.startTime ?? facts.lastUpdated ?? null;
 
@@ -166,8 +177,12 @@ export function liveEventImpactRows(event, place = null) {
  */
 export function liveEventDetailSections(event) {
   const association = liveEventAssociationRows(event);
+  // What DataConnect captured when the event was first seen — the weather and the local clock time
+  // at the moment it happened, which is not something the FL511 feed itself publishes.
+  const conditions = liveEventConditionsRows(event);
   return [
     { heading: null, rows: liveEventSourceRows(event), note: null },
+    ...(conditions.length ? [{ heading: 'Conditions at the time', rows: conditions, note: null }] : []),
     ...(association.length ? [{
       heading: 'Matched by this application',
       rows: association,

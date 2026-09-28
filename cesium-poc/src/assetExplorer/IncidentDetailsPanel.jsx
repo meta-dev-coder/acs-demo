@@ -29,7 +29,8 @@ import { camerasNear, carriagewayAt, carriagewayLabel, distanceLabel, loadCorrid
 import { RelatedRecords, relatedRecordCount, useRelatedGroups } from './RelatedRecords.jsx';
 import {
   isLiveEventAssetType, liveEventDetailSections, liveEventFacts, liveEventHeadline, liveEventImpactRows,
-  liveEventNarrative, liveEventReportedAt, liveEventSeverity, liveEventVisual,
+  liveEventNarrative, liveEventReportedAt, liveEventSeverity, liveEventSnapshots, liveEventVisual,
+  liveEventWeatherLine,
 } from './liveEventPresentation.js';
 import { LiveEventBadge } from './LiveEventIcon.jsx';
 import { detailFacts, impactRows, incidentFacts, incidentHeadline, incidentNarrative, reportedAt, RECOMMENDED_STEPS } from './incidentNarrative.js';
@@ -117,6 +118,40 @@ function CameraSnapshot({ camera, height = 176, badge = true }) {
         </Stack>
       )}
     </Box>
+  );
+}
+
+/**
+ * The camera photographs DataConnect stored for a live event — when it was first seen, and when it
+ * was cleared.
+ *
+ * Different from the live snapshot above them, and kept: that one is the corridor NOW, these are
+ * what the corridor looked like at the moment the event happened, which is the evidence an operator
+ * writing it up afterwards actually needs.
+ */
+function StoredSnapshots({ event }) {
+  const shots = liveEventSnapshots(event);
+  if (!shots.length) return null;
+  return (
+    <Stack spacing={1}>
+      {shots.map(shot => (
+        <Box key={shot.url} sx={{ borderRadius: 1.5, border: 1, borderColor: 'divider', overflow: 'hidden', flex: 'none' }}>
+          <Box
+            component="a"
+            href={shot.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            sx={{ display: 'block' }}
+          >
+            <Box component="img" src={shot.url} alt={`Camera snapshot ${shot.label.toLowerCase()}`} loading="lazy"
+              sx={{ display: 'block', width: '100%' }} />
+          </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', px: 1, py: 0.75 }}>
+            {[shot.label, shot.cameraId ? `camera ${shot.cameraId}` : null, shot.takenAt].filter(Boolean).join(' · ')}
+          </Typography>
+        </Box>
+      ))}
+    </Stack>
   );
 }
 
@@ -226,6 +261,7 @@ export function IncidentDetailsPanel({
   const narrative = liveEvent ? liveEventNarrative(record, place) : incidentNarrative(record, place);
   const reported = liveEvent ? liveEventReportedAt(facts) : reportedAt(facts);
   const showRelated = Boolean(lookupRecords) && !liveEvent;
+  const weatherLine = liveEvent ? liveEventWeatherLine(record) : null;
   const subtitle = liveEvent
     ? [asset.id, facts.carriageway ?? (place?.resolved ? carriagewayLabel(place) : null), facts.section ?? facts.roadway]
     : [asset.id, place?.resolved ? carriagewayLabel(place) : null, facts.segment];
@@ -280,6 +316,10 @@ export function IncidentDetailsPanel({
           {reported && (
             <Typography variant="caption" color="text.secondary" component="div">{`Reported ${reported}`}</Typography>
           )}
+          {/* The weather captured when the event was first seen — FL511 does not publish it. */}
+          {weatherLine && (
+            <Typography variant="caption" color="text.secondary" component="div">{weatherLine}</Typography>
+          )}
         </Box>
         <Tooltip title="Close incident details">
           {/* The panel's top-right corner, pinned: a drag handle ignores clicks on a button, so
@@ -294,6 +334,8 @@ export function IncidentDetailsPanel({
       {/* Everything below the heading scrolls. */}
       <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
       <CameraSnapshot camera={leadCamera} />
+
+      {liveEvent && <StoredSnapshots event={record} />}
 
       {headline.length > 0 && (
         <Stack direction="row" spacing={1}>
