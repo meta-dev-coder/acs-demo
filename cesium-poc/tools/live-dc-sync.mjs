@@ -129,7 +129,7 @@ async function main(argv) {
   loadServerEnv();
   const env = process.env;
 
-  let workflowConfig, profileName, linkMode, heartbeatSeconds, assetRefreshSeconds, intervalSeconds;
+  let workflowConfig, profileName, linkMode, holdOpen, heartbeatSeconds, assetRefreshSeconds, intervalSeconds;
   try {
     const spawnTypes = (env.LIVE_DC_SPAWN_TYPES ?? '').split(',').map(t => t.trim().toUpperCase()).filter(Boolean);
     workflowConfig = loadWorkflowConfig(spawnTypes.length ? { spawnTypes } : {});
@@ -137,6 +137,7 @@ async function main(argv) {
     if (!workflowConfig.profiles[profileName]) throw new UsageError(`unknown profile '${profileName}'`);
     linkMode = env.LIVE_DC_LINK_MODE || 'live';
     if (!LINK_MODES.includes(linkMode)) throw new UsageError(`LIVE_DC_LINK_MODE must be one of ${LINK_MODES.join(', ')}`);
+    holdOpen = new Set((env.LIVE_DC_HOLD_OPEN ?? '').split(',').map(k => k.trim()).filter(Boolean));
     heartbeatSeconds = env.LIVE_DC_HEARTBEAT_SECONDS ? Number(env.LIVE_DC_HEARTBEAT_SECONDS) : 900;
     if (!Number.isFinite(heartbeatSeconds) || heartbeatSeconds < 0) throw new UsageError('LIVE_DC_HEARTBEAT_SECONDS must be >= 0');
     assetRefreshSeconds = env.LIVE_DC_ASSET_REFRESH_SECONDS ? positive(env.LIVE_DC_ASSET_REFRESH_SECONDS, 'LIVE_DC_ASSET_REFRESH_SECONDS') : 3600;
@@ -195,7 +196,7 @@ async function main(argv) {
     const started = Date.now();
     try {
       const report = await runLiveDcCycle({
-        writer, service, workflowConfig, profileName, heartbeatSeconds, assetCache, memory, linkMode, logger: console, capture, publicApiBase,
+        writer, service, workflowConfig, profileName, heartbeatSeconds, assetCache, memory, linkMode, logger: console, capture, publicApiBase, holdOpen,
       });
       console.log(formatCycleSummary(report));
       if (args.once && report.errors.length) exitCode = 1;

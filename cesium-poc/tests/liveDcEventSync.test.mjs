@@ -462,3 +462,33 @@ test('a failed tooltip fetch carries forward text only; position attributes foll
   assert.equal(rec.latitude, bare.latitude);
   assert.equal(validateRecord(EVENTS_DEF, rec).valid, true);
 });
+
+test('holdOpen keeps a demo event active when it leaves the feed, and reopens it if already cleared', () => {
+  const first = syncLiveEvents({ payload: livePayload([davie(), ramp()]), existing: [], now: T0 });
+  const keys = first.state.map(r => r.keyInSource);
+  const held = keys[0], other = keys[1];
+
+  // Both leave the feed: only the non-held one is cleared.
+  const gone = syncLiveEvents({ payload: livePayload([]), existing: first.state, now: T0 + 60_000, holdOpen: new Set([held]) });
+  const byKey = new Map(gone.state.map(r => [r.keyInSource, r]));
+  assert.equal(byKey.get(held).status, 'active');
+  assert.equal(byKey.get(other).status, 'cleared');
+  assert.equal(gone.stats.cleared, 1);
+
+  // A held event that is already cleared is reopened, with last_seen_at refreshed so it is not STALE.
+  const clearedAll = syncLiveEvents({ payload: livePayload([]), existing: first.state, now: T0 + 60_000 });
+  const reopened = syncLiveEvents({ payload: livePayload([]), existing: clearedAll.state, now: T0 + 120_000, holdOpen: new Set([held]) });
+  const rec = reopened.upserts.find(r => r.keyInSource === held);
+  assert.equal(rec.status, 'active');
+  assert.equal(rec.cleared_at, '');
+  assert.equal(rec.last_seen_at, new Date(T0 + 120_000).toISOString());
+  assert.equal(reopened.stats.reactivated, 1);
+  assert.equal(reopened.upserts.some(r => r.keyInSource === other), false);
+
+  // Held + active + heartbeat due: last_seen_at is refreshed; not due: nothing sent.
+  const quiet = syncLiveEvents({ payload: livePayload([]), existing: reopened.state, now: T0 + 180_000, holdOpen: new Set([held]), heartbeatSeconds: 900 });
+  assert.equal(quiet.upserts.length, 0);
+  const beat = syncLiveEvents({ payload: livePayload([]), existing: reopened.state, now: T0 + 120_000 + 900_000, holdOpen: new Set([held]), heartbeatSeconds: 900 });
+  assert.equal(beat.upserts.length, 1);
+  assert.equal(beat.stats.heartbeat, 1);
+});

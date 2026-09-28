@@ -66,6 +66,7 @@ export function createAssetCache({ writer, refreshSeconds = 3600, now = Date.now
 }
 
 export async function runLiveDcCycle({
+  holdOpen = new Set(),
   writer, service, now = Date.now, workflowConfig = loadWorkflowConfig(), profileName = workflowConfig.defaultProfile,
   heartbeatSeconds = 900, assetCache, memory = createCycleMemory(), linkMode = 'live', logger = console,
   capture = null, publicApiBase = '', enrichment,
@@ -115,7 +116,7 @@ export async function runLiveDcCycle({
   }
 
   const sync = syncLiveEvents({
-    payload, existing: existingEvents, now: at, heartbeatSeconds, firstSeenHints, publicApiBase, ...(enrichment ? { enrichment } : {}),
+    payload, existing: existingEvents, now: at, heartbeatSeconds, firstSeenHints, publicApiBase, holdOpen, ...(enrichment ? { enrichment } : {}),
   });
   report.sync = { skipped: sync.skipped, reason: sync.reason, stats: sync.stats };
   if (sync.stats.clearingSuppressed) warn('clearing suppressed: the FL511 poll was not fully healthy');

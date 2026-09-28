@@ -184,6 +184,7 @@ const emptyStats = () => ({
  */
 export function syncLiveEvents({
   payload, existing, now, heartbeatSeconds = 900, firstSeenHints = new Map(), enrichment = loadEnrichmentContext(), publicApiBase = '',
+  holdOpen = new Set(),
 }) {
   const existingByKey = new Map();
   for (const record of existing ?? []) {
@@ -228,7 +229,21 @@ export function syncLiveEvents({
     }
   }
 
-  const gone = [...existingByKey.values()].filter(record => record.status === 'active' && !kept.has(record.keyInSource));
+  // Demo hold (LIVE_DC_HOLD_OPEN): listed events stay active after they leave FL511, and a listed
+  // event that was already cleared is reopened. last_seen_at is kept fresh so it never reads STALE.
+  for (const key of holdOpen) {
+    const previous = existingByKey.get(key);
+    if (!previous || kept.has(key)) continue;
+    if (previous.status === 'cleared') {
+      upserts.push(reloadActiveRecord(previous, { status: 'active', cleared_at: '', last_seen_at: iso(now) }, { enrichment, publicApiBase }));
+      stats.reactivated++;
+    } else if (heartbeatSeconds > 0 && !(now - Date.parse(previous.last_seen_at) < heartbeatSeconds * 1000)) {
+      upserts.push(reloadActiveRecord(previous, { last_seen_at: iso(now) }, { enrichment, publicApiBase }));
+      stats.heartbeat++;
+    }
+  }
+
+  const gone = [...existingByKey.values()].filter(record => record.status === 'active' && !kept.has(record.keyInSource) && !holdOpen.has(record.keyInSource));
   if (gone.length > 0) {
     if (canClear(payload)) {
       for (const previous of gone) {
