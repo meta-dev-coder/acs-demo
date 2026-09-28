@@ -220,7 +220,6 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
       ['disabledVehicle', 'DISABLED']] : []) {
     sources.push({
       assetType,
-      usesLegacyPanel: true,
       group: 'liveEvents',
       subscribeChanges: fn => liveEvents.onUpdate(fn),
       read: () => [...liveEvents.entityById.entries()]
@@ -239,7 +238,8 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
         if (event && event.type !== eventType) return;   // the other feed's pick, not ours
         report(event ? String(event.id) : null);
       }),
-      own: () => {},
+      // One module backs all five types, so ownership is reported per type — see setExternallyOwned.
+      own: owned => liveEvents.setExternallyOwned(assetType, owned),
       silence: () => liveEvents.onSelection(null),
     });
   }

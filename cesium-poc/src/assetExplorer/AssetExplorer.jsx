@@ -25,6 +25,7 @@ import { AssetMiniMap } from './AssetMiniMap.jsx';
 import { AssetDetailsPanel, DETAILS_WIDTH } from './AssetDetailsPanel.jsx';
 import { IncidentDetailsPanel, INCIDENT_DETAILS_WIDTH } from './IncidentDetailsPanel.jsx';
 import { IncidentTypeIcon } from './IncidentTypeIcon.jsx';
+import { isLiveEventAssetType } from './liveEventPresentation.js';
 
 /** Below this the mini-map stops earning its space and the details panel becomes an overlay. */
 export const MINIMAP_MIN_WIDTH = 1100;
@@ -151,7 +152,10 @@ export function AssetExplorer({
   const detailsShowing = detailsOpen && Boolean(selectedAsset) && !config.legacyDetailsPanel;
   // An incident is an event to be acted on rather than a record to be read, so it has its own panel
   // — the type's colour, the nearest camera and the impact — instead of the shared field list.
-  const showingIncident = detailsShowing && selectedAsset.assetType === 'incidentRecord';
+  // The rich panel serves the maintenance incident register and Live Ops' five operational feeds:
+  // both are events an operator acts on, read the same way, so they get the same surface.
+  const showingIncident = detailsShowing
+    && (selectedAsset.assetType === 'incidentRecord' || isLiveEventAssetType(selectedAsset.assetType));
   const openPanelWidth = showingIncident ? INCIDENT_DETAILS_WIDTH : DETAILS_WIDTH;
   // The bottom group keeps a fixed position: selecting an asset must not slide the browser out from
   // under the cursor. It can afford to, because the mini-map sits to the LEFT of the browser — the

@@ -246,6 +246,23 @@ export function installAssetExplorer(container, viewer, {
     })
     : null;
 
+  /**
+   * Which layer describes the browsed type: the explorer, or the layer's own details panel.
+   *
+   * Driven by the STORE rather than by layer changes, because the browsed type is set from three
+   * places — the Map Explorer's layer tree, a workspace choosing a card, and a search hit — and only
+   * the first of those is a layer change. Assigning ownership there meant a workspace that set the
+   * type directly never granted it, and the layer opened its own panel beside the explorer's.
+   */
+  let ownedType;
+  function applyOwnership(assetType) {
+    if (assetType === ownedType) return;
+    ownedType = assetType;
+    for (const source of sources) source.own(source.assetType === assetType && !source.usesLegacyPanel);
+  }
+  applyOwnership(store.getState().activeExplorerType);
+  const unsubscribeOwnership = store.subscribe(state => applyOwnership(state.activeExplorerType));
+
   // A selection gets at most a moderate look, and only when the user did not make it by clicking
   // the map — they are already looking at what they just clicked.
   let lastFocusKey = null;
@@ -304,7 +321,6 @@ export function installAssetExplorer(container, viewer, {
       // The current one is kept while it is still on the map, and dropped when it is not.
       const keep = current && visibleTypes.includes(current) ? current : null;
       if (keep !== current) store.setActiveExplorerType(keep);
-      for (const source of sources) source.own(source.assetType === keep && !source.usesLegacyPanel);
       if (keep) refreshAssets(store, sources.filter(source => source.assetType === keep), { logger });
       return;
     }
@@ -330,7 +346,6 @@ export function installAssetExplorer(container, viewer, {
     store.setActiveExplorerType(next);
     // Only the browsed type hands its selection over — and only if it does not keep its own
     // details panel, which is a capability the explorer does not reproduce.
-    for (const source of sources) source.own(source.assetType === next && !source.usesLegacyPanel);
     if (next) refreshAssets(store, sources.filter(source => source.assetType === next), { logger });
   }
 
@@ -510,6 +525,7 @@ export function installAssetExplorer(container, viewer, {
       cancelAnimationFrame(settleMeasure);
       window.removeEventListener('resize', onResize);
       unsubscribeSelection();
+      unsubscribeOwnership();
       unsubscribeShields?.();
       // Never leave the corridor without its shields because this island went away.
       roadShields?.setVisible?.(true);

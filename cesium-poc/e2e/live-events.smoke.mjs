@@ -162,12 +162,24 @@ try {
   let clickPoint = null;
   for (const deadline = Date.now() + 20000; !clickPoint && Date.now() < deadline;) clickPoint = await findMarker(closure.id);
   await page.mouse.click((clickPoint ?? marker).x, (clickPoint ?? marker).y);
-  await page.locator('.live-event-details:not([hidden])').waitFor();
-  // Clicking a live event must not leave another layer's panel open.
+  // A live event is described by the shared event panel — the same surface a maintenance incident
+  // gets — so this reads the React panel rather than the layer's own DOM one.
+  const eventPanel = page.locator('[role="complementary"]').first();
+  await eventPanel.waitFor();
+  // Clicking a live event must not leave another layer's panel open, its own included.
   assert.equal(await page.locator('.camera-details:not([hidden]), .bridge-details:not([hidden]), .signal-details:not([hidden])').count(), 0);
+  assert.equal(await page.evaluate(() => [...document.querySelectorAll('.live-event-details')]
+    .filter(el => el.getBoundingClientRect().width > 0).length), 0, 'one panel per event, not two');
+  // A live event has no maintenance history to relate to, so it is offered no Related tab.
+  // The camera count depends on where the event is, so only the tab set is asserted: the point is
+  // that a live event is offered no Related tab, because it has no maintenance history to relate to.
+  assert.deepEqual((await eventPanel.locator('[role="tab"]').allInnerTexts()).map(tab => tab.replace(/\s*\(\d+\)$/, '')),
+    ['Details', 'Impact', 'Cameras']);
 
-  const sourceTerms = await page.locator('.live-event-details > dl dt').allTextContents();
-  const sourceValues = await page.locator('.live-event-details > dl dd').allTextContents();
+  // FL511's own fields come first; what our geometry matched is a separate, labelled block.
+  const section = index => eventPanel.locator('dl').nth(index);
+  const sourceTerms = await section(0).locator('dt').allTextContents();
+  const sourceValues = await section(0).locator('dd').allTextContents();
   assert.deepEqual(sourceTerms, ['Type', 'Description', 'Severity', 'Started', 'Last Updated', 'Region', 'Location', 'Source', 'FL511 Event ID']);
   assert.ok(sourceValues.includes('FL511'));
   assert.equal(sourceValues[sourceTerms.indexOf('Severity')], 'Major');
@@ -175,12 +187,12 @@ try {
   for (const invented of ['Road', 'Direction', 'Lanes Blocked', 'Ends', 'Status']) {
     assert.ok(!sourceTerms.includes(invented), `${invented} must not be fabricated`);
   }
-  assert.match(await page.locator('.live-event-caption').textContent(), /Source data · FL511/);
-  const derivedTerms = await page.locator('.live-event-association dt').allTextContents();
-  const derivedValues = await page.locator('.live-event-association dd').allTextContents();
+  assert.match(await eventPanel.innerText(), /Matched by this application/);
+  const derivedTerms = await section(1).locator('dt').allTextContents();
+  const derivedValues = await section(1).locator('dd').allTextContents();
   assert.deepEqual(derivedTerms, ['Nearest Facility', 'Distance']);
   assert.deepEqual(derivedValues, ['I-595 Ramp / Connector', '15 m']);
-  assert.match(await page.locator('.live-event-association p').textContent(), /Proximity does not mean FL511 placed the event on that facility/);
+  assert.match(await eventPanel.innerText(), /Proximity does not mean FL511 placed the event on that facility/);
   await page.screenshot({ path: '/tmp/live-events-details.png' });
 
   // ---- incremental refresh ---------------------------------------------------------------------
@@ -228,7 +240,8 @@ try {
   await page.mouse.click(spanningPoint.x, spanningPoint.y);
   await page.locator('.live-event-note').waitFor();
   assert.match(await page.locator('.live-event-note').textContent(), /not the closed roadway geometry/);
-  assert.ok((await page.locator('.live-event-details > dl dt').allTextContents()).includes('Secondary Location'));
+  assert.ok((await page.locator('[role="complementary"]').first().locator('dl').first().locator('dt').allTextContents())
+    .includes('Secondary Location'));
 
   // ---- stale source ----------------------------------------------------------------------------
   poll = 2;

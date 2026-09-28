@@ -27,6 +27,11 @@ import { incidentVisual, incidentSeverity } from './incidentTypes.js';
 import { IncidentTypeBadge } from './IncidentTypeIcon.jsx';
 import { camerasNear, carriagewayAt, carriagewayLabel, distanceLabel, loadCorridorContext, segmentSpanLabel } from './incidentContext.js';
 import { RelatedRecords, relatedRecordCount, useRelatedGroups } from './RelatedRecords.jsx';
+import {
+  isLiveEventAssetType, liveEventDetailSections, liveEventFacts, liveEventHeadline, liveEventImpactRows,
+  liveEventNarrative, liveEventReportedAt, liveEventSeverity, liveEventVisual,
+} from './liveEventPresentation.js';
+import { LiveEventBadge } from './LiveEventIcon.jsx';
 import { detailFacts, impactRows, incidentFacts, incidentHeadline, incidentNarrative, reportedAt, RECOMMENDED_STEPS } from './incidentNarrative.js';
 
 /** Wider than the generic panel: this one carries a camera image and a tab strip, not a field list. */
@@ -115,6 +120,27 @@ function CameraSnapshot({ camera, height = 176, badge = true }) {
   );
 }
 
+/** Several labelled groups of rows — what a live event's own fields and our matches look like. */
+function FactSections({ sections }) {
+  return (
+    <Stack spacing={1.5}>
+      {sections.map((section, index) => (
+        <Box key={section.heading ?? `section-${index}`}>
+          {section.heading && (
+            <Typography variant="subtitle2" sx={{ mb: 0.75 }}>{section.heading}</Typography>
+          )}
+          <FactGrid rows={section.rows} />
+          {section.note && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
+              {section.note}
+            </Typography>
+          )}
+        </Box>
+      ))}
+    </Stack>
+  );
+}
+
 /** The shared two-column definition grid, so the tabs read like the other panels on this map. */
 function FactGrid({ rows }) {
   if (!rows.length) return <Typography variant="body2" color="text.secondary">This record carries no further details.</Typography>;
@@ -165,10 +191,19 @@ export function IncidentDetailsPanel({
     [context, coordinates],
   );
   const leadCamera = cameras[0] ?? null;
-  const facts = useMemo(() => (record ? incidentFacts(record) : null), [record]);
+  // Two kinds of record land in this panel: a maintenance incident from the register, and an FL511
+  // live event from Live Ops. They are read the same way — what is it, how bad, where, what does it
+  // do to the road — so they share the panel and differ only in where each line comes from. The
+  // asset type decides, not the record's shape: both spell their own kind `type: 'INCIDENT'`.
+  const liveEvent = isLiveEventAssetType(asset?.assetType);
+  const facts = useMemo(
+    () => (record ? (liveEvent ? liveEventFacts(record) : incidentFacts(record)) : null),
+    [record, liveEvent],
+  );
   // The crash is one class's record of an event the other four also wrote about — the ticket raised
   // for the guardrail it took out, the crew sent, the work order, the inspection that closed it.
-  const related = useRelatedGroups(record, lookupRecords);
+  // A live event has no such history: it IS the present, so it is offered no Related tab.
+  const related = useRelatedGroups(liveEvent ? null : record, lookupRecords);
   const relatedTotal = relatedRecordCount(related);
   const openRelated = onOpenRecord ? reference => { void onOpenRecord(reference.assetType, reference.id); } : null;
 
@@ -185,10 +220,15 @@ export function IncidentDetailsPanel({
   }, [onHighlightCameras, tab, cameras]);
 
   if (!asset || !record) return null;
-  const visual = incidentVisual(facts.type);
-  const severity = incidentSeverity(record);
-  const headline = incidentHeadline(facts);
-  const narrative = incidentNarrative(record, place);
+  const visual = liveEvent ? liveEventVisual(record) : incidentVisual(facts.type);
+  const severity = liveEvent ? liveEventSeverity(record) : incidentSeverity(record);
+  const headline = liveEvent ? liveEventHeadline(facts) : incidentHeadline(facts);
+  const narrative = liveEvent ? liveEventNarrative(record, place) : incidentNarrative(record, place);
+  const reported = liveEvent ? liveEventReportedAt(facts) : reportedAt(facts);
+  const showRelated = Boolean(lookupRecords) && !liveEvent;
+  const subtitle = liveEvent
+    ? [asset.id, facts.carriageway ?? (place?.resolved ? carriagewayLabel(place) : null), facts.section ?? facts.roadway]
+    : [asset.id, place?.resolved ? carriagewayLabel(place) : null, facts.segment];
 
   return (
     <Paper
@@ -207,7 +247,7 @@ export function IncidentDetailsPanel({
         borderLeft: `4px solid ${visual.color}`,
       }}
       role="complementary"
-      aria-label={`${facts.type ?? 'Incident'} details`}
+      aria-label={`${facts.type ?? (liveEvent ? 'Live event' : 'Incident')} details`}
     >
       <Stack
         ref={headingRef}
@@ -221,7 +261,7 @@ export function IncidentDetailsPanel({
           pr: 6,
         }}
       >
-        <IncidentTypeBadge incidentType={facts.type} />
+        {liveEvent ? <LiveEventBadge event={record} /> : <IncidentTypeBadge incidentType={facts.type} />}
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
             <Typography component="h2" sx={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, lineHeight: 1.25 }}>
@@ -235,10 +275,10 @@ export function IncidentDetailsPanel({
             />
           </Stack>
           <Typography variant="caption" color="text.secondary" component="div">
-            {[asset.id, place?.resolved ? carriagewayLabel(place) : null, facts.segment].filter(Boolean).join(' · ')}
+            {subtitle.filter(Boolean).join(' · ')}
           </Typography>
-          {reportedAt(facts) && (
-            <Typography variant="caption" color="text.secondary" component="div">{`Reported ${reportedAt(facts)}`}</Typography>
+          {reported && (
+            <Typography variant="caption" color="text.secondary" component="div">{`Reported ${reported}`}</Typography>
           )}
         </Box>
         <Tooltip title="Close incident details">
@@ -275,20 +315,24 @@ export function IncidentDetailsPanel({
         <Tab label="Details" />
         <Tab label="Impact" />
         <Tab label={`Cameras (${cameras.length})`} />
-        {lookupRecords ? <Tab label={`Related (${relatedTotal})`} /> : null}
+        {showRelated ? <Tab label={`Related (${relatedTotal})`} /> : null}
       </Tabs>
 
-      {tab === 0 && <FactGrid rows={detailFacts(record, place)} />}
+      {tab === 0 && (liveEvent
+        ? <FactSections sections={liveEventDetailSections(record)} />
+        : <FactGrid rows={detailFacts(record, place)} />)}
 
       {tab === 1 && (
         <Stack spacing={1.25}>
           {narrative.map(sentence => (
             <Typography key={sentence} variant="body2" sx={{ lineHeight: 1.5 }}>{sentence}</Typography>
           ))}
-          <FactGrid rows={impactRows(record, place)} />
-          <Typography variant="caption" color="text.secondary">
-            Delay and queue length are not recorded for historical incidents, so none is shown.
-          </Typography>
+          <FactGrid rows={liveEvent ? liveEventImpactRows(record, place) : impactRows(record, place)} />
+          {!liveEvent && (
+            <Typography variant="caption" color="text.secondary">
+              Delay and queue length are not recorded for historical incidents, so none is shown.
+            </Typography>
+          )}
         </Stack>
       )}
 
@@ -322,7 +366,7 @@ export function IncidentDetailsPanel({
         </Stack>
       )}
 
-      {lookupRecords && tab === 3 && (
+      {showRelated && tab === 3 && (
         <RelatedRecords
           groups={related}
           onOpen={openRelated}

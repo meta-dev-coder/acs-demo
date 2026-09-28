@@ -150,14 +150,26 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
     }
   }
 
+  /**
+   * Which asset types the Asset Explorer is currently describing for us.
+   *
+   * One module backs five asset types (incidents, closures, construction, congestion, disabled), so
+   * ownership is a SET rather than a flag: the explorer tells each of its five sources in turn, and
+   * with a single boolean the four saying "not mine" would cancel the one saying "mine" purely by
+   * array order.
+   */
+  const externalOwners = new Set();
+  const externallyOwned = () => externalOwners.size > 0;
+
   function select(entity) {
     const previous = selected; selected = entity; style(previous); style(entity);
     const event = entity ? records.get(entity) : null;
-    panel.select(event);
-    renderProvenance(event);
+    // While the explorer owns this type it describes the event itself, and two panels for one
+    // event is worse than either alone. The map still highlights and still reports the pick.
+    if (externallyOwned()) panel.select(null); else { panel.select(event); renderProvenance(event); }
     reportSelection(event);
-    if (event) focusMapPoints(viewer, pointsOf(event), '.live-event-details');
-    else if (previous) viewer.camera.cancelFlight();
+    if (event && !externallyOwned()) focusMapPoints(viewer, pointsOf(event), '.live-event-details');
+    else if (previous && !externallyOwned()) viewer.camera.cancelFlight();
     viewer.scene.requestRender();
   }
 
@@ -232,7 +244,7 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
     entity.billboard.image = ICONS[event.type] ?? ICONS[LIVE_EVENT_TYPES.INCIDENT];
     records.set(entity, event);
     updateConnector(event);
-    if (selected === entity) { panel.select(event); renderProvenance(event); }
+    if (selected === entity && !externallyOwned()) { panel.select(event); renderProvenance(event); }
   }
 
   function removeEntity(id) {
@@ -352,6 +364,18 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
       return true;
     },
     clearSelection() { select(null); },
+    /**
+     * Hand one asset type's details over to the Asset Explorer, or take it back.
+     * @param {string} assetType which of the five this module backs
+     */
+    setExternallyOwned(assetType, owned) {
+      const before = externallyOwned();
+      if (owned) externalOwners.add(assetType); else externalOwners.delete(assetType);
+      if (externallyOwned() === before) return;
+      // Handing over closes this module's panel; taking back re-opens it for whatever is selected.
+      if (externallyOwned()) panel.select(null);
+      else if (selected) { panel.select(records.get(selected)); renderProvenance(records.get(selected)); }
+    },
     onSelection(callback) {
       // null clears every listener, which is what teardown wants.
       if (!callback) { selectionListeners.clear(); return () => {}; }
