@@ -22,6 +22,44 @@
  * Pure — records in, grouped records out — so the rules are unit-tested against the real export.
  */
 
+/*
+ * TODO(Arpana): decide whether and how the Related tab shows the historical incident chain.
+ * Comment only; nothing here changes at runtime.
+ *
+ * DESIGN CONFLICT, please decide: the chain below deliberately includes links this file refuses to
+ * make (see "Nothing is joined on a date window" above). The product owner asked for a complete
+ * Incident -> Ticket -> Task(s) -> Work Order -> Inspection story for the demo. Where Bentley's data
+ * has no named link, the chain uses a same-asset match within 90 days ("inferred") or a generated
+ * step ("synthetic"). Every row says which, so it can be shown as such or left out.
+ *
+ * What exists: DataConnect class "SDNA Florida I595 Historical Chain", built by
+ * server/liveDc/historicalChain.mjs and loaded by tools/historical-chain.mjs. It has one row per chain
+ * step for each Bentley historical incident. Bentley's own classes are not modified.
+ *
+ * Query: POST /class/<id>/curated-data with filter attributes.chain_id equals "CHAIN-<incident id>".
+ * - From an incident, use attributes.incident_id.
+ * - From a ticket, task, work order or inspection, use attributes.record_id; that row's chain_id
+ *   gives the whole chain.
+ * - Sort by step_order.
+ * - Bentley reuses 34 incident ids, so a second chain can be "CHAIN-<id>-DUP2". Group by chain_id,
+ *   never by incident_id.
+ *
+ * Columns:
+ * - step: incident | ticket | task | work_order | inspection.
+ * - record_id: the Bentley id, or TIC-SYN-… / TSK-SYN-…-01 / WO-SYN-… / INSP-SYN-… when synthetic.
+ * - Also: parent_record_id, record_class (Bentley class name or "synthetic"), step_date, asset_id.
+ * - Synthetic steps carry summary / status / priority / assigned_team / work_type /
+ *   inspection_result / asset_condition ("NA" = not applicable).
+ *
+ * Labels, from link_method / confidence / is_synthetic:
+ *   root | bentley_link (High)       -> "Linked"   (the same idea as NAMED above)
+ *   inferred_same_asset (Medium)     -> "Inferred · <link_detail>", e.g. "same asset, ticket 12 d after"
+ *   synthetic (is_synthetic = true)  -> "Synthetic (demo)"  (no Bentley record to open)
+ *
+ * Keep the existing SAME ASSET items as they are. They answer a different question, so don't
+ * merge them into the chain.
+ */
+
 /** The reference columns each class carries, as the normalizer already parsed them onto `related`. */
 const NAMED_REFERENCES = Object.freeze({
   WORK_ORDER: [

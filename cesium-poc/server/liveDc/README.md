@@ -228,7 +228,7 @@ node tools/historical-chain.mjs --apply                                         
 - `inferred_same_asset` → "Inferred · <link_detail>"
 - `synthetic` → "Synthetic (demo)"
 
-See the `TODO(Arpana)` note in `src/maintenance/maintenanceRecords.js`.
+See the `TODO(Arpana)` note in `src/assetExplorer/relatedRecords.js` (it flags a design conflict for her to decide).
 
 ## Test double (`standin.mjs`)
 
