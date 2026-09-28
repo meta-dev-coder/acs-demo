@@ -107,13 +107,13 @@ describe('camera choice', () => {
     assert.deepEqual(chooseSnapshotCamera({ ...point, fl511Cameras, cameras: CAMERAS }), { cameraId: '1837', divasChanId: '7001', source: 'FL511' });
   });
 
-  test('else by DIVAS channel, else nearest corridor camera within 300 m of an FL511 camera position', () => {
+  test('else by DIVAS channel; carousel entries carry no position, so an unmatched one is skipped', async () => {
     assert.deepEqual(chooseSnapshotCamera({ ...point, fl511Cameras: [{ cameraId: '5555', divasChanId: '9560' }], cameras: CAMERAS }),
       { cameraId: '2034', divasChanId: '9560', source: 'FL511' });
-    const near = [{ cameraId: '5556', divasChanId: null, longitude: -80.2267, latitude: 26.0935 }];
-    assert.equal(chooseSnapshotCamera({ ...point, fl511Cameras: near, cameras: CAMERAS }).cameraId, '2026');
-    const far = [{ cameraId: '5557', divasChanId: null, longitude: -80.1, latitude: 26.2 }];
-    assert.equal(chooseSnapshotCamera({ ...point, fl511Cameras: far, cameras: CAMERAS }).source, 'derived');
+    const unmatched = [{ cameraId: '5556', divasChanId: null, longitude: -80.2267, latitude: 26.0935 }];
+    assert.deepEqual(chooseSnapshotCamera({ ...point, fl511Cameras: unmatched, cameras: CAMERAS }), { cameraId: '2034', divasChanId: '9560', source: 'derived' });
+    const snapshots = await import('../server/liveDc/eventSnapshots.mjs');
+    assert.equal('CAROUSEL_MATCH_RADIUS_M' in snapshots, false);
   });
 
   test('falls back to the nearest corridor camera with a DIVAS channel (same direction first)', () => {
@@ -255,6 +255,128 @@ describe('capture', () => {
     assert.equal(fetch.calls.length, before);
   });
 
+  test('reactivation drops the old cleared snapshot; a later clear captures a fresh one', async () => {
+    const capture = createEventCapture({ snapshotStore: fakeStore(), fetchImpl: fakeFetch().impl, context: CONTEXT, logger: silent });
+    const events = [event()];
+    const opened = first(events);
+    await capture({ records: opened.upserts, events, now: T0 });
+    const cleared = syncLiveEvents({ payload: live([]), existing: opened.upserts, now: T0 + 600_000, enrichment: CONTEXT });
+    await capture({ records: cleared.upserts, events: [], now: T0 + 600_000 });
+    const old = cleared.upserts[0];
+    assert.match(old.snapshot_cleared_url, /20260926T044000Z/);
+    const back = syncLiveEvents({ payload: live(events), existing: [old], now: T0 + 1200_000, enrichment: CONTEXT });
+    assert.equal(back.stats.reactivated, 1);
+    const re = back.upserts[0];
+    await capture({ records: back.upserts, events, now: T0 + 1200_000 });
+    for (const name of ['snapshot_cleared_url', 'snapshot_cleared_taken_at', 'cleared_at_dt']) assert.equal(re[name], undefined, name);
+    assert.equal(re.snapshot_cleared_camera_id, 'NA');
+    assert.equal(re.snapshot_first_url, opened.upserts[0].snapshot_first_url);
+    // Merge semantics cannot erase a URL or DateTime, so DataConnect still reads the old ones back.
+    const readBack = { ...re, snapshot_cleared_url: old.snapshot_cleared_url, snapshot_cleared_taken_at: old.snapshot_cleared_taken_at, cleared_at_dt: old.cleared_at_dt };
+    const steady = syncLiveEvents({ payload: live(events), existing: [readBack], now: T0 + 1260_000, enrichment: CONTEXT });
+    assert.equal(steady.upserts.length, 0, 'stale cleared values do not reload the record every cycle');
+    const again = syncLiveEvents({ payload: live([]), existing: [readBack], now: T0 + 1800_000, enrichment: CONTEXT });
+    assert.equal(again.upserts[0].snapshot_cleared_url, undefined);
+    await capture({ records: again.upserts, events: [], now: T0 + 1800_000 });
+    assert.match(again.upserts[0].snapshot_cleared_url, /20260926T050000Z/);
+    assert.equal(again.upserts[0].snapshot_cleared_taken_at, '2026-09-26T05:00:00Z');
+  });
+
+  test('an uploaded snapshot is reused, not re-uploaded, while its load has not reached DataConnect', async () => {
+    const fetch = fakeFetch();
+    const store = fakeStore();
+    const capture = createEventCapture({ snapshotStore: store, fetchImpl: fetch.impl, context: CONTEXT, logger: silent });
+    const events = [event()];
+    const { upserts } = first(events);
+    await capture({ records: upserts, events, now: T0 });
+    const url = upserts[0].snapshot_first_url;
+    // The Events load was refused: the next cycle's record still has no snapshot.
+    const retry = first(events, T0 + 60_000).upserts;
+    await capture({ records: retry, events, now: T0 + 60_000 });
+    assert.equal(store.puts.length, 1);
+    assert.equal(fetch.divas().length, 1);
+    assert.equal(retry[0].snapshot_first_url, url);
+    assert.equal(retry[0].snapshot_first_taken_at, '2026-09-26T04:30:00Z');
+    assert.equal(retry[0].snapshot_first_camera_id, upserts[0].snapshot_first_camera_id);
+  });
+
+  test('after an upload timeout the retry reuses the same S3 key, then the upload is remembered', async () => {
+    const fetch = fakeFetch();
+    const keys = [];
+    let hang = true;
+    const store = {
+      put(key) { keys.push(key); return hang ? new Promise(() => {}) : Promise.resolve(); },
+      url: key => `${BASE}/${key}`,
+    };
+    const capture = createEventCapture({ snapshotStore: store, fetchImpl: fetch.impl, context: CONTEXT, logger: silent, storeTimeoutMs: 20 });
+    const events = [event()];
+    const opened = first(events).upserts;
+    const stats = await capture({ records: opened, events, now: T0 });
+    assert.equal('snapshot_first_url' in opened[0], false);
+    assert.equal(stats.snapshots.failed, 1);
+    hang = false;
+    const retry = first(events, T0 + 60_000).upserts;
+    await capture({ records: retry, events, now: T0 + 60_000 });
+    assert.deepEqual(keys, ['snapshots/FL511-1/20260926T043000Z_2026.jpg', 'snapshots/FL511-1/20260926T043000Z_2026.jpg']);
+    assert.equal(retry[0].snapshot_first_url, `${BASE}/${keys[0]}`);
+    assert.equal(retry[0].snapshot_first_taken_at, '2026-09-26T04:30:00Z');
+    assert.equal(fetch.divas().length, 1, 'the same image is stored again, not a newer one');
+    const third = first(events, T0 + 120_000).upserts;
+    await capture({ records: third, events, now: T0 + 120_000 });
+    assert.equal(keys.length, 2);
+    assert.equal(third[0].snapshot_first_url, retry[0].snapshot_first_url);
+  });
+
+  test('the cleared snapshot uses the first-seen camera while it has a DIVAS still, before the carousel choice', async () => {
+    const fetch = fakeFetch();
+    const capture = createEventCapture({ snapshotStore: fakeStore(), fetchImpl: fetch.impl, context: CONTEXT, logger: silent });
+    const plain = [event('1', { liveOps: { ...event().liveOps, direction: 'WB' } })];
+    const opened = first(plain);
+    await capture({ records: opened.upserts, events: plain, now: T0 });
+    assert.equal(opened.upserts[0].snapshot_first_camera_id, '2026');
+    // FL511 later lists another camera in the tooltip carousel.
+    const listed = [{ ...plain[0], fl511Cameras: [{ cameraId: '2034', divasChanId: '9560' }] }];
+    const later = syncLiveEvents({ payload: live(listed), existing: opened.upserts, now: T0 + 900_000, enrichment: CONTEXT });
+    await capture({ records: later.upserts, events: listed, now: T0 + 900_000 });
+    const cleared = syncLiveEvents({ payload: live([]), existing: opened.upserts, now: T0 + 1800_000, enrichment: CONTEXT });
+    await capture({ records: cleared.upserts, events: [], now: T0 + 1800_000 });
+    assert.equal(cleared.upserts[0].snapshot_cleared_camera_id, '2026');
+    assert.equal(fetch.divas().at(-1), 'https://images-dis.divas.cloud/DGI/chan-9545_h.jpg');
+  });
+
+  test('camera choice and memory only for the records being captured; pruned when an event leaves the payload', async () => {
+    const capture = createEventCapture({ snapshotStore: fakeStore(), fetchImpl: fakeFetch().impl, context: CONTEXT, logger: silent });
+    const carousel = [{ cameraId: '2026', divasChanId: '9545' }];
+    const events = [event('1', { fl511Cameras: carousel }), event('2', { fl511Cameras: carousel })];
+    const { upserts } = first(events);
+    await capture({ records: upserts.filter(r => r.keyInSource === 'FL511-1'), events, now: T0 });
+    assert.deepEqual(capture.remembered(), ['FL511-1']);
+    await capture({ records: [], events: [events[1]], now: T0 + 60_000 });
+    assert.deepEqual(capture.remembered(), []);
+  });
+
+  test('at most 4 DIVAS / Open-Meteo requests at a time', async () => {
+    let inFlight = 0, peak = 0;
+    const slow = make => async () => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      await new Promise(r => setTimeout(r, 5));
+      inFlight--;
+      return make();
+    };
+    const fetch = fakeFetch({
+      image: slow(() => new Response(JPEG, { status: 200, headers: { 'content-type': 'image/jpeg' } })), weather: slow(() => Response.json(WEATHER)),
+    });
+    const capture = createEventCapture({ snapshotStore: fakeStore(), fetchImpl: fetch.impl, context: CONTEXT, logger: silent });
+    const events = Array.from({ length: 10 }, (_, i) => event(String(i + 1)));
+    const { upserts } = first(events);
+    const stats = await capture({ records: upserts, events, now: T0 });
+    assert.equal(stats.snapshots.first, 10);
+    assert.equal(stats.weather.captured, 10);
+    assert.ok(peak <= 4, `peak ${peak}`);
+    assert.ok(peak > 1);
+  });
+
   test('failures leave NA (strings) or nothing (URLs, numbers, DateTimes) and never throw', async () => {
     for (const setup of [
       { store: fakeStore({ fail: true }), fetch: fakeFetch({ weather: () => Response.json({ error: true, reason: 'x' }) }) },
@@ -337,6 +459,61 @@ describe('cycle', () => {
     await run();
     assert.equal(fetch.calls.length, calls);
     assert.equal(writer.loads.find(l => l.className === LIVE_CLASS.EVENTS).records.length, 0);
+  });
+
+  test('a failed first-sight capture is retried while the event is young, and a filled value is loaded', async () => {
+    const writer = fakeWriter();
+    let weatherUp = false;
+    const fetch = fakeFetch({ weather: () => (weatherUp ? Response.json(WEATHER) : new Response('x', { status: 503 })) });
+    const events = [event()];
+    const service = { async refresh() {}, async snapshot() { return live(events); } };
+    const capture = createEventCapture({ snapshotStore: fakeStore(), fetchImpl: fetch.impl, context: CONTEXT, logger: silent });
+    const clock = { t: T0 };
+    const memory = createCycleMemory();
+    const run = () => runLiveDcCycle({
+      writer, service, now: () => clock.t, workflowConfig: loadWorkflowConfig(), profileName: 'demo', memory,
+      assetCache: { get: async () => [] }, logger: silent, capture, publicApiBase: BASE, enrichment: CONTEXT,
+    });
+    const eventLoads = () => writer.loads.filter(l => l.className === LIVE_CLASS.EVENTS);
+    await run();
+    assert.equal(eventLoads()[0].records[0].weather_source, 'NA');
+    const snapshots = fetch.divas().length;
+    clock.t += 60_000;
+    weatherUp = true;
+    const report = await run();
+    assert.deepEqual(report.errors, []);
+    const sent = eventLoads().at(-1).records;
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].weather_source, 'Open-Meteo');
+    assert.equal(sent[0].temperature_c, 27.4);
+    assert.ok(sent[0].snapshot_first_url, 'the stored snapshot is carried along');
+    assert.equal(fetch.divas().length, snapshots, 'the snapshot is not retaken');
+    assert.equal(validateRecord(EVENTS_DEF, sent[0]).valid, true);
+    clock.t += 60_000;
+    const calls = fetch.calls.length;
+    await run();
+    assert.equal(eventLoads().at(-1).records.length, 0);
+    assert.equal(fetch.calls.length, calls);
+  });
+
+  test('no retry once the first-capture window has passed', async () => {
+    const writer = fakeWriter();
+    const fetch = fakeFetch({ weather: () => new Response('x', { status: 503 }) });
+    const service = { async refresh() {}, async snapshot() { return live([event()]); } };
+    const capture = createEventCapture({ snapshotStore: null, fetchImpl: fetch.impl, context: CONTEXT, logger: silent });
+    const clock = { t: T0 };
+    const memory = createCycleMemory();
+    const run = () => runLiveDcCycle({
+      writer, service, now: () => clock.t, workflowConfig: loadWorkflowConfig(), profileName: 'demo', memory, heartbeatSeconds: 0,
+      assetCache: { get: async () => [] }, logger: silent, capture, enrichment: CONTEXT,
+    });
+    await run();
+    clock.t += 60_000;
+    await run();
+    assert.equal(fetch.meteo().length, 2);
+    clock.t += 2 * 3600_000;
+    await run();
+    assert.equal(fetch.meteo().length, 2);
   });
 
   test('a throwing capture is a warning, not a failed cycle', async () => {

@@ -43,17 +43,7 @@ export const DC_SEGMENT_CODES = Object.freeze([...SEGMENT_CONFIG.codes]);
 export const LINK_MODES = Object.freeze(['live', 'linked', 'none']);
 export const LIVE_RELATIONSHIP_TYPES = deepFreeze(clone(LIVE_CONFIG.relationshipTypes));
 
-const STANDALONE_CLASSES = LIVE_CONFIG.standaloneClasses ?? [];
-export const SDNA_CLASS = Object.freeze(Object.fromEntries(STANDALONE_CLASSES.map((c) => [c.key, c.className])));
-export const HISTORICAL_CHAIN_CLASS = SDNA_CLASS.HISTORICAL_CHAIN;
-/** Every class the writer may load into: the six synced Live classes plus the standalone SDNA classes. */
-export const WRITABLE_CLASS_NAMES = Object.freeze([...LIVE_CLASS_NAMES, ...STANDALONE_CLASSES.map((c) => c.className)]);
-for (const name of WRITABLE_CLASS_NAMES) {
-  if (!name.startsWith('SDNA ')) throw new Error(`writable class '${name}' must start with 'SDNA '`);
-}
-
 const LIVE_NAME_SET = new Set(LIVE_CLASS_NAMES);
-const WRITABLE_NAME_SET = new Set(WRITABLE_CLASS_NAMES);
 const HISTORICAL_ID_BY_NAME = new Map(HISTORICAL_CLASSES.map((c) => [c.className, c.id]));
 const STRING_LIKE = new Set(['String', 'Date', 'DateTime', 'Timestamp', 'URL']);
 const OMITTED_WHEN_UNSET = new Set(['DateTime', 'URL']);
@@ -61,10 +51,6 @@ const CORE_NAMES = new Set(LIVE_CONFIG.coreAttributes.map((a) => a.name));
 
 export function isLiveClassName(name) {
   return typeof name === 'string' && LIVE_NAME_SET.has(name);
-}
-
-export function isWritableClassName(name) {
-  return typeof name === 'string' && WRITABLE_NAME_SET.has(name);
 }
 
 const assertLinkMode = (linkMode) => {
@@ -108,14 +94,6 @@ export function liveClassDefinition(className, { linkMode = 'live' } = {}) {
   return buildDefinition(cls, linkMode);
 }
 
-/** Definition of any writable SDNA class (the six Live classes or a standalone one). */
-export function sdnaClassDefinition(className, { linkMode = 'live' } = {}) {
-  assertLinkMode(linkMode);
-  const cls = [...LIVE_CONFIG.classes, ...STANDALONE_CLASSES].find((c) => c.className === className);
-  if (!cls) throw new Error(`not an SDNA class: '${className}'`);
-  return buildDefinition(cls, linkMode);
-}
-
 export function placeholderObjectId(className) {
   return createHash('sha1').update(`live-dc:${className}`).digest('hex').slice(0, 24);
 }
@@ -151,44 +129,31 @@ export function toClassDto(def, { id, classId, resolveClassId, now = 0 }) {
   };
 }
 
-const createRequestFor = (def, resolveClassId) => ({
-  className: def.className,
-  create: {
-    className: def.className, description: def.description, status: 'Published', owners: [], classType: 'DATA_CLASS',
-    displayInExplorer: true, includeSecuritySettings: false,
-  },
-  update: {
-    className: def.className, description: def.description, owners: [], displayInExplorer: true, includeSecuritySettings: false,
-    geometryAttributeName: 'geometry',
-    add: def.attributes.filter((a) => !a.core).map((a) => resolvedAttribute(a, resolveClassId)),
-    modify: [], remove: [],
-  },
-});
-
 export function buildCreateRequests({ resolveClassId, linkMode = 'live' } = {}) {
   requireResolver(resolveClassId);
-  return liveClassDefinitions({ linkMode }).map((def) => createRequestFor(def, resolveClassId));
-}
-
-/** POST /class body plus the ClassUpdate `add` for one SDNA class (standalone classes carry no relationships). */
-export function buildSdnaCreateRequest(className, { resolveClassId = (name) => `<id of ${name}>`, linkMode = 'live' } = {}) {
-  return createRequestFor(sdnaClassDefinition(className, { linkMode }), resolveClassId);
+  return liveClassDefinitions({ linkMode }).map((def) => ({
+    className: def.className,
+    create: {
+      className: def.className, description: def.description, status: 'Published', owners: [], classType: 'DATA_CLASS',
+      displayInExplorer: true, includeSecuritySettings: false,
+    },
+    update: {
+      className: def.className, description: def.description, owners: [], displayInExplorer: true, includeSecuritySettings: false,
+      geometryAttributeName: 'geometry',
+      add: def.attributes.filter((a) => !a.core).map((a) => resolvedAttribute(a, resolveClassId)),
+      modify: [], remove: [],
+    },
+  }));
 }
 
 /**
- * ClassUpdate body that adds the `classUpdates` attributes of liveClasses.json to an already-created
- * Live class. Additive only: modify and remove stay empty.
+ * The attributes an already-created Live class must have: every declared non-core attribute of
+ * liveClasses.json. tools/live-dc-apply-update.mjs adds the ones the real class lacks, so applying
+ * it is idempotent. Additive only: modify and remove stay empty.
  */
 export function buildClassUpdateRequest(className, { resolveClassId = (name) => `<id of ${name}>`, linkMode = 'live' } = {}) {
-  const update = (LIVE_CONFIG.classUpdates ?? []).find((u) => u.className === className);
-  if (!update) throw new Error(`no class update configured for '${className}'`);
-  const byName = new Map(liveClassDefinition(className, { linkMode }).attributes.map((a) => [a.name, a]));
-  const add = update.add.map((name) => {
-    const attr = byName.get(name);
-    if (!attr || attr.core) throw new Error(`class update attribute '${name}' is not a declared attribute of '${className}'`);
-    return resolvedAttribute(attr, resolveClassId);
-  });
-  return { className, add, modify: [], remove: [] };
+  const ensure = liveClassDefinition(className, { linkMode }).attributes.filter((a) => !a.core).map((a) => resolvedAttribute(a, resolveClassId));
+  return { className, ensure, modify: [], remove: [] };
 }
 
 const RELATIONSHIP_TYPES_NOTE = 'ADDITIVE delta for the global relationship-type registry. GET /api/data-mgmt/v1/relationship-types, '

@@ -4,15 +4,13 @@
  * DataConnect. A SnapshotStore is `{ put(key, bytes, contentType?): Promise<void>, url(key): string }`.
  */
 import { spawn } from 'node:child_process';
-import { haversineMeters } from '../geo.mjs';
 import { selectCameras } from './eventEnrichment.mjs';
-import { fetchWithTimeout } from './eventWeather.mjs';
+import { fetchWithTimeout } from './timeouts.mjs';
 
 export const DIVAS_SNAPSHOT_BASE = 'https://images-dis.divas.cloud/DGI';
 export const SNAPSHOT_PREFIX = 'snapshots/';
 export const SNAPSHOT_CONTENT_TYPE = 'image/jpeg';
 export const SNAPSHOT_TIMEOUT_MS = 5_000;
-export const CAROUSEL_MATCH_RADIUS_M = 300;
 
 const CHAN_ID = /^\d{1,10}$/;
 const EVENT_KEY = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
@@ -46,22 +44,12 @@ export async function fetchDivasSnapshot(chanId, { fetchImpl = fetch, timeoutMs 
   }
 }
 
-/** The corridor camera an FL511 carousel camera is: same id, else same DIVAS channel, else nearest within 300 m. */
+/** The corridor camera an FL511 carousel camera is: same id, else same DIVAS channel (carousel entries carry no position). */
 function corridorCameraFor(fl511Camera, cameras) {
   const byId = cameras.find(c => c.cameraId === String(fl511Camera.cameraId));
   if (byId) return byId;
-  if (fl511Camera.divasChanId) {
-    const byChan = cameras.find(c => c.divasChanId && c.divasChanId === String(fl511Camera.divasChanId));
-    if (byChan) return byChan;
-  }
-  const { longitude, latitude } = fl511Camera;
-  if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) return null;
-  let best = null;
-  for (const camera of cameras) {
-    const distance = haversineMeters(longitude, latitude, camera.longitude, camera.latitude);
-    if (distance <= CAROUSEL_MATCH_RADIUS_M && (!best || distance < best.distance)) best = { camera, distance };
-  }
-  return best?.camera ?? null;
+  if (!fl511Camera.divasChanId) return null;
+  return cameras.find(c => c.divasChanId && c.divasChanId === String(fl511Camera.divasChanId)) ?? null;
 }
 
 /**

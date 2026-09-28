@@ -9,7 +9,7 @@
 import {
   LIVE_CLASS, PROJECT_CODE, completeRecord, dcSegmentCodeFor, diffRecords, liveClassDefinition,
 } from './classes.mjs';
-import { STICKY_FIELDS, enrichEventFields, loadEnrichmentContext, typedValue } from './eventEnrichment.mjs';
+import { SNAPSHOT_CLEARED_FIELDS, STICKY_FIELDS, enrichEventFields, loadEnrichmentContext, typedValue } from './eventEnrichment.mjs';
 import EVENT_FIELDS from '../../config/liveDc/eventFields.json' with { type: 'json' };
 
 export const TYPE_PRIORITY = Object.freeze(['INCIDENT', 'CLOSURE', 'DISABLED', 'CONSTRUCTION', 'CONGESTION']);
@@ -33,11 +33,18 @@ const POSITION_SET = new Set(POSITION_ATTRIBUTES);
  * cleared_at_dt is only ever set on the (always written) clearing, and an omitted DateTime is not
  * erased by a merge-semantics load, so a reactivated record may keep a stale one.
  */
-const VOLATILE_ATTRIBUTES = Object.freeze(['last_seen_at', 'updated_at', 'cleared_at_dt']);
+const VOLATILE_ATTRIBUTES = Object.freeze(['last_seen_at', 'updated_at', 'cleared_at_dt', 'snapshot_cleared_url', 'snapshot_cleared_taken_at']);
 
-/** Captured snapshot and weather values of an existing record, in their DataConnect types. */
-const stickyOf = previous => Object.fromEntries(STICKY_FIELDS.map(name => [name, typedValue(name, previous?.[name])])
+/**
+ * Captured snapshot and weather values of an existing record, in their DataConnect types. The cleared
+ * snapshot belongs to one clearing only: an active record (and a new clearing) never carries it, so a
+ * later clear takes a fresh one. Its URL and time cannot be erased in DataConnect, hence VOLATILE above.
+ */
+const CLEARED_ONLY = new Set(SNAPSHOT_CLEARED_FIELDS);
+const stickyOf = previous => Object.fromEntries(STICKY_FIELDS.filter(name => !CLEARED_ONLY.has(name))
+  .map(name => [name, typedValue(name, previous?.[name])])
   .filter(([, value]) => value !== null));
+const withoutCleared = record => Object.fromEntries(Object.entries(record).filter(([name]) => !CLEARED_ONLY.has(name) && name !== 'cleared_at_dt'));
 
 const iso = ms => new Date(ms).toISOString();
 const round = (value, dp) => {
@@ -148,6 +155,15 @@ export function mapEventToRecord(event, {
   return completeRecord(liveClassDefinition(LIVE_CLASS.EVENTS), { ...rec, ...enrichEventFields(rec, enrichment, { publicApiBase }) });
 }
 
+/**
+ * An active read-back record made loadable again (geometry, captured values, derived fields), with
+ * `changes` applied: the clearing of an event, or a record whose missing capture was just retried.
+ */
+export function reloadActiveRecord(previous, changes = {}, { enrichment = loadEnrichmentContext(), publicApiBase = '' } = {}) {
+  const record = { ...withoutCleared(previous), ...stickyOf(previous), geometry: pointOf(previous), ...changes };
+  return completeRecord(liveClassDefinition(LIVE_CLASS.EVENTS), { ...record, ...enrichEventFields(record, enrichment, { publicApiBase }) });
+}
+
 /** Only a fully healthy LIVE poll is proof that a missing event has really gone. */
 export function canClear(payload) {
   if (!payload || payload.sourceStatus !== 'LIVE') return false;
@@ -215,10 +231,8 @@ export function syncLiveEvents({
   const gone = [...existingByKey.values()].filter(record => record.status === 'active' && !kept.has(record.keyInSource));
   if (gone.length > 0) {
     if (canClear(payload)) {
-      const def = liveClassDefinition(LIVE_CLASS.EVENTS);
       for (const previous of gone) {
-        const cleared = { ...previous, ...stickyOf(previous), geometry: pointOf(previous), status: 'cleared', cleared_at: iso(now) };
-        upserts.push(completeRecord(def, { ...cleared, ...enrichEventFields(cleared, enrichment, { publicApiBase }) }));
+        upserts.push(reloadActiveRecord(previous, { status: 'cleared', cleared_at: iso(now) }, { enrichment, publicApiBase }));
         stats.cleared++;
       }
     } else {

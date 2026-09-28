@@ -222,6 +222,10 @@ export function impactLevel(record) {
 }
 
 const numberOr = value => (value === '' || value == null ? NaN : Number(value));
+/** The record's position as numbers (NaN when missing), from longitude/latitude or x/y_coordinates. */
+export const pointOf = record => ({
+  longitude: numberOr(record.longitude ?? record.x_coordinates), latitude: numberOr(record.latitude ?? record.y_coordinates),
+});
 
 /**
  * Every ENRICHMENT_FIELDS value plus field_sources, in a fixed order. A String is "NA" when unavailable;
@@ -246,7 +250,7 @@ export function enrichEventFields(record, context = loadEnrichmentContext(), { p
   put('incident_time_local', newYorkLocalTime(values.reported_at), 'derived');
   put('first_seen_at_dt', record.first_seen_at, 'derived');
   put('cleared_at_dt', record.status === 'cleared' ? record.cleared_at : null, 'derived');
-  const point = { longitude: numberOr(record.longitude ?? record.x_coordinates), latitude: numberOr(record.latitude ?? record.y_coordinates) };
+  const point = pointOf(record);
   const segment = filled(record.fdot_segment_id) ? context.segments.find(s => s.segmentId === record.fdot_segment_id) : null;
   const milepost = milepostAt(point, segment);
   put('milepost', milepost == null ? null : milepost.toFixed(1), 'derived');

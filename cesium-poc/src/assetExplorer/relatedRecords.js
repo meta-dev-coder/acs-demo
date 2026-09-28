@@ -23,41 +23,28 @@
  */
 
 /*
- * TODO(Arpana): decide whether and how the Related tab shows the historical incident chain.
- * Comment only; nothing here changes at runtime.
+ * TODO(Arpana): show the whole LIVE incident chain in the Related tab. Comment only; nothing here
+ * changes at runtime.
  *
- * DESIGN CONFLICT, please decide: the chain below deliberately includes links this file refuses to
- * make (see "Nothing is joined on a date window" above). The product owner asked for a complete
- * Incident -> Ticket -> Task(s) -> Work Order -> Inspection story for the demo. Where Bentley's data
- * has no named link, the chain uses a same-asset match within 90 days ("inferred") or a generated
- * step ("synthetic"). Every row says which, so it can be shown as such or left out.
+ * Live incidents already have a complete, exact chain in DataConnect's "SDNA Florida I595 Live *"
+ * classes: Live Event -> Ticket -> Tasks -> Work Order -> Inspection -> Asset Status (damaged).
+ * Live event records are INCIDENT-type items with `live: true`; their id is the event key
+ * (code / keyInSource), which is the value every other live class stores in `source_event_id`.
  *
- * What exists: DataConnect class "SDNA Florida I595 Historical Chain", built by
- * server/liveDc/historicalChain.mjs and loaded by tools/historical-chain.mjs. It has one row per chain
- * step for each Bentley historical incident. Bentley's own classes are not modified.
+ * Live tickets/tasks/work orders are normalised by the historical normalisers (via
+ * src/maintenance/liveDcSource.js viaHistorical), so the Bentley-named joins above already work
+ * for them: task -> ticket and work order -> ticket/task via related.ticketId / related.taskId
+ * ("Related Ticket ID" / "Related Task ID").
  *
- * Query: POST /class/<id>/curated-data with filter attributes.chain_id equals "CHAIN-<incident id>".
- * - From an incident, use attributes.incident_id.
- * - From a ticket, task, work order or inspection, use attributes.record_id; that row's chain_id
- *   gives the whole chain.
- * - Sort by step_order.
- * - Bentley reuses 34 incident ids, so a second chain can be "CHAIN-<id>-DUP2". Group by chain_id,
- *   never by incident_id.
- *
- * Columns:
- * - step: incident | ticket | task | work_order | inspection.
- * - record_id: the Bentley id, or TIC-SYN-… / TSK-SYN-…-01 / WO-SYN-… / INSP-SYN-… when synthetic.
- * - Also: parent_record_id, record_class (Bentley class name or "synthetic"), step_date, asset_id.
- * - Synthetic steps carry summary / status / priority / assigned_team / work_type /
- *   inspection_result / asset_condition ("NA" = not applicable).
- *
- * Labels, from link_method / confidence / is_synthetic:
- *   root | bentley_link (High)       -> "Linked"   (the same idea as NAMED above)
- *   inferred_same_asset (Medium)     -> "Inferred · <link_detail>", e.g. "same asset, ticket 12 d after"
- *   synthetic (is_synthetic = true)  -> "Synthetic (demo)"  (no Bentley record to open)
- *
- * Keep the existing SAME ASSET items as they are. They answer a different question, so don't
- * merge them into the chain.
+ * Still to add to NAMED_REFERENCES (identifiers printed in the record's own columns, so named
+ * links, not guesses):
+ * - TICKET / TASK / WORK_ORDER / INSPECTION / ASSET_STATUS -> live event: `source_event_id`,
+ *   already normalised as related.eventId (viaHistorical and normalizeLiveAssetStatus).
+ *   Target type: 'incidentRecord'.
+ * - ASSET_STATUS -> inspection: `source_inspection_id`, already related.inspectionId (existing entry).
+ * - INSPECTION -> ticket (`related_ticket_id`) and -> work order (`related_work_order_id`): NOT
+ *   normalised yet. normalizeInspection's `related` has no ticketId / workOrderId; add them there
+ *   (or in liveDcSource.js viaHistorical for inspections) before referencing them here.
  */
 
 /** The reference columns each class carries, as the normalizer already parsed them onto `related`. */

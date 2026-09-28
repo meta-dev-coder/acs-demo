@@ -2,9 +2,8 @@
 /**
  * Regenerates the admin artifacts for the Live DataConnect classes under config/liveDc/.
  * No network: the admin applies these by hand (POST /class, then POST /class/{id} with `add`).
- * live-events.update-request.json adds new attributes to the existing Live Events class
- * (tools/live-dc-apply-update.mjs). historical-chain.create-request.json creates the standalone
- * "SDNA Florida I595 Historical Chain" class (tools/live-dc-create-class.mjs).
+ * live-events.update-request.json lists the attributes the existing Live Events class must have
+ * (tools/live-dc-apply-update.mjs adds the missing ones).
  *
  *   node tools/live-dc-classes.mjs            write the committed artifacts
  *   node tools/live-dc-classes.mjs --check    exit 1 when a committed artifact has drifted
@@ -16,7 +15,6 @@ import { resolve } from 'node:path';
 import {
   HISTORICAL_CLASSES, LINK_MODES, LIVE_RELATIONSHIP_TYPES, isLiveClassName,
   LIVE_CLASS, buildCreateRequests, buildRelationshipTypesDelta, buildClassReference, buildClassUpdateRequest,
-  HISTORICAL_CHAIN_CLASS, buildSdnaCreateRequest,
 } from '../server/liveDc/classes.mjs';
 
 const CONFIG_DIR = fileURLToPath(new URL('../config/liveDc/', import.meta.url));
@@ -46,9 +44,8 @@ export function generateArtifacts() {
     'live-classes.create-requests.linked.json': toJson(buildCreateRequests({ resolveClassId: createRequestResolver, linkMode: 'linked' })),
     'live-relationship-types.json': toJson(relationshipTypesFile()),
     'live-classes.reference.json': toJson(buildClassReference({ linkMode: 'live' })),
-    // Additive ClassUpdate for the already-created real class; applied with tools/live-dc-apply-update.mjs.
+    // Attributes the already-created real class must have; tools/live-dc-apply-update.mjs adds the missing ones.
     'live-events.update-request.json': toJson(buildClassUpdateRequest(LIVE_CLASS.EVENTS, { resolveClassId: createRequestResolver })),
-    'historical-chain.create-request.json': toJson([buildSdnaCreateRequest(HISTORICAL_CHAIN_CLASS)]),
   };
 }
 

@@ -4,6 +4,7 @@
  */
 import { toDcDateTime } from './classes.mjs';
 import { compassPoint, weatherCodeText } from '../../src/weather/weatherText.js';
+import { fetchWithTimeout } from './timeouts.mjs';
 
 export const OPEN_METEO_FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
 export const WEATHER_CURRENT = Object.freeze([
@@ -11,18 +12,6 @@ export const WEATHER_CURRENT = Object.freeze([
 ]);
 export const WEATHER_SOURCE = 'Open-Meteo';
 export const WEATHER_TIMEOUT_MS = 5_000;
-
-/** fetch with an abort after `timeoutMs` (a ref'd timer, cleared once the body is read by `read`). */
-export async function fetchWithTimeout(fetchImpl, url, init, timeoutMs, read) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(new Error('timeout')), timeoutMs);
-  try {
-    const response = await fetchImpl(url, { ...init, signal: controller.signal });
-    return await read(response);
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
 const finite = value => (typeof value === 'number' && Number.isFinite(value) ? value : null);
 

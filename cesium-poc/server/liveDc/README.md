@@ -82,9 +82,9 @@ Each SDNA Live Events record also carries these fields. Most are derived determi
 | `injuries`, `fatalities`, `traffic_conditions`, `queue_length_mi`, `est_delay_min`, `recovery_eta`, `responder_status`, `responding_units`, `nearby_dms_ids`, `dms_message`, `recommended_next_action` | String | always `NA` for now |
 | `field_sources` | String | JSON object: each field above → `FL511`, `derived`, `DIVAS`, `Open-Meteo` or `NA` |
 
-**Snapshots and weather** are captured, not derived, and are sticky: once a value is in DataConnect it is carried forward and never recaptured. The camera is the first one FL511 lists in the incident tooltip's camera carousel (FL511 camera id, title and a DIVAS video URL `…/chan-<n>_h/…`) that is one of the corridor cameras (same id, else same DIVAS channel); otherwise the nearest corridor camera with a DIVAS channel. The JPEG comes from DIVAS (`https://images-dis.divas.cloud/DGI/chan-<n>_h.jpg`, 5 s timeout) and is stored in the data bucket at `snapshots/<eventKey>/<UTC yyyymmddThhmmssZ>_<cameraId>.jpg`, served by CloudFront's default behaviour; DataConnect stores only the URL. The poller uses S3 `PutObject`; `npm run live-dc:sync` uses `aws s3 cp -` when `LIVE_DC_SNAPSHOT_BUCKET` and `LIVE_DC_SNAPSHOT_PUBLIC_BASE` are set, and takes no snapshots otherwise. With `--feed` nothing is captured. A failed fetch or upload leaves the columns unset and never fails the cycle.
+**Snapshots and weather** are captured, not derived, and are sticky: once a value is in DataConnect it is carried forward and never recaptured. The camera is the first one FL511 lists in the incident tooltip's camera carousel (FL511 camera id, title and a DIVAS video URL `…/chan-<n>_h/…`) that is one of the corridor cameras (same id, else same DIVAS channel); otherwise the nearest corridor camera with a DIVAS channel. The JPEG comes from DIVAS (`https://images-dis.divas.cloud/DGI/chan-<n>_h.jpg`, 5 s timeout) and is stored in the data bucket at `snapshots/<eventKey>/<UTC yyyymmddThhmmssZ>_<cameraId>.jpg`, served by CloudFront's default behaviour; DataConnect stores only the URL. The poller uses S3 `PutObject`; `npm run live-dc:sync` uses `aws s3 cp -` when `LIVE_DC_SNAPSHOT_BUCKET` and `LIVE_DC_SNAPSHOT_PUBLIC_BASE` are set, and takes no snapshots otherwise. With `--feed` nothing is captured. A failed fetch or upload leaves the columns unset and never fails the cycle; while an active event is within an hour of first sight, a missing first snapshot or weather is retried every cycle, and a retry that fills a value reloads the record. An uploaded snapshot is remembered in memory per event (key fixed at the first attempt) until DataConnect reads the value back, so a refused load or an upload timeout reuses the same object instead of storing another. The clearing snapshot uses the first-seen camera while it has a DIVAS still, else the camera chosen at first sight, else the carousel/nearest choice. A reactivated event drops its old clearing snapshot (DataConnect cannot erase a URL or DateTime, so the stale read-back values are ignored by the diff), and a later clear takes a fresh one. At most 4 DIVAS / Open-Meteo requests run at a time.
 
-**Schema change for the existing class.** `config/liveDc/live-events.update-request.json` (generated and `--check`ed by `tools/live-dc-classes.mjs`) is the additive ClassUpdate for these attributes. `tools/live-dc-apply-update.mjs` shows the plan (dry run); with `--apply` it POSTs it to `https://dc-data-mgmt-demo-dqa3.cohesivecloud.app/api/v1/class/<id>`. It refuses any other class and any attribute that already exists. Apply it before the sync writes the new fields, otherwise every Live Events load is refused as carrying undeclared attributes.
+**Schema change for the existing class.** `config/liveDc/live-events.update-request.json` (generated and `--check`ed by `tools/live-dc-classes.mjs`) lists every Live Events attribute declared in `liveClasses.json` (`ensure`). `tools/live-dc-apply-update.mjs` adds the declared attributes the real class lacks, so it is idempotent: dry run by default; with `--apply` it POSTs the ClassUpdate to `https://dc-data-mgmt-demo-dqa3.cohesivecloud.app/api/v1/class/<id>`, and does nothing when the class is up to date. It refuses any other class and any modify/remove. Loads do not depend on the order of deploy and schema update: the writer drops attributes the resolved class does not declare (one warning per class per process) and still validates the declared ones.
 
 DataConnect rejects a DateTime with milliseconds ("DateTime type cannot have milliseconds"), so every DateTime is sent in whole seconds (`toDcDateTime` in `classes.mjs`), and `validateRecord` refuses milliseconds before a load. DataConnect reads a DateTime back as `2026-09-26T08:14:32.000+00:00`; the diff normalises zoned ISO timestamps on both sides, so a re-run writes nothing.
 
@@ -144,11 +144,11 @@ Two things to avoid:
 All guards run before any network I/O:
 
 - **Allowlist.**
-  - The class name must be one of the six Live names or a standalone SDNA class (`standaloneClasses` in `liveClasses.json`, today only `SDNA Florida I595 Historical Chain`), exact and case-sensitive. Every writable name must start with `SDNA `.
+  - The class name must be one of the six Live names (exact, case-sensitive).
   - The class ObjectId must not be a historical id.
   - The numeric `classId` must not be one of the historical ones (8–15, 22). The load service resolves its target only by `CL0000NN`.
 - **Resolved classes only.**
-  - `loadRecords` accepts only DTOs returned by this writer's `resolveLiveClasses()`, or by `resolveWritableClass(name)` for a standalone SDNA class. Both read the server's own class list.
+  - `loadRecords` accepts only DTOs returned by this writer's `resolveLiveClasses()`, which reads the server's own class list.
   - That call also cross-checks that each classId is unique.
   - Hand-built or copied DTOs are refused with `unresolved_class`.
 - **Configured origins only** (checked per request; the redirect check is on the response).
@@ -168,67 +168,6 @@ All guards run before any network I/O:
   - DataConnect is the only target: `DC_WRITER_BASE_URL` for class metadata and curated reads, `DC_WRITER_LOAD_BASE_URL` for loads. There is no default host and no local stand-in; without either URL the writer refuses with `not_configured`.
   - The credential is `DC_WRITER_ACCESS_TOKEN`, else `DC_WRITER_ACCESS_TOKEN_FILE` (re-read on every request, so the hourly `npm run dc:login` rewrite needs no restart), else `DC_WRITER_CLIENT_ID` + `DC_WRITER_CLIENT_SECRET`.
   - Tokens never appear in logs or errors.
-
-## Historical chain (SDNA Florida I595 Historical Chain)
-
-Bentley's historical data links only Ticket → Task → Work Order, and everything → Asset. This class holds a complete **Incident → Ticket → Task(s) → Work Order → Inspection** chain for every historical incident without modifying any Bentley class. It has one row per step. Links to Bentley records are plain String ids, with no DataConnect relationships. The class is standalone: the live sync never reads or writes it, and `resolveLiveClasses()` does not require it.
-
-**Chain rules** (`historicalChain.mjs`, pure and deterministic). "Days" are calendar days and the window is 0–90 days inclusive. When several records qualify, the earliest wins, then the smallest id.
-
-| Step | Real link | Otherwise |
-|---|---|---|
-| Ticket | Ticket on the same asset (`damaged_asset_id` == `Asset ID`), opened 0–90 d after the incident: `inferred_same_asset` / Medium, e.g. `same asset, ticket 12 d after` | `TIC-SYN-<n>` |
-| Task(s) | Bentley `Related Ticket ID`: `bentley_link` / High, all tasks by id | `TSK-SYN-<n>-01..03` (the live workflow's INCIDENT task templates) |
-| Work Order | Bentley `Related Ticket ID` or `Related Task ID`: `bentley_link` / High | `WO-SYN-<n>` |
-| Inspection | ITS / Roadway / Safety inspection on the same asset, 0–90 d after the WO open date: `inferred_same_asset` / Medium | `INSP-SYN-<n>` |
-
-- `<n>` is the incident's numeric part (`INC-200062` → `200062`).
-- Bentley reuses 34 incident ids in the export (178 incidents, 144 ids). Later occurrences get their own chain, `CHAIN-<id>-DUP2`, and synthetic ids `…-200063-DUP2`. The order is by date, then content.
-- Dates can be ISO, `dd/mm/yyyy`, `dd/mm/yyyy HH:MM` or DataConnect's zoned read-back. They are read as America/New_York wall time. `1900-01-00` and years before 1901 are invalid.
-- Synthetic step dates follow the previous step with fixed, hash-derived offsets: hours for the ticket and tasks, 1–3 d for the WO, 5–14 d for the inspection.
-
-**Columns.** Core `keyInSource` = `code` = `CHAIN-<incident id>-<step_order>-<step>`, plus `name` and `description`, then:
-
-- `chain_id`, `incident_id`, `step`, `step_order` (Integer), `record_id`, `parent_record_id`, `record_class` (Bentley class or `synthetic`)
-- `link_method` (`root` | `bentley_link` | `inferred_same_asset` | `synthetic`), `link_detail`, `confidence` (High | Medium | Synthetic), `is_synthetic` (Boolean)
-- `asset_id`, `segment`, `step_date` (DateTime, whole seconds, omitted when unknown)
-- `summary`, `status`, `priority`, `assigned_team`, `work_type`, `inspection_result`, `asset_condition`
-- `geometry` (the incident's Point), `x_coordinates`, `y_coordinates`
-
-An unavailable String is `NA`.
-
-**Local export numbers** (`--from-local`): 178 chains, 1,170 rows.
-
-| Step | Real | Inferred | Synthetic |
-|---|---|---|---|
-| Incident | 178 | 0 | 0 |
-| Ticket | 0 | 38 | 140 |
-| Task | 38 | 0 | 420 |
-| Work Order | 33 | 0 | 145 |
-| Inspection | 0 | 87 | 91 |
-
-**Tools** (dry runs by default):
-
-```bash
-node tools/live-dc-classes.mjs --check                                            # includes historical-chain.create-request.json
-node tools/live-dc-create-class.mjs "SDNA Florida I595 Historical Chain"          # plan; checks the class does not exist yet
-node tools/live-dc-create-class.mjs "SDNA Florida I595 Historical Chain" --apply  # POST /class, then POST /class/{id} with the attributes
-node tools/historical-chain.mjs --from-local                                      # stats + 3 sample chains from public/dataconnect-data
-node tools/historical-chain.mjs                                                   # same, reading the 7 Bentley classes from DataConnect (read-only)
-node tools/historical-chain.mjs --from-local --out /tmp/chain-rows.json           # write the rows
-node tools/historical-chain.mjs --apply                                           # Incremental load of changed rows into the chain class only
-```
-
-- `live-dc-create-class.mjs` refuses names without the `SDNA ` prefix, classes with no committed create request, requests that still hold an `<id of …>` placeholder, and classes that already exist.
-- `historical-chain.mjs --apply` resolves the class with `resolveWritableClass`, which runs the same guards as for the Live classes. It diffs the rows against the class and sends only changed rows, in chunks of 500.
-
-**Reading a chain (UI).** Filter `chain_id` (or `incident_id`, or `record_id` for any step) and sort by `step_order`. Label each step from `link_method`:
-
-- `root` / `bentley_link` → "Linked"
-- `inferred_same_asset` → "Inferred · <link_detail>"
-- `synthetic` → "Synthetic (demo)"
-
-See the `TODO(Arpana)` note in `src/assetExplorer/relatedRecords.js` (it flags a design conflict for her to decide).
 
 ## Test double (`standin.mjs`)
 

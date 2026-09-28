@@ -12,6 +12,7 @@ import { createAssetCache, createCycleMemory, runLiveDcCycle } from '../../../se
 import { createEventCapture } from '../../../server/liveDc/eventCapture.mjs';
 import { loadWorkflowConfig } from '../../../server/liveDc/workflow.mjs';
 import { tokenExpiresAtMs } from '../../../server/liveDc/tokenHandoff.mjs';
+import { withDeadline } from '../../../server/liveDc/timeouts.mjs';
 
 export const MIN_RUN_TOKEN_MS = 2 * 60_000;
 const DEADLINE_MARGIN_MS = 5_000;
@@ -95,13 +96,6 @@ function summarize(report) {
     warnings: report.warnings?.length ?? 0,
   };
 }
-
-const withDeadline = (promise, ms) => (Number.isFinite(ms) && ms > 0
-  ? new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(Object.assign(new Error('timeout'), { code: 'timeout' })), ms);
-    promise.then(value => { clearTimeout(timer); resolve(value); }, error => { clearTimeout(timer); reject(error); });
-  })
-  : promise);
 
 /** Messages from the writer never carry the token; the cap keeps the public status small. */
 const reasonOf = error => {

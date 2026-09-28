@@ -442,7 +442,7 @@ test('loadRecords guards run before any HTTP', async () => {
   assert.equal(dc.calls.length, before);
 });
 
-test('record checks: keys, duplicates, unknown attributes, mandatory and relationships — no fetch', async () => {
+test('record checks: keys, duplicates, mandatory and relationships — no fetch', async () => {
   const dc = createFakeDc();
   const { writer } = makeWriter(dc);
   const map = await writer.resolveLiveClasses();
@@ -455,7 +455,6 @@ test('record checks: keys, duplicates, unknown attributes, mandatory and relatio
   await rejectsCode(writer.loadRecords(tasks, [{ ...task(''), code: '' }]), WRITER_ERRORS.INVALID_RECORD);
   await rejectsCode(writer.loadRecords(tasks, [null]), WRITER_ERRORS.INVALID_RECORD);
   await rejectsCode(writer.loadRecords(tasks, 'nope'), WRITER_ERRORS.INVALID_RECORD);
-  await rejectsCode(writer.loadRecords(tasks, [task('K1'), { ...task('K2'), bogus: 1 }]), WRITER_ERRORS.UNKNOWN_ATTRIBUTE);
   const { description, ...noDescription } = task('K1');
   await rejectsCode(writer.loadRecords(tasks, [noDescription]), WRITER_ERRORS.INVALID_RECORD);
   await rejectsCode(writer.loadRecords(tasks, [record('K1')]), WRITER_ERRORS.INVALID_RECORD);
@@ -465,6 +464,25 @@ test('record checks: keys, duplicates, unknown attributes, mandatory and relatio
   await writer.loadRecords(map.get(EVENTS), [record('E1', { reported_at: '2026-09-26T08:11:41.238Z' })])
     .catch(err => assert.match(err.message, /reported_at Type/));
   assert.equal(dc.calls.length, before);
+});
+
+test('attributes the resolved class does not declare are dropped with one warning per class; declared ones are still validated', async () => {
+  const dc = createFakeDc();
+  const { writer, log } = makeWriter(dc);
+  const map = await writer.resolveLiveClasses();
+  const events = map.get(EVENTS);
+  const input = [record('E1', { status: 'active', weather_zz: 1, snapshot_zz_url: 'https://x.example/a.jpg' }), record('E2', { weather_zz: 2 })];
+  const res = await writer.loadRecords(events, input);
+  assert.equal(res.count, 2);
+  const upload = dc.calls.find(c => c.path.endsWith('/upload/json-file'));
+  assert.deepEqual(upload.json, [record('E1', { status: 'active' }), record('E2')]);
+  assert.equal(input[0].weather_zz, 1, 'the caller records are not mutated');
+  await writer.loadRecords(events, [record('E3', { weather_zz: 3, other_zz: 'x' })]);
+  const warnings = log.lines.filter(l => l.level === 'warn' && /not declared/.test(l.text));
+  assert.equal(warnings.length, 1, 'one warning per class per process');
+  assert.match(warnings[0].text, new RegExp(`${EVENTS}.*snapshot_zz_url, weather_zz`));
+  await rejectsCode(writer.loadRecords(events, [record('E4', { weather_zz: 1, latitude: '26.1' })]), WRITER_ERRORS.INVALID_RECORD);
+  await rejectsCode(writer.loadRecords(events, [record('E5', { weather_zz: 1 }), record('E5')]), WRITER_ERRORS.DUPLICATE_KEYS);
 });
 
 test('empty records still run the guards, then skip without HTTP', async () => {

@@ -8,7 +8,8 @@
 import {
   LIVE_CLASS, LIVE_CLASS_NAMES, REF, diffRecords, fromCurated, isLiveClassName, liveClassDefinition, relationshipAttributes,
 } from './classes.mjs';
-import { syncLiveEvents } from './eventSync.mjs';
+import { reloadActiveRecord, syncLiveEvents } from './eventSync.mjs';
+import { STICKY_FIELDS, typedValue } from './eventEnrichment.mjs';
 import { loadWorkflowConfig, runWorkflow } from './workflow.mjs';
 import { assetsFromCurated } from './assetCatalog.mjs';
 
@@ -119,12 +120,26 @@ export async function runLiveDcCycle({
   report.sync = { skipped: sync.skipped, reason: sync.reason, stats: sync.stats };
   if (sync.stats.clearingSuppressed) warn('clearing suppressed: the FL511 poll was not fully healthy');
 
-  // Snapshots and weather are filled into the records about to be loaded; a failure never blocks the load.
-  if (capture && sync.upserts.length > 0) {
-    try {
-      report.capture = await capture({ records: sync.upserts, events: payload?.events ?? [], now: now() });
-    } catch (error) {
-      warn(`capture failed: ${error.message}`);
+  // Snapshots and weather are filled into the records about to be loaded, and retried for young records
+  // still missing them; a retry that fills a value makes that record an upsert. A failure never blocks the load.
+  if (capture && !sync.skipped) {
+    const loading = new Set(sync.upserts.map(record => record.keyInSource));
+    const retries = sync.state.filter(record => !loading.has(record.keyInSource) && capture.needsCapture?.(record, at))
+      .map(previous => ({ previous, record: reloadActiveRecord(previous, {}, { publicApiBase, ...(enrichment ? { enrichment } : {}) }) }));
+    if (sync.upserts.length > 0 || retries.length > 0) {
+      try {
+        report.capture = await capture({ records: [...sync.upserts, ...retries.map(r => r.record)], events: payload?.events ?? [], now: now() });
+        const filled = retries.filter(({ previous, record }) => STICKY_FIELDS.some(name => typedValue(name, record[name]) !== null
+          && typedValue(name, previous[name]) === null)).map(r => r.record);
+        if (filled.length) {
+          sync.upserts = [...sync.upserts, ...filled].sort(byKey);
+          const byKeyInSource = new Map(sync.state.map(record => [record.keyInSource, record]));
+          for (const record of filled) byKeyInSource.set(record.keyInSource, record);
+          sync.state = [...byKeyInSource.values()].sort(byKey);
+        }
+      } catch (error) {
+        warn(`capture failed: ${error.message}`);
+      }
     }
   }
 
