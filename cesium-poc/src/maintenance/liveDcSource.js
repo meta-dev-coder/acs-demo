@@ -182,12 +182,6 @@ export function mergeLiveRecords(historical, live) {
   return [...renamed, ...historical];
 }
 
-export function liveCardNote(records, note) {
-  const count = (records ?? []).filter(item => item.live).length;
-  if (!count) return note ?? null;
-  return note ? `${count} live · ${note}` : `${count} live`;
-}
-
 async function request(fetchImpl, path, options) {
   let response;
   try { response = await fetchImpl(`${BASE}${path}`, options); } catch { throw new Error('Live DataConnect is unreachable.'); }

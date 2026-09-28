@@ -70,8 +70,17 @@ export function createAssetSelectionStore() {
    * that knows the asset registry; the store stays a plain state container.
    */
   let filterResolver = (type, assets) => assets;
-  /** The assets on screen: the active type's, narrowed by the search and filter. */
-  const visibleAssets = () => filterResolver(state.activeExplorerType, assetsOf(state.activeExplorerType), state.filter);
+  /**
+   * The assets on screen: the active type's, narrowed by the search and filter.
+   *
+   * `overrides` answers "what WOULD be on screen if one part of the filter were different" — which
+   * is how the type dropdown counts each of its options without the option itself narrowing the
+   * count. It never changes the stored filter.
+   */
+  const visibleAssets = (overrides = null) => filterResolver(
+    state.activeExplorerType, assetsOf(state.activeExplorerType),
+    overrides ? { ...state.filter, ...overrides } : state.filter,
+  );
 
   return {
     getState: () => state,

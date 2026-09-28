@@ -15,6 +15,7 @@ import { bindCartographic, connectAssetSources, createAssetSources, refreshAsset
 import { LAYER_TO_ASSET_TYPE, nextExplorerType } from './explorerRouting.js';
 import { assetTypeConfig } from './assetTypes.js';
 import { searchEntry } from './assetSearch.js';
+import { createCameraSpotlight } from './cameraSpotlight.js';
 
 export { LAYER_TO_ASSET_TYPE, nextExplorerType };
 
@@ -89,6 +90,9 @@ export function installAssetExplorer(container, viewer, {
   const lookupMaintenanceRecords = maintenanceRecords ? assetType => maintenanceRecords(assetType) ?? [] : null;
 
   const navigation = createAssetNavigation(viewer, { logger });
+  // The cameras an incident's Cameras tab is offering, marked on the corridor while it is open.
+  const cameraSpotlight = createCameraSpotlight(viewer);
+  const highlightCameras = cameras => (cameras?.length ? cameraSpotlight.show(cameras) : cameraSpotlight.hide());
   const disconnect = connectAssetSources(store, sources, { logger });
 
   const host = document.createElement('div');
@@ -193,6 +197,7 @@ export function installAssetExplorer(container, viewer, {
         onViewCamera={onViewCamera}
         lookupRecords={lookupMaintenanceRecords}
         onOpenRecord={revealRecord}
+        onHighlightCameras={highlightCameras}
       />);
   }
   render();
@@ -224,7 +229,7 @@ export function installAssetExplorer(container, viewer, {
       const suppress = state.activeExplorerType !== null;
       if (suppress === stripSuppressed) return;
       stripSuppressed = suppress;
-      corridorStatus.setSuppressed?.(suppress);
+      corridorStatus.setSuppressed?.(suppress, 'assetExplorer');
     })
     : null;
 
@@ -389,9 +394,30 @@ export function installAssetExplorer(container, viewer, {
     }
     const live = await waitForState(state => (state.assetsByType[asset.assetType] ?? []).find(candidate => candidate.id === asset.id), 10000);
     if (!live) { logger.warn?.(`[asset-explorer] ${asset.assetType} ${asset.id} did not appear after enabling ${layerId}`); return null; }
+    // A search hit is the same explicit "show me this one": it must land on a card, not beside one.
+    revealThroughFilters(asset.assetType, live.id);
     store.selectAsset(live, SELECTION_SOURCES.SEARCH);
     inspect(live);
     return live;
+  }
+
+  /**
+   * Clear whatever is keeping one record out of the list, before selecting it.
+   *
+   * Selecting a record the filter excludes leaves the details panel describing an asset that has no
+   * card — the carousel finds no index for it, so nothing reads as selected and Previous/Next jump
+   * somewhere else. Opening a record by name is an explicit "show me this one", so the narrowing
+   * gives way rather than the record.
+   *
+   * The date range goes first and alone, because it is the one narrowing the workspace applies on
+   * the operator's behalf rather than one they chose; a search or a type filter they typed is only
+   * dropped if the record is still hidden without it.
+   */
+  function revealThroughFilters(assetType, id) {
+    const hidden = () => !store.filteredAssets().some(asset => asset.id === id);
+    if (store.getState().activeExplorerType !== assetType || !hidden()) return;
+    store.setFilter({ from: null, to: null });
+    if (hidden()) store.setFilter({ query: '', id: null });
   }
 
   /**
@@ -415,6 +441,7 @@ export function installAssetExplorer(container, viewer, {
     const wanted = String(id);
     const live = await waitForState(state => (state.assetsByType[assetType] ?? []).find(candidate => candidate.id === wanted), 10000);
     if (!live) { logger.warn?.(`[asset-explorer] ${assetType} ${wanted} did not appear`); return null; }
+    revealThroughFilters(assetType, live.id);
     store.selectAsset(live, SELECTION_SOURCES.SEARCH);
     return live;
   }
@@ -475,6 +502,7 @@ export function installAssetExplorer(container, viewer, {
     inspect,
     returnFromInspection,
     destroy() {
+      cameraSpotlight.destroy();
       unsubscribeTheme?.();
       panelObserver?.disconnect();
       bodyObserver.disconnect();
@@ -487,7 +515,7 @@ export function installAssetExplorer(container, viewer, {
       roadShields?.setVisible?.(true);
       unsubscribeStrip?.();
       // Never leave the strip hidden because this island went away.
-      corridorStatus?.setSuppressed?.(false);
+      corridorStatus?.setSuppressed?.(false, 'assetExplorer');
       unsubscribeLayers?.();
       disconnect();
       // Unmounting synchronously inside a React event would warn; this only ever runs from the

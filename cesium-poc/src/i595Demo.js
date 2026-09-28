@@ -339,7 +339,12 @@ try {
   }
 
   const placeCorridorModels = () => corridorModelLayers.place();
-  if (showIntro) void startupSequence.run().then(placeCorridorModels);
+  // The intro choreography owns the camera until it is done, so a workspace that opens on its own
+  // view waits for it rather than flying into the middle of it. With no intro the camera is already
+  // where startup put it, and waiting on the 3D tiles would mean waiting on a network that may
+  // never answer — so that path is settled immediately and the models still place when they can.
+  let startupSettled = Promise.resolve();
+  if (showIntro) startupSettled = startupSequence.run().then(placeCorridorModels, () => {});
   else {
     document.body.dataset.startup = "ready";
     void base3dReady.then(placeCorridorModels);
@@ -417,7 +422,7 @@ try {
   });
   if (import.meta.env.DEV) { window.__assetExplorer = assetExplorer; window.__viewer = viewer; }
 
-  const maintenance = installMaintenanceWorkspace(viewer, { assetExplorer, maintenanceLayer });
+  const maintenance = installMaintenanceWorkspace(viewer, { assetExplorer, maintenanceLayer, layerStore, corridorStatus, roadShields });
   maintenanceWorkspace = maintenance;
   // Ask the Twin can be asked for a ticket before Maintenance has ever been opened, so the classes
   // load in the background rather than only on arrival.
@@ -441,18 +446,21 @@ try {
     roadShields,
   });
   const eventPulses = installEventPulses(viewer, { liveEvents: liveEventControls, cameras: cameraControls, messageSigns: messageSignControls });
-  // Live Ops opens on the whole corridor: an operator watching for what is happening needs all
-  // fifteen miles in frame, not the close hero shot the rest of the app opens on. Derived from the
-  // centerline, and only applied on arrival — it never fights the camera afterwards.
+  // Live Ops and Maintenance open on the whole corridor: an operator watching for what is happening
+  // — or reading a maintenance backlog spread over fifteen miles — needs all of it in frame, not the
+  // close hero shot the rest of the app opens on. Derived from the centerline, and only applied on
+  // arrival: it never fights the camera afterwards.
   const opsView = corridorOperationsView(corridor);
   const flyToOperationsView = () => viewer.camera.flyTo({
     destination: Cartesian3.fromDegrees(opsView.lon, opsView.lat, opsView.height),
     orientation: orientationOf(opsView), duration: 1.6,
   });
+  /** The workspaces that open on the whole corridor rather than on whatever the camera was doing. */
+  const CORRIDOR_VIEW_SECTIONS = new Set(["liveOps", "maintenance"]);
   const workspaces = { maintenance, safety, traffic, liveOps };
   appNav.onSelect(section => {
     eventPulses.setActive(section === "liveOps");
-    if (section === "liveOps") flyToOperationsView();
+    if (CORRIDOR_VIEW_SECTIONS.has(section)) flyToOperationsView();
     cameraControls.setIconMarkers(section === "liveOps");
     messageSignControls.setIconMarkers(section === "liveOps");
     for (const [name, workspace] of Object.entries(workspaces)) {
@@ -462,6 +470,9 @@ try {
   cameraControls.setIconMarkers(appNav.section === "liveOps");
   messageSignControls.setIconMarkers(appNav.section === "liveOps");
   workspaces[appNav.section]?.activate();
+  // Landing directly on one of these — the Maintenance Team role opens on Maintenance — gets the
+  // same corridor view as arriving by the nav bar, once the intro has finished with the camera.
+  if (CORRIDOR_VIEW_SECTIONS.has(appNav.section)) void startupSettled.then(() => flyToOperationsView());
   eventPulses.setActive(appNav.section === "liveOps");
   if (import.meta.env.DEV) { window.__maintenance = maintenance; window.__safety = safety; window.__traffic = traffic; window.__liveOps = liveOps; window.__liveEvents = liveEventControls; window.__layerStore = layerStore; window.__segments = mainlineSegments; }
 

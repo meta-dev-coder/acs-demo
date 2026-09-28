@@ -141,3 +141,21 @@ test('the reported date reads as the calendar day the record names, whatever the
   const record = normalizeIncident({ incident_id: 'INC-1', incident_type: 'Vehicle fire', incident_date: '2024-07-16T00:00:00', incident_time: '13:00' });
   assert.equal(reportedAt(incidentFacts(record)), 'Jul 16, 2024 · 13:00');
 });
+
+test('feedOnly keeps only the cameras that can actually show a frame, before the limit applies', () => {
+  const record = normalizeIncident(incidents[0]);
+  const all = camerasNear(record.longitude, record.latitude, cameras);
+  const withFeed = camerasNear(record.longitude, record.latitude, cameras, { feedOnly: true });
+  assert.ok(withFeed.every(camera => camera.divasChannelId), 'every camera offered can be looked through');
+  assert.ok(withFeed.length > 0, 'and there is at least one near this incident');
+  // Dropped before the limit, so "the four nearest" is four usable ones rather than four minus the duds.
+  const feedlessInRange = all.filter(camera => !camera.divasChannelId).length;
+  if (feedlessInRange > 0) assert.ok(withFeed.length >= all.length - feedlessInRange);
+  assert.deepEqual([...withFeed].sort((a, b) => a.metres - b.metres).map(c => c.id), withFeed.map(c => c.id));
+});
+
+test('an incident whose only nearby cameras have no feed is offered none, not a list of dead rows', () => {
+  const feedless = [{ properties: { camera_id: '9001', divas_chan_id: null }, geometry: { coordinates: [-80.25, 26.09] } }];
+  assert.deepEqual(camerasNear(-80.25, 26.09, feedless, { feedOnly: true }), []);
+  assert.equal(camerasNear(-80.25, 26.09, feedless).length, 1, 'and the unfiltered helper still reports it');
+});

@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 import { normalizeAll } from '../src/maintenance/maintenanceRecords.js';
 import { RELATED_ORDER, relatedRecordCount, relatedRecordGroups } from '../src/assetExplorer/relatedRecords.js';
-import { maintenanceDate, maintenanceDateKey, maintenanceDateParts } from '../src/assetExplorer/assetTypes.js';
+import { currentDateWindow, incidentTypeFilters, maintenanceDate, maintenanceDateKey, maintenanceDateParts, todayKey } from '../src/assetExplorer/assetTypes.js';
 
 const read = async name =>
   JSON.parse(await readFile(fileURLToPath(new URL(`../public/dataconnect-data/${name}.json`, import.meta.url)), 'utf8'));
@@ -117,4 +117,61 @@ test('every class in the export produces keys that sort as calendar dates', () =
     const sorted = [...keys].sort();
     assert.ok(sorted[0] >= '2000-01-01' && sorted[sorted.length - 1] <= '2100-01-01', `${assetType} dates out of range`);
   }
+});
+
+test('the default window is this calendar month and the five before it, ending today', () => {
+  assert.deepEqual(currentDateWindow({ today: new Date(2026, 8, 28) }), { from: '2026-04-01', to: '2026-09-28' });
+  // Across a year boundary, and on the first day of a month.
+  assert.deepEqual(currentDateWindow({ today: new Date(2026, 1, 1) }), { from: '2025-09-01', to: '2026-02-01' });
+  assert.deepEqual(currentDateWindow({ today: new Date(2026, 0, 31) }), { from: '2025-08-01', to: '2026-01-31' });
+  assert.deepEqual(currentDateWindow({ months: 1, today: new Date(2026, 8, 28) }), { from: '2026-09-01', to: '2026-09-28' });
+});
+
+test('the window never reaches past today, so a record dated later is not shown as history', () => {
+  const window = currentDateWindow({ today: new Date(2026, 8, 28) });
+  assert.equal(window.to, '2026-09-28');
+  assert.ok('2026-09-29' > window.to, 'tomorrow is outside the window');
+  assert.ok('2026-12-01' > window.to, 'and so is a record dated months ahead');
+  assert.equal(todayKey(new Date(2026, 8, 28)), '2026-09-28');
+});
+
+test('a record is in the window only when its own key falls inside it', () => {
+  const inside = (key, window) => Boolean(key) && key >= window.from && key <= window.to;
+  const window = currentDateWindow({ today: new Date(2026, 8, 28) });
+  assert.equal(inside('2026-04-01', window), true, 'the first day of the earliest month is in');
+  assert.equal(inside('2026-03-31', window), false, 'the day before it is out');
+  assert.equal(inside('2026-09-28', window), true, 'today is in');
+  assert.equal(inside('2026-09-29', window), false, 'tomorrow is out');
+  assert.equal(inside(null, window), false, 'a record with no readable date is outside every window');
+});
+
+test('the type dropdown lists every type but counts only what the other filters leave on screen', () => {
+  const asset = (id, title, date) => ({ id, assetType: 'incidentRecord', source: { title, createdDate: date } });
+  const all = [
+    asset('A', 'Vehicle fire', '2026-05-02T00:00:00'),
+    asset('B', 'Vehicle fire', '2026-05-09T00:00:00'),
+    asset('C', 'Rear-end crash', '2026-05-11T00:00:00'),
+    asset('D', 'Guardrail strike', '2024-01-04T00:00:00'),
+  ];
+  const inRange = all.filter(item => maintenanceDateKey(item.source.createdDate) >= '2026-04-01');
+  const filters = incidentTypeFilters(all, inRange);
+
+  // Every type the class carries is still offered — the taxonomy does not shrink with the range.
+  assert.deepEqual([...filters].map(entry => entry.label).sort(),
+    ['Guardrail strike', 'Rear-end crash', 'Vehicle fire']);
+  const count = label => filters.find(entry => entry.label === label).count;
+  assert.equal(count('Vehicle fire'), 2);
+  assert.equal(count('Rear-end crash'), 1);
+  // Out of range entirely: listed, and honestly zero.
+  assert.equal(count('Guardrail strike'), 0);
+  // Ordered by what is actually on screen, so the common ones stay reachable first.
+  assert.deepEqual(filters.map(entry => entry.label), ['Vehicle fire', 'Rear-end crash', 'Guardrail strike']);
+  // The match itself is unaffected by the counting set.
+  assert.equal(filters.find(entry => entry.label === 'Guardrail strike').match(all[3]), true);
+});
+
+test('with no counting set given, a value filter counts the records it was built from', () => {
+  const asset = (id, title) => ({ id, source: { title } });
+  const filters = incidentTypeFilters([asset('A', 'Vehicle fire'), asset('B', 'Vehicle fire')]);
+  assert.equal(filters[0].count, 2);
 });

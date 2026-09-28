@@ -134,7 +134,7 @@ export function IncidentDetailsPanel({
   // The same top edge as the generic panel: below the app header and the workspace's KPI strip,
   // which this must not cover. The panel scrolls rather than growing past it.
   asset, inspecting, onClose, onInspect, onReturn, onViewCamera,
-  lookupRecords = null, onOpenRecord = null,
+  lookupRecords = null, onOpenRecord = null, onHighlightCameras = null,
   top = 220, bottom = 16, right = 16,
 }) {
   const panelRef = useRef(null);
@@ -156,13 +156,15 @@ export function IncidentDetailsPanel({
     () => (context && coordinates ? carriagewayAt(coordinates.longitude, coordinates.latitude, context.lines) : null),
     [context, coordinates],
   );
+  // Only the cameras that can actually show a frame: a row reading "no public snapshot feed" is a
+  // row an operator cannot use, and counting it in the tab's badge overstates what they can see.
   const cameras = useMemo(
-    () => (context && coordinates ? camerasNear(coordinates.longitude, coordinates.latitude, context.cameras) : []),
+    () => (context && coordinates
+      ? camerasNear(coordinates.longitude, coordinates.latitude, context.cameras, { feedOnly: true })
+      : []),
     [context, coordinates],
   );
-  // The panel leads with a camera that can actually show a frame; one without a feed is still listed
-  // in the Cameras tab, because "the nearest camera has no feed" is itself worth knowing.
-  const leadCamera = useMemo(() => cameras.find(camera => camera.divasChannelId) ?? cameras[0] ?? null, [cameras]);
+  const leadCamera = cameras[0] ?? null;
   const facts = useMemo(() => (record ? incidentFacts(record) : null), [record]);
   // The crash is one class's record of an event the other four also wrote about — the ticket raised
   // for the guardrail it took out, the crew sent, the work order, the inspection that closed it.
@@ -172,6 +174,15 @@ export function IncidentDetailsPanel({
 
   // Selecting a different incident should not leave the panel on a tab about the previous one.
   useEffect(() => { setTab(0); }, [asset?.id]);
+
+  // While the Cameras tab is open, its cameras are marked on the corridor — a list of four names
+  // does not say which side of the crash they are on. They come off the map when the tab, the panel
+  // or the incident changes, so the scene never keeps a camera the list is no longer offering.
+  useEffect(() => {
+    if (!onHighlightCameras) return undefined;
+    onHighlightCameras(tab === 2 ? cameras : null);
+    return () => onHighlightCameras(null);
+  }, [onHighlightCameras, tab, cameras]);
 
   if (!asset || !record) return null;
   const visual = incidentVisual(facts.type);
@@ -186,8 +197,11 @@ export function IncidentDetailsPanel({
       sx={{
         position: 'absolute', right, top, width: INCIDENT_DETAILS_WIDTH, zIndex: 60,
         maxHeight: `calc(100% - ${top + bottom}px)`,
-        p: 2, borderRadius: 2, overflowY: 'auto',
-        display: 'flex', flexDirection: 'column', gap: 1.5, pointerEvents: 'auto',
+        // No padding and no scrolling on the Paper itself: the heading is pinned and the BODY
+        // scrolls under it, so Close and the incident's name stay on screen however long the
+        // Related tab gets. Padding lives on the two sections instead.
+        p: 0, borderRadius: 2, overflow: 'hidden',
+        display: 'flex', flexDirection: 'column', pointerEvents: 'auto',
         // The one place the family colour is structural rather than decorative: the panel's left
         // edge says which kind of incident is open before a word is read.
         borderLeft: `4px solid ${visual.color}`,
@@ -195,7 +209,18 @@ export function IncidentDetailsPanel({
       role="complementary"
       aria-label={`${facts.type ?? 'Incident'} details`}
     >
-      <Stack ref={headingRef} direction="row" spacing={1.25} sx={{ alignItems: 'flex-start' }}>
+      <Stack
+        ref={headingRef}
+        direction="row"
+        spacing={1.25}
+        sx={{
+          position: 'relative', flex: 'none', alignItems: 'flex-start',
+          px: 2, pt: 2, pb: 1.5, borderBottom: 1, borderColor: 'divider',
+          // Room for the close button, which sits in the panel's own corner rather than inline —
+          // so the title can be any length without pushing it out of reach.
+          pr: 6,
+        }}
+      >
         <IncidentTypeBadge incidentType={facts.type} />
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
@@ -217,13 +242,17 @@ export function IncidentDetailsPanel({
           )}
         </Box>
         <Tooltip title="Close incident details">
+          {/* The panel's top-right corner, pinned: a drag handle ignores clicks on a button, so
+              this stays clickable while the heading still moves the panel. */}
           <IconButton onClick={onClose} aria-label="Close incident details"
-            sx={{ width: 32, height: 32, borderRadius: 1, bgcolor: 'action.hover', flex: 'none' }}>
+            sx={{ position: 'absolute', top: 8, right: 8, width: 32, height: 32, borderRadius: 1, bgcolor: 'action.hover' }}>
             <CloseIcon fontSize="small" />
           </IconButton>
         </Tooltip>
       </Stack>
 
+      {/* Everything below the heading scrolls. */}
+      <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
       <CameraSnapshot camera={leadCamera} />
 
       {headline.length > 0 && (
@@ -337,6 +366,7 @@ export function IncidentDetailsPanel({
           </Button>
         )}
       </Stack>
+      </Box>
     </Paper>
   );
 }

@@ -143,12 +143,16 @@ export function segmentSpanLabel(place) {
  * Distance only — no attempt to work out which way a camera is pointing, because the inventory does
  * not say. `direction` is the camera's own carriageway where the feed reports one.
  *
+ * `feedOnly` keeps just the cameras that can actually show a frame. A camera with no DIVAS channel
+ * is a real camera at a real place, but to an operator looking for eyes on an incident it is a row
+ * that says "no". The count of what you can see should not include what you cannot.
+ *
  * @param {{features: object[]}|object[]} cameras the camera GeoJSON, or already-flattened records
  * @returns {{id: string, label: string, description: string|null, direction: string|null,
  *            metres: number, longitude: number, latitude: number, divasChannelId: string|null,
  *            express: boolean}[]}
  */
-export function camerasNear(longitude, latitude, cameras, { limit = 4, rangeM = CAMERA_RANGE_M } = {}) {
+export function camerasNear(longitude, latitude, cameras, { limit = 4, rangeM = CAMERA_RANGE_M, feedOnly = false } = {}) {
   if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) return [];
   const features = Array.isArray(cameras) ? cameras : cameras?.features ?? [];
   const near = [];
@@ -161,6 +165,10 @@ export function camerasNear(longitude, latitude, cameras, { limit = 4, rangeM = 
     if (!id || !Number.isFinite(cameraLon) || !Number.isFinite(cameraLat)) continue;
     const metres = metresBetween(longitude, latitude, cameraLon, cameraLat);
     if (metres > rangeM) continue;
+    // Only a camera with a DIVAS channel has a snapshot to show; the rest are dropped before the
+    // limit is applied, so "the four nearest" means the four nearest you can actually look through.
+    const divasChannelId = typeof properties.divas_chan_id === 'string' && properties.divas_chan_id ? properties.divas_chan_id : null;
+    if (feedOnly && !divasChannelId) continue;
     near.push({
       id,
       label: String(properties.title ?? '').trim() || `Camera ${id}`,
@@ -170,8 +178,7 @@ export function camerasNear(longitude, latitude, cameras, { limit = 4, rangeM = 
       metres,
       longitude: cameraLon,
       latitude: cameraLat,
-      // Only a camera with a DIVAS channel has a snapshot to show; the rest are listed, not promised.
-      divasChannelId: typeof properties.divas_chan_id === 'string' && properties.divas_chan_id ? properties.divas_chan_id : null,
+      divasChannelId,
       express: properties.is_express_camera === true,
     });
   }

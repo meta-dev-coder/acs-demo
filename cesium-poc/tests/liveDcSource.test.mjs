@@ -6,7 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   LIVE_DC_CLASSES, LIVE_SOURCE_LABEL, CLEARED_WINDOW_MS, fetchLiveDc, createLiveDcFeed, liveDcEnabled,
-  liveCardNote, liveDcConnection, mergeLiveRecords, normalizeLiveRows,
+  liveDcConnection, mergeLiveRecords, normalizeLiveRows,
 } from '../src/maintenance/liveDcSource.js';
 import { normalizeTicket } from '../src/maintenance/maintenanceRecords.js';
 import { ASSET_TYPES, assetTypeConfig, detailRows, maintenanceFilters } from '../src/assetExplorer/assetTypes.js';
@@ -157,13 +157,6 @@ test('live records are merged beside the historical ones, live first, ids kept u
   assert.equal(new Set(merged.map(r => r.id)).size, 3);
   assert.deepEqual(merged.slice(1), historical, 'historical records untouched');
   assert.equal(mergeLiveRecords(historical, []), historical);
-});
-
-test('the card note leads with the live count', () => {
-  const live = normalizeLiveRows('tickets', [TICKET], { now: NOW });
-  assert.equal(liveCardNote(live, '12 open'), '1 live · 12 open');
-  assert.equal(liveCardNote([], '12 open'), '12 open');
-  assert.equal(liveCardNote(live, null), '1 live');
 });
 
 test('enabled by ?live=, VITE_LIVE_DC, the DataConnect source, or dev', () => {

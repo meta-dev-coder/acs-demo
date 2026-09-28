@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  liveBadge, liveFeedControl, liveOnlyCard, liveRedrawNeeded, liveSignature, maintenanceSourceNote, mergeLiveEntry, nextLiveSnapshot,
+  liveFeedControl, liveOnlyCard, liveRedrawNeeded, liveSignature, maintenanceSourceNote, mergeLiveEntry, nextLiveSnapshot,
   shownRecords,
 } from '../src/maintenance/maintenanceWorkspace.js';
 
@@ -18,14 +18,6 @@ test('the live signature changes with any rendered field, not just id, status an
   }
   assert.equal(liveSignature([{ ...base }]), before);
   assert.notEqual(liveSignature([base], 'Live feed unavailable'), before);
-});
-
-test('a card that is not ready is never badged live', () => {
-  const records = [base];
-  assert.equal(liveBadge({ state: 'ready', records }), 'true');
-  assert.equal(liveBadge({ state: 'ready', records: [{ ...base, live: false }] }), 'false');
-  assert.equal(liveBadge({ state: 'loading', records }), 'false');
-  assert.equal(liveBadge({ state: 'error', records }), 'false');
 });
 
 test('the live feed polls only while the workspace is shown', async () => {

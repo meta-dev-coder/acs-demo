@@ -71,14 +71,21 @@ export function installMaintenanceLayer(viewer) {
     const entity = layer?.entities.get(id);
     if (!entity) return;
     const isSelected = id === selected && assetType === active;
-    const state = isSelected ? 'selected' : labelled.has(id) && assetType === active ? 'id' : 'dot';
+    const tone = layer.tones.get(id);
+    // An incident is drawn as its family's pictogram at EVERY zoom, not promoted from a dot once the
+    // camera is within a few kilometres. The picture is the record's meaning — a fire and a flood
+    // spinout call for different people — and a corridor-wide frame is exactly where an operator
+    // reads that. The other classes keep the dot-until-near rule: a thousand work-order pins over
+    // fifteen miles is a texture, not a map.
+    const state = isSelected ? 'selected'
+      : tone?.glyph ? 'id'
+        : labelled.has(id) && assetType === active ? 'id' : 'dot';
     if (layer.drawn.get(id) === state) return;
     layer.drawn.set(id, state);
     // The selected one is drawn by the selection source instead, so it cannot end up behind a marker
     // it shares a position with.
     entity.show = !isSelected && assetType === active && !hiddenBySelection(layer, id)
       && (!layer.visible || layer.visible.has(id));
-    const tone = layer.tones.get(id);
     const marker = markerFor(id, tone, state);
     entity.billboard.image = marker.image;
     entity.billboard.width = marker.width;
@@ -145,16 +152,21 @@ export function installMaintenanceLayer(viewer) {
         if (entities.has(item.id)) continue;   // an id the source repeats: one marker, not a crash
         // An incident's tone is its crash family — colour and pictogram — rather than one of the
         // three shared tones; see markerFor.
-        tones.set(item.id, item.type === 'INCIDENT' ? incidentToneOf(item)
-          : item.type === 'ASSET_STATUS' ? 'damaged' : item.live ? 'live' : 'normal');
+        const tone = item.type === 'INCIDENT' ? incidentToneOf(item)
+          : item.type === 'ASSET_STATUS' ? 'damaged' : item.live ? 'live' : 'normal';
+        tones.set(item.id, tone);
+        // A class drawn as pictograms is built that way from the start. present() is only called
+        // for the markers near the camera, so a record beyond that range would otherwise keep the
+        // dot it was created with however far the operator zoomed out to look at the corridor.
+        const initial = tone?.glyph ? 'id' : 'dot';
         const position = Cartesian3.fromDegrees(item.longitude, item.latitude);
         const entity = source.entities.add({
           id: entityId(assetType, item.id), name: item.id, show: assetType === active,
-          position, billboard: { ...BILLBOARD, ...assetDotMarker(tones.get(item.id)) },
+          position, billboard: { ...BILLBOARD, ...markerFor(item.id, tone, initial) },
         });
         entities.set(item.id, entity);
         positions.set(item.id, position);
-        drawn.set(item.id, 'dot');
+        drawn.set(item.id, initial);
         // Records commonly share an asset, so their markers land on exactly the same point.
         const key = `${item.longitude},${item.latitude}`;
         atPoint.set(key, [...(atPoint.get(key) ?? []), item.id]);

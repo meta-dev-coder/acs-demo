@@ -97,6 +97,9 @@ export function installCorridorStatusBar(container, { mainline, liveEvents } = {
 
   refresh();
   const timer = setInterval(refresh, refreshMs);
+  /** Who is currently asking the strip to stand down. Empty means it is shown. */
+  const suppressors = new Set();
+
   return {
     element: strip,
     refresh,
@@ -104,9 +107,15 @@ export function installCorridorStatusBar(container, { mainline, liveEvents } = {
      * Step aside without being torn down. The Asset Explorer occupies the same edge of the map, and
      * two stacked bars leave neither enough room — but the strip is still a live feature with its
      * own toggle and refresh, so it hides rather than being removed and rebuilt.
+     *
+     * Suppression is held per `reason`, because more than one thing asks for this edge and they come
+     * and go independently: a workspace wants the strip gone for as long as it is open, while the
+     * explorer within it wants the same thing for only part of that time. With a single flag the one
+     * that finished first put the strip back underneath the one still using the space.
      */
-    setSuppressed(suppressed) {
-      strip.hidden = Boolean(suppressed);
+    setSuppressed(suppressed, reason = 'default') {
+      if (suppressed) suppressors.add(reason); else suppressors.delete(reason);
+      strip.hidden = suppressors.size > 0;
     },
     get suppressed() { return strip.hidden === true; },
     get collapsed() { return strip.classList.contains('collapsed'); },

@@ -181,16 +181,28 @@ export function maintenanceSearchText(asset) {
  * class like the incidents has fifteen types, and fifteen chips would push the cards off the screen.
  * Ordered by how many records each value has, so the common ones are reachable first.
  *
- * @param {object[]} assets
- * @param {{group: string, prefix: string, read: (item: object) => string|null}} spec
+ * The list of values and the COUNTS beside them come from different sets on purpose. The values come
+ * from the whole class, so the taxonomy does not rearrange itself underneath the cursor as a date
+ * range moves. The counts come from `counted` — everything the other filters already leave on screen
+ * — so each number is exactly how many records choosing that value would show, and a type with none
+ * in the current range reads "(0)" rather than promising records that are not there.
+ *
+ * @param {object[]} assets every record of the class: what values exist
+ * @param {{group: string, prefix: string, read: (item: object) => string|null, counted?: object[]}} spec
  */
-export function valueFilters(assets, { group, prefix, read }) {
-  const counts = new Map();
+export function valueFilters(assets, { group, prefix, read, counted = assets }) {
+  const values = new Set();
   for (const asset of assets) {
+    const value = text(read(asset.source ?? {}));
+    if (value) values.add(value);
+  }
+  const counts = new Map();
+  for (const asset of counted) {
     const value = text(read(asset.source ?? {}));
     if (value) counts.set(value, (counts.get(value) ?? 0) + 1);
   }
-  return [...counts.entries()]
+  return [...values]
+    .map(value => [value, counts.get(value) ?? 0])
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .map(([value, count]) => ({
       id: `${prefix}:${value.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
@@ -200,8 +212,8 @@ export function valueFilters(assets, { group, prefix, read }) {
 }
 
 /** The crash taxonomy the incident class carries — "Multi-vehicle crash", "Rear-end crash", … */
-export const incidentTypeFilters = assets =>
-  valueFilters(assets, { group: 'Incident type', prefix: 'incident-type', read: item => item.title });
+export const incidentTypeFilters = (assets, counted) =>
+  valueFilters(assets, { group: 'Incident type', prefix: 'incident-type', read: item => item.title, counted });
 
 export function maintenanceFilters(assets) {
   const items = assets.map(asset => asset.source).filter(Boolean);
@@ -284,6 +296,29 @@ export function maintenanceDateKey(value) {
   return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
 }
 
+/** How much of a class's history a workspace opens on. */
+export const DEFAULT_WINDOW_MONTHS = 6;
+
+/** A Date's calendar key in the reader's own timezone — "today" is a local idea, not a UTC one. */
+export const todayKey = (today = new Date()) =>
+  `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+
+/**
+ * The window a class opens on: this calendar month and the five before it, ending today.
+ *
+ * Measured from the clock, not from the records. The end bound is today rather than the end of the
+ * month, so a record dated later than now — which these classes do carry — is not shown as if it had
+ * already happened. Widening the range is an explicit act; the default never volunteers the future.
+ *
+ * @param {{months?: number, today?: Date}} [options]
+ * @returns {{from: string, to: string}} inclusive calendar keys
+ */
+export function currentDateWindow({ months = DEFAULT_WINDOW_MONTHS, today = new Date() } = {}) {
+  // Whole calendar months: six months ending in September starts on 1 April, not on the 28th of it.
+  const first = new Date(today.getFullYear(), today.getMonth() - (months - 1), 1);
+  return { from: `${first.getFullYear()}-${pad(first.getMonth() + 1)}-01`, to: todayKey(today) };
+}
+
 /** One entry per maintenance class; everything else about them is identical. */
 const MAINTENANCE_TYPE = ({ id, label, singular, title = singular, icon, statusTone, extraFilters = null,
   /** What "reported" means for this class — the column its own sheet opens a record with. */
@@ -304,7 +339,9 @@ const MAINTENANCE_TYPE = ({ id, label, singular, title = singular, icon, statusT
   getStatus: () => null,
   details: asset => maintenanceDetails(asset.source),
   getSearchText: maintenanceSearchText,
-  getFilters: assets => [...maintenanceFilters(assets), ...(extraFilters?.(assets) ?? [])],
+  // `counted` is what the other filters leave on screen; the chips themselves are offered on the
+  // whole class, so a date range narrows the numbers without making controls come and go.
+  getFilters: (assets, counted = assets) => [...maintenanceFilters(assets), ...(extraFilters?.(assets, counted) ?? [])],
 });
 
 /** Live DataConnect records lead their card status with LIVE; historical ones are unchanged. */

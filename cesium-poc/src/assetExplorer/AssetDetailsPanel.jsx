@@ -63,28 +63,41 @@ export function AssetDetailsPanel({
         // same width, same padding and radius, so the two kinds of panel are visibly one family.
         position: 'absolute', right, top, width: DETAILS_WIDTH, zIndex: 60,
         maxHeight: `calc(100% - ${top + bottom}px)`,
-        p: 2.25, borderRadius: 2, overflowY: 'auto',
-        display: 'flex', flexDirection: 'column', gap: 1.5, pointerEvents: 'auto',
+        // The heading is pinned and the body scrolls under it, so Close and the record's name stay
+        // on screen however long the Related tab gets. Padding lives on the two sections instead.
+        p: 0, borderRadius: 2, overflow: 'hidden',
+        display: 'flex', flexDirection: 'column', pointerEvents: 'auto',
       }}
       role="complementary"
       aria-label={title}
     >
-      <Stack ref={headingRef} direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
-        {/* The title takes the remaining width so the close button sits hard against the top-right
-            corner, whatever the title's length. */}
+      <Stack
+        ref={headingRef}
+        direction="row"
+        spacing={1}
+        sx={{
+          position: 'relative', flex: 'none', alignItems: 'flex-start',
+          px: 2.25, pt: 2.25, pb: 1.5, pr: 6.5, borderBottom: 1, borderColor: 'divider',
+        }}
+      >
         <Typography component="h2" sx={{ flex: 1, minWidth: 0, fontSize: 17, fontWeight: 600, lineHeight: 1.25 }}>
           {title}
         </Typography>
         <Tooltip title="Close asset details">
+          {/* The panel's top-right corner, pinned: a drag handle ignores clicks on a button, so
+              this stays clickable while the heading still moves the panel. */}
           <IconButton
             onClick={onClose}
             aria-label="Close asset details"
-            sx={{ width: 36, height: 36, borderRadius: 1, bgcolor: 'action.hover', flex: 'none' }}
+            sx={{ position: 'absolute', top: 10, right: 10, width: 36, height: 36, borderRadius: 1, bgcolor: 'action.hover' }}
           >
             <CloseIcon fontSize="small" />
           </IconButton>
         </Tooltip>
       </Stack>
+
+      {/* Everything below the heading scrolls. */}
+      <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', p: 2.25, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
 
       {showRelated && (
         <Tabs
@@ -147,6 +160,7 @@ export function AssetDetailsPanel({
           </Button>
         )}
       </Stack>
+      </Box>
     </Paper>
   );
 }

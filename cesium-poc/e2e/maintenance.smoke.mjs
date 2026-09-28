@@ -219,12 +219,24 @@ try {
 
   // 7. Search and filters are on the browser, and everything follows them: cards, list and map.
   const explorer = page.getByRole('region', { name: 'Work Orders explorer', exact: true });
+  // A class opens on its most recent six months, so the whole class is not on screen to begin with.
+  // The rest of this section is about search and the chips, so the range is cleared first.
+  const openedOn = await page.evaluate(() => {
+    const { from, to } = window.__assetExplorer.store.getState().filter;
+    return { from, to, shown: window.__assetExplorer.store.filteredAssets().length };
+  });
+  assert.ok(openedOn.from && openedOn.to, 'Work Orders opens on a date range, not on everything');
+  assert.ok(openedOn.shown > 0 && openedOn.shown < workOrders.length, `the default window shows ${openedOn.shown} of ${workOrders.length}`);
+  assert.equal((await drawn()).shown, openedOn.shown, 'and the map draws exactly that window');
+  await explorer.getByRole('button', { name: 'Clear the date range' }).click();
+  await page.waitForTimeout(400);
+  console.log(`✓ Work Orders opens on ${openedOn.from} → ${openedOn.to} (${openedOn.shown} of ${workOrders.length}), map included`);
   const search = explorer.getByRole('textbox', { name: 'Search work orders' });
   await search.fill(target.id);
   await page.waitForTimeout(400);
   assert.equal(await cards.count(), 1, 'the cards narrow with the search');
   assert.equal((await drawn()).shown, 1, 'and so does the map');
-  assert.match(await explorer.innerText(), /1 of 854/);
+  assert.match(await explorer.innerText(), /1 asset/);
   await search.fill('zzzz-not-a-record');
   await page.waitForTimeout(400);
   assert.equal(await cards.count(), 0);
@@ -234,7 +246,7 @@ try {
   await explorer.getByRole('button', { name: 'High priority' }).click();
   await page.waitForTimeout(500);
   const high = workOrders.filter(row => row.Priority === 'High').length;
-  assert.match(await explorer.innerText(), new RegExp(`${high} of 854`));
+  assert.match(await explorer.innerText(), new RegExp(`${high} assets`));
   const shownCards = await cards.allInnerTexts();
   assert.ok(shownCards.length && shownCards.every(text => /High priority/.test(text)), 'the filter uses the record\'s own priority');
   const drawnHigh = (await drawn()).shown;
@@ -244,7 +256,7 @@ try {
   await page.waitForTimeout(400);
   assert.match(await explorer.innerText(), /854 assets/);
   assert.equal((await drawn()).shown, placed.length, 'All puts every record back on the map');
-  console.log(`✓ browser search and filters drive the cards, the list and the map (High priority: ${high} of 854)`);
+  console.log(`✓ browser search and filters drive the cards, the list and the map (High priority: ${high} of ${workOrders.length})`);
 
   // 8. The map is still a map, and the workspace closes cleanly.
   const controls = await page.evaluate(() => { const c = window.__viewer.scene.screenSpaceCameraController; return [c.enableRotate, c.enableTranslate, c.enableZoom, c.enableTilt]; });
@@ -291,6 +303,10 @@ try {
   const incidentList = page.getByRole('region', { name: 'Incidents explorer', exact: true });
   await incidentList.waitFor({ timeout: 30000 });
   const incidentTotal = await page.evaluate(() => window.__assetExplorer.store.getState().assetsByType.incidentRecord.length);
+  // This section is about the crash-type filter, so the six-month window the class opened on is
+  // cleared first — otherwise "All incident types" restores the window, not the whole class.
+  await incidentList.getByRole('button', { name: 'Clear the date range' }).click();
+  await page.waitForTimeout(400);
   const typeSelect = incidentList.locator('[aria-label="Incident type"]');
   assert.equal(await typeSelect.count(), 1, 'Maintenance offers the incident-type filter too');
   await typeSelect.click();

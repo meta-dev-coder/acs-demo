@@ -9,11 +9,11 @@
  * class loads on its own: a slow or failing one shows its own state and never blocks the others.
  */
 import { SELECTION_SOURCES } from '../assetExplorer/assetSelectionStore.js';
-import { assetTypeConfig, maintenanceDate } from '../assetExplorer/assetTypes.js';
+import { assetTypeConfig, currentDateWindow, maintenanceDate, maintenanceDateKey } from '../assetExplorer/assetTypes.js';
 import { installWorkspaceStrip } from '../workspaceStrip.js';
 import { clearCache, DataConnectError, getCuratedData, isLive, MissingClassError, needsSignIn, signIn, sourceLabel, debugEnabled } from './dataConnectService.js';
 import { assetIndex, normalizeAll, resolveLocations, summarize } from './maintenanceRecords.js';
-import { createLiveDcFeed, liveCardNote, liveDcConnection, liveDcEnabled, mergeLiveRecords } from './liveDcSource.js';
+import { createLiveDcFeed, liveDcConnection, liveDcEnabled, mergeLiveRecords } from './liveDcSource.js';
 import { DC_NOT_CONNECTED } from '../liveEventsData.js';
 
 /** The classes the strip shows, in order. `assetType` is set for the ones the map can browse. */
@@ -50,9 +50,6 @@ export function maintenanceSourceNote({ base, live, liveShown, connection }) {
   }
   return { text: liveShown ? `${base} + Live DataConnect` : base, live: Boolean(live || liveShown) };
 }
-
-/** A card's LIVE badge: only a ready card can show live records. */
-export const liveBadge = entry => String(entry?.state === 'ready' && entry.records.some(item => item.live));
 
 /** Polls while the workspace is shown and stops while it is hidden. */
 export function liveFeedControl(feed, { onError = () => {} } = {}) {
@@ -95,7 +92,14 @@ export function shownRecords(entry, { live = true } = {}) {
  * @param {import('cesium').Viewer} viewer
  * @param {{assetExplorer: object, maintenanceLayer: object, host?: HTMLElement}} deps
  */
-export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenanceLayer, host = document.body }) {
+/**
+ * The corridor's own road lines. Maintenance switches them off while it is open: the workspace is
+ * about WHERE the work is, and a blue ribbon down the middle of every record is the one thing on
+ * screen that carries no maintenance information. Whatever was on comes back on the way out.
+ */
+export const CORRIDOR_ROAD_LAYERS = Object.freeze(['mainline-eb', 'mainline-wb', 'express']);
+
+export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenanceLayer, layerStore = null, corridorStatus = null, roadShields = null, host = document.body }) {
   const store = assetExplorer.store;
   const liveOn = liveDcEnabled();
   const cards = liveOn ? [...KPI_CARDS, LIVE_KPI_CARD] : KPI_CARDS;
@@ -180,18 +184,58 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
     if (activeKey === key) applyRecords();
   }
 
+  // ── the corridor's road lines ───────────────────────────────────────────────────────────────
+
+  /** Road layers this workspace switched off, so only those are switched back on. */
+  let borrowedRoads = [];
+  function hideCorridorRoads() {
+    if (!layerStore) return;
+    borrowedRoads = CORRIDOR_ROAD_LAYERS.filter(id => layerStore.stateOf(id) !== 'off');
+    for (const id of borrowedRoads) void layerStore.setVisible(id, false);
+  }
+  function restoreCorridorRoads() {
+    if (!layerStore || !borrowedRoads.length) return;
+    const roads = borrowedRoads;
+    borrowedRoads = [];
+    // Only what this workspace took away: a layer the operator switched off themselves stays off.
+    for (const id of roads) void layerStore.setVisible(id, true);
+  }
+
+  // ── the six months a class is summarised and opened on ──────────────────────────────────────
+
+  /**
+   * The six months every card counts and every class opens on: this month and the five before it,
+   * ending today. One window for the whole strip, so the cards are comparable with each other.
+   */
+  const windowOf = () => currentDateWindow();
+
+  /** The records inside a window. A record with no readable date is outside every window. */
+  function within(records, window) {
+    if (!window) return records;
+    return records.filter(item => {
+      const key = maintenanceDateKey(item.createdDate);
+      return Boolean(key) && key >= window.from && key <= window.to;
+    });
+  }
+
   // ── KPI strip ───────────────────────────────────────────────────────────────────────────────
   function renderStrip() {
     for (const card of cards) {
       const entry = datasets.get(card.key);
-      const button = strip.root.querySelector(`[data-kpi="${card.key}"]`);
-      if (button) button.dataset.live = liveBadge(entry);
       if (entry.state !== 'ready') { strip.set(card.key, { state: entry.state, note: entry.note, warning: entry.warning, title: entry.title }); continue; }
-      const unplaced = entry.records.length - entry.summary.located;
+      // The card counts the six months the class opens on, not its whole history: the strip is a
+      // picture of what is happening on the corridor now, and 1,549 inspections going back two years
+      // is not that. Summarised over the same records, so the note can never contradict the count.
+      const loaded = shownRecords(entry, { live: withLive });
+      const records = within(loaded, windowOf());
+      const summary = summarize(records, card.key);
+      const unplaced = records.length - summary.located;
       strip.set(card.key, {
         state: 'ready',
-        count: entry.summary.total,
-        note: liveCardNote(entry.records, entry.summary.note ?? (entry.summary.total ? `${unplaced} without location` : 'None recorded')),
+        count: summary.total,
+        // The card counts the class, not the feed: a "3 live" prefix on every note said the same
+        // thing five times over, and the strip's own source pill already says the feed is on.
+        note: summary.note ?? (summary.total ? `${unplaced} without location` : 'None recorded'),
       });
     }
     strip.setActive(activeKey);
@@ -214,9 +258,26 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
   // ── selection, shared with the map and the bottom explorer ──────────────────────────────────
   let lastFilter = '';
   function onStoreChange(state) {
-    const signature = `${state.filter.query}|${state.filter.id}|${state.activeExplorerType}`;
+    // Every part of the filter, not just the ones that existed first: a date range that was left
+    // out of this signature narrowed the cards and the rail while the map kept drawing all 181.
+    const { query, id, from, to } = state.filter;
+    const signature = `${query}|${id}|${from}|${to}|${state.activeExplorerType}`;
     if (signature !== lastFilter) { lastFilter = signature; syncMap(); }
     writeUrl();
+  }
+
+  /**
+   * A class opens on its most recent six months, on the cards, the rail and the map alike.
+   *
+   * Applied once per opening, never on a live refresh: the 60-second poll calls applyRecords again,
+   * and re-asserting the default there would drag an operator's own date range back under them every
+   * minute. Closing the card forgets it, so re-opening starts from the default again.
+   */
+  let defaultedType = null;
+  function applyDefaultWindow(assetType) {
+    if (defaultedType === assetType) return;
+    defaultedType = assetType;
+    store.setFilter(windowOf());
   }
 
   /** Put the records into the explorer and onto the map. */
@@ -225,10 +286,14 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
     const entry = datasets.get(activeKey);
     if (!card || !entry) return;
     if (card.assetType) {
-      maintenanceLayer.setRecords(card.assetType, shownRecords(entry, { live: withLive }));
+      const records = shownRecords(entry, { live: withLive });
+      maintenanceLayer.setRecords(card.assetType, records);
       maintenanceLayer.show(card.assetType);
       assetExplorer.refresh();
       store.setActiveExplorerType(card.assetType);
+      // After setActiveExplorerType, which clears the previous class's filter, and after refresh()
+      // has put the records in the store — so the window is measured against what is actually there.
+      applyDefaultWindow(card.assetType);
       store.setStatus(card.assetType, { loading: entry.state === 'loading', error: entry.state === 'ready' ? null : assetTypeConfig(card.assetType)?.errorMessage ?? 'Unavailable' });
     }
     syncMap();
@@ -244,6 +309,7 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
 
   function closeType() {
     activeKey = null;
+    defaultedType = null;
     maintenanceLayer.show(null);
     store.setActiveExplorerType(null);
     renderStrip();
@@ -353,6 +419,15 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
       if (active) return;
       active = true;
       root.hidden = false;
+      hideCorridorRoads();
+      // The corridor status strip reports live traffic on the bottom edge. This workspace is about
+      // the maintenance backlog, and its own record browser takes that edge — so the strip stands
+      // down for as long as Maintenance is open, not only while a class is being browsed.
+      corridorStatus?.setSuppressed?.(true, 'maintenance');
+      // Only the shields at either end of I-595, as Live Ops does: over a corridor-wide frame the
+      // interchange shields between them repeat the same route number down the whole length of it,
+      // competing with the records that are the point of this workspace.
+      roadShields?.setEndpointsOnly?.(true);
       renderStrip();
       strip.measure();
       void liveControl.show();
@@ -366,13 +441,23 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
       if (!active) return;
       active = false;
       root.hidden = true;
+      restoreCorridorRoads();
+      corridorStatus?.setSuppressed?.(false, 'maintenance');
+      roadShields?.setEndpointsOnly?.(false);
       liveControl.hide();
       maintenanceLayer.show(null);
       if (activeKey) store.setActiveExplorerType(null);
       activeKey = null;
       renderStrip();
     },
-    destroy() { liveFeed?.stop(); unsubscribe(); strip.destroy(); root.remove(); },
+    destroy() {
+      liveFeed?.stop(); unsubscribe(); strip.destroy(); root.remove();
+      // Never leave the corridor without its roads, its shields or its status strip because this
+      // workspace went away.
+      restoreCorridorRoads();
+      corridorStatus?.setSuppressed?.(false, 'maintenance');
+      roadShields?.setEndpointsOnly?.(false);
+    },
   };
 }
 

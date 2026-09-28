@@ -16,7 +16,7 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { createAppTheme } from './theme.js';
 import { useAssetStore } from './useAssetStore.js';
-import { assetTypeConfig } from './assetTypes.js';
+import { assetTypeConfig, todayKey } from './assetTypes.js';
 import { corridorLengthMiles } from './corridorPosition.js';
 import { SELECTION_SOURCES } from './assetSelectionStore.js';
 import { AssetCarousel } from './AssetCarousel.jsx';
@@ -67,7 +67,7 @@ export function AssetExplorer({
   store, centerline, leftInset = 16, rightInset: detailsInset = 16, themeMode = 'dark',
   /** Where the details panel's top edge goes — measured, so it clears this workspace's own strip. */
   panelTop = 220,
-  onInspect, onReturn, onViewCamera, lookupRecords = null, onOpenRecord = null,
+  onInspect, onReturn, onViewCamera, lookupRecords = null, onOpenRecord = null, onHighlightCameras = null,
 }) {
   const state = useAssetStore(store);
   // Rebuilt only when the mode actually changes; a new theme object on every render would remount
@@ -82,7 +82,10 @@ export function AssetExplorer({
   // Search and filters live on the browser itself, so the cards, the rail, the mini-map, Next and
   // the map are all looking at the same narrowed set.
   const assets = store.filteredAssets();
-  const filters = useMemo(() => config?.getFilters?.(all) ?? [], [config, all]);
+  // What every filter EXCEPT the grouped ones leaves on screen — the set the type dropdown counts
+  // over, so "Vehicle fire (4)" means four in the range you are looking at, not four ever.
+  const counted = useMemo(() => store.filteredAssets({ id: null }), [store, state.filter, all]);
+  const filters = useMemo(() => config?.getFilters?.(all, counted) ?? [], [config, all, counted]);
   // A filter with a `group` is one of many values of the same field — offered as a dropdown, because
   // a class like the incidents has fifteen types and that many chips would push the cards off screen.
   const chipFilters = useMemo(() => filters.filter(filter => !filter.group), [filters]);
@@ -94,18 +97,17 @@ export function AssetExplorer({
     }
     return [...groups.entries()];
   }, [filters]);
-  // Only a class that actually dates its records is offered a date range, and the inputs are bounded
-  // by the dates it holds rather than by today — these are historical registers, not live feeds.
+  // Only a class that actually dates its records is offered a date range. The earliest date it holds
+  // is the floor; today is the ceiling, because a record dated later than now has not happened yet
+  // and offering to filter "up to" it would be offering to show the future as if it were history.
   const dateBounds = useMemo(() => {
     if (!config?.getDateKey) return null;
-    let min = null, max = null;
+    let min = null;
     for (const asset of all) {
       const key = config.getDateKey(asset);
-      if (!key) continue;
-      if (min === null || key < min) min = key;
-      if (max === null || key > max) max = key;
+      if (key && (min === null || key < min)) min = key;
     }
-    return min ? { min, max } : null;
+    return min ? { min, max: todayKey() } : null;
   }, [config, all]);
   const datesAvailable = Boolean(dateBounds);
   const status = state.statusByType[activeExplorerType] ?? { loading: false, error: null };
@@ -176,6 +178,7 @@ export function AssetExplorer({
             onViewCamera={onViewCamera}
             lookupRecords={lookupRecords}
             onOpenRecord={onOpenRecord}
+            onHighlightCameras={onHighlightCameras}
           />
         ) : (
           <AssetDetailsPanel
@@ -241,10 +244,11 @@ export function AssetExplorer({
           >
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center', px: 1.5, py: 1 }}>
               <Typography variant="h6">{config.label}</Typography>
+              {/* What is on screen, full stop. "22 of 181" invited the question "why am I not seeing
+                  the other 159", whose answer is the date range sitting right beside this chip. */}
               <Chip
                 label={status.loading ? '…'
-                  : assets.length === all.length ? `${all.length.toLocaleString('en-US')} ${all.length === 1 ? 'asset' : 'assets'}`
-                    : `${assets.length.toLocaleString('en-US')} of ${all.length.toLocaleString('en-US')}`}
+                  : `${assets.length.toLocaleString('en-US')} ${assets.length === 1 ? 'asset' : 'assets'}`}
                 size="small" variant="outlined"
               />
               <Box sx={{ flex: 1 }} />
