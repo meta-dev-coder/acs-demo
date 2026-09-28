@@ -15,7 +15,7 @@ import { Box, Button, Chip, Stack, Typography } from '@mui/material';
 import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
 import { AssetTypeIcon } from './AssetTypeIcon.jsx';
 import { assetTypeConfig, maintenanceDate } from './assetTypes.js';
-import { relatedRecordCount, relatedRecordGroups } from './relatedRecords.js';
+import { liveEventRelatedGroups, relatedRecordCount, relatedRecordGroups } from './relatedRecords.js';
 
 /** A class with more than this many related records is capped until the operator asks for the rest. */
 const PREVIEW = 6;
@@ -25,6 +25,14 @@ export function useRelatedGroups(record, lookupRecords) {
   return useMemo(
     () => (record && lookupRecords ? relatedRecordGroups(record, lookupRecords) : []),
     [record, lookupRecords],
+  );
+}
+
+/** The same, for an FL511 live event: what the register holds for the event on screen. */
+export function useLiveEventRelatedGroups(event, lookupRecords) {
+  return useMemo(
+    () => (event && lookupRecords ? liveEventRelatedGroups(event, lookupRecords) : []),
+    [event, lookupRecords],
   );
 }
 

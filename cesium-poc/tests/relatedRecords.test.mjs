@@ -10,7 +10,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 import { normalizeAll } from '../src/maintenance/maintenanceRecords.js';
-import { RELATED_ORDER, relatedRecordCount, relatedRecordGroups } from '../src/assetExplorer/relatedRecords.js';
+import { RELATED_ORDER, liveEventRelatedGroups, relatedRecordCount, relatedRecordGroups } from '../src/assetExplorer/relatedRecords.js';
 import { currentDateWindow, incidentTypeFilters, maintenanceDate, maintenanceDateKey, maintenanceDateParts, todayKey } from '../src/assetExplorer/assetTypes.js';
 
 const read = async name =>
@@ -174,4 +174,94 @@ test('with no counting set given, a value filter counts the records it was built
   const asset = (id, title) => ({ id, source: { title } });
   const filters = incidentTypeFilters([asset('A', 'Vehicle fire'), asset('B', 'Vehicle fire')]);
   assert.equal(filters[0].count, 2);
+});
+
+/**
+ * The live DataConnect chain, with the record shapes this instance actually produces: a road event,
+ * the ticket raised for it, its three tasks, the work order, the inspection and the damaged asset.
+ * Every one of them carries the event key in `source_event_id` (normalised to `related.eventId`);
+ * the event itself IS that key. Ids and fields are copied from a live read, not invented.
+ */
+const liveChain = () => {
+  const event = { id: 'FL511-999003', sourceId: 'FL511-999003', type: 'INCIDENT', live: true,
+    title: 'Crash', status: 'Cleared', assetId: null, createdDate: '2026-09-27T20:10:00',
+    related: { fl511ItemId: '999003', eventType: 'INCIDENT' } };
+  const of = (id, type, extra = {}) => ({ id, sourceId: id, type, live: true, assetId: null,
+    related: { eventId: 'FL511-999003' }, ...extra });
+  return {
+    incidentRecord: [event, { id: 'INC-200022', type: 'INCIDENT', assetId: '182', related: {} }],
+    ticket: [of('TIC-FL511-999003', 'TICKET', { title: 'Crash - Crash', assetId: 'H63571',
+      related: { eventId: 'FL511-999003' } })],
+    task: ['01', '02', '03'].map((n, i) => of(`TSK-FL511-999003-${n}`, 'TASK', {
+      title: ['Dispatch Field Crew', 'Temporary Mitigation', 'Inspect and Verify'][i],
+      related: { eventId: 'FL511-999003', ticketId: 'TIC-FL511-999003' },
+    })),
+    workOrder: [of('WO-FL511-999003', 'WORK_ORDER', {
+      related: { eventId: 'FL511-999003', ticketId: 'TIC-FL511-999003' } })],
+    inspection: [of('INSP-FL511-999003', 'INSPECTION', { title: 'Live Post-Incident Inspection', status: 'Fail', assetId: 'H63571' })],
+    damagedAsset: [of('AST-H63571', 'ASSET_STATUS', { title: 'Attenuetors', assetId: 'H63571' })],
+  };
+};
+
+test('the whole live chain is visible from its ticket — event, tasks, work order, inspection, damaged asset', () => {
+  const chain = liveChain();
+  const look = assetType => chain[assetType] ?? [];
+  const ticket = chain.ticket[0];
+  const groups = Object.fromEntries(relatedRecordGroups(ticket, look)
+    .map(group => [group.assetType, group.items.map(entry => entry.record.id)]));
+
+  assert.deepEqual(groups.incidentRecord, ['FL511-999003'], 'the road event it was raised for');
+  assert.deepEqual([...groups.task].sort(), ['TSK-FL511-999003-01', 'TSK-FL511-999003-02', 'TSK-FL511-999003-03']);
+  assert.deepEqual(groups.workOrder, ['WO-FL511-999003']);
+  // These two name the event, not the ticket — the links that were missing before.
+  assert.deepEqual(groups.inspection, ['INSP-FL511-999003']);
+  assert.deepEqual(groups.damagedAsset, ['AST-H63571']);
+  assert.equal(relatedRecordCount(relatedRecordGroups(ticket, look)), 7);
+});
+
+test('every member of a chain sees the whole of it, whichever one is opened', () => {
+  const chain = liveChain();
+  const look = assetType => chain[assetType] ?? [];
+  const all = ['FL511-999003', 'TIC-FL511-999003', 'TSK-FL511-999003-01', 'TSK-FL511-999003-02',
+    'TSK-FL511-999003-03', 'WO-FL511-999003', 'INSP-FL511-999003', 'AST-H63571'];
+  for (const assetType of ['incidentRecord', 'ticket', 'task', 'workOrder', 'inspection', 'damagedAsset']) {
+    const record = look(assetType).find(item => item.related?.eventId === 'FL511-999003' || item.id === 'FL511-999003');
+    const seen = relatedRecordGroups(record, look).flatMap(group => group.items.map(entry => entry.record.id));
+    assert.deepEqual([...seen, record.id].sort(), [...all].sort(), `${record.id} must see the whole chain`);
+  }
+});
+
+test('a chain link is reported as the identifier column it is, never as a shared asset', () => {
+  const chain = liveChain();
+  const look = assetType => chain[assetType] ?? [];
+  const entries = relatedRecordGroups(chain.ticket[0], look).flatMap(group => group.items);
+  assert.ok(entries.every(entry => entry.named), 'every chain link is a named reference');
+  const reasons = new Set(entries.map(entry => entry.reason));
+  assert.ok(reasons.has('Raised for this incident'), 'the event says what it is');
+  assert.ok([...reasons].some(reason => reason.startsWith('Same road event · FL511-999003')));
+  assert.ok(![...reasons].some(reason => reason.startsWith('Same asset')), 'the stronger reason wins');
+});
+
+test('a historical incident is not chained to anything by its own id', () => {
+  const chain = liveChain();
+  const look = assetType => chain[assetType] ?? [];
+  const historical = chain.incidentRecord[1];
+  const seen = relatedRecordGroups(historical, look).flatMap(group => group.items.map(entry => entry.record.id));
+  // It shares asset 182 with nothing here, and no live record names INC-200022 as its event.
+  assert.deepEqual(seen, []);
+});
+
+test('an FL511 live event reaches the register through its own item id', () => {
+  const chain = liveChain();
+  const look = assetType => chain[assetType] ?? [];
+  const event = { id: 'FL511-INCIDENT-999003', rawSourceId: '999003', type: 'INCIDENT' };
+  const groups = liveEventRelatedGroups(event, look);
+  const byType = Object.fromEntries(groups.map(group => [group.assetType, group.items.map(entry => entry.record.id)]));
+  assert.deepEqual(byType.incidentRecord, ['FL511-999003'], 'the register row for this event leads');
+  assert.equal(groups.find(group => group.assetType === 'incidentRecord').items[0].reason, 'This event in the register');
+  assert.deepEqual(byType.damagedAsset, ['AST-H63571']);
+  assert.deepEqual(byType.inspection, ['INSP-FL511-999003']);
+  assert.equal(relatedRecordCount(groups), 8, 'the event plus the seven records raised for it');
+  // An event the register has never heard of gets nothing rather than a guess.
+  assert.deepEqual(liveEventRelatedGroups({ id: 'FL511-CLOSURE-1', rawSourceId: '1' }, look), []);
 });

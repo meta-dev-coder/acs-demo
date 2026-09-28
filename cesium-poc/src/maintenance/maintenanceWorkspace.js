@@ -411,9 +411,14 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
     hide() { if (activeKey) closeType(); },
     /** Load every class without showing any of them, so a search can see records first. */
     preload() {
-      return Promise.all(cards
-        .filter(card => datasets.get(card.key).state === 'loading')
-        .map(card => load(card.key)));
+      return Promise.all([
+        ...cards.filter(card => datasets.get(card.key).state === 'loading').map(card => load(card.key)),
+        // One live read, not a poll. The live records are no longer this workspace's alone: Live Ops
+        // reads them to answer what has been raised for the event on screen, and a search can be
+        // asked for a live ticket before Maintenance has ever been opened. Polling still starts only
+        // when this workspace does.
+        liveFeed ? liveFeed.refresh().catch(onLiveError) : null,
+      ].filter(Boolean));
     },
     activate() {
       if (active) return;

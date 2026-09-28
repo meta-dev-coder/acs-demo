@@ -26,7 +26,7 @@ import { getCameraStreamUrl } from '../cctvCameras.js';
 import { incidentVisual, incidentSeverity } from './incidentTypes.js';
 import { IncidentTypeBadge } from './IncidentTypeIcon.jsx';
 import { camerasNear, carriagewayAt, carriagewayLabel, distanceLabel, loadCorridorContext, segmentSpanLabel } from './incidentContext.js';
-import { RelatedRecords, relatedRecordCount, useRelatedGroups } from './RelatedRecords.jsx';
+import { RelatedRecords, relatedRecordCount, useLiveEventRelatedGroups, useRelatedGroups } from './RelatedRecords.jsx';
 import {
   isLiveEventAssetType, liveEventDetailSections, liveEventFacts, liveEventHeadline, liveEventImpactRows,
   liveEventNarrative, liveEventReportedAt, liveEventSeverity, liveEventSnapshots, liveEventVisual,
@@ -241,8 +241,11 @@ export function IncidentDetailsPanel({
   );
   // The crash is one class's record of an event the other four also wrote about — the ticket raised
   // for the guardrail it took out, the crew sent, the work order, the inspection that closed it.
-  // A live event has no such history: it IS the present, so it is offered no Related tab.
-  const related = useRelatedGroups(liveEvent ? null : record, lookupRecords);
+  // A live event reaches the same records through the register's own row for it, so both kinds get
+  // the tab; only the way in differs.
+  const recordRelated = useRelatedGroups(liveEvent ? null : record, lookupRecords);
+  const eventRelated = useLiveEventRelatedGroups(liveEvent ? record : null, lookupRecords);
+  const related = liveEvent ? eventRelated : recordRelated;
   const relatedTotal = relatedRecordCount(related);
   const openRelated = onOpenRecord ? reference => { void onOpenRecord(reference.assetType, reference.id); } : null;
 
@@ -264,7 +267,7 @@ export function IncidentDetailsPanel({
   const headline = liveEvent ? liveEventHeadline(facts) : incidentHeadline(facts);
   const narrative = liveEvent ? liveEventNarrative(record, place) : incidentNarrative(record, place);
   const reported = liveEvent ? liveEventReportedAt(facts) : reportedAt(facts);
-  const showRelated = Boolean(lookupRecords) && !liveEvent;
+  const showRelated = Boolean(lookupRecords);
   const weatherLine = liveEvent ? liveEventWeatherLine(record) : null;
   const subtitle = liveEvent
     ? [asset.id, facts.carriageway ?? (place?.resolved ? carriagewayLabel(place) : null), facts.section ?? facts.roadway]
@@ -416,7 +419,9 @@ export function IncidentDetailsPanel({
         <RelatedRecords
           groups={related}
           onOpen={openRelated}
-          emptyMessage="No ticket, task, work order or inspection names this incident or stands on its asset."
+          emptyMessage={liveEvent
+            ? 'Nothing has been raised in DataConnect for this event yet.'
+            : 'No ticket, task, work order or inspection names this incident or stands on its asset.'}
         />
       )}
 
