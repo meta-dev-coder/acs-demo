@@ -292,6 +292,10 @@ export function createDataConnectApi({ config = loadDataConnectConfig(), fetchIm
     const missing = missingConfig(config);
     const route = url.pathname.slice(BASE.length);
 
+    if (route === '/signin/callback' && req.method === 'GET') {
+      await signIn.callback(req, res);
+      return true;
+    }
     if (route === '/status') {
       // `authenticated` is what the app needs to decide whether to offer a sign-in button. It is a
       // boolean about this server's own credential — never the credential itself.

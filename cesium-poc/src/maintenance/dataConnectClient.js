@@ -84,12 +84,12 @@ export async function signIn(popup) {
   while (Date.now() < deadline) {
     await new Promise(resolve => setTimeout(resolve, 1200));
     const state = await status().catch(() => null);
-    if (state?.authenticated) return state;
+    if (state?.authenticated && !state.signInPending) { popup?.close(); return state; }
     if (state && !state.signInPending) {
       // The flow finished without producing a credential — report what the server saw.
       throw new DataConnectError(DC_ERRORS.AUTH, state.lastSignIn?.message ?? 'Sign-in did not complete.', {});
     }
-    if (popup?.closed && !state?.signInPending) break;
+    if (popup?.closed) break;
   }
   await request('/signin/cancel', { method: 'POST' }).catch(() => {});
   throw new DataConnectError(DC_ERRORS.AUTH, 'Sign-in did not complete.', {});

@@ -41,7 +41,7 @@ export function createSignInFlow({ config, fetchImpl = fetch, logger = console }
     lastResult = { ...result, at: Date.now() };
     if (!active) return;
     clearTimeout(active.timer);
-    active.server.close();
+    active.server?.close();
     active = null;
   }
 
@@ -106,7 +106,31 @@ export function createSignInFlow({ config, fetchImpl = fetch, logger = console }
     throw new Error('The authority returned no usable token.');
   }
 
+  async function callback(req, res) {
+    const url = new URL(req.url, 'http://localhost');
+    const reply = (status, message) => {
+      res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' });
+      res.end(page(message));
+    };
+    if (!active || url.searchParams.get('state') !== active.state) {
+      reply(400, 'This sign-in has expired or does not match. Close this window and try again.');
+      return;
+    }
+    try {
+      if (url.searchParams.has('error')) throw new Error('Sign-in was declined or cancelled.');
+      const code = url.searchParams.get('code');
+      if (!code) throw new Error('The sign-in reply did not contain an authorization code.');
+      const result = await exchange(code, active.verifier);
+      finish({ ok: true, message: 'Signed in.', renewable: result.renewable });
+      reply(200, 'Signed in. Returning to Maintenance…');
+    } catch {
+      finish({ ok: false, message: 'Sign-in could not be completed. Please retry.' });
+      reply(400, 'Sign-in could not be completed. Close this window and try again.');
+    }
+  }
+
   return {
+    callback,
     /** Whether a sign-in is waiting for the person right now. */
     get pending() { return Boolean(active); },
     get lastResult() { return lastResult; },
@@ -119,7 +143,7 @@ export function createSignInFlow({ config, fetchImpl = fetch, logger = console }
       if (active) return { url: active.url, scope: active.scope, renewable: active.renewable };
 
       const verifier = base64url(randomBytes(32));
-      const pkce = { state: base64url(randomBytes(16)), challenge: base64url(createHash('sha256').update(verifier).digest()) };
+      const pkce = { state: `dc-maintenance-${base64url(randomBytes(16))}`, challenge: base64url(createHash('sha256').update(verifier).digest()) };
 
       // Prefer a refresh token; fall back when the client may not ask for offline access.
       const withRefresh = `${config.scope} offline_access`;
@@ -127,35 +151,24 @@ export function createSignInFlow({ config, fetchImpl = fetch, logger = console }
       const scope = renewable ? withRefresh : config.scope;
       const url = String(buildUrl(scope, pkce));
 
-      const server = createServer(async (req, res) => {
-        const url = new URL(req.url, `http://localhost:${redirect.port || 80}`);
+      const server = createServer((req, res) => {
+        const url = new URL(req.url, 'http://localhost');
         if (url.pathname !== redirect.pathname) { res.writeHead(404).end(); return; }
-        const reply = (status, message) => { res.writeHead(status, { 'content-type': 'text/html; charset=utf-8' }); res.end(page(message)); };
-        try {
-          if (url.searchParams.get('error')) throw new Error(`Sign-in failed: ${url.searchParams.get('error')}`);
-          if (url.searchParams.get('state') !== pkce.state) throw new Error('The reply did not belong to this sign-in.');
-          const result = await exchange(url.searchParams.get('code'), verifier);
-          reply(200, result.renewable
-            ? 'Signed in. The app can renew its own access from now on.'
-            : `Signed in for about ${Math.round(result.lifetime / 60)} minutes.`);
-          finish({ ok: true, message: 'Signed in.', renewable: result.renewable });
-        } catch (error) {
-          reply(400, error.message);
-          logger.warn?.('[DataConnect] sign-in failed', { message: error.message });
-          finish({ ok: false, message: error.message });
-        }
+        void callback(req, res);
       });
-
+      let listener = server;
       await new Promise((resolve, reject) => {
-        server.once('error', error => reject(error.code === 'EADDRINUSE'
-          ? new Error(`Port ${redirect.port} is in use, and the sign-in must come back to it. Stop whatever is on that port (the root app's dev server uses it) and try again.`)
-          : error));
+        server.once('error', error => {
+          // The root Vite app forwards Maintenance callbacks to our API when it owns port 3000.
+          if (error.code === 'EADDRINUSE') { listener = null; resolve(); }
+          else reject(error);
+        });
         server.listen(Number(redirect.port) || 80, resolve);
       });
 
       const timer = setTimeout(() => finish({ ok: false, message: 'The sign-in was not completed in time.' }), SIGN_IN_TIMEOUT_MS);
       timer.unref?.();
-      active = { verifier, state: pkce.state, server, timer, url, scope, renewable };
+      active = { verifier, state: pkce.state, server: listener, timer, url, scope, renewable };
       return { url, scope, renewable };
     },
 

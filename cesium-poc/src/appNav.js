@@ -26,14 +26,20 @@ const ICONS = Object.freeze({
 
 /** The workspaces, in the order they are shown. */
 export const NAV_SECTIONS = Object.freeze([
-  Object.freeze({ id: 'overview', label: 'Overview', icon: 'overview' }),
   Object.freeze({ id: 'traffic', label: 'Traffic', icon: 'traffic' }),
   Object.freeze({ id: 'maintenance', label: 'Maintenance', icon: 'maintenance' }),
   Object.freeze({ id: 'safety', label: 'Safety', icon: 'safety' }),
   Object.freeze({ id: 'liveOps', label: 'Live Ops', icon: 'liveOps' }),
 ]);
 
-export const DEFAULT_SECTION = NAV_SECTIONS[0].id;
+export const APP_ROLES = Object.freeze([
+  { id: 'roadOperator', label: 'Road Operator', sections: ['liveOps', 'safety'] },
+  { id: 'maintenanceTeam', label: 'Maintenance Team', sections: ['maintenance', 'safety'] },
+  { id: 'agency', label: 'Agency', sections: ['traffic', 'safety'] },
+]);
+export const DEFAULT_SECTION = 'liveOps';
+export const resolveRole = id => APP_ROLES.find(role => role.id === id) ?? APP_ROLES[0];
+export const sectionsForRole = id => resolveRole(id).sections.map(key => NAV_SECTIONS.find(section => section.id === key));
 
 /** @returns {string} the section to open — a known id, otherwise the default. */
 export function resolveSection(id, sections = NAV_SECTIONS) {
@@ -56,10 +62,15 @@ export function installAppNav(host, {
   onSelect = null,
   onToggleLayers = null,
 } = {}) {
+  let savedRole;
+  try { savedRole = localStorage.getItem('i595-role'); } catch {}
+  let role = resolveRole(savedRole);
+  const allowedSections = () => role.sections.map(id => sections.find(entry => entry.id === id)).filter(Boolean);
   const nav = document.createElement('nav');
   nav.className = 'app-nav';
   nav.setAttribute('aria-label', 'Workspaces');
   nav.innerHTML = `
+    <label class="app-role"><select aria-label="Role">${APP_ROLES.map(role => `<option value="${role.id}">${role.label}</option>`).join('')}</select></label>
     <div class="app-nav-sections">${sections.map(entry => item(entry.id, entry.label, entry.icon, 'aria-current="false"')).join('')}</div>
     <div class="app-nav-foot">${item('layers', 'Layers', 'layers', 'data-action="layers" aria-pressed="false" aria-controls="layer-content"')}</div>`;
   host.append(nav);
@@ -68,23 +79,26 @@ export function installAppNav(host, {
   // The bar mounts before the map does, so listeners are added rather than passed in at install.
   const listeners = new Set(onSelect ? [onSelect] : []);
   const layersButton = buttons.get('layers');
-  let current = resolveSection(section, sections);
+  let current = resolveSection(section, allowedSections());
   let open = Boolean(layersOpen);
 
   function render() {
     for (const [id, button] of buttons) {
       if (id === 'layers') continue;
+      button.hidden = !role.sections.includes(id);
       button.setAttribute('aria-current', id === current ? 'page' : 'false');
     }
     layersButton.setAttribute('aria-pressed', String(open));
     // Written on <body> so panels and future workspace content can style or query the choice
     // without this module knowing about any of them.
+    document.body.dataset.role = role.id;
+    roleSelect.value = role.id;
     document.body.dataset.section = current;
     document.body.dataset.layersOpen = String(open);
   }
 
   function select(id, { notify = true } = {}) {
-    const next = resolveSection(id, sections);
+    const next = resolveSection(id, allowedSections());
     if (next === current) { if (notify) announce(next); return next; }
     current = next;
     render();
@@ -106,16 +120,27 @@ export function installAppNav(host, {
   for (const [id, button] of buttons) {
     button.onclick = () => { if (id === 'layers') setLayersOpen(!open); else select(id); };
   }
+  const roleControl = nav.querySelector('.app-role');
+  const roleSelect = roleControl.querySelector('select');
+  host.append(roleControl);
+  roleSelect.onchange = () => {
+    role = resolveRole(roleSelect.value);
+    try { localStorage.setItem('i595-role', role.id); } catch {}
+    current = resolveSection(current, allowedSections());
+    render();
+    announce(current);
+  };
   render();
 
   return {
     nav,
     get section() { return current; },
+    get role() { return role.id; },
     get layersOpen() { return open; },
     select,
     setLayersOpen,
     /** Called whenever a workspace is chosen. Returns an unsubscribe. */
     onSelect(listener) { listeners.add(listener); return () => listeners.delete(listener); },
-    destroy() { nav.remove(); delete document.body.dataset.section; delete document.body.dataset.layersOpen; },
+    destroy() { roleControl.remove(); nav.remove(); delete document.body.dataset.role; delete document.body.dataset.section; delete document.body.dataset.layersOpen; },
   };
 }

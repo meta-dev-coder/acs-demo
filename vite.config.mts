@@ -15,6 +15,21 @@ export default defineConfig(() => {
       chunkSizeWarningLimit: 8000, // Increase chunk size warning limit to avoid warnings for large chunks
     },
     plugins: [
+      {
+        name: 'maintenance-signin-callback',
+        configureServer(server) {
+          server.middlewares.use((req, res, next) => {
+            const url = new URL(req.url || '/', 'http://localhost:3000');
+            if (url.pathname !== '/signin-callback' || !url.searchParams.get('state')?.startsWith('dc-maintenance-')) return next();
+            // Only our Maintenance PKCE flow is handed back; iTwin's callback is unchanged.
+            res.writeHead(302, {
+              location: `http://localhost:5188/api/dataconnect/signin/callback${url.search}`,
+              'cache-control': 'no-store', 'referrer-policy': 'no-referrer',
+            });
+            res.end();
+          });
+        },
+      },
       react(),
       // Wires CESIUM_BASE_URL + copies Cesium's static assets (Workers/Assets/Widgets), same as
       // cesium-poc. rebuildCesium is REQUIRED here (unlike cesium-poc): the default mode injects

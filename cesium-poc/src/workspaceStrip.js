@@ -62,7 +62,9 @@ export function installWorkspaceStrip(host, { cards, label, onSelect }) {
   function measure() {
     const toolbar = document.querySelector('.map-nav')?.getBoundingClientRect();
     if (!toolbar?.width) return;
-    root.style.maxWidth = `${Math.max(240, Math.round(toolbar.left) - Math.round(root.getBoundingClientRect().left) - 16)}px`;
+    const role = document.querySelector('.app-role')?.getBoundingClientRect();
+    const controlsLeft = Math.min(toolbar.left, role?.width ? role.left : toolbar.left);
+    root.style.maxWidth = `${Math.max(240, Math.round(controlsLeft) - Math.round(root.getBoundingClientRect().left) - 16)}px`;
   }
   const onResize = () => measure();
   window.addEventListener('resize', onResize);
