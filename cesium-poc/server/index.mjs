@@ -11,12 +11,16 @@ import { loadConfig } from './config.mjs';
 import { API_BASE, createLiveEventsApi, createSnapshotApi } from './api.mjs';
 import { createMessageSignsApi } from './messageSigns.mjs';
 import { createLiveDcReadApi, loadLiveDcReadConfig } from './liveDc/liveReadApi.mjs';
+import { createDcTokenPusher, loadTokenHandoffConfig } from './dcTokenPusher.mjs';
 
 export function createApiServer({ config = loadConfig(), env = process.env, logger = console } = {}) {
   // One read proxy serves both /api/live-dc/* and ?source=dataconnect, as in vite.config.js.
   const liveDcReadApi = createLiveDcReadApi({ config: loadLiveDcReadConfig(env), logger });
   const api = createLiveEventsApi({ config, liveDc: liveDcReadApi, logger });
   const handlers = [api, createSnapshotApi({ logger }), createMessageSignsApi({ config }), liveDcReadApi];
+  // TEMPORARY: pushes the dc:login access token to the AWS intake lambda (DC_TOKEN_HANDOFF_URL; unset = off).
+  const tokenPusher = createDcTokenPusher({ config: loadTokenHandoffConfig(env), logger });
+  tokenPusher.start();
 
   const server = createServer((request, response) => {
     (async () => {
@@ -31,7 +35,7 @@ export function createApiServer({ config = loadConfig(), env = process.env, logg
       response.end(JSON.stringify({ error: 'Internal error' }));
     });
   });
-  return { server, stop: () => api.stop() };
+  return { server, stop: () => { tokenPusher.stop(); return api.stop(); } };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

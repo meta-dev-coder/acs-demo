@@ -3,3 +3,6 @@ infra/node_modules
 infra/cdk.out
 .env
 *.log
+.dc-access-token
+.dc-refresh-token
+.env.*

@@ -1,38 +1,38 @@
 /**
  * FL511 poller Lambda — polls FL511 for I-595 live events, diffs against the current DynamoDB
- * state, writes changes, and emits an EventBridge event when anything has changed.
+ * state, writes changes, and emits an EventBridge event when anything has changed. TEMPORARY: also
+ * writes the same events to Live DataConnect with the hand-off token (see poller.mjs).
  *
  * Environment variables:
  *   LIVE_EVENTS_TABLE  — DynamoDB table name for event state
  *   EVENTS_BUS_ARN     — EventBridge event bus ARN (or name)
  *   DATA_DIR           — directory containing the corridor GeoJSON files
  *                        (defaults to /var/task/data, where CDK bundles them)
+ *   DC_TOKEN_BUCKET    — bucket holding secrets/dc-token.txt and status/live-dc-status.json
+ *                        (unset = no DataConnect step)
+ *   DC_WRITER_*, LIVE_DC_* — as for tools/live-dc-sync.mjs; LIVE_DC_DATA_DIR = DATA_DIR
  */
 
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, ScanCommand, PutCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 import { EventBridgeClient, PutEventsCommand } from '@aws-sdk/client-eventbridge';
+import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 
 import { loadConfig } from '../../../server/config.mjs';
 import { loadI595Network } from '../../../server/i595Network.mjs';
 import { createFl511Service } from '../../../server/fl511Service.mjs';
+import { DC_TOKEN_OBJECT_KEY, LIVE_DC_STATUS_KEY } from '../../../server/liveDc/tokenHandoff.mjs';
+import { createPollerHandler } from './poller.mjs';
 
-// ---------------------------------------------------------------------------
 // AWS clients (module scope — reused across warm invocations)
-// ---------------------------------------------------------------------------
-
 const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
   marshallOptions: { removeUndefinedValues: true },
 });
-
 const eb = new EventBridgeClient({});
+const s3 = new S3Client({});
 
-// ---------------------------------------------------------------------------
 // Lazy service initialisation — only pays the cold-start cost once
-// ---------------------------------------------------------------------------
-
 let service = null;
-
 const getService = async () => {
   if (service) return service;
   const config = loadConfig();
@@ -42,129 +42,44 @@ const getService = async () => {
   return service;
 };
 
-// ---------------------------------------------------------------------------
-// Helper: scan the entire LIVE_EVENTS_TABLE and return a Map keyed by eventId
-// ---------------------------------------------------------------------------
-
-async function scanCurrentState(tableName) {
-  const items = new Map();
-  let lastKey;
-  do {
-    const resp = await dynamo.send(new ScanCommand({
-      TableName: tableName,
-      ...(lastKey ? { ExclusiveStartKey: lastKey } : {}),
-    }));
-    for (const item of resp.Items ?? []) {
-      if (item.eventId) items.set(item.eventId, item);
-    }
-    lastKey = resp.LastEvaluatedKey;
-  } while (lastKey);
-  return items;
-}
-
-// ---------------------------------------------------------------------------
-// Handler
-// ---------------------------------------------------------------------------
-
-export const handler = async (_event) => {
-  try {
-    const tableName = process.env.LIVE_EVENTS_TABLE;
-    const busProp  = process.env.EVENTS_BUS_ARN;
-
-    if (!tableName) throw new Error('LIVE_EVENTS_TABLE environment variable is not set');
-    if (!busProp)   throw new Error('EVENTS_BUS_ARN environment variable is not set');
-
-    // 1. Fetch live events from FL511 via the service layer
-    const svc = await getService();
-    // Lambda timers do not run while an execution environment is frozen.
-    // Each scheduled invocation must explicitly fetch fresh upstream data.
-    await svc.refresh();
-    const payload = await svc.getI595LiveEvents();
-
-    // 2. Build new-state Map from payload — keyed by event.id (the stable sorted key)
-    const newState = new Map();
-    for (const event of payload.events ?? []) {
-      newState.set(event.id, event);
-    }
-
-    // 3. Read current state from DynamoDB
-    const oldState = await scanCurrentState(tableName);
-
-    // 4. Compute diff
-    const added   = [];
-    const updated = [];
-    const removed = [];
-
-    for (const [id, event] of newState) {
-      if (!oldState.has(id)) {
-        added.push(event);
-      } else {
-        // Compare only the event payload, not the DynamoDB housekeeping fields
-        const { eventId: _eid, lastUpdated: _lu, ttl: _ttl, ...oldCore } = oldState.get(id);
-        if (JSON.stringify(event) !== JSON.stringify(oldCore)) {
-          updated.push(event);
-        }
-      }
-    }
-
-    for (const id of oldState.keys()) {
-      if (!newState.has(id)) removed.push(id);
-    }
-
-    if (added.length + removed.length + updated.length === 0) {
-      console.log('no change');
-      return;
-    }
-
-    // 5. Write changes to DynamoDB
-    const nowIso = new Date().toISOString();
-    const ttl    = Math.floor(Date.now() / 1000) + 86400; // 24 h from now
-
-    const writes = [];
-
-    for (const event of [...added, ...updated]) {
-      writes.push(
-        dynamo.send(new PutCommand({
-          TableName: tableName,
-          Item: { eventId: event.id, ...event, lastUpdated: nowIso, ttl },
-        }))
-      );
-    }
-
-    for (const id of removed) {
-      writes.push(
-        dynamo.send(new DeleteCommand({
-          TableName: tableName,
-          Key: { eventId: id },
-        }))
-      );
-    }
-
-    await Promise.all(writes);
-
-    // 6. Emit EventBridge event
-    await eb.send(new PutEventsCommand({
-      Entries: [{
-        Source: 'i595.poller',
-        DetailType: 'EventsChanged',
-        EventBusName: busProp,
-        Detail: JSON.stringify({
-          added,
-          removed,
-          updated,
-          timestamp: nowIso,
-        }),
-      }],
-    }));
-
-    // 7. Summary log
-    console.log(
-      `FL511 poller: +${added.length} added, ~${updated.length} updated, -${removed.length} removed` +
-      ` (sourceStatus=${payload.sourceStatus}, total=${newState.size})`
-    );
-  } catch (err) {
-    // Log but do not rethrow — EventBridge scheduler retries are not useful here because a
-    // transient FL511 outage is already handled inside fl511Service (it serves cached data).
-    console.error('FL511 poller error:', err);
-  }
+const ddb = {
+  async scanAll(tableName) {
+    const items = [];
+    let lastKey;
+    do {
+      const resp = await dynamo.send(new ScanCommand({
+        TableName: tableName,
+        ...(lastKey ? { ExclusiveStartKey: lastKey } : {}),
+      }));
+      items.push(...(resp.Items ?? []));
+      lastKey = resp.LastEvaluatedKey;
+    } while (lastKey);
+    return items;
+  },
+  put: (tableName, item) => dynamo.send(new PutCommand({ TableName: tableName, Item: item })),
+  remove: (tableName, key) => dynamo.send(new DeleteCommand({ TableName: tableName, Key: key })),
 };
+
+const emit = entry => eb.send(new PutEventsCommand({ Entries: [entry] }));
+
+const bucket = process.env.DC_TOKEN_BUCKET;
+const tokenStore = bucket ? {
+  async read() {
+    try {
+      const res = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: DC_TOKEN_OBJECT_KEY }));
+      return await res.Body.transformToString('utf8');
+    } catch (error) {
+      if (error?.name === 'NoSuchKey' || error?.$metadata?.httpStatusCode === 404) return null;
+      throw error;
+    }
+  },
+  writeStatus: status => s3.send(new PutObjectCommand({
+    Bucket: bucket,
+    Key: LIVE_DC_STATUS_KEY,
+    Body: JSON.stringify(status),
+    ContentType: 'application/json',
+    CacheControl: 'no-store',
+  })),
+} : null;
+
+export const handler = createPollerHandler({ getService, ddb, emit, tokenStore, env: process.env });

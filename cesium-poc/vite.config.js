@@ -2,6 +2,7 @@ import { loadServerEnv } from './server/loadEnv.mjs';
 import { createMessageSignsApi } from './server/messageSigns.mjs';
 import { createDataConnectApi } from './server/dataConnect.mjs';
 import { createLiveDcReadApi } from './server/liveDc/liveReadApi.mjs';
+import { createDcTokenPusher } from './server/dcTokenPusher.mjs';
 
 // Before any plugin reads process.env: Vite only exposes VITE_-prefixed variables, and the
 // server-side credentials are deliberately not prefixed, so nothing else would load them.
@@ -54,6 +55,14 @@ const liveDcReadApi = api => ({ name: 'i595-live-dc-read-api',
   configurePreviewServer(server) { server.middlewares.use(api.middleware); },
 });
 
+// TEMPORARY: pushes the dc:login access token to the AWS intake lambda (DC_TOKEN_HANDOFF_URL; unset = off).
+const dcTokenHandoff = () => {
+  const pusher = createDcTokenPusher();
+  return { name: 'i595-dc-token-handoff',
+    configureServer(server) { pusher.start(); server.httpServer?.on('close', () => pusher.stop()); },
+  };
+};
+
 // CCTV snapshot proxy — pipes DIVAS JPEG bytes through same-origin to avoid CORS issues.
 const snapshotApi = () => {
   const api = createSnapshotApi();
@@ -79,7 +88,7 @@ export default defineConfig({
   // automatic runtime is enough for it — no fast-refresh plugin, so the rest of the app's plain
   // HMR is untouched.
   esbuild: { jsx: 'automatic' },
-  plugins: [cesium({ cesiumBuildRootPath, cesiumBuildPath: join(cesiumBuildRootPath, "Cesium") }), liveEventsApi(liveDc), snapshotApi(), messageSignsApi(), dataConnectApi(), liveDcReadApi(liveDc)],
+  plugins: [cesium({ cesiumBuildRootPath, cesiumBuildPath: join(cesiumBuildRootPath, "Cesium") }), liveEventsApi(liveDc), snapshotApi(), messageSignsApi(), dataConnectApi(), liveDcReadApi(liveDc), dcTokenHandoff()],
   // Port 5188 (not the default 5180) keeps this NTTA worktree isolated from a sibling session's
   // dev server sharing localhost. Disable auto-open under headless e2e.
   server: { port: 5188, open: false, strictPort: true },

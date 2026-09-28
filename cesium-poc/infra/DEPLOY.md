@@ -7,7 +7,7 @@ This stack deploys:
 - **S3** — GeoJSON corridor data files + built Vite app assets
 - **CloudFront** — CDN in front of S3; routes `/api/i595/*` paths to Lambda Function URLs
 - **DynamoDB** — two tables: `I595LiveEvents` (FL511 event state + TTL) and `I595WsConnections` (active WebSocket connections + TTL)
-- **Lambda functions** — 8 functions (see [Lambda functions](#lambda-functions) below)
+- **Lambda functions** — 9 functions (see [Lambda functions](#lambda-functions) below)
 - **EventBridge Scheduler** — triggers the FL511 poller every minute (`i595-poller`)
 - **EventBridge custom bus** — `i595-events`; routes poller output to the broadcaster
 - **API Gateway WebSocket API** — `i595-websocket-api`; real-time push to connected browsers
@@ -36,7 +36,8 @@ Full outputs are also in `cdk-outputs.json` after a deploy.
 
 | CDK logical ID | Runtime | Purpose |
 |----------------|---------|---------|
-| `PollerFn` | Node.js 22 | Polls FL511 every minute; diffs against DynamoDB; emits `EventsChanged` to EventBridge |
+| `PollerFn` | Node.js 22 | Polls FL511 every minute; diffs against DynamoDB; emits `EventsChanged` to EventBridge; TEMPORARY: writes the same events to Live DataConnect with the hand-off token |
+| `DcTokenIntakeFn` | Node.js 22 | TEMPORARY: POST (Function URL) of a `dcm-admin` DataConnect token; stores it SSE-KMS at `secrets/dc-token.txt` |
 | `SnapshotProxyFn` | Node.js 22 | Proxies DIVAS JPEG snapshots; validates channel IDs against `KNOWN_CHAN_IDS` env var |
 | `WsConnectFn` | Node.js 22 | Handles `$connect`; writes connection record to DynamoDB |
 | `WsDisconnectFn` | Node.js 22 | Handles `$disconnect`; removes connection record from DynamoDB |
@@ -59,6 +60,7 @@ CloudFront sits in front of both S3 and Lambda Function URLs:
 | `/api/i595/camera/*` | SnapshotProxyFn URL | Camera JPEG proxy; 90s cache |
 | `/api/i595/live-events*` | LiveEventsRestFn URL | Live FL511 events; no cache |
 | `/api/i595/ask*` | AskTheTwinFn URL | AI chat; no cache |
+| `/status/*` | S3 bucket | Poller status (`status/live-dc-status.json`); no cache; CORS all origins |
 | `/*` (default) | S3 bucket | Vite app assets |
 
 ---
@@ -272,6 +274,30 @@ Built `src/askTheTwin.js` — floating "Ask the Twin" button at the bottom-cente
 
 ---
 
+## DataConnect token hand-off (TEMPORARY)
+
+This stays in place until Bentley provides refresh tokens or a service client. Design: `server/liveDc/README.md`, "Cloud writer token hand-off".
+
+- **KMS key `DcTokenKey`** (new, rotation on). Only `DcTokenIntakeFn` (Encrypt/GenerateDataKey) and `PollerFn` (Decrypt) are granted it. CloudFront's OAC is not, and the bucket policy also denies CloudFront `s3:GetObject` on `secrets/*`.
+- **Lifecycle rule `ExpireDcTokenSecrets`** on `secrets/`: current objects and noncurrent versions expire after 1 day.
+- **Grants.** Intake: `s3:PutObject secrets/*`. Poller: `s3:GetObject secrets/dc-token.txt`, `s3:ListBucket` (prefix `secrets/*`, so a missing token is a 404), `s3:PutObject status/*`.
+- **Poller env.** `DC_TOKEN_BUCKET`, `DC_WRITER_BASE_URL` (gateway, `/api/data-mgmt/v1`), `DC_WRITER_LOAD_BASE_URL`, `DC_WRITER_*_TIMEOUT_MS` (tight, so a cycle fits the 55 s timeout; the step stops 5 s early and reports `timeout`), `LIVE_DC_*`, `LIVE_DC_DATA_DIR=/var/task/data`. The timeout is 55 s, below the 1-minute schedule, so runs do not overlap. Memory is 512 MB.
+- **Intake env.** `DC_TOKEN_ALLOWED_SUBJECTS` is optional (`npx cdk deploy -c dcTokenAllowedSubjects=you@example.com,...`). `DC_TOKEN_ALLOWED_ORIGINS` is set to localhost dev plus the Pages origin. CORS is owned by the handler, not by the Function URL.
+- **Outputs.** `DcTokenIntakeFunctionUrl` and `LiveDcStatusUrl`.
+
+After deploy:
+
+```bash
+# cesium-poc/.env.local on the machine that runs `npm run dc:login` + `npm run dev` (or `npm run api`)
+DC_TOKEN_HANDOFF_URL=<DcTokenIntakeFunctionUrl>
+# page indicator (optional; defaults to the origin of VITE_LIVE_EVENTS_API)
+VITE_LIVE_DC_STATUS_URL=<LiveDcStatusUrl>
+```
+
+Then check `<LiveDcStatusUrl>`: `dcWrite` goes from `skipped` (`no_token`) to `ok` within a minute of the first hand-off.
+
+**Single writer rule.** Stop any local `npm run live-dc:sync` once the lambda writes (`dcWrite: ok`). Two writers duplicate loads.
+
 ## Poller internals
 
 `lambdas/poller/index.mjs` depends on shared server modules:
@@ -284,9 +310,12 @@ lambdas/poller/index.mjs
                                        → server/liveEvents.mjs → server/geo.mjs
                                                                → server/fl511Tooltip.mjs
                                                                → server/i595Network.mjs
+  └── ./poller.mjs → ../../../server/liveDc/{dcWriter,cycle,workflow,eventSync,eventEnrichment,classes,assetCatalog,tokenHandoff}.mjs
+                                                   → config/liveDc/*.json (JSON imports, inlined)
+                                                   → src/liveOps/{operationalImpact,carriagewayModel}.js
 ```
 
-CDK's `NodejsFunction` bundler (`esbuild`) resolves these relative imports at build time and inlines them into the zip. The bundled output also includes the `public/data/` GeoJSON files (copied via `commandHooks.afterBundling`) into `/var/task/data/`, referenced by `DATA_DIR=/var/task/data`.
+CDK's `NodejsFunction` bundler (`esbuild`) resolves these relative imports at build time and inlines them into the zip. The bundled output also includes the `public/data/` GeoJSON files (copied via `commandHooks.afterBundling`) into `/var/task/data/`, referenced by `DATA_DIR=/var/task/data` (and `LIVE_DC_DATA_DIR`, which the Live Events enrichment reads cameras and FDOT segments from). Because the bundle is a single `/var/task/index.mjs`, nothing in the liveDc chain may read files relative to `import.meta.url`; config is imported as JSON instead (`tests/liveDcPollerBundle.test.mjs`). The `Dockerfile` (image alternative, build context `cesium-poc/`) copies the same set of files.
 
 ---
 

@@ -6,6 +6,36 @@ The sync polls FL511 the same way the existing live-events API does. It pushes I
 
 DataConnect is the system of record, and the app's live view reads these classes back.
 
+## Set up on a new machine
+
+There is **no shared token file and no client secret**. Every developer signs in with their own Bentley account (it needs DataConnect `dcm-admin` to write, or read access to only view). `spa-2u82GTzSkDl5CMm0mvqt0SWPv` is a public browser client with no secret. A service client id/secret has been requested from Bentley but does not exist yet.
+
+1. In `cesium-poc/`, create `.env.local` (git-ignored). Use **absolute** paths for the token file:
+
+   ```
+   DC_BASE_URL=https://dc-data-mgmt-demo-dqa3.cohesivecloud.app
+   DC_CLIENT_ID=spa-2u82GTzSkDl5CMm0mvqt0SWPv
+   DC_SCOPE=itwin-platform
+   VITE_DATA_SOURCE=dataconnect
+   LIVE_DC_READ_BASE_URL=https://dataconnect-demo-dqa3.cohesivecloud.app
+   LIVE_DC_READ_ACCESS_TOKEN_FILE=/absolute/path/to/cesium-poc/.dc-access-token
+   DC_WRITER_BASE_URL=https://dataconnect-demo-dqa3.cohesivecloud.app
+   DC_WRITER_LOAD_BASE_URL=https://dc-load-demo-dqa3.cohesivecloud.app
+   DC_WRITER_ACCESS_TOKEN_FILE=/absolute/path/to/cesium-poc/.dc-access-token
+   LIVE_DC_LINK_MODE=live
+   ```
+
+2. Run `npm install`, then `npm run dc:login`.
+   - Port 3000 must be free; stop the root iTwin app first.
+   - The command writes `.dc-access-token`, which lasts about an hour. Re-run it when it expires; nothing needs a restart, because the token file is re-read on every call.
+   - Never share or commit this file.
+
+3. Run `npm run dev -- --port 5188` and open `http://localhost:5188/?demo=i595`. Traffic, Live Ops and Maintenance read the SDNA Live classes.
+   - "⚠ DataConnect not connected" means the token is missing or expired, or a URL is unset.
+   - `curl localhost:5188/api/live-dc/status` shows why.
+
+4. **Only one writer at a time.** Run `npm run live-dc:sync` on one machine only, and never while the AWS poller writes.
+
 ## Why the Live classes are separate
 
 Bentley's historical classes must never be corrupted. These are Florida I595 Assets, Incidents, Tickets, Tasks, Work Orders, the three Inspection classes and Roadway Segments.
@@ -191,7 +221,19 @@ What happens when something goes wrong:
 - **Parents must be curated.** A record is sent only when every Live relationship it carries points at a code DataConnect has curated: one in the read-back, or one sent in a load whose curation was confirmed. This holds on every cycle, not just the one where curation timed out, so dependants wait until the parent shows up in the read-back.
 - **A load where every record reports `notChanged`** raises a loop-detector warning, because it means the diff and the server semantics disagree.
 
-`runLiveDcCycle` has no timers and no CLI dependencies, so the AWS poller lambda can call it later.
+`runLiveDcCycle` has no timers and no CLI dependencies, so the AWS poller lambda calls it too (below).
+
+## Cloud writer token hand-off (TEMPORARY)
+
+Until Bentley provides refresh tokens or a service client, the AWS poller lambda writes with an access token handed off from a signed-in machine:
+
+1. The machine running the app (`npm run dev` or `npm run api`) holds the token in `.dc-access-token`, renewed by `npm run dc:login`. With `DC_TOKEN_HANDOFF_URL` set (the `DcTokenIntakeFunctionUrl` stack output), `server/dcTokenPusher.mjs` POSTs it as `Authorization: Bearer` whenever the file changes and at least every 50 minutes. It is server-side only (never in browser JS), a no-op when the URL is unset, and never logs the token.
+2. The intake lambda (`infra/lambdas/dc-token-intake/`) checks the token has at least 5 minutes left, that `GET /api/user-mgmt/permission` grants `dcm-admin`, and (optionally) that its `sub`/`email` is in `DC_TOKEN_ALLOWED_SUBJECTS`. It then stores it at `secrets/dc-token.txt` in the data bucket, SSE-KMS with a dedicated key. CloudFront cannot decrypt that key and is also explicitly denied `secrets/*`. A lifecycle rule expires `secrets/` objects and old versions after 1 day.
+3. Each poller run fetches FL511 once. It writes DynamoDB exactly as before, then runs one `runLiveDcCycle` on the same payload if the token has at least 2 minutes left. Either way it writes the non-secret `status/live-dc-status.json` (`{lastRunAt, dcWrite: ok|skipped|error, reason, tokenExpiresAt, fl511, summary}`), which CloudFront serves at `/status/live-dc-status.json`. The workspace strips show it as "Cloud sync: …", for example "needs sign-in" when there is no valid token (`src/liveDcCloudSync.js`).
+
+**Single writer rule.** Once the lambda is writing (status `dcWrite: ok`), stop any local `npm run live-dc:sync`. Two writers would duplicate loads and fight over the diff.
+
+The token lasts about an hour. If the signed-in machine stops (no `dc:login`, or no dev/api server running), the cloud writer skips with `token_expired` until someone signs in again.
 
 ## Configuration (env only)
 
@@ -216,7 +258,7 @@ What happens when something goes wrong:
 
 ## Known costs and assumptions
 
-- **Single writer per class.** Loads are correlated by their load-service id, but the diff still assumes one sync instance per environment.
+- **Single writer per class.** Loads are correlated by their load-service id, but the diff still assumes one sync instance per environment. The local `npm run live-dc:sync` and the AWS poller are two writers, so run only one of them.
 - **Curated-process list growth.** Each load adds about 1–3 `curated-data-process` entries. The writer scans the whole list to find the entry for its `loadId`, so this gets slower over months. `GET /class/system-status` is a possible future optimisation.
 - **Read volume.** The engine recomputes every chain each cycle, so reads of the Live classes grow over time. The diff keeps writes at zero when nothing changed. Archiving is out of scope.
 - **Heuristics.** The DC segment longitude bands (`dcSegments.json`) and the damage mapping (`workflow.json`) are inferred and config-driven. An unresolved segment becomes `''` in a plain attribute, which never makes a record invalid.

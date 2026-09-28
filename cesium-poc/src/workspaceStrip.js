@@ -7,6 +7,7 @@
  *
  * Framework-free and styled from the theme tokens, like the rest of the map chrome.
  */
+import { subscribeCloudSync } from './liveDcCloudSync.js';
 
 /** Line icons, drawn to the weight the quick rail and the left bar already use. */
 const ICONS = Object.freeze({
@@ -52,7 +53,8 @@ export function installWorkspaceStrip(host, { cards, label, onSelect }) {
       </span>
       <span class="ws-kpi-chevron" aria-hidden="true">›</span>
     </button>`).join('')}
-    <span class="ws-source" data-source role="status"></span>`;
+    <span class="ws-source" data-source role="status"></span>
+    <span class="ws-source" data-cloud-sync role="status" hidden></span>`;
   host.append(root);
 
   const buttons = new Map([...root.querySelectorAll('[data-kpi]')].map(button => [button.dataset.kpi, button]));
@@ -68,6 +70,15 @@ export function installWorkspaceStrip(host, { cards, label, onSelect }) {
   }
   const onResize = () => measure();
   window.addEventListener('resize', onResize);
+
+  // Next to the source pill: whether the AWS poller is writing Live DataConnect (hidden when unknown).
+  const cloudSync = root.querySelector('[data-cloud-sync]');
+  const unsubscribeCloudSync = subscribeCloudSync(note => {
+    cloudSync.hidden = !note;
+    cloudSync.textContent = note ? sourceLabelText(note.text, note) : '';
+    cloudSync.dataset.warning = String(Boolean(note?.warning));
+    if (note?.title) cloudSync.title = note.title; else cloudSync.removeAttribute('title');
+  });
 
   return {
     root,
@@ -107,6 +118,6 @@ export function installWorkspaceStrip(host, { cards, label, onSelect }) {
       source.dataset.warning = String(warning);
       if (title) source.title = title; else source.removeAttribute('title');
     },
-    destroy() { window.removeEventListener('resize', onResize); root.remove(); },
+    destroy() { window.removeEventListener('resize', onResize); unsubscribeCloudSync(); root.remove(); },
   };
 }

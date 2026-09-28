@@ -5,12 +5,14 @@
  * historical definitions here are read-only references. Pure Node, so the AWS poller can import it.
  */
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+// Imported, not read from disk, so the poller lambda's single-file bundle carries them.
+import LIVE_CONFIG_JSON from '../../config/liveDc/liveClasses.json' with { type: 'json' };
+import HISTORICAL_CONFIG_JSON from '../../config/liveDc/historicalClasses.json' with { type: 'json' };
+import SEGMENT_CONFIG_JSON from '../../config/liveDc/dcSegments.json' with { type: 'json' };
 
-const readConfig = (name) => JSON.parse(readFileSync(new URL(`../../config/liveDc/${name}`, import.meta.url), 'utf8'));
-const LIVE_CONFIG = readConfig('liveClasses.json');
-const HISTORICAL_CONFIG = readConfig('historicalClasses.json');
-const SEGMENT_CONFIG = readConfig('dcSegments.json');
+const LIVE_CONFIG = structuredClone(LIVE_CONFIG_JSON);
+const HISTORICAL_CONFIG = structuredClone(HISTORICAL_CONFIG_JSON);
+const SEGMENT_CONFIG = structuredClone(SEGMENT_CONFIG_JSON);
 
 const deepFreeze = (value) => {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {

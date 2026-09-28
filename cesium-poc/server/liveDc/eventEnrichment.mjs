@@ -7,6 +7,8 @@
  * two local GeoJSON files in loadEnrichmentContext(). No network.
  */
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { haversineMeters } from '../geo.mjs';
 import { toDcDateTime } from './classes.mjs';
 import EVENT_FIELDS from '../../config/liveDc/eventFields.json' with { type: 'json' };
@@ -184,7 +186,11 @@ export function enrichEventFields(record, context = loadEnrichmentContext()) {
   return { ...values, field_sources: JSON.stringify(sources) };
 }
 
-const readGeoJson = name => JSON.parse(readFileSync(new URL(`../../public/data/${name}`, import.meta.url), 'utf8'));
+/** LIVE_DC_DATA_DIR lets the bundled poller lambda point at its own copy of public/data. */
+export const enrichmentDataPath = (name, env = process.env) => (env.LIVE_DC_DATA_DIR
+  ? join(env.LIVE_DC_DATA_DIR, name)
+  : fileURLToPath(new URL(`../../public/data/${name}`, import.meta.url)));
+const readGeoJson = name => JSON.parse(readFileSync(enrichmentDataPath(name), 'utf8'));
 let defaultContext = null;
 
 /** Corridor cameras and FDOT traffic segments from public/data, read once. */

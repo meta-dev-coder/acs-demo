@@ -4,12 +4,11 @@
  * from the event's own first_seen_at / cleared_at, never from `now`, so reruns are byte-identical and
  * the cycle's diff sends nothing when nothing changed. `now` only decides which milestones are reached.
  */
-import { readFileSync } from 'node:fs';
 import { LIVE_CLASS, PROJECT_CODE, liveClassDefinition, completeRecord } from './classes.mjs';
 import { nearestAsset } from './assetCatalog.mjs';
 import { haversineMeters } from '../geo.mjs';
+import WORKFLOW_CONFIG from '../../config/liveDc/workflow.json' with { type: 'json' };
 
-const CONFIG_URL = new URL('../../config/liveDc/workflow.json', import.meta.url);
 const PROFILE_KEYS = Object.freeze(['assignAfterSeconds', 'workOrderAfterSeconds', 'inspectionAfterClearSeconds', 'closeAfterInspectionSeconds']);
 const WORKFLOW_CLASSES = Object.freeze([LIVE_CLASS.TICKETS, LIVE_CLASS.TASKS, LIVE_CLASS.WORK_ORDERS, LIVE_CLASS.INSPECTIONS, LIVE_CLASS.ASSET_STATUS]);
 const HIGH_SEVERITY = /major|severe|serious/i;
@@ -30,7 +29,7 @@ function validateProfiles(config) {
 }
 
 export function loadWorkflowConfig(overrides = {}) {
-  const config = { ...JSON.parse(readFileSync(CONFIG_URL, 'utf8')), ...overrides };
+  const config = { ...structuredClone(WORKFLOW_CONFIG), ...overrides };
   validateProfiles(config);
   return config;
 }
