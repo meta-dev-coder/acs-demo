@@ -99,7 +99,27 @@ export function installMapNavigationControls(container, viewer, { zoom, onStreet
   }
 
   const reset = document.querySelector('#reset-view');
-  if (reset) group.append(reset);
+  if (reset) {
+    reset.innerHTML = '<span aria-hidden="true">⌖</span>';
+    reset.title = 'Reset view';
+    reset.setAttribute('aria-label', 'Reset view');
+    group.append(reset);
+  }
+  const toggle = document.createElement('button');
+  toggle.className = 'map-nav-toggle';
+  toggle.type = 'button';
+  toggle.innerHTML = '<span aria-hidden="true">⌃</span>';
+  toggle.title = 'Collapse map controls';
+  toggle.setAttribute('aria-label', toggle.title);
+  toggle.setAttribute('aria-expanded', 'true');
+  toggle.onclick = () => {
+    const collapsed = group.classList.toggle('collapsed');
+    toggle.innerHTML = `<span aria-hidden="true">${collapsed ? '⌄' : '⌃'}</span>`;
+    toggle.title = collapsed ? 'Expand map controls' : 'Collapse map controls';
+    toggle.setAttribute('aria-label', toggle.title);
+    toggle.setAttribute('aria-expanded', String(!collapsed));
+  };
+  group.prepend(toggle);
   container.append(group);
 
   function renderTheme() {

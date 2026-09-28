@@ -38,6 +38,13 @@ export function installBaseEnvironmentControls(container, service, { onFirstActi
       <label title="${LABELS.GOOGLE_PHOTOREALISTIC_3D}"><input type="radio" name="base-environment" value="${BASE_ENVIRONMENTS.GOOGLE_PHOTOREALISTIC_3D}" aria-label="${LABELS.GOOGLE_PHOTOREALISTIC_3D}"><span>${bar ? SHORT_LABELS.GOOGLE_PHOTOREALISTIC_3D : LABELS.GOOGLE_PHOTOREALISTIC_3D}</span></label>
     </fieldset>
     <p class="base-environment-status" role="status"></p>`;
+  if (bar) {
+    const glyphs = ['<path d="m3 15 5-6 4 5 3-3 6 7H3z"/><circle cx="16" cy="6" r="2"/>', '<path d="m12 2 9 5v10l-9 5-9-5V7zM3 7l9 5 9-5M12 12v10"/>'];
+    [...group.querySelectorAll('label')].forEach((label, index) => {
+      label.title = label.querySelector('input').getAttribute('aria-label');
+      label.querySelector('span').innerHTML = `<svg aria-hidden="true" viewBox="0 0 24 24">${glyphs[index]}</svg>`;
+    });
+  }
   container.append(group);
 
   const radios = new Map([...group.querySelectorAll('input[name="base-environment"]')].map(input => [input.value, input]));

@@ -934,3 +934,23 @@ body[data-section="liveOps"] [role="region"][aria-label$="explorer"] .MuiTypogra
 
 .liveops-impact-notice { position: absolute; bottom: 88px; left: calc(var(--app-nav-w) + 16px); max-width: min(460px, 70vw); padding: 10px 14px; border: 1px solid var(--ui-border); border-radius: 10px; background: var(--ui-surface-solid); color: var(--ui-text-secondary); font-size: 12px; pointer-events: auto; }
 .liveops-impact-notice[hidden] { display: none; }
+
+/* Compact, collapsible map controls along the right edge. */
+body .map-nav, body:has(.twin-hud) .map-nav {
+  top: 16px; right: 16px; bottom: auto; left: auto; width: 42px;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 1px; padding: 4px; max-height: calc(100dvh - 100px); overflow-y: auto;
+}
+body .map-nav button, body .map-nav #reset-view,
+body .map-nav .map-nav-north {
+  flex: none; width: 34px; min-width: 34px; height: 32px; padding: 0;
+  margin: 0; border: 0; border-radius: 7px;
+}
+body .map-nav #reset-view { font-size: 21px; }
+body .map-nav.collapsed > :not(.map-nav-toggle) { display: none; }
+body .map-nav .base-environment--bar { width: 34px; min-width: 0; margin: 0; padding: 0; }
+body .map-nav .base-environment-options { flex-direction: column; gap: 1px; }
+body .map-nav .base-environment--bar label { box-sizing: border-box; width: 34px; height: 32px; padding: 5px; justify-content: center; border-radius: 7px; }
+body .map-nav .base-environment--bar svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+body .map-nav button:focus-visible, body .map-nav label:has(input:focus-visible) { outline: 2px solid var(--ui-accent); outline-offset: -2px; }
+.liveops-layers { right: 78px; top: 16px; }
