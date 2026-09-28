@@ -23,6 +23,8 @@ import { AssetCarousel } from './AssetCarousel.jsx';
 import { AssetPositionRail } from './AssetPositionRail.jsx';
 import { AssetMiniMap } from './AssetMiniMap.jsx';
 import { AssetDetailsPanel, DETAILS_WIDTH } from './AssetDetailsPanel.jsx';
+import { IncidentDetailsPanel, INCIDENT_DETAILS_WIDTH } from './IncidentDetailsPanel.jsx';
+import { IncidentTypeIcon } from './IncidentTypeIcon.jsx';
 
 /** Below this the mini-map stops earning its space and the details panel becomes an overlay. */
 export const MINIMAP_MIN_WIDTH = 1100;
@@ -31,7 +33,42 @@ export const EXPLORER_MAX_WIDTH = 720;
 /** Sits close to the bottom edge now that no status strip runs beneath it. */
 export const BOTTOM_OFFSET = 20;
 
-export function AssetExplorer({ store, centerline, leftInset = 16, rightInset: detailsInset = 16, themeMode = 'dark', onInspect, onReturn, onViewCamera }) {
+/**
+ * One end of the reported-date range.
+ *
+ * A bare `<input type="date">` themed to match the strip: it is already keyboard-accessible, already
+ * shows the operator's own date format, and already refuses an impossible day — none of which a
+ * hand-built picker would get right for the space of a 130px field.
+ */
+function DateBound({ label, value, min, max, onChange }) {
+  return (
+    <Box
+      component="input"
+      type="date"
+      value={value ?? ''}
+      min={min ?? undefined}
+      max={max ?? undefined}
+      aria-label={label}
+      title={label}
+      onChange={event => onChange(event.target.value)}
+      sx={{
+        height: 24, width: 126, px: 0.75, borderRadius: 1.5,
+        border: 1, borderColor: value ? 'primary.main' : 'divider',
+        bgcolor: 'action.hover', color: 'text.primary',
+        font: 'inherit', fontSize: 12,
+        colorScheme: theme => (theme.palette.mode === 'dark' ? 'dark' : 'light'),
+        '&::-webkit-calendar-picker-indicator': { cursor: 'pointer', opacity: 0.6 },
+      }}
+    />
+  );
+}
+
+export function AssetExplorer({
+  store, centerline, leftInset = 16, rightInset: detailsInset = 16, themeMode = 'dark',
+  /** Where the details panel's top edge goes — measured, so it clears this workspace's own strip. */
+  panelTop = 220,
+  onInspect, onReturn, onViewCamera, lookupRecords = null, onOpenRecord = null,
+}) {
   const state = useAssetStore(store);
   // Rebuilt only when the mode actually changes; a new theme object on every render would remount
   // every styled node in the island.
@@ -57,6 +94,20 @@ export function AssetExplorer({ store, centerline, leftInset = 16, rightInset: d
     }
     return [...groups.entries()];
   }, [filters]);
+  // Only a class that actually dates its records is offered a date range, and the inputs are bounded
+  // by the dates it holds rather than by today — these are historical registers, not live feeds.
+  const dateBounds = useMemo(() => {
+    if (!config?.getDateKey) return null;
+    let min = null, max = null;
+    for (const asset of all) {
+      const key = config.getDateKey(asset);
+      if (!key) continue;
+      if (min === null || key < min) min = key;
+      if (max === null || key > max) max = key;
+    }
+    return min ? { min, max } : null;
+  }, [config, all]);
+  const datesAvailable = Boolean(dateBounds);
   const status = state.statusByType[activeExplorerType] ?? { loading: false, error: null };
   const corridorMiles = useMemo(() => corridorLengthMiles(centerline), [centerline]);
 
@@ -86,6 +137,8 @@ export function AssetExplorer({ store, centerline, leftInset = 16, rightInset: d
   const selectFromRail = useCallback(asset => select(asset, SELECTION_SOURCES.RAIL), [select]);
   const step = useCallback(delta => { store.step(delta); }, [store]);
   const setQuery = useCallback(event => { store.setFilter({ query: event.target.value }); }, [store]);
+  // An empty date input means "no bound", not "the epoch", so it is stored as null.
+  const setDate = useCallback((edge, value) => { store.setFilter({ [edge]: value || null }); }, [store]);
   const toggleFilter = useCallback(id => { store.setFilter({ id: store.getState().filter.id === id ? null : id }); }, [store]);
 
   if (!config) return null;
@@ -94,30 +147,50 @@ export function AssetExplorer({ store, centerline, leftInset = 16, rightInset: d
   // A type that keeps its own details panel gets no second one here; two panels describing the
   // same asset is worse than either alone.
   const detailsShowing = detailsOpen && Boolean(selectedAsset) && !config.legacyDetailsPanel;
+  // An incident is an event to be acted on rather than a record to be read, so it has its own panel
+  // — the type's colour, the nearest camera and the impact — instead of the shared field list.
+  const showingIncident = detailsShowing && selectedAsset.assetType === 'incidentRecord';
+  const openPanelWidth = showingIncident ? INCIDENT_DETAILS_WIDTH : DETAILS_WIDTH;
   // The bottom group keeps a fixed position: selecting an asset must not slide the browser out from
   // under the cursor. It can afford to, because the mini-map sits to the LEFT of the browser — the
   // only thing that reaches toward the details panel is the browser's own right edge, and a centred
   // browser of EXPLORER_MAX_WIDTH stops well short of it. The panel's width is still subtracted
   // when the Map Explorer is also open, which is the one case where the two could otherwise meet.
-  const rightInset = Math.max(detailsInset, detailsShowing && !compact && leftInset > 16 ? DETAILS_WIDTH + 32 : 16);
+  const rightInset = Math.max(detailsInset, detailsShowing && !compact && leftInset > 16 ? openPanelWidth + 32 : 16);
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline enableColorScheme={false} />
       {/* The island covers the map, so it must not intercept pointer events except on its own
           surfaces — Cesium navigation has to keep working around it. */}
-      <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 12 }}>
-        {detailsShowing && (
-          <AssetDetailsPanel
+      <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+        {detailsShowing && (showingIncident ? (
+          <IncidentDetailsPanel
             right={detailsInset}
+            top={panelTop}
             asset={selectedAsset}
             inspecting={inspectionViewActive}
             onClose={() => store.setDetailsOpen(false)}
             onInspect={onInspect}
             onReturn={onReturn}
             onViewCamera={onViewCamera}
+            lookupRecords={lookupRecords}
+            onOpenRecord={onOpenRecord}
           />
-        )}
+        ) : (
+          <AssetDetailsPanel
+            right={detailsInset}
+            top={panelTop}
+            asset={selectedAsset}
+            inspecting={inspectionViewActive}
+            onClose={() => store.setDetailsOpen(false)}
+            onInspect={onInspect}
+            onReturn={onReturn}
+            onViewCamera={onViewCamera}
+            lookupRecords={lookupRecords}
+            onOpenRecord={onOpenRecord}
+          />
+        ))}
 
         {/* One bottom navigation group. The browser and the mini-map stay separate Material
             surfaces, but they are a single workspace: this container owns the bottom offset, the
@@ -126,7 +199,7 @@ export function AssetExplorer({ store, centerline, leftInset = 16, rightInset: d
             workspace that is actually free rather than on the browser window. */}
         <Box
           sx={{
-            position: 'absolute', left: leftInset, right: rightInset, bottom: BOTTOM_OFFSET,
+            position: 'absolute', left: leftInset, right: rightInset, bottom: BOTTOM_OFFSET, zIndex: 12,
             // Three columns rather than a centred row: the middle column holds the browser, so the
             // browser itself is centred on the workspace. A flex row would centre the PAIR, which
             // pushes the browser right of centre by half the mini-map's width.
@@ -203,7 +276,7 @@ export function AssetExplorer({ store, centerline, leftInset = 16, rightInset: d
                 </IconButton>
               </Tooltip>
             </Stack>
-            {explorerExpanded && filters.length > 0 && (
+            {explorerExpanded && (filters.length > 0 || datesAvailable) && (
               <Stack direction="row" spacing={0.75} sx={{ px: 1.5, pb: 0.5, flexWrap: 'wrap', rowGap: 0.75 }}>
                 {/* "All" is the state with no filter, named so it can be chosen rather than guessed at. */}
                 <Chip
@@ -240,11 +313,52 @@ export function AssetExplorer({ store, centerline, leftInset = 16, rightInset: d
                       {/* Choosing nothing is choosing every type, and is named so rather than blank. */}
                       <MenuItem value="">{`All ${group.toLowerCase()}s`}</MenuItem>
                       {entries.map(entry => (
-                        <MenuItem key={entry.id} value={entry.id}>{`${entry.label} (${entry.count})`}</MenuItem>
+                        <MenuItem key={entry.id} value={entry.id} sx={{ gap: 1 }}>
+                          {/* The crash taxonomy carries its own colour and pictogram; every other
+                              grouped filter is plain text, so nothing else gains a stray icon. */}
+                          {group === 'Incident type' && <IncidentTypeIcon incidentType={entry.label} fontSize="small" />}
+                          {`${entry.label} (${entry.count})`}
+                        </MenuItem>
                       ))}
                     </Select>
                   );
                 })}
+                {/* The reported-date range. Native date inputs rather than a picker component: they
+                    are keyboard- and locale-correct for free, and this strip has room for two
+                    fields, not a calendar popover. */}
+                {datesAvailable && (
+                  <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
+                      {`${config.dateLabel ?? 'Reported'}`}
+                    </Typography>
+                    <DateBound
+                      label={`${config.dateLabel ?? 'Reported'} on or after`}
+                      value={state.filter.from}
+                      min={dateBounds.min}
+                      max={state.filter.to ?? dateBounds.max}
+                      onChange={value => setDate('from', value)}
+                    />
+                    <Typography variant="caption" color="text.secondary">to</Typography>
+                    <DateBound
+                      label={`${config.dateLabel ?? 'Reported'} on or before`}
+                      value={state.filter.to}
+                      min={state.filter.from ?? dateBounds.min}
+                      max={dateBounds.max}
+                      onChange={value => setDate('to', value)}
+                    />
+                    {(state.filter.from || state.filter.to) && (
+                      <Tooltip title="Clear the date range">
+                        <IconButton
+                          aria-label="Clear the date range"
+                          onClick={() => store.setFilter({ from: null, to: null })}
+                          sx={{ width: 22, height: 22 }}
+                        >
+                          <CloseIcon sx={{ fontSize: 14 }} />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </Stack>
+                )}
               </Stack>
             )}
             {explorerExpanded && (

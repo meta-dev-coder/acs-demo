@@ -15,6 +15,7 @@ import EngineeringOutlinedIcon from '@mui/icons-material/EngineeringOutlined';
 import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined';
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import HorizontalRuleOutlinedIcon from '@mui/icons-material/HorizontalRuleOutlined';
+import { IncidentTypeIcon } from './IncidentTypeIcon.jsx';
 
 const ICONS = {
   workOrder: HandymanOutlinedIcon,
@@ -35,7 +36,16 @@ const ICONS = {
   disabledVehicle: CarRepairOutlinedIcon,
 };
 
-export function AssetTypeIcon({ assetType, ...props }) {
+/**
+ * @param {{assetType: string, asset?: object, tinted?: boolean}} props An incident's icon is its
+ *   crash type's, not the class's: fifteen identical amber triangles told an operator nothing about
+ *   which of them was a fire. `asset` is what carries the type, so callers that only know the class
+ *   (a rail button, a layer legend) still get the generic icon.
+ */
+export function AssetTypeIcon({ assetType, asset = null, tinted = true, ...props }) {
+  if (assetType === 'incidentRecord' && asset?.source?.title) {
+    return <IncidentTypeIcon incidentType={asset.source.title} tinted={tinted} {...props} />;
+  }
   const Icon = ICONS[assetType] ?? LocationOnOutlinedIcon;
   return <Icon {...props} />;
 }

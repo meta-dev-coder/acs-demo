@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=20.12"
+  },
   "description": "Standalone CesiumJS PoC: SUMO toll-plaza traffic flow on the real I-595 corridor.",
   "scripts": {
     "dev": "vite",

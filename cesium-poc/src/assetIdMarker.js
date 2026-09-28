@@ -139,8 +139,12 @@ export function assetIdMarker({ id, selected = false, stem = STEM, tone = 'norma
  * @returns {{image: HTMLCanvasElement, width: number, height: number}}
  */
 export function assetDotMarker(tone = 'normal') {
-  const colors = MARKER_COLORS[tone] && tone !== 'selected' ? MARKER_COLORS[tone] : MARKER_COLORS.normal;
-  const key = `dot:${colors === MARKER_COLORS.normal ? 'normal' : tone}`;
+  // A tone may also be a colour of its own — the incident families each have one, and there are
+  // fifteen of them, which is not a list that belongs in MARKER_COLORS.
+  const custom = typeof tone === 'object' && tone?.color ? tone.color : null;
+  const colors = custom ? { dot: custom, dotRing: '#FFFFFF' }
+    : MARKER_COLORS[tone] && tone !== 'selected' ? MARKER_COLORS[tone] : MARKER_COLORS.normal;
+  const key = custom ? `dot:color:${custom}` : `dot:${colors === MARKER_COLORS.normal ? 'normal' : tone}`;
   const hit = cache.get(key);
   if (hit) return hit;
   // The full marker's dot centre sits DOT_RADIUS + 2 above its bottom edge; so does this one's.
@@ -159,6 +163,41 @@ export function assetDotMarker(tone = 'normal') {
   ctx.stroke();
   const marker = Object.freeze({ image: canvas, width: size, height: size });
   cache.set(key, marker);
+  return marker;
+}
+
+/**
+ * A coloured map pin carrying one pictogram — what an incident looks like on the corridor.
+ *
+ * The ID pill answers "which one" and is right for a corridor of 47 cameras. An incident layer asks
+ * a different question: a fire, a flood spinout and a wrong-way entry need different people, and the
+ * marker should say which at a glance rather than print a record number. The glyph and the colour
+ * come from the incident's own family (`assetExplorer/incidentTypes.js`), so the marker, the card
+ * and the details panel are one picture.
+ *
+ * @param {{color: string, glyph: string, rotate?: number, selected?: boolean, key?: string}} options
+ *   `glyph` is SVG path data in a 24×24 box; `key` names the family for the texture cache.
+ * @returns {{image: string, width: number, height: number}}
+ */
+export function assetPinMarker({ color, glyph, rotate = 0, selected = false, key = color }) {
+  const cacheKey = `pin:${key}:${rotate}:${selected}`;
+  const hit = cache.get(cacheKey);
+  if (hit) return hit;
+  // Selection keeps the shared warm yellow it has everywhere else on this map; the family colour
+  // moves to the outline so the selected pin still says what kind of incident it is.
+  const fill = selected ? '#F5B51B' : color;
+  const ink = selected ? '#172033' : '#FFFFFF';
+  const stroke = selected ? color : '#FFFFFF';
+  // The 24×24 glyph is placed in the pin's 26px head, centred on it.
+  const turn = rotate ? ` transform="rotate(${rotate} 12 12)"` : '';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="152" height="184" viewBox="0 0 38 46">`
+    + `<path d="M19 45.5 7.5 29.5A14.5 14.5 0 1 1 30.5 29.5Z" fill="${fill}" stroke="${stroke}" stroke-width="2.4" stroke-linejoin="round"/>`
+    + `<g transform="translate(7 6) scale(1)" fill="${ink}"><path d="${glyph}"${turn}/></g></svg>`;
+  const marker = Object.freeze({
+    image: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
+    width: selected ? 30 : 26, height: selected ? 36 : 31,
+  });
+  cache.set(cacheKey, marker);
   return marker;
 }
 

@@ -1,0 +1,346 @@
+/**
+ * The details panel for one incident.
+ *
+ * An incident is not another row of asset metadata — it is an event an operator has to act on — so
+ * it gets its own surface rather than the shared definition list: the type's own colour and
+ * pictogram, the nearest camera looking at it, the two or three numbers that decide the response,
+ * and the record's own columns behind tabs.
+ *
+ * Everything on it is measured or quoted. The carriageway, the milepost and the cameras are
+ * resolved from the incident's coordinates against the corridor's published geometry
+ * (`incidentContext.js`); the prose comes from the record's own columns (`incidentNarrative.js`).
+ * The one exception is Recommended next steps, which is explicitly a placeholder and says so.
+ */
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Box, Chip, IconButton, Paper, Stack, Tab, Tabs, Tooltip, Typography, Button } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import MyLocationOutlinedIcon from '@mui/icons-material/MyLocationOutlined';
+import ArrowBackOutlinedIcon from '@mui/icons-material/ArrowBackOutlined';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import VideocamOutlinedIcon from '@mui/icons-material/VideocamOutlined';
+import InsightsOutlinedIcon from '@mui/icons-material/InsightsOutlined';
+import DvrOutlinedIcon from '@mui/icons-material/DvrOutlined';
+import AltRouteOutlinedIcon from '@mui/icons-material/AltRouteOutlined';
+import { makeDraggable } from '../draggablePanel.js';
+import { getCameraStreamUrl } from '../cctvCameras.js';
+import { incidentVisual, incidentSeverity } from './incidentTypes.js';
+import { IncidentTypeBadge } from './IncidentTypeIcon.jsx';
+import { camerasNear, carriagewayAt, carriagewayLabel, distanceLabel, loadCorridorContext, segmentSpanLabel } from './incidentContext.js';
+import { RelatedRecords, relatedRecordCount, useRelatedGroups } from './RelatedRecords.jsx';
+import { detailFacts, impactRows, incidentFacts, incidentHeadline, incidentNarrative, reportedAt, RECOMMENDED_STEPS } from './incidentNarrative.js';
+
+/** Wider than the generic panel: this one carries a camera image and a tab strip, not a field list. */
+export const INCIDENT_DETAILS_WIDTH = 390;
+/** The camera panel's own cadence, so two snapshots of the same corridor never disagree by age. */
+const SNAPSHOT_INTERVAL_MS = 6000;
+
+const TONE_COLOR = { danger: 'error.main', warning: 'warning.main', muted: 'text.secondary' };
+const STEP_ICONS = { analysis: InsightsOutlinedIcon, sign: DvrOutlinedIcon, route: AltRouteOutlinedIcon };
+
+/**
+ * The corridor geometry, once, shared by every incident the operator clicks. Loading is per page,
+ * not per selection — the same two GeoJSON files answer every incident.
+ */
+function useCorridorContext() {
+  const [context, setContext] = useState(null);
+  useEffect(() => {
+    let live = true;
+    void loadCorridorContext().then(loaded => { if (live) setContext(loaded); });
+    return () => { live = false; };
+  }, []);
+  return context;
+}
+
+/** The live JPEG from one camera, re-fetched on the camera panel's cadence. */
+function CameraSnapshot({ camera, height = 176, badge = true }) {
+  const url = camera ? getCameraStreamUrl({ divas_chan_id: camera.divasChannelId }) : null;
+  const [tick, setTick] = useState(() => Date.now());
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setFailed(false);
+    setTick(Date.now());
+    if (!url) return undefined;
+    const timer = setInterval(() => setTick(Date.now()), SNAPSHOT_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [url]);
+
+  const frame = {
+    // `flex: none` is load-bearing: the panel is a scrolling flex column, and a flex child with a
+    // height is still shrunk to fit — which collapsed the snapshot to nothing while leaving its
+    // overlay chips behind.
+    position: 'relative', height, minHeight: height, flex: 'none',
+    borderRadius: 1.5, overflow: 'hidden',
+    border: 1, borderColor: 'divider', bgcolor: 'action.hover',
+    display: 'grid', placeItems: 'center',
+  };
+  if (!url || failed) {
+    return (
+      <Box sx={frame}>
+        <Stack spacing={0.5} sx={{ alignItems: 'center', color: 'text.secondary', px: 2, textAlign: 'center' }}>
+          <VideocamOutlinedIcon fontSize="small" />
+          <Typography variant="caption">
+            {!camera ? 'No corridor camera within range of this incident'
+              : !url ? `${camera.label} has no public snapshot feed` : `${camera.label} did not return a frame`}
+          </Typography>
+        </Stack>
+      </Box>
+    );
+  }
+  return (
+    <Box sx={frame}>
+      <Box
+        component="img"
+        src={`${url}?t=${tick}`}
+        alt={`Live snapshot from ${camera.label}`}
+        onError={() => setFailed(true)}
+        sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+      />
+      {badge && (
+        <Stack direction="row" spacing={0.5} sx={{ position: 'absolute', left: 8, bottom: 8, alignItems: 'center' }}>
+          <Chip
+            size="small"
+            label={`Live · Cam ${camera.id}`}
+            sx={{ bgcolor: 'rgba(11,23,41,0.78)', color: '#fff', border: '1px solid rgba(255,255,255,0.28)' }}
+          />
+          {distanceLabel(camera.metres) && (
+            <Chip
+              size="small"
+              label={distanceLabel(camera.metres)}
+              sx={{ bgcolor: 'rgba(11,23,41,0.78)', color: '#fff', border: '1px solid rgba(255,255,255,0.28)' }}
+            />
+          )}
+        </Stack>
+      )}
+    </Box>
+  );
+}
+
+/** The shared two-column definition grid, so the tabs read like the other panels on this map. */
+function FactGrid({ rows }) {
+  if (!rows.length) return <Typography variant="body2" color="text.secondary">This record carries no further details.</Typography>;
+  return (
+    <Box component="dl" sx={{ display: 'grid', gridTemplateColumns: '108px 1fr', gap: 1.25, m: 0, fontSize: 12, lineHeight: 1.5 }}>
+      {rows.map(([label, value]) => (
+        <Fragment key={label}>
+          <Box component="dt" sx={{ color: 'text.secondary' }}>{label}</Box>
+          <Box component="dd" sx={{ m: 0, overflowWrap: 'anywhere' }}>{value}</Box>
+        </Fragment>
+      ))}
+    </Box>
+  );
+}
+
+export function IncidentDetailsPanel({
+  // The same top edge as the generic panel: below the app header and the workspace's KPI strip,
+  // which this must not cover. The panel scrolls rather than growing past it.
+  asset, inspecting, onClose, onInspect, onReturn, onViewCamera,
+  lookupRecords = null, onOpenRecord = null,
+  top = 220, bottom = 16, right = 16,
+}) {
+  const panelRef = useRef(null);
+  const headingRef = useRef(null);
+  const [tab, setTab] = useState(0);
+  const context = useCorridorContext();
+
+  // Same floating behaviour as every other details panel on this map: the heading is the handle.
+  useEffect(() => {
+    if (!panelRef.current || !headingRef.current) return undefined;
+    const drag = makeDraggable(panelRef.current, headingRef.current);
+    return () => drag.destroy();
+  }, [Boolean(asset)]);
+
+  const record = asset?.source ?? null;
+  const coordinates = asset?.coordinates ?? null;
+  // Re-resolved only when the incident or the loaded geometry changes — not on every tab switch.
+  const place = useMemo(
+    () => (context && coordinates ? carriagewayAt(coordinates.longitude, coordinates.latitude, context.lines) : null),
+    [context, coordinates],
+  );
+  const cameras = useMemo(
+    () => (context && coordinates ? camerasNear(coordinates.longitude, coordinates.latitude, context.cameras) : []),
+    [context, coordinates],
+  );
+  // The panel leads with a camera that can actually show a frame; one without a feed is still listed
+  // in the Cameras tab, because "the nearest camera has no feed" is itself worth knowing.
+  const leadCamera = useMemo(() => cameras.find(camera => camera.divasChannelId) ?? cameras[0] ?? null, [cameras]);
+  const facts = useMemo(() => (record ? incidentFacts(record) : null), [record]);
+  // The crash is one class's record of an event the other four also wrote about — the ticket raised
+  // for the guardrail it took out, the crew sent, the work order, the inspection that closed it.
+  const related = useRelatedGroups(record, lookupRecords);
+  const relatedTotal = relatedRecordCount(related);
+  const openRelated = onOpenRecord ? reference => { void onOpenRecord(reference.assetType, reference.id); } : null;
+
+  // Selecting a different incident should not leave the panel on a tab about the previous one.
+  useEffect(() => { setTab(0); }, [asset?.id]);
+
+  if (!asset || !record) return null;
+  const visual = incidentVisual(facts.type);
+  const severity = incidentSeverity(record);
+  const headline = incidentHeadline(facts);
+  const narrative = incidentNarrative(record, place);
+
+  return (
+    <Paper
+      ref={panelRef}
+      elevation={4}
+      sx={{
+        position: 'absolute', right, top, width: INCIDENT_DETAILS_WIDTH, zIndex: 60,
+        maxHeight: `calc(100% - ${top + bottom}px)`,
+        p: 2, borderRadius: 2, overflowY: 'auto',
+        display: 'flex', flexDirection: 'column', gap: 1.5, pointerEvents: 'auto',
+        // The one place the family colour is structural rather than decorative: the panel's left
+        // edge says which kind of incident is open before a word is read.
+        borderLeft: `4px solid ${visual.color}`,
+      }}
+      role="complementary"
+      aria-label={`${facts.type ?? 'Incident'} details`}
+    >
+      <Stack ref={headingRef} direction="row" spacing={1.25} sx={{ alignItems: 'flex-start' }}>
+        <IncidentTypeBadge incidentType={facts.type} />
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+            <Typography component="h2" sx={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, lineHeight: 1.25 }}>
+              {facts.type ?? 'Incident'}
+            </Typography>
+            <Chip
+              size="small"
+              label={severity.level}
+              sx={{ flex: 'none', color: TONE_COLOR[severity.tone], borderColor: TONE_COLOR[severity.tone] }}
+              variant="outlined"
+            />
+          </Stack>
+          <Typography variant="caption" color="text.secondary" component="div">
+            {[asset.id, place?.resolved ? carriagewayLabel(place) : null, facts.segment].filter(Boolean).join(' · ')}
+          </Typography>
+          {reportedAt(facts) && (
+            <Typography variant="caption" color="text.secondary" component="div">{`Reported ${reportedAt(facts)}`}</Typography>
+          )}
+        </Box>
+        <Tooltip title="Close incident details">
+          <IconButton onClick={onClose} aria-label="Close incident details"
+            sx={{ width: 32, height: 32, borderRadius: 1, bgcolor: 'action.hover', flex: 'none' }}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </Stack>
+
+      <CameraSnapshot camera={leadCamera} />
+
+      {headline.length > 0 && (
+        <Stack direction="row" spacing={1}>
+          {headline.map(card => (
+            <Box key={card.label} sx={{ flex: 1, minWidth: 0, p: 1, borderRadius: 1.5, border: 1, borderColor: 'divider' }}>
+              <Typography sx={{ fontSize: 18, fontWeight: 700, lineHeight: 1.1, color: TONE_COLOR[card.tone] }}>{card.value}</Typography>
+              <Typography variant="caption" color="text.secondary" component="div" sx={{ lineHeight: 1.3 }}>{card.label}</Typography>
+            </Box>
+          ))}
+        </Stack>
+      )}
+
+      <Tabs
+        value={tab}
+        onChange={(event, next) => setTab(next)}
+        variant="fullWidth"
+        sx={{ minHeight: 34, borderBottom: 1, borderColor: 'divider', '& .MuiTab-root': { minHeight: 34, fontSize: 12, py: 0, px: 0.5, minWidth: 0 } }}
+      >
+        <Tab label="Details" />
+        <Tab label="Impact" />
+        <Tab label={`Cameras (${cameras.length})`} />
+        {lookupRecords ? <Tab label={`Related (${relatedTotal})`} /> : null}
+      </Tabs>
+
+      {tab === 0 && <FactGrid rows={detailFacts(record, place)} />}
+
+      {tab === 1 && (
+        <Stack spacing={1.25}>
+          {narrative.map(sentence => (
+            <Typography key={sentence} variant="body2" sx={{ lineHeight: 1.5 }}>{sentence}</Typography>
+          ))}
+          <FactGrid rows={impactRows(record, place)} />
+          <Typography variant="caption" color="text.secondary">
+            Delay and queue length are not recorded for historical incidents, so none is shown.
+          </Typography>
+        </Stack>
+      )}
+
+      {tab === 2 && (
+        <Stack spacing={1.25}>
+          {cameras.length === 0 && (
+            <Typography variant="body2" color="text.secondary">No corridor camera lies within range of this incident.</Typography>
+          )}
+          {cameras.map(camera => (
+            <Box key={camera.id} sx={{ borderRadius: 1.5, border: 1, borderColor: 'divider', overflow: 'hidden' }}>
+              <CameraSnapshot camera={camera} height={112} badge={false} />
+              <Stack direction="row" spacing={1} sx={{ p: 1, alignItems: 'center' }}>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="subtitle2" noWrap>{`Cam ${camera.id}`}</Typography>
+                  <Typography variant="caption" color="text.secondary" noWrap component="div">
+                    {[camera.description, camera.direction, distanceLabel(camera.metres)].filter(Boolean).join(' · ')}
+                  </Typography>
+                </Box>
+                {onViewCamera && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => onViewCamera({ coordinates: { longitude: camera.longitude, latitude: camera.latitude }, name: `Cam ${camera.id}` })}
+                  >
+                    Street View
+                  </Button>
+                )}
+              </Stack>
+            </Box>
+          ))}
+        </Stack>
+      )}
+
+      {lookupRecords && tab === 3 && (
+        <RelatedRecords
+          groups={related}
+          onOpen={openRelated}
+          emptyMessage="No ticket, task, work order or inspection names this incident or stands on its asset."
+        />
+      )}
+
+      <Box>
+        <Typography variant="subtitle2" sx={{ mb: 0.75 }}>Recommended next steps</Typography>
+        <Stack spacing={0.75}>
+          {RECOMMENDED_STEPS.map(step => {
+            const Icon = STEP_ICONS[step.icon] ?? InsightsOutlinedIcon;
+            return (
+              <Stack
+                key={step.id}
+                direction="row"
+                spacing={1}
+                sx={{ alignItems: 'center', p: 1, borderRadius: 1.5, border: 1, borderColor: 'divider', color: 'text.secondary' }}
+              >
+                <Icon fontSize="small" />
+                <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }}>{step.label}</Typography>
+                <ChevronRightIcon fontSize="small" />
+              </Stack>
+            );
+          })}
+        </Stack>
+        {/* Said out loud rather than implied by a greyed-out row: these do not answer anything yet. */}
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+          Placeholders — the Twin will answer these once the impact model is wired in.
+        </Typography>
+      </Box>
+
+      <Stack spacing={1}>
+        <Button variant="contained" startIcon={<MyLocationOutlinedIcon />} onClick={() => onInspect(asset)}
+          disabled={!asset.coordinates} aria-label={`View ${asset.id} on map`}>
+          View on map
+        </Button>
+        {inspecting && (
+          <Button variant="text" startIcon={<ArrowBackOutlinedIcon />} onClick={onReturn} aria-label="Return to the previous view">
+            Back to corridor view
+          </Button>
+        )}
+      </Stack>
+    </Paper>
+  );
+}
+
+/** What the heading's second line says, exported so the card and the panel cannot disagree. */
+export const incidentPlaceLabel = place => (place?.resolved ? carriagewayLabel(place) : null);
+export { segmentSpanLabel };

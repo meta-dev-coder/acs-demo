@@ -53,12 +53,22 @@ export function installAssetExplorer(container, viewer, {
   // How a search and a filter chip narrow a type's assets. The rules come from the type registry,
   // so a type without either simply shows everything.
   store.setFilterResolver((assetType, assets, filter) => {
-    if (!assetType || (!filter?.query && !filter?.id)) return assets;
+    if (!assetType || (!filter?.query && !filter?.id && !filter?.from && !filter?.to)) return assets;
     const config = assetTypeConfig(assetType);
     let list = assets;
     if (filter.id) {
       const match = config?.getFilters?.(assets).find(entry => entry.id === filter.id)?.match;
       if (match) list = list.filter(match);
+    }
+    // The reported-date range. Calendar keys compare as strings ("2024-05-27"), which is exactly
+    // the comparison an operator means by "between these two days" and needs no timezone at all.
+    // A record whose class has no date, or whose own date is unreadable, is OUT of every range:
+    // "when this happened is unknown" is not the same as "it happened in your window".
+    if ((filter.from || filter.to) && config?.getDateKey) {
+      list = list.filter(asset => {
+        const key = config.getDateKey(asset);
+        return Boolean(key) && (!filter.from || key >= filter.from) && (!filter.to || key <= filter.to);
+      });
     }
     const query = filter.query.trim().toLowerCase();
     if (query) {
@@ -70,6 +80,14 @@ export function installAssetExplorer(container, viewer, {
 
   const sources = createAssetSources({ corridorModels, cameras, bridges, signals, messageSigns, lighting, maintenance,
     maintenanceRecords, revealMaintenance, liveEvents, signStructures, centerline, modelConfigs });
+  /**
+   * Every loaded record of one maintenance class, whether or not it is the class on screen.
+   *
+   * The Related tab reads through this: an incident's work orders have to be findable without first
+   * opening the Work Orders card, exactly as search already finds them.
+   */
+  const lookupMaintenanceRecords = maintenanceRecords ? assetType => maintenanceRecords(assetType) ?? [] : null;
+
   const navigation = createAssetNavigation(viewer, { logger });
   const disconnect = connectAssetSources(store, sources, { logger });
 
@@ -121,18 +139,43 @@ export function installAssetExplorer(container, viewer, {
   const rightPanel = () => document.querySelector('.mx-list:not([hidden])');
   // The left navigation bar is always there, so the island starts beside it rather than under it.
   const navBar = document.querySelector('.app-nav');
+  /** The map's own vertical toolbar, which owns the top-right corner whatever a panel wants. */
+  const mapToolbar = () => document.querySelector('.map-nav');
+  /**
+   * Furniture that owns the top of the map. A details panel starts below the lowest of it, which is
+   * what lets the panel be as tall as the workspace actually allows instead of clearing a guessed
+   * height — a KPI strip is six lines tall in one workspace and absent in another.
+   */
+  const topFurniture = () => [...document.querySelectorAll('.ws-kpis, .twin-hud')]
+    .filter(element => element.offsetParent !== null && !element.hidden);
+  /** Nothing may start above this, so a panel never covers the workspace's own heading. */
+  const MIN_PANEL_TOP = 96;
   let leftInset = 16;
   let rightInset = 16;
+  let panelTop = MIN_PANEL_TOP;
+  function visibleRect(element) {
+    if (!element || element.offsetParent === null) return null;
+    const rect = element.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0 ? rect : null;
+  }
   function measureInsets() {
-    const right = rightPanel()?.getBoundingClientRect();
-    const nextRight = right && right.width > 0 ? Math.round(window.innerWidth - right.left) + 16 : 16;
-    if (nextRight !== rightInset) { rightInset = nextRight; render(); }
+    const right = visibleRect(rightPanel());
+    // The right-hand column is shared: the Maintenance list when it is open, and always the map
+    // toolbar. A panel that sits under the zoom controls cannot be clicked, so the further of the
+    // two decides where the column starts.
+    const listInset = right ? Math.round(window.innerWidth - right.left) + 16 : 16;
+    const toolbar = visibleRect(mapToolbar());
+    const toolbarInset = toolbar ? Math.round(window.innerWidth - toolbar.left) + 12 : 16;
+    const nextRight = Math.max(listInset, toolbarInset);
     const navWidth = navBar?.getBoundingClientRect().width ?? 0;
     const rect = explorerPanel?.offsetParent === null ? null : explorerPanel?.getBoundingClientRect();
     const nextLeft = rect && rect.width > 0 && rect.right > 0 && !explorerPanel.classList.contains('collapsed')
       ? Math.round(rect.right) + 16 : Math.round(navWidth) + 16;
-    if (nextLeft === leftInset) return;
+    const nextTop = Math.max(MIN_PANEL_TOP, ...topFurniture().map(element => Math.round(element.getBoundingClientRect().bottom) + 16));
+    if (nextRight === rightInset && nextLeft === leftInset && nextTop === panelTop) return;
+    rightInset = nextRight;
     leftInset = nextLeft;
+    panelTop = nextTop;
     render();
   }
 
@@ -144,9 +187,12 @@ export function installAssetExplorer(container, viewer, {
         leftInset={leftInset}
         themeMode={themeMode?.mode ?? 'dark'}
         rightInset={rightInset}
+        panelTop={panelTop}
         onInspect={inspect}
         onReturn={returnFromInspection}
         onViewCamera={onViewCamera}
+        lookupRecords={lookupMaintenanceRecords}
+        onOpenRecord={revealRecord}
       />);
   }
   render();
@@ -349,6 +395,31 @@ export function installAssetExplorer(container, viewer, {
   }
 
   /**
+   * Open one record by class and id — what clicking a related record does.
+   *
+   * It takes the ordinary route: put the class on screen (its workspace card, or its map layer),
+   * wait for it to deliver the record, then select it. So the card list, the map marker, the rail
+   * and the details panel all move together, and the camera takes the same moderate look it takes
+   * for any other selection. No flight: the operator asked to READ the related record, not to be
+   * taken to it — "View on map" in its panel is still the explicit way to fly.
+   *
+   * @returns {Promise<object|null>} the selected asset, or null if its class never delivered it
+   */
+  async function revealRecord(assetType, id) {
+    if (!assetType || id == null) return null;
+    const source = sources.find(candidate => candidate.assetType === assetType);
+    const layerId = source?.layerFor?.(null) ?? assetTypeConfig(assetType)?.layerId;
+    if (layerId && layerStore) await layerStore.setVisible(layerId, true);
+    else if (source?.reveal) { if (!await source.reveal()) return null; }
+    else return null;
+    const wanted = String(id);
+    const live = await waitForState(state => (state.assetsByType[assetType] ?? []).find(candidate => candidate.id === wanted), 10000);
+    if (!live) { logger.warn?.(`[asset-explorer] ${assetType} ${wanted} did not appear`); return null; }
+    store.selectAsset(live, SELECTION_SOURCES.SEARCH);
+    return live;
+  }
+
+  /**
    * Fly to a place that is not an asset — the end of a road segment, or a whole segment — with the
    * same saved-camera close view, so "Back" returns from it exactly as from an asset. The explorer's
    * selection is left alone: nothing was selected.
@@ -396,6 +467,8 @@ export function installAssetExplorer(container, viewer, {
     flyToAsset,
     flyToPlace,
     showAssetType,
+    /** Open one maintenance record by class and id, as the Related tab does. */
+    revealRecord,
     /** Re-read every layer's records, e.g. once an async layer has finished loading. */
     refresh: () => refreshAssets(store, sources, { logger }),
     /** Test/diagnostic hook. */

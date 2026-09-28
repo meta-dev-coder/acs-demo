@@ -17,6 +17,9 @@ function AssetCardBase({ asset, selected, onSelect }) {
   const subtitle = config?.getSubtitle(asset) ?? null;
   // A type may suppress status on the card while still reporting it in the details panel.
   const status = (config?.getCardStatus ?? config?.getStatus)?.(asset) ?? null;
+  // When a class dates its records, the card says when — an operator scanning a hundred work orders
+  // is almost always asking "which of these is recent", and the answer was two clicks away.
+  const date = config?.getCardDate?.(asset) ?? null;
   return (
     <Card
       elevation={selected ? 3 : 0}
@@ -36,7 +39,15 @@ function AssetCardBase({ asset, selected, onSelect }) {
       >
         <Stack spacing={0.75}>
           <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-            <AssetTypeIcon assetType={asset.assetType} fontSize="small" sx={{ color: selected ? 'primary.main' : 'text.secondary' }} />
+            {/* A tinted incident icon keeps its family colour; every other type follows the card's
+                own selected/unselected ink. */}
+            <AssetTypeIcon
+              assetType={asset.assetType}
+              asset={asset}
+              tinted={!selected}
+              fontSize="small"
+              sx={{ color: selected ? 'primary.main' : 'text.secondary' }}
+            />
             <Typography variant="subtitle2" noWrap sx={{ flex: 1 }}>{config?.getTitle(asset) ?? asset.name}</Typography>
             {/* Selection is not signalled by colour alone. */}
             {selected && <CheckCircleIcon fontSize="small" color="primary" aria-hidden />}
@@ -44,12 +55,23 @@ function AssetCardBase({ asset, selected, onSelect }) {
           {subtitle && (
             <Typography variant="caption" color="text.secondary" noWrap title={subtitle}>{subtitle}</Typography>
           )}
-          {status && (
+          {(status || date) && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: TONE_COLOR[status.tone] ?? 'text.secondary' }} aria-hidden />
-              <Typography variant="caption" sx={{ color: TONE_COLOR[status.tone] ?? 'text.secondary' }} noWrap>
-                {status.label}
-              </Typography>
+              {status && (
+                <>
+                  <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: TONE_COLOR[status.tone] ?? 'text.secondary' }} aria-hidden />
+                  <Typography variant="caption" sx={{ color: TONE_COLOR[status.tone] ?? 'text.secondary', minWidth: 0 }} noWrap>
+                    {status.label}
+                  </Typography>
+                </>
+              )}
+              {/* Pushed to the card's right edge, so a column of cards reads as a column of dates. */}
+              {date && (
+                <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto', flex: 'none' }} noWrap
+                  title={`${config?.dateLabel ?? 'Reported'} ${date}`}>
+                  {date}
+                </Typography>
+              )}
             </Box>
           )}
         </Stack>

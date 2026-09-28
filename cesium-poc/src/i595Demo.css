@@ -871,11 +871,16 @@ body[data-layers-open="false"] .layers { display: none; }
 .liveops-legend-item i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 
 .ws-kpis { position: absolute; top: 16px; left: calc(var(--app-nav-w) + 16px); display: flex; align-items: stretch; gap: 8px;
-  max-width: calc(100vw - var(--app-nav-w) - 560px); pointer-events: auto; }
+  max-width: calc(100vw - var(--app-nav-w) - 560px); pointer-events: auto; min-width: 0; }
+/* The cards are the part that scrolls when the strip runs out of room; the source pills stay put. */
+.ws-kpi-cards { display: flex; align-items: stretch; gap: 8px; min-width: 0;
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
 /* A figure with a heading: tinted icon chip, then label, value and note. The tone comes from the
    card when it names one, so an operational category keeps its colour here too. */
+/* Cards never shrink: a flex item with a min-width is still squeezed by a capped strip, which is
+   what cut "145 with lane closure" to "145 with lane closu". The strip scrolls instead. */
 .ws-kpi { --kpi-tone: var(--ui-accent);
-  display: flex; align-items: center; gap: 10px; min-width: 148px; padding: 9px 12px;
+  display: flex; align-items: center; gap: 10px; min-width: 148px; flex: 0 0 auto; padding: 9px 12px;
   border: 1px solid var(--ui-border); border-radius: 12px; background: var(--ui-surface-translucent);
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); color: var(--ui-text); font: inherit; text-align: left; cursor: pointer;
   transition: border-color .15s ease, background .15s ease; }
@@ -889,8 +894,10 @@ body[data-layers-open="false"] .layers { display: none; }
 .ws-kpi-count { font-size: 22px; font-weight: 650; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .ws-kpi-note { font-size: 10.5px; color: var(--ui-text-muted); white-space: nowrap; }
 .ws-kpi[data-state="error"] .ws-kpi-count, .ws-kpi[data-state="unavailable"] .ws-kpi-count { color: var(--ui-text-muted); font-weight: 500; }
-.ws-source { align-self: center; margin-left: 4px; padding: 4px 8px; border-radius: 999px; background: var(--ui-surface-sunken);
-  color: var(--ui-text-muted); font-size: 10px; letter-spacing: .02em; white-space: nowrap; }
+/* The pill gives way before the cards do, and says so with an ellipsis rather than a hard cut —
+   its full text is always on the element's title. */
+.ws-source { align-self: center; flex: 0 1 auto; min-width: 0; margin-left: 4px; padding: 4px 8px; border-radius: 999px; background: var(--ui-surface-sunken);
+  color: var(--ui-text-muted); font-size: 10px; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ws-source[data-live="true"] { color: var(--ui-accent); }
 /* Live DataConnect records on a Maintenance card. */
 .ws-kpi[data-live="true"] .ws-kpi-label::after { content: "LIVE"; margin-left: 6px; padding: 0 5px; border-radius: 4px;

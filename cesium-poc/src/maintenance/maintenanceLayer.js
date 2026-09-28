@@ -10,7 +10,8 @@
  * nearest the camera and for the selection, because a type can hold several hundred records.
  */
 import { CustomDataSource, Cartesian3, HeightReference, NearFarScalar, ScreenSpaceEventType, VerticalOrigin } from 'cesium';
-import { assetDotMarker, assetIdMarker } from '../assetIdMarker.js';
+import { assetDotMarker, assetIdMarker, assetPinMarker } from '../assetIdMarker.js';
+import { incidentVisual } from '../assetExplorer/incidentTypes.js';
 
 export const LABEL_BUDGET = 60;
 export const LABEL_RANGE_M = 4000;
@@ -21,6 +22,12 @@ const BILLBOARD = Object.freeze({
 });
 
 const entityId = (assetType, id) => `maintenance-${assetType}-${id}`;
+
+/** An incident's marker tone: the family's own colour and glyph, keyed for the texture cache. */
+const incidentToneOf = item => {
+  const { key, color, glyph, rotate } = incidentVisual(item.title);
+  return { key, color, glyph, rotate };
+};
 
 /**
  * @param {import('cesium').Viewer} viewer
@@ -44,6 +51,21 @@ export function installMaintenanceLayer(viewer) {
 
   const layerOf = assetType => layers.get(assetType) ?? null;
 
+  /**
+   * The image one record's marker carries.
+   *
+   * Every class but the incidents answers "which record is this", so the ID pill is right for them.
+   * An incident answers "what happened" — a fire and a flood spinout call for different responses —
+   * so it is drawn as its family's coloured pin instead. A `tone` carrying a glyph IS an incident;
+   * the string tones are the shared charcoal/live/damaged ones.
+   */
+  function markerFor(id, tone, state) {
+    if (tone?.glyph) {
+      return state === 'dot' ? assetDotMarker(tone) : assetPinMarker({ ...tone, selected: state === 'selected' });
+    }
+    return state === 'dot' ? assetDotMarker(tone) : assetIdMarker({ id, selected: state === 'selected', tone });
+  }
+
   function present(assetType, id) {
     const layer = layerOf(assetType);
     const entity = layer?.entities.get(id);
@@ -57,7 +79,7 @@ export function installMaintenanceLayer(viewer) {
     entity.show = !isSelected && assetType === active && !hiddenBySelection(layer, id)
       && (!layer.visible || layer.visible.has(id));
     const tone = layer.tones.get(id);
-    const marker = state === 'dot' ? assetDotMarker(tone) : assetIdMarker({ id, selected: false, tone });
+    const marker = markerFor(id, tone, state);
     entity.billboard.image = marker.image;
     entity.billboard.width = marker.width;
     entity.billboard.height = marker.height;
@@ -80,7 +102,7 @@ export function installMaintenanceLayer(viewer) {
     const layer = layerOf(active);
     const position = selected ? layer?.positions.get(selected) : null;
     if (!position) return;
-    const marker = assetIdMarker({ id: selected, selected: true });
+    const marker = markerFor(selected, layer?.tones.get(selected), 'selected');
     selectionSource.entities.add({
       id: `maintenance-${active}-${selected}`, name: selected, show: true, position,
       billboard: { ...BILLBOARD, ...marker, scale: 1.08 },
@@ -121,7 +143,10 @@ export function installMaintenanceLayer(viewer) {
       for (const item of records) {
         if (!Number.isFinite(item.longitude) || !Number.isFinite(item.latitude)) continue;   // stays in the list only
         if (entities.has(item.id)) continue;   // an id the source repeats: one marker, not a crash
-        tones.set(item.id, item.type === 'ASSET_STATUS' ? 'damaged' : item.live ? 'live' : 'normal');
+        // An incident's tone is its crash family — colour and pictogram — rather than one of the
+        // three shared tones; see markerFor.
+        tones.set(item.id, item.type === 'INCIDENT' ? incidentToneOf(item)
+          : item.type === 'ASSET_STATUS' ? 'damaged' : item.live ? 'live' : 'normal');
         const position = Cartesian3.fromDegrees(item.longitude, item.latitude);
         const entity = source.entities.add({
           id: entityId(assetType, item.id), name: item.id, show: assetType === active,

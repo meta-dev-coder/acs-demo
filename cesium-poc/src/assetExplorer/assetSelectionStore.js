@@ -38,8 +38,12 @@ export function createAssetSelectionStore() {
     statusByType: Object.freeze({}),
     selectedAsset: null,
     selectionSource: SELECTION_SOURCES.NONE,
-    /** What the explorer is showing of the active type: a search, and at most one named filter. */
-    filter: Object.freeze({ query: '', id: null }),
+    /**
+     * What the explorer is showing of the active type: a search, at most one named filter, and a
+     * reported-date range. `from`/`to` are inclusive calendar keys ("2024-05-27") or null — dates,
+     * not instants, because these classes record the DAY a record was opened.
+     */
+    filter: Object.freeze({ query: '', id: null, from: null, to: null }),
     explorerExpanded: true,
     detailsOpen: false,
     /** True while the camera is parked at an asset's close view, so Back can be offered. */
@@ -106,7 +110,7 @@ export function createAssetSelectionStore() {
       const keepSelection = state.selectedAsset?.assetType === assetType;
       set({
         activeExplorerType: assetType,
-        filter: Object.freeze({ query: '', id: null }),
+        filter: Object.freeze({ query: '', id: null, from: null, to: null }),
         explorerExpanded: assetType ? state.explorerExpanded : true,
         ...(keepSelection ? {} : { selectedAsset: null, detailsOpen: false, inspectionViewActive: false }),
       });
@@ -142,7 +146,8 @@ export function createAssetSelectionStore() {
      */
     setFilter(changes) {
       const filter = Object.freeze({ ...state.filter, ...changes });
-      if (filter.query === state.filter.query && filter.id === state.filter.id) return;
+      if (filter.query === state.filter.query && filter.id === state.filter.id
+        && filter.from === state.filter.from && filter.to === state.filter.to) return;
       set({ filter });
       const selected = state.selectedAsset;
       if (selected && selected.assetType === state.activeExplorerType

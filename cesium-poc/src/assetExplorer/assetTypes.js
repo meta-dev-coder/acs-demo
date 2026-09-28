@@ -229,18 +229,9 @@ export function maintenanceFilters(assets) {
 export function maintenanceDate(value) {
   const string = text(value);
   if (!string) return null;
-  const dayFirst = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(string);
-  // An ISO value here carries no timezone ("2024-04-16T00:00:00"), so `new Date` reads it as LOCAL
-  // midnight and formatting it in UTC moves it a day west of Greenwich. These are calendar dates,
-  // not instants, so the components are taken as written in both formats.
-  const iso = /^(\d{4})-(\d{2})-(\d{2})(?:[T ]|$)/.exec(string);
-  if (dayFirst || iso) {
-    const [year, month, day] = dayFirst
-      ? [Number(dayFirst[3]), Number(dayFirst[2]), Number(dayFirst[1])]
-      : [Number(iso[1]), Number(iso[2]), Number(iso[3])];
-    // Anything that is not a real date is left exactly as written rather than reinterpreted.
-    if (month < 1 || month > 12 || day < 1 || day > 31) return string;
-    return new Date(Date.UTC(year, month - 1, day))
+  const parts = maintenanceDateParts(string);
+  if (parts) {
+    return new Date(Date.UTC(parts.year, parts.month - 1, parts.day))
       .toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
   }
   const date = new Date(string);
@@ -248,9 +239,61 @@ export function maintenanceDate(value) {
     : date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
+/**
+ * The calendar components of a record's date, whichever of the two spellings it uses.
+ *
+ * @returns {{year: number, month: number, day: number}|null} null when the value is not one of the
+ *   two known shapes, or when its components are not a real date — which is left as written by the
+ *   caller rather than reinterpreted.
+ */
+export function maintenanceDateParts(value) {
+  const string = text(value);
+  if (!string) return null;
+  const dayFirst = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(string);
+  // An ISO value here carries no timezone ("2024-04-16T00:00:00"), so `new Date` reads it as LOCAL
+  // midnight and formatting it in UTC moves it a day west of Greenwich. These are calendar dates,
+  // not instants, so the components are taken as written in both formats.
+  const iso = /^(\d{4})-(\d{2})-(\d{2})(?:[T ]|$)/.exec(string);
+  if (!dayFirst && !iso) return null;
+  const [year, month, day] = dayFirst
+    ? [Number(dayFirst[3]), Number(dayFirst[2]), Number(dayFirst[1])]
+    : [Number(iso[1]), Number(iso[2]), Number(iso[3])];
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return { year, month, day };
+}
+
+const pad = value => String(value).padStart(2, '0');
+
+/**
+ * A record's date as a sortable, comparable calendar key: "2024-05-27".
+ *
+ * This is what the date-range filter compares against, and it is deliberately a calendar key rather
+ * than a timestamp — the classes record the DAY something was reported, and turning that into an
+ * instant would make a record's membership of a range depend on the reader's timezone.
+ *
+ * @returns {string|null} null when the record carries no date the two known formats can be read as,
+ *   which is why a date range excludes it: "when" is unknown, not "outside the range".
+ */
+export function maintenanceDateKey(value) {
+  const parts = maintenanceDateParts(value);
+  if (parts) return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}`;
+  const string = text(value);
+  if (!string) return null;
+  const date = new Date(string);
+  if (Number.isNaN(date.getTime())) return null;
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+}
+
 /** One entry per maintenance class; everything else about them is identical. */
-const MAINTENANCE_TYPE = ({ id, label, singular, title = singular, icon, statusTone, extraFilters = null }) => Object.freeze({
+const MAINTENANCE_TYPE = ({ id, label, singular, title = singular, icon, statusTone, extraFilters = null,
+  /** What "reported" means for this class — the column its own sheet opens a record with. */
+  dateLabel = 'Reported' }) => Object.freeze({
   id, label, singular, detailsTitle: `${title} Details`, icon,
+  dateLabel,
+  // Every maintenance class records the day a record was opened, so all of them can be browsed by
+  // date. `getDateKey` is what the range filter compares; `getCardDate` is what the card prints.
+  getDateKey: asset => maintenanceDateKey(asset.source?.createdDate),
+  getCardDate: asset => maintenanceDate(asset.source?.createdDate),
   // Not a map layer: the Maintenance workspace decides what is loaded and drawn.
   layerId: null,
   emptyMessage: `No ${label.toLowerCase()} found.`,
@@ -276,11 +319,11 @@ const workTone = item => {
 };
 
 export const ASSET_TYPES = Object.freeze({
-  workOrder: MAINTENANCE_TYPE({ id: 'workOrder', label: 'Work Orders', singular: 'Work order', title: 'Work Order', icon: 'workOrder', statusTone: workTone }),
-  ticket: MAINTENANCE_TYPE({ id: 'ticket', label: 'Tickets', singular: 'Ticket', icon: 'ticket', statusTone: workTone }),
-  task: MAINTENANCE_TYPE({ id: 'task', label: 'Tasks', singular: 'Task', icon: 'task', statusTone: workTone }),
+  workOrder: MAINTENANCE_TYPE({ id: 'workOrder', label: 'Work Orders', singular: 'Work order', title: 'Work Order', icon: 'workOrder', statusTone: workTone, dateLabel: 'Opened' }),
+  ticket: MAINTENANCE_TYPE({ id: 'ticket', label: 'Tickets', singular: 'Ticket', icon: 'ticket', statusTone: workTone, dateLabel: 'Opened' }),
+  task: MAINTENANCE_TYPE({ id: 'task', label: 'Tasks', singular: 'Task', icon: 'task', statusTone: workTone, dateLabel: 'Scheduled' }),
   incidentRecord: MAINTENANCE_TYPE({
-    id: 'incidentRecord', label: 'Incidents', singular: 'Incident', icon: 'incidentRecord',
+    id: 'incidentRecord', label: 'Incidents', singular: 'Incident', icon: 'incidentRecord', dateLabel: 'Reported',
     // 178 crash records across fifteen types: the type is the first thing an operator narrows by.
     extraFilters: incidentTypeFilters,
     // An incident has no status; what matters is whether it closed lanes or hurt anyone.
@@ -291,7 +334,7 @@ export const ASSET_TYPES = Object.freeze({
     },
   }),
   inspection: MAINTENANCE_TYPE({
-    id: 'inspection', label: 'Inspections', singular: 'Inspection', icon: 'inspection',
+    id: 'inspection', label: 'Inspections', singular: 'Inspection', icon: 'inspection', dateLabel: 'Inspected',
     statusTone: item => {
       const status = text(item.status);
       if (!status) return null;
@@ -300,7 +343,7 @@ export const ASSET_TYPES = Object.freeze({
     },
   }),
   damagedAsset: MAINTENANCE_TYPE({
-    id: 'damagedAsset', label: 'Damaged Assets', singular: 'Damaged asset', title: 'Damaged Asset', icon: 'damagedAsset',
+    id: 'damagedAsset', label: 'Damaged Assets', singular: 'Damaged asset', title: 'Damaged Asset', icon: 'damagedAsset', dateLabel: 'Reported',
     statusTone: item => ({ label: text(item.status) ?? 'Damaged', tone: 'warn' }),
   }),
   lighting: Object.freeze({

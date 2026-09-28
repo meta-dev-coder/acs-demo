@@ -42,7 +42,9 @@ export function installWorkspaceStrip(host, { cards, label, onSelect }) {
   root.setAttribute('aria-label', label);
   // Icon on the left in its own tinted chip, then label, value and note stacked beside it — the
   // arrangement reads as one figure with a heading rather than three loose lines.
-  root.innerHTML = `${cards.map(card => `
+  // The cards scroll as a group; the source pills sit outside that scroller so "where these numbers
+  // came from" is never the thing that gets scrolled off the end.
+  root.innerHTML = `<div class="ws-kpi-cards">${cards.map(card => `
     <button class="ws-kpi" type="button" data-kpi="${card.key}" aria-pressed="false"
       ${card.color ? `style="--kpi-tone:${card.color}"` : ''}>
       <span class="ws-kpi-icon">${icon(card.icon)}</span>
@@ -52,7 +54,7 @@ export function installWorkspaceStrip(host, { cards, label, onSelect }) {
         <span class="ws-kpi-note" data-note>Loading…</span>
       </span>
       <span class="ws-kpi-chevron" aria-hidden="true">›</span>
-    </button>`).join('')}
+    </button>`).join('')}</div>
     <span class="ws-source" data-source role="status"></span>
     <span class="ws-source" data-cloud-sync role="status" hidden></span>`;
   host.append(root);
@@ -77,7 +79,9 @@ export function installWorkspaceStrip(host, { cards, label, onSelect }) {
     cloudSync.hidden = !note;
     cloudSync.textContent = note ? sourceLabelText(note.text, note) : '';
     cloudSync.dataset.warning = String(Boolean(note?.warning));
-    if (note?.title) cloudSync.title = note.title; else cloudSync.removeAttribute('title');
+    // The pill truncates when the strip is narrow, so its full text always stays reachable.
+    const cloudTitle = note?.title ?? cloudSync.textContent;
+    if (cloudTitle) cloudSync.title = cloudTitle; else cloudSync.removeAttribute('title');
   });
 
   return {
@@ -116,7 +120,8 @@ export function installWorkspaceStrip(host, { cards, label, onSelect }) {
       source.textContent = sourceLabelText(text, { warning });
       source.dataset.live = String(live);
       source.dataset.warning = String(warning);
-      if (title) source.title = title; else source.removeAttribute('title');
+      const full = title ?? source.textContent;
+      if (full) source.title = full; else source.removeAttribute('title');
     },
     destroy() { window.removeEventListener('resize', onResize); unsubscribeCloudSync(); root.remove(); },
   };

@@ -13,8 +13,14 @@
  *
  * `process.loadEnvFile` never overwrites a variable that is already set, so the files are read
  * most-specific FIRST: whichever gets there first keeps the value.
+ *
+ * `process.loadEnvFile` only exists from Node 20.12, and where it is missing this parses the file
+ * itself rather than skipping it. Skipping was the original behaviour and it was the wrong one: on
+ * an older Node every DC_* and LIVE_DC_* variable was silently ignored and the app reported
+ * "DataConnect not connected" with nothing but one line in the terminal to say why — which reads
+ * as a broken checkout rather than a Node version.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -30,10 +36,41 @@ export function loadServerEnv(root = projectRoot) {
     const path = join(root, name);
     if (!existsSync(path)) continue;
     try {
-      process.loadEnvFile(path);
+      if (typeof process.loadEnvFile === 'function') process.loadEnvFile(path);
+      else applyEnvFile(path);
     } catch (error) {
       // A malformed file should say so by name, never by dumping its contents.
       console.warn(`[env] could not read ${name}: ${error?.message ?? error}`);
     }
+  }
+}
+
+/**
+ * The same job as `process.loadEnvFile`, for a Node that does not have it.
+ *
+ * Deliberately small and deliberately identical in the ways that matter: a variable already set in
+ * the environment is never overwritten, `#` starts a comment, and a quoted value keeps whatever is
+ * inside the quotes — the DataConnect password contains `$`, `!` and `^`, none of which may be
+ * touched. Anything it cannot parse is skipped rather than guessed at, and never printed.
+ */
+export function applyEnvFile(path) {
+  for (const raw of readFileSync(path, 'utf8').split(/\r?\n/)) {
+    const line = raw.trim().replace(/^export\s+/, '');
+    if (!line || line.startsWith('#')) continue;
+    const eq = line.indexOf('=');
+    if (eq < 1) continue;
+    const key = line.slice(0, eq).trim();
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || key in process.env) continue;
+    let value = line.slice(eq + 1).trim();
+    const quote = value[0];
+    if ((quote === '"' || quote === "'") && value.endsWith(quote) && value.length > 1) {
+      value = value.slice(1, -1);
+      // Only a double-quoted value carries escapes, exactly as the shell and dotenv treat them.
+      if (quote === '"') value = value.replace(/\\n/g, '\n').replace(/\\"/g, '"');
+    } else {
+      // Unquoted: a `#` after whitespace begins a trailing comment.
+      value = value.replace(/\s+#.*$/, '').trim();
+    }
+    process.env[key] = value;
   }
 }

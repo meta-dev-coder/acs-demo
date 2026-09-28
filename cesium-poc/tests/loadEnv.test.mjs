@@ -40,3 +40,55 @@ test('a missing or malformed file is not fatal', async () => {
   const { loadServerEnv } = await import(`../server/loadEnv.mjs?case=missing`);
   assert.doesNotThrow(() => loadServerEnv(join(tmpdir(), 'i595-env-does-not-exist')));
 });
+
+test('the fallback parser matches process.loadEnvFile, value for value', async () => {
+  // Node only gained `process.loadEnvFile` in 20.12. Below that the whole file used to be skipped,
+  // which silently voided every DC_* and LIVE_DC_* setting; the fallback must agree with the real
+  // thing or an older Node would be configured differently from a newer one.
+  const dir = mkdtempSync(join(tmpdir(), 'i595-env-parity-'));
+  const file = join(dir, '.env');
+  writeFileSync(file, [
+    'PARITY_PLAIN=hello',
+    'PARITY_SPACED = spaced out ',
+    '# a comment line',
+    '',
+    'PARITY_QUOTED="85^Gy$hfRX@!jVU"',
+    "PARITY_SINGLE='keeps $literal'",
+    'PARITY_TRAILING=value # not part of it',
+    'PARITY_EMPTY=',
+    'PARITY_URL=https://example.com/a/b?x=1&y=2',
+    'export PARITY_EXPORTED=exported',
+    'not a variable line',
+  ].join('\n'));
+
+  const keys = ['PARITY_PLAIN', 'PARITY_SPACED', 'PARITY_QUOTED', 'PARITY_SINGLE',
+    'PARITY_TRAILING', 'PARITY_EMPTY', 'PARITY_URL', 'PARITY_EXPORTED'];
+  const clear = () => { for (const key of keys) delete process.env[key]; };
+
+  clear();
+  const { applyEnvFile } = await import(`../server/loadEnv.mjs?case=parity`);
+  applyEnvFile(file);
+  const fallback = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+
+  clear();
+  process.loadEnvFile(file);
+  const native = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+
+  assert.deepEqual(fallback, native);
+  // The one that actually matters: a password full of shell metacharacters survives intact.
+  assert.equal(fallback.PARITY_QUOTED, '85^Gy$hfRX@!jVU');
+  clear();
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('the fallback never overwrites the real environment', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'i595-env-keep-'));
+  const file = join(dir, '.env');
+  writeFileSync(file, 'PARITY_KEEP=from_file\n');
+  process.env.PARITY_KEEP = 'from_shell';
+  const { applyEnvFile } = await import(`../server/loadEnv.mjs?case=keep`);
+  applyEnvFile(file);
+  assert.equal(process.env.PARITY_KEEP, 'from_shell');
+  delete process.env.PARITY_KEEP;
+  rmSync(dir, { recursive: true, force: true });
+});
