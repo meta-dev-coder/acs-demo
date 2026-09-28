@@ -7,6 +7,8 @@
  * built separately so the details panel can label them separately.
  */
 
+import { compassPoint } from './weather/weatherText.js';
+
 /** @typedef {'INCIDENT'|'CLOSURE'|'CONSTRUCTION'|'CONGESTION'|'DISABLED'} LiveRoadEventType */
 
 export const LIVE_EVENT_TYPES = Object.freeze({ INCIDENT: 'INCIDENT', CLOSURE: 'CLOSURE', CONSTRUCTION: 'CONSTRUCTION', CONGESTION: 'CONGESTION', DISABLED: 'DISABLED' });
@@ -63,6 +65,56 @@ export function liveEventSourceRows(event) {
     ['Source', event.source ?? 'FL511'],
     ['FL511 Event ID', event.rawSourceId],
   ]);
+}
+
+const known = value => present(value) && String(value).trim() !== 'NA';
+const withUnit = (value, unit) => (known(value) && Number.isFinite(Number(value)) ? `${Number(value)} ${unit}` : null);
+const isHttp = value => /^https?:\/\/[^\s]+$/i.test(String(value ?? ''));
+/** "Sep 28 2026, 4:12 AM EDT" in Florida time; anything unparseable is shown as DataConnect gave it. */
+const floridaTime = value => {
+  if (!known(value)) return null;
+  const ms = Date.parse(String(value));
+  if (!Number.isFinite(ms)) return String(value);
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short',
+  }).formatToParts(new Date(ms)).map(part => [part.type, part.value]));
+  return `${p.month} ${p.day} ${p.year}, ${p.hour}:${p.minute} ${p.dayPeriod} ${p.timeZoneName}`;
+};
+
+/** Weather and time captured into DataConnect when the event was first seen (`event.sdna`). */
+export function liveEventConditionsRows(event) {
+  const s = event?.sdna ?? {};
+  const wind = withUnit(s.wind_speed_kmh, 'km/h');
+  return rows([
+    ['Incident time', known(s.incident_time_local) ? s.incident_time_local : null],
+    ['Weather', known(s.weather_at_event) ? s.weather_at_event : null],
+    ['Temperature', withUnit(s.temperature_c, '°C')],
+    ['Humidity', withUnit(s.relative_humidity_pct, '%')],
+    ['Wind', wind ? [wind, known(s.wind_direction_deg) ? compassPoint(Number(s.wind_direction_deg)) : null].filter(Boolean).join(' ') : null],
+    ['Precipitation', withUnit(s.precipitation_mm, 'mm')],
+    ['Weather observed', floridaTime(s.weather_observed_at)],
+  ]);
+}
+
+/** One line for the top of the details panel: the captured weather, plus the local incident clock time. */
+export function liveEventWeatherLine(event) {
+  const s = event?.sdna ?? {};
+  if (!known(s.weather_at_event)) return null;
+  const clock = known(s.incident_time_local) ? String(s.incident_time_local).replace(/^\d{4}-\d{2}-\d{2}\s+/, '') : null;
+  return `Weather: ${s.weather_at_event}${clock ? ` · incident ${clock}` : ''}`;
+}
+
+/** Stored camera snapshots (first seen, cleared); only absolute http(s) URLs are ever returned. */
+export function liveEventSnapshots(event) {
+  const s = event?.sdna ?? {};
+  // DataConnect cannot erase a URL, so a reactivated event may still carry its old cleared photo.
+  const cleared = String(event?.status ?? s.status ?? '').toLowerCase() === 'cleared';
+  return [['snapshot_first', 'When first seen'], ['snapshot_cleared', 'When cleared']]
+    .filter(([prefix]) => isHttp(s[`${prefix}_url`]) && (prefix === 'snapshot_first' || cleared))
+    .map(([prefix, label]) => ({
+      label, url: s[`${prefix}_url`], cameraId: known(s[`${prefix}_camera_id`]) ? String(s[`${prefix}_camera_id`]) : null,
+      takenAt: floridaTime(s[`${prefix}_taken_at`]),
+    }));
 }
 
 /**

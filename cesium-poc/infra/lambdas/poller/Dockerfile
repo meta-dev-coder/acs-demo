@@ -6,6 +6,7 @@ COPY server/ ${LAMBDA_TASK_ROOT}/server/
 # Live DataConnect cycle: class/workflow config and the Operational Impact model it imports
 COPY config/liveDc/ ${LAMBDA_TASK_ROOT}/config/liveDc/
 COPY src/liveOps/ ${LAMBDA_TASK_ROOT}/src/liveOps/
+COPY src/weather/ ${LAMBDA_TASK_ROOT}/src/weather/
 # Copy corridor GeoJSON data (DATA_DIR=/var/task/data; set LIVE_DC_DATA_DIR to the same)
 COPY public/data/ ${LAMBDA_TASK_ROOT}/data/
 # src/liveOps/*.js are ES modules

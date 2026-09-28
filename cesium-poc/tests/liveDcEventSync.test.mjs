@@ -128,11 +128,15 @@ test('a real incident maps to a complete, valid Live Events record', () => {
   assert.deepEqual(validateRecord(EVENTS_DEF, rec), { valid: true, failures: [] });
   assert.deepEqual(unknownAttributes(EVENTS_DEF, rec), []);
   // Every String-like attribute is present, so a merge-semantics load can't leave a stale value.
+  // A DateTime or URL is never sent as text: a whole-second instant / absolute http(s) URL, or omitted.
   for (const attr of EVENTS_DEF.attributes) {
-    if (['String', 'Date', 'DateTime', 'Timestamp', 'URL'].includes(attr.type)) {
+    if (attr.type === 'URL') assert.equal(attr.name in rec, false, `${attr.name} is omitted until captured`);
+    if (['String', 'Date', 'Timestamp'].includes(attr.type)) {
       assert.equal(typeof rec[attr.name], 'string', `${attr.name} is always emitted`);
     }
+    if (attr.type === 'DateTime' && attr.name in rec) assert.match(rec[attr.name], /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/, attr.name);
   }
+  assert.equal('cleared_at_dt' in rec, false);
 });
 
 test('an unresolved segment is an empty plain attribute and lane flags are omitted without parsed impact', () => {
@@ -457,4 +461,34 @@ test('a failed tooltip fetch carries forward text only; position attributes foll
   assert.equal(rec.description, previous.description);
   assert.equal(rec.latitude, bare.latitude);
   assert.equal(validateRecord(EVENTS_DEF, rec).valid, true);
+});
+
+test('holdOpen keeps a demo event active when it leaves the feed, and reopens it if already cleared', () => {
+  const first = syncLiveEvents({ payload: livePayload([davie(), ramp()]), existing: [], now: T0 });
+  const keys = first.state.map(r => r.keyInSource);
+  const held = keys[0], other = keys[1];
+
+  // Both leave the feed: only the non-held one is cleared.
+  const gone = syncLiveEvents({ payload: livePayload([]), existing: first.state, now: T0 + 60_000, holdOpen: new Set([held]) });
+  const byKey = new Map(gone.state.map(r => [r.keyInSource, r]));
+  assert.equal(byKey.get(held).status, 'active');
+  assert.equal(byKey.get(other).status, 'cleared');
+  assert.equal(gone.stats.cleared, 1);
+
+  // A held event that is already cleared is reopened, with last_seen_at refreshed so it is not STALE.
+  const clearedAll = syncLiveEvents({ payload: livePayload([]), existing: first.state, now: T0 + 60_000 });
+  const reopened = syncLiveEvents({ payload: livePayload([]), existing: clearedAll.state, now: T0 + 120_000, holdOpen: new Set([held]) });
+  const rec = reopened.upserts.find(r => r.keyInSource === held);
+  assert.equal(rec.status, 'active');
+  assert.equal(rec.cleared_at, '');
+  assert.equal(rec.last_seen_at, new Date(T0 + 120_000).toISOString());
+  assert.equal(reopened.stats.reactivated, 1);
+  assert.equal(reopened.upserts.some(r => r.keyInSource === other), false);
+
+  // Held + active + heartbeat due: last_seen_at is refreshed; not due: nothing sent.
+  const quiet = syncLiveEvents({ payload: livePayload([]), existing: reopened.state, now: T0 + 180_000, holdOpen: new Set([held]), heartbeatSeconds: 900 });
+  assert.equal(quiet.upserts.length, 0);
+  const beat = syncLiveEvents({ payload: livePayload([]), existing: reopened.state, now: T0 + 120_000 + 900_000, holdOpen: new Set([held]), heartbeatSeconds: 900 });
+  assert.equal(beat.upserts.length, 1);
+  assert.equal(beat.stats.heartbeat, 1);
 });

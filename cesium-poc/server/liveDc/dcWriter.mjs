@@ -211,6 +211,26 @@ function defaultTokenProvider(config, fetchImpl, now) {
   throw new DcWriterError(E.NOT_CONFIGURED, `DataConnect writer needs ${MISSING_CREDENTIALS} for ${new URL(config.baseUrl).origin}`);
 }
 
+// Classes already warned about in this process: code may be deployed before the schema update.
+const warnedUndeclared = new Set();
+
+/** Copies of `records` without the attributes the resolved class does not declare (one warning per class). */
+function withoutUndeclared(dto, records, warn) {
+  if (!Array.isArray(records)) return records;
+  const dropped = new Set();
+  const kept = records.map(rec => {
+    const unknown = rec && typeof rec === 'object' ? unknownAttributes(dto, rec) : [];
+    if (!unknown.length) return rec;
+    for (const name of unknown) dropped.add(name);
+    return Object.fromEntries(Object.entries(rec).filter(([name]) => !unknown.includes(name)));
+  });
+  if (dropped.size && !warnedUndeclared.has(dto.className)) {
+    warnedUndeclared.add(dto.className);
+    warn(`live-dc: attributes not declared on ${dto.className} are dropped until the class is updated: ${[...dropped].sort().join(', ')}`);
+  }
+  return kept;
+}
+
 function checkRecords(dto, records) {
   if (!Array.isArray(records)) throw new DcWriterError(E.INVALID_RECORD, 'records must be an array');
   records.forEach((rec, i) => {
@@ -224,12 +244,6 @@ function checkRecords(dto, records) {
   const dupes = [...counts].filter(([, n]) => n > 1).map(([k]) => k);
   if (dupes.length) {
     throw new DcWriterError(E.DUPLICATE_KEYS, `duplicate keyInSource in ${dto.className}: ${dupes.slice(0, 5).join(', ')}${dupes.length > 5 ? ', …' : ''}`);
-  }
-  for (const rec of records) {
-    const unknown = unknownAttributes(dto, rec);
-    if (unknown.length) {
-      throw new DcWriterError(E.UNKNOWN_ATTRIBUTE, `${rec.keyInSource}: attributes not defined on ${dto.className}: ${unknown.join(', ')}`);
-    }
   }
   for (const rec of records) {
     const { valid, failures } = validateRecord(dto, rec);
@@ -453,9 +467,10 @@ export function createDcWriter({
   async function loadRecords(classDto, records, { loadType = 'Incremental', waitForCuration = true } = {}) {
     assertWritable(classDto, loadType);
     assertResolved(classDto);
-    checkRecords(classDto, records);
-    if (records.length === 0) return result(classDto, loadType, 0);
-    return submitLoad(classDto, records, loadType, { waitForCuration });
+    const declared = withoutUndeclared(classDto, records, warn);
+    checkRecords(classDto, declared);
+    if (declared.length === 0) return result(classDto, loadType, 0);
+    return submitLoad(classDto, declared, loadType, { waitForCuration });
   }
 
   async function resetLiveClass(classDto, { confirm } = {}) {

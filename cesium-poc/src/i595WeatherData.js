@@ -1,3 +1,4 @@
+import { compassPoint } from './weather/weatherText.js';
 export const HEIGHTS = [10, 80, 120, 180];
 export const HOURLY = ['temperature_2m', 'relative_humidity_2m', 'precipitation', ...HEIGHTS.flatMap(h => [`wind_speed_${h}m`, `wind_direction_${h}m`])];
 export const DAILY = ['temperature_2m_max', 'temperature_2m_min', 'sunrise', 'sunset', 'daylight_duration'];
@@ -10,7 +11,7 @@ export function validateForecast(data) {
   return data;
 }
 export const number = (v, digits = 0) => Number.isFinite(v) ? v.toFixed(digits) : '—';
-export const direction = v => Number.isFinite(v) ? `${['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'][Math.round(v / 22.5) % 16]} · ${Math.round(v)}°` : '—';
+export const direction = v => Number.isFinite(v) ? `${compassPoint(v)} · ${Math.round(v)}°` : '—';
 export function localHour(now = new Date()) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'}).formatToParts(now).map(p=>[p.type,p.value]));
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:00`;

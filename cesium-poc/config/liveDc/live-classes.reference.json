@@ -596,6 +596,159 @@
           "array": false
         },
         {
+          "name": "incident_time_local",
+          "displayName": "incident_time_local",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "first_seen_at_dt",
+          "displayName": "first_seen_at_dt",
+          "description": "",
+          "type": "DateTime",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "cleared_at_dt",
+          "displayName": "cleared_at_dt",
+          "description": "",
+          "type": "DateTime",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "snapshot_first_url",
+          "displayName": "snapshot_first_url",
+          "description": "",
+          "type": "URL",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "snapshot_first_taken_at",
+          "displayName": "snapshot_first_taken_at",
+          "description": "",
+          "type": "DateTime",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "snapshot_first_camera_id",
+          "displayName": "snapshot_first_camera_id",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "snapshot_cleared_url",
+          "displayName": "snapshot_cleared_url",
+          "description": "",
+          "type": "URL",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "snapshot_cleared_taken_at",
+          "displayName": "snapshot_cleared_taken_at",
+          "description": "",
+          "type": "DateTime",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "snapshot_cleared_camera_id",
+          "displayName": "snapshot_cleared_camera_id",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "weather_code",
+          "displayName": "weather_code",
+          "description": "",
+          "type": "Integer",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "temperature_c",
+          "displayName": "temperature_c",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "relative_humidity_pct",
+          "displayName": "relative_humidity_pct",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "precipitation_mm",
+          "displayName": "precipitation_mm",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "wind_speed_kmh",
+          "displayName": "wind_speed_kmh",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "wind_direction_deg",
+          "displayName": "wind_direction_deg",
+          "description": "",
+          "type": "Decimal",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "weather_observed_at",
+          "displayName": "weather_observed_at",
+          "description": "",
+          "type": "DateTime",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
+          "name": "weather_source",
+          "displayName": "weather_source",
+          "description": "",
+          "type": "String",
+          "mandatory": false,
+          "core": false,
+          "array": false
+        },
+        {
           "name": "field_sources",
           "displayName": "field_sources",
           "description": "",

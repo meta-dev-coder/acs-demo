@@ -221,6 +221,62 @@
         "dms_message",
         "recommended_next_action",
         "snapshot_archive_url",
+        "incident_time_local",
+        {
+          "name": "first_seen_at_dt",
+          "type": "DateTime"
+        },
+        {
+          "name": "cleared_at_dt",
+          "type": "DateTime"
+        },
+        {
+          "name": "snapshot_first_url",
+          "type": "URL"
+        },
+        {
+          "name": "snapshot_first_taken_at",
+          "type": "DateTime"
+        },
+        "snapshot_first_camera_id",
+        {
+          "name": "snapshot_cleared_url",
+          "type": "URL"
+        },
+        {
+          "name": "snapshot_cleared_taken_at",
+          "type": "DateTime"
+        },
+        "snapshot_cleared_camera_id",
+        {
+          "name": "weather_code",
+          "type": "Integer"
+        },
+        {
+          "name": "temperature_c",
+          "type": "Decimal"
+        },
+        {
+          "name": "relative_humidity_pct",
+          "type": "Decimal"
+        },
+        {
+          "name": "precipitation_mm",
+          "type": "Decimal"
+        },
+        {
+          "name": "wind_speed_kmh",
+          "type": "Decimal"
+        },
+        {
+          "name": "wind_direction_deg",
+          "type": "Decimal"
+        },
+        {
+          "name": "weather_observed_at",
+          "type": "DateTime"
+        },
+        "weather_source",
         "field_sources",
         "x_coordinates",
         "y_coordinates",

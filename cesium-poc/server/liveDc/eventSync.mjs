@@ -9,7 +9,7 @@
 import {
   LIVE_CLASS, PROJECT_CODE, completeRecord, dcSegmentCodeFor, diffRecords, liveClassDefinition,
 } from './classes.mjs';
-import { enrichEventFields, loadEnrichmentContext } from './eventEnrichment.mjs';
+import { SNAPSHOT_CLEARED_FIELDS, STICKY_FIELDS, enrichEventFields, loadEnrichmentContext, typedValue } from './eventEnrichment.mjs';
 import EVENT_FIELDS from '../../config/liveDc/eventFields.json' with { type: 'json' };
 
 export const TYPE_PRIORITY = Object.freeze(['INCIDENT', 'CLOSURE', 'DISABLED', 'CONSTRUCTION', 'CONGESTION']);
@@ -28,8 +28,23 @@ export const DETAIL_ATTRIBUTES = Object.freeze([
   'lane_impact_label', 'blocked_lanes', 'full_closure', 'ramp_closure', 'shoulder_only', 'spatial_confidence',
 ]);
 const POSITION_SET = new Set(POSITION_ATTRIBUTES);
-/** Re-stamped on every write; updated_at falls back to last_seen_at when FL511 gives no last_updated. */
-const VOLATILE_ATTRIBUTES = Object.freeze(['last_seen_at', 'updated_at']);
+/**
+ * Re-stamped on every write; updated_at falls back to last_seen_at when FL511 gives no last_updated.
+ * cleared_at_dt is only ever set on the (always written) clearing, and an omitted DateTime is not
+ * erased by a merge-semantics load, so a reactivated record may keep a stale one.
+ */
+const VOLATILE_ATTRIBUTES = Object.freeze(['last_seen_at', 'updated_at', 'cleared_at_dt', 'snapshot_cleared_url', 'snapshot_cleared_taken_at']);
+
+/**
+ * Captured snapshot and weather values of an existing record, in their DataConnect types. The cleared
+ * snapshot belongs to one clearing only: an active record (and a new clearing) never carries it, so a
+ * later clear takes a fresh one. Its URL and time cannot be erased in DataConnect, hence VOLATILE above.
+ */
+const CLEARED_ONLY = new Set(SNAPSHOT_CLEARED_FIELDS);
+const stickyOf = previous => Object.fromEntries(STICKY_FIELDS.filter(name => !CLEARED_ONLY.has(name))
+  .map(name => [name, typedValue(name, previous?.[name])])
+  .filter(([, value]) => value !== null));
+const withoutCleared = record => Object.fromEntries(Object.entries(record).filter(([name]) => !CLEARED_ONLY.has(name) && name !== 'cleared_at_dt'));
 
 const iso = ms => new Date(ms).toISOString();
 const round = (value, dp) => {
@@ -60,7 +75,9 @@ export function liveEventKey(event) {
  * @param {object} event normalizeEvent + attachDetails + enrichForLiveOps output
  * @param {{now:number, previous?:object|null, firstSeenAt?:string|null, enrichment?:object}} options
  */
-export function mapEventToRecord(event, { now, previous = null, firstSeenAt = null, enrichment = loadEnrichmentContext() }) {
+export function mapEventToRecord(event, {
+  now, previous = null, firstSeenAt = null, enrichment = loadEnrichmentContext(), publicApiBase = '',
+}) {
   const key = liveEventKey(event);
   const liveOps = event.liveOps ?? {};
   const type = event.type;
@@ -114,6 +131,7 @@ export function mapEventToRecord(event, { now, previous = null, firstSeenAt = nu
     x_coordinates: longitude,
     y_coordinates: latitude,
     project: PROJECT_CODE,
+    ...stickyOf(previous),
   };
 
   const impact = liveOps.laneImpact;
@@ -134,7 +152,16 @@ export function mapEventToRecord(event, { now, previous = null, firstSeenAt = nu
   }
 
   // Derived from the final record, so carried-forward details derive the same values.
-  return completeRecord(liveClassDefinition(LIVE_CLASS.EVENTS), { ...rec, ...enrichEventFields(rec, enrichment) });
+  return completeRecord(liveClassDefinition(LIVE_CLASS.EVENTS), { ...rec, ...enrichEventFields(rec, enrichment, { publicApiBase }) });
+}
+
+/**
+ * An active read-back record made loadable again (geometry, captured values, derived fields), with
+ * `changes` applied: the clearing of an event, or a record whose missing capture was just retried.
+ */
+export function reloadActiveRecord(previous, changes = {}, { enrichment = loadEnrichmentContext(), publicApiBase = '' } = {}) {
+  const record = { ...withoutCleared(previous), ...stickyOf(previous), geometry: pointOf(previous), ...changes };
+  return completeRecord(liveClassDefinition(LIVE_CLASS.EVENTS), { ...record, ...enrichEventFields(record, enrichment, { publicApiBase }) });
 }
 
 /** Only a fully healthy LIVE poll is proof that a missing event has really gone. */
@@ -152,11 +179,12 @@ const emptyStats = () => ({
 
 /**
  * @param {{payload:object, existing:object[], now:number, heartbeatSeconds?:number, firstSeenHints?:Map<string,string>,
- *   enrichment?:object}} input
+ *   enrichment?:object, publicApiBase?:string}} input
  * @returns {{skipped:boolean, reason:string|null, upserts:object[], state:object[], stats:object}}
  */
 export function syncLiveEvents({
-  payload, existing, now, heartbeatSeconds = 900, firstSeenHints = new Map(), enrichment = loadEnrichmentContext(),
+  payload, existing, now, heartbeatSeconds = 900, firstSeenHints = new Map(), enrichment = loadEnrichmentContext(), publicApiBase = '',
+  holdOpen = new Set(),
 }) {
   const existingByKey = new Map();
   for (const record of existing ?? []) {
@@ -182,7 +210,7 @@ export function syncLiveEvents({
   const upserts = [];
   for (const [key, event] of kept) {
     const previous = existingByKey.get(key) ?? null;
-    const candidate = mapEventToRecord(event, { now, previous, firstSeenAt: firstSeenHints.get(key) ?? null, enrichment });
+    const candidate = mapEventToRecord(event, { now, previous, firstSeenAt: firstSeenHints.get(key) ?? null, enrichment, publicApiBase });
     if (!previous) {
       stats.new++;
       upserts.push(candidate);
@@ -201,13 +229,25 @@ export function syncLiveEvents({
     }
   }
 
-  const gone = [...existingByKey.values()].filter(record => record.status === 'active' && !kept.has(record.keyInSource));
+  // Demo hold (LIVE_DC_HOLD_OPEN): listed events stay active after they leave FL511, and a listed
+  // event that was already cleared is reopened. last_seen_at is kept fresh so it never reads STALE.
+  for (const key of holdOpen) {
+    const previous = existingByKey.get(key);
+    if (!previous || kept.has(key)) continue;
+    if (previous.status === 'cleared') {
+      upserts.push(reloadActiveRecord(previous, { status: 'active', cleared_at: '', last_seen_at: iso(now) }, { enrichment, publicApiBase }));
+      stats.reactivated++;
+    } else if (heartbeatSeconds > 0 && !(now - Date.parse(previous.last_seen_at) < heartbeatSeconds * 1000)) {
+      upserts.push(reloadActiveRecord(previous, { last_seen_at: iso(now) }, { enrichment, publicApiBase }));
+      stats.heartbeat++;
+    }
+  }
+
+  const gone = [...existingByKey.values()].filter(record => record.status === 'active' && !kept.has(record.keyInSource) && !holdOpen.has(record.keyInSource));
   if (gone.length > 0) {
     if (canClear(payload)) {
-      const def = liveClassDefinition(LIVE_CLASS.EVENTS);
       for (const previous of gone) {
-        const cleared = { ...previous, geometry: pointOf(previous), status: 'cleared', cleared_at: iso(now) };
-        upserts.push(completeRecord(def, { ...cleared, ...enrichEventFields(cleared, enrichment) }));
+        upserts.push(reloadActiveRecord(previous, { status: 'cleared', cleared_at: iso(now) }, { enrichment, publicApiBase }));
         stats.cleared++;
       }
     } else {

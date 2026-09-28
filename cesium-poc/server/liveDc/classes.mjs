@@ -46,6 +46,7 @@ export const LIVE_RELATIONSHIP_TYPES = deepFreeze(clone(LIVE_CONFIG.relationship
 const LIVE_NAME_SET = new Set(LIVE_CLASS_NAMES);
 const HISTORICAL_ID_BY_NAME = new Map(HISTORICAL_CLASSES.map((c) => [c.className, c.id]));
 const STRING_LIKE = new Set(['String', 'Date', 'DateTime', 'Timestamp', 'URL']);
+const OMITTED_WHEN_UNSET = new Set(['DateTime', 'URL']);
 const CORE_NAMES = new Set(LIVE_CONFIG.coreAttributes.map((a) => a.name));
 
 export function isLiveClassName(name) {
@@ -145,6 +146,16 @@ export function buildCreateRequests({ resolveClassId, linkMode = 'live' } = {}) 
   }));
 }
 
+/**
+ * The attributes an already-created Live class must have: every declared non-core attribute of
+ * liveClasses.json. tools/live-dc-apply-update.mjs adds the ones the real class lacks, so applying
+ * it is idempotent. Additive only: modify and remove stay empty.
+ */
+export function buildClassUpdateRequest(className, { resolveClassId = (name) => `<id of ${name}>`, linkMode = 'live' } = {}) {
+  const ensure = liveClassDefinition(className, { linkMode }).attributes.filter((a) => !a.core).map((a) => resolvedAttribute(a, resolveClassId));
+  return { className, ensure, modify: [], remove: [] };
+}
+
 const RELATIONSHIP_TYPES_NOTE = 'ADDITIVE delta for the global relationship-type registry. GET /api/data-mgmt/v1/relationship-types, '
   + 'append these entries to the existing list (never remove or rename existing types), PUT with the current version. '
   + 'DataConnect requires order in 1..total: renumber each entry as existingCount + order. '
@@ -204,6 +215,15 @@ export function toDcDateTime(value) {
   return new Date(Math.floor(ms / 1000) * 1000).toISOString().replace('.000Z', 'Z');
 }
 
+/** DataConnect URL: an absolute http(s) URL with a host. */
+export function isHttpUrl(value) {
+  if (typeof value !== 'string') return false;
+  try {
+    const url = new URL(value);
+    return (url.protocol === 'https:' || url.protocol === 'http:') && url.hostname !== '';
+  } catch { return false; }
+}
+
 const typeMatches = (type, value) => (STRING_LIKE.has(type) ? typeof value === 'string' : (TYPE_CHECKS[type]?.(value) ?? true));
 
 const relationshipTarget = (attr) => attr.relatedClassName
@@ -223,6 +243,12 @@ const attributeFailure = (attr, value, codesFor) => {
   }
   if (attr.type === 'DateTime' && typeof value === 'string' && HAS_FRACTION.test(value)) {
     return { attribute: attr.name, reasonCode: 'Type', reason: 'DateTime type cannot have milliseconds' };
+  }
+  if (attr.type === 'DateTime' && !isEmpty(value) && !ISO_ZONED.test(value)) {
+    return { attribute: attr.name, reasonCode: 'Type', reason: 'Value does not match attribute type DateTime' };
+  }
+  if (attr.type === 'URL' && !isEmpty(value) && !isHttpUrl(value)) {
+    return { attribute: attr.name, reasonCode: 'Type', reason: 'Value does not match attribute type URL' };
   }
   if (!isRelationship(attr)) return null;
   // Real DataConnect treats an absent relationship key exactly like an empty one.
@@ -249,8 +275,9 @@ export function completeRecord(defOrDto, record) {
   const out = {};
   for (const [key, value] of Object.entries(record ?? {})) if (value !== null && value !== undefined) out[key] = value;
   // '' (not absence) so that merge-semantics Incremental loads overwrite a previously set value.
+  // Never for DateTime or URL: an unset instant or link is omitted, not sent as text.
   for (const attr of defOrDto.attributes) {
-    if (!attr.core && !isRelationship(attr) && STRING_LIKE.has(attr.type) && !(attr.name in out)) out[attr.name] = '';
+    if (!attr.core && !isRelationship(attr) && STRING_LIKE.has(attr.type) && !OMITTED_WHEN_UNSET.has(attr.type) && !(attr.name in out)) out[attr.name] = '';
   }
   return out;
 }

@@ -59,21 +59,32 @@ Every Live class name and every Live relationship type starts with `SDNA` (`SDNA
 
 ## Live Events enrichment (`eventEnrichment.mjs`)
 
-Each SDNA Live Events record also carries these fields. They are derived deterministically from the record itself and two local files (`public/data/i595_corridor_cameras.geojson`, `public/data/i595_fdot_traffic_segments.geojson`), with no network calls. A value that is not available is the literal `NA`.
+Each SDNA Live Events record also carries these fields. Most are derived deterministically from the record itself and two local files (`public/data/i595_corridor_cameras.geojson`, `public/data/i595_fdot_traffic_segments.geojson`), with no network calls. An unavailable String value is the literal `NA`; an unavailable URL, DateTime, Integer or Decimal is omitted (never `NA`, never `''`), and a URL value must be an absolute http(s) URL (`field_sources` still says `NA` for it).
 
 | Field | Type | Source |
 |---|---|---|
 | `reported_at` | DateTime (`YYYY-MM-DDTHH:mm:ssZ`) | FL511 `start_time` (America/New_York, DST aware); else `first_seen_at` |
-| `updated_at` | DateTime (`YYYY-MM-DDTHH:mm:ssZ`) | FL511 `last_updated`; else `last_seen_at` |
+| `updated_at` | DateTime | FL511 `last_updated`; else `last_seen_at` |
+| `incident_time_local` | String | `reported_at` as New York wall time, e.g. `2026-09-26 12:26 AM EDT` |
+| `first_seen_at_dt`, `cleared_at_dt` | DateTime | `first_seen_at`; `cleared_at` only while `status=cleared` |
 | `milepost` | String | interpolated along the record's FDOT segment (`begin_post`..`end_post`), one decimal |
 | `cross_street` | String | description: "at / beyond / near / before / past X" |
 | `incident_subtype` | String | keywords in title + description |
 | `vehicles_involved` | String | "N vehicles", "N-vehicle", "multi-vehicle" (`Multiple`) |
 | `impact_level` | String | Live Ops per-event level (`src/liveOps/operationalImpact.js`) from type, severity and lane flags |
 | `est_clearance_at` | String | FL511 `end_time` as ISO UTC |
-| `primary_camera_id`, `nearby_camera_ids`, `camera_snapshot_url` | String | cameras within 2000 m, same direction first, then nearest; up to 3 as `<camera_id>@<distance>m`; the snapshot is the same-origin proxy `/api/i595/camera/<divas_chan_id>/snapshot` |
-| `injuries`, `fatalities`, `weather_at_event`, `traffic_conditions`, `queue_length_mi`, `est_delay_min`, `recovery_eta`, `responder_status`, `responding_units`, `nearby_dms_ids`, `dms_message`, `recommended_next_action`, `snapshot_archive_url` | String | always `NA` for now |
-| `field_sources` | String | JSON object: each field above → `FL511`, `derived` or `NA` |
+| `primary_camera_id`, `nearby_camera_ids`, `camera_snapshot_url` | String | cameras within 2000 m, same direction first, then nearest; up to 3 as `<camera_id>@<distance>m`; the snapshot is the proxy `/api/i595/camera/<divas_chan_id>/snapshot`, absolute when `LIVE_DC_PUBLIC_API_BASE` is set |
+| `snapshot_first_url` (URL), `snapshot_first_taken_at` (DateTime), `snapshot_first_camera_id` | captured | DIVAS still stored once, within an hour of first sight (`eventCapture.mjs`) |
+| `snapshot_cleared_url` (URL), `snapshot_cleared_taken_at` (DateTime), `snapshot_cleared_camera_id` | captured | DIVAS still stored once, when the event clears (same camera as the first one when possible) |
+| `snapshot_archive_url` | String | = `snapshot_first_url` |
+| `weather_at_event`, `weather_source` | String | Open-Meteo current conditions at the event at first sight, e.g. `Clear · 27.4 °C · wind 12 km/h SE` |
+| `weather_code` (Integer), `temperature_c`, `relative_humidity_pct`, `precipitation_mm`, `wind_speed_kmh`, `wind_direction_deg` (Decimal), `weather_observed_at` (DateTime) | captured | the same Open-Meteo reading (WMO code, °C, %, mm, km/h, degrees) |
+| `injuries`, `fatalities`, `traffic_conditions`, `queue_length_mi`, `est_delay_min`, `recovery_eta`, `responder_status`, `responding_units`, `nearby_dms_ids`, `dms_message`, `recommended_next_action` | String | always `NA` for now |
+| `field_sources` | String | JSON object: each field above → `FL511`, `derived`, `DIVAS`, `Open-Meteo` or `NA` |
+
+**Snapshots and weather** are captured, not derived, and are sticky: once a value is in DataConnect it is carried forward and never recaptured. The camera is the first one FL511 lists in the incident tooltip's camera carousel (FL511 camera id, title and a DIVAS video URL `…/chan-<n>_h/…`) that is one of the corridor cameras (same id, else same DIVAS channel); otherwise the nearest corridor camera with a DIVAS channel. The JPEG comes from DIVAS (`https://images-dis.divas.cloud/DGI/chan-<n>_h.jpg`, 5 s timeout) and is stored in the data bucket at `snapshots/<eventKey>/<UTC yyyymmddThhmmssZ>_<cameraId>.jpg`, served by CloudFront's default behaviour; DataConnect stores only the URL. The poller uses S3 `PutObject`; `npm run live-dc:sync` uses `aws s3 cp -` when `LIVE_DC_SNAPSHOT_BUCKET` and `LIVE_DC_SNAPSHOT_PUBLIC_BASE` are set, and takes no snapshots otherwise. With `--feed` nothing is captured. A failed fetch or upload leaves the columns unset and never fails the cycle; while an active event is within an hour of first sight, a missing first snapshot or weather is retried every cycle, and a retry that fills a value reloads the record. An uploaded snapshot is remembered in memory per event (key fixed at the first attempt) until DataConnect reads the value back, so a refused load or an upload timeout reuses the same object instead of storing another. The clearing snapshot uses the first-seen camera while it has a DIVAS still, else the camera chosen at first sight, else the carousel/nearest choice. A reactivated event drops its old clearing snapshot (DataConnect cannot erase a URL or DateTime, so the stale read-back values are ignored by the diff), and a later clear takes a fresh one. At most 4 DIVAS / Open-Meteo requests run at a time.
+
+**Schema change for the existing class.** `config/liveDc/live-events.update-request.json` (generated and `--check`ed by `tools/live-dc-classes.mjs`) lists every Live Events attribute declared in `liveClasses.json` (`ensure`). `tools/live-dc-apply-update.mjs` adds the declared attributes the real class lacks, so it is idempotent: dry run by default; with `--apply` it POSTs the ClassUpdate to `https://dc-data-mgmt-demo-dqa3.cohesivecloud.app/api/v1/class/<id>`, and does nothing when the class is up to date. It refuses any other class and any modify/remove. Loads do not depend on the order of deploy and schema update: the writer drops attributes the resolved class does not declare (one warning per class per process) and still validates the declared ones.
 
 DataConnect rejects a DateTime with milliseconds ("DateTime type cannot have milliseconds"), so every DateTime is sent in whole seconds (`toDcDateTime` in `classes.mjs`), and `validateRecord` refuses milliseconds before a load. DataConnect reads a DateTime back as `2026-09-26T08:14:32.000+00:00`; the diff normalises zoned ISO timestamps on both sides, so a re-run writes nothing.
 

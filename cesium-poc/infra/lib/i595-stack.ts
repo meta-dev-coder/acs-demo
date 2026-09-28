@@ -46,6 +46,13 @@ export class I595Stack extends cdk.Stack {
       expiration: cdk.Duration.days(1),
       noncurrentVersionExpiration: cdk.Duration.days(1),
     })
+    // Incident camera snapshots are evidence for the demo, not an archive: keep 90 days.
+    dataBucket.addLifecycleRule({
+      id: 'ExpireIncidentSnapshots',
+      prefix: 'snapshots/',
+      expiration: cdk.Duration.days(90),
+      noncurrentVersionExpiration: cdk.Duration.days(1),
+    })
     const DC_TOKEN_KEY = 'secrets/dc-token.txt'
     const DC_GATEWAY_URL = 'https://dataconnect-demo-dqa3.cohesivecloud.app'
 
@@ -123,6 +130,11 @@ export class I595Stack extends cdk.Stack {
     pollerFn.addToRolePolicy(new iam.PolicyStatement({
       actions: ['s3:PutObject'],
       resources: [dataBucket.arnForObjects('status/*')],
+    }))
+    // Live Events camera snapshots, public through CloudFront's default behaviour.
+    pollerFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['s3:PutObject'],
+      resources: [dataBucket.arnForObjects('snapshots/*')],
     }))
     dcTokenKey.grantDecrypt(pollerFn)
 
@@ -424,6 +436,12 @@ export class I595Stack extends cdk.Stack {
         },
       },
     })
+
+    // Snapshot links stored in DataConnect: images under snapshots/ and the live camera proxy, both on this distribution.
+    const publicBase = `https://${distribution.distributionDomainName}`
+    pollerFn.addEnvironment('LIVE_DC_SNAPSHOT_BUCKET', dataBucket.bucketName)
+    pollerFn.addEnvironment('LIVE_DC_SNAPSHOT_PUBLIC_BASE', publicBase)
+    pollerFn.addEnvironment('LIVE_DC_PUBLIC_API_BASE', publicBase)
 
     const cfnDistribution = distribution.node.defaultChild as cloudfront.CfnDistribution
     cfnDistribution.addPropertyOverride(

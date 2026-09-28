@@ -430,6 +430,10 @@ describe('completeRecord', () => {
     assert.equal(out.extra, 1);
     assert.equal(out.blocked_lanes, '');
     assert.equal('latitude' in out, false);
+    // URL attributes are omitted when unset, like DateTime (never '' or "NA").
+    assert.equal('snapshot_first_url' in out, false);
+    assert.equal('snapshot_cleared_url' in out, false);
+    assert.equal(out.snapshot_archive_url, '', 'String attributes are still filled');
   });
 });
 

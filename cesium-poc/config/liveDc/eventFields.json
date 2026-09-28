@@ -4,6 +4,9 @@
   "enrichmentFields": [
     {"name":"reported_at","label":"Reported"},
     {"name":"updated_at","label":"Updated"},
+    {"name":"incident_time_local","label":"Incident time (local)"},
+    {"name":"first_seen_at_dt","label":"First seen"},
+    {"name":"cleared_at_dt","label":"Cleared at"},
     {"name":"milepost","label":"Milepost"},
     {"name":"cross_street","label":"Cross street"},
     {"name":"incident_subtype","label":"Incident subtype"},
@@ -13,9 +16,23 @@
     {"name":"primary_camera_id","label":"Camera"},
     {"name":"nearby_camera_ids","label":"Nearby cameras"},
     {"name":"camera_snapshot_url","label":"Camera snapshot"},
+    {"name":"snapshot_first_url","label":"Snapshot (first seen)"},
+    {"name":"snapshot_first_taken_at","label":"Snapshot taken (first seen)"},
+    {"name":"snapshot_first_camera_id","label":"Snapshot camera (first seen)"},
+    {"name":"snapshot_cleared_url","label":"Snapshot (cleared)"},
+    {"name":"snapshot_cleared_taken_at","label":"Snapshot taken (cleared)"},
+    {"name":"snapshot_cleared_camera_id","label":"Snapshot camera (cleared)"},
     {"name":"injuries","label":"Injuries","pending":true},
     {"name":"fatalities","label":"Fatalities","pending":true},
-    {"name":"weather_at_event","label":"Weather","pending":true},
+    {"name":"weather_at_event","label":"Weather"},
+    {"name":"weather_code","label":"Weather code"},
+    {"name":"temperature_c","label":"Temperature (°C)"},
+    {"name":"relative_humidity_pct","label":"Relative humidity (%)"},
+    {"name":"precipitation_mm","label":"Precipitation (mm)"},
+    {"name":"wind_speed_kmh","label":"Wind speed (km/h)"},
+    {"name":"wind_direction_deg","label":"Wind direction (°)"},
+    {"name":"weather_observed_at","label":"Weather observed"},
+    {"name":"weather_source","label":"Weather source"},
     {"name":"traffic_conditions","label":"Traffic conditions","pending":true},
     {"name":"queue_length_mi","label":"Queue length (mi)","pending":true},
     {"name":"est_delay_min","label":"Est. delay (min)","pending":true},
@@ -25,6 +42,6 @@
     {"name":"nearby_dms_ids","label":"Nearby DMS","pending":true},
     {"name":"dms_message","label":"DMS message","pending":true},
     {"name":"recommended_next_action","label":"Recommended next action","pending":true},
-    {"name":"snapshot_archive_url","label":"Snapshot archive","pending":true}
+    {"name":"snapshot_archive_url","label":"Snapshot archive"}
   ]
 }

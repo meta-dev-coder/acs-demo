@@ -14,7 +14,7 @@ import { createMapDetailsPanel } from './mapDetailsPanel.js';
 import { focusMapPoints } from './bridgeCamera.js';
 import {
   LIVE_EVENT_LABELS, LIVE_EVENT_SOURCE_STATUS, LIVE_EVENT_TYPES, diffLiveEvents,
-  liveEventAssociationRows, liveEventLabel, liveEventNotice, liveEventSourceRows,
+  liveEventAssociationRows, liveEventConditionsRows, liveEventLabel, liveEventNotice, liveEventSnapshots, liveEventSourceRows, liveEventWeatherLine,
   liveEventStatusText, liveEventTooltip, liveEventsEndpoint,
 } from './liveEventsData.js';
 import { liveDcEnabled } from './maintenance/liveDcSource.js';
@@ -121,6 +121,32 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
     if (ops.laneImpactLabel) hero.querySelector('.live-event-hero-lanes').textContent = ops.laneImpactLabel;
     details.querySelector('dl').before(hero);
 
+    // Stored camera snapshots sit right under the header, where an operator looks first.
+    for (const shot of liveEventSnapshots(event)) {
+      const figure = document.createElement('figure');
+      figure.className = 'live-event-extra live-event-snapshot';
+      figure.style.margin = '8px 0';
+      const link = document.createElement('a');
+      link.href = shot.url; link.target = '_blank'; link.rel = 'noopener noreferrer';
+      const img = document.createElement('img');
+      img.src = shot.url; img.alt = `Camera snapshot ${shot.label.toLowerCase()}`; img.loading = 'lazy';
+      img.style.cssText = 'display:block;width:100%;border-radius:6px';
+      link.append(img);
+      const caption = document.createElement('figcaption');
+      caption.style.cssText = 'font-size:11px;opacity:.75;margin-top:4px';
+      caption.textContent = [shot.label, shot.cameraId ? `camera ${shot.cameraId}` : null, shot.takenAt].filter(Boolean).join(' · ');
+      figure.append(link, caption);
+      details.querySelector('dl').before(figure);
+    }
+    const weatherLine = liveEventWeatherLine(event);
+    if (weatherLine) {
+      const line = document.createElement('p');
+      line.className = 'live-event-extra live-event-weather';
+      line.style.cssText = 'margin:4px 0 8px;font-size:13px';
+      line.textContent = weatherLine;
+      details.querySelector('dl').before(line);
+    }
+
     const caption = document.createElement('p');
     caption.className = 'live-event-extra live-event-caption';
     caption.textContent = `Source data · ${event.source ?? 'FL511'}`;
@@ -140,6 +166,20 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
       const note = document.createElement('p');
       note.textContent = 'Nearest corridor geometry computed by this digital twin. Proximity does not mean FL511 placed the event on that facility.';
       section.append(heading, list, note);
+      details.append(section);
+    }
+    const conditions = liveEventConditionsRows(event);
+    if (conditions.length) {
+      const section = document.createElement('section');
+      section.className = 'live-event-extra live-event-association live-event-conditions';
+      const heading = document.createElement('h3');
+      heading.textContent = 'Conditions at the time';
+      const list = document.createElement('dl');
+      for (const [label, value] of conditions) {
+        const dt = document.createElement('dt'), dd = document.createElement('dd');
+        dt.textContent = label; dd.textContent = value; list.append(dt, dd);
+      }
+      section.append(heading, list);
       details.append(section);
     }
     if (Number.isFinite(event.secondaryLatitude)) {

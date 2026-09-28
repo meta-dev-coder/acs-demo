@@ -9,8 +9,10 @@
  */
 import { DcWriterError, WRITER_ERRORS, createDcWriter, createStaticTokenProvider, loadDcWriterConfig } from '../../../server/liveDc/dcWriter.mjs';
 import { createAssetCache, createCycleMemory, runLiveDcCycle } from '../../../server/liveDc/cycle.mjs';
+import { createEventCapture } from '../../../server/liveDc/eventCapture.mjs';
 import { loadWorkflowConfig } from '../../../server/liveDc/workflow.mjs';
 import { tokenExpiresAtMs } from '../../../server/liveDc/tokenHandoff.mjs';
+import { withDeadline } from '../../../server/liveDc/timeouts.mjs';
 
 export const MIN_RUN_TOKEN_MS = 2 * 60_000;
 const DEADLINE_MARGIN_MS = 5_000;
@@ -79,6 +81,7 @@ export function liveDcCycleOptions(env = {}) {
     profileName,
     linkMode: env.LIVE_DC_LINK_MODE || 'live',
     heartbeatSeconds: env.LIVE_DC_HEARTBEAT_SECONDS && heartbeat >= 0 ? heartbeat : 900,
+    publicApiBase: env.LIVE_DC_PUBLIC_API_BASE || '',
   };
 }
 
@@ -88,17 +91,11 @@ function summarize(report) {
     sync: report.sync ? { skipped: report.sync.skipped, reason: report.sync.reason, stats: report.sync.stats ?? null } : null,
     workflow: report.workflow ?? null,
     loads: Object.fromEntries(Object.entries(report.loads ?? {}).map(([name, load]) => [shortName(name), load.sent ?? 0])),
+    capture: report.capture ?? null,
     errors: report.errors?.length ?? 0,
     warnings: report.warnings?.length ?? 0,
   };
 }
-
-const withDeadline = (promise, ms) => (Number.isFinite(ms) && ms > 0
-  ? new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(Object.assign(new Error('timeout'), { code: 'timeout' })), ms);
-    promise.then(value => { clearTimeout(timer); resolve(value); }, error => { clearTimeout(timer); reject(error); });
-  })
-  : promise);
 
 /** Messages from the writer never carry the token; the cap keeps the public status small. */
 const reasonOf = error => {
@@ -114,6 +111,7 @@ const reasonOf = error => {
 export async function runLiveDcStep({
   payload, readToken, writeStatus, env = {}, now = Date.now, logger = console, fetchImpl = fetch,
   createWriter = createDcWriter, runCycle = runLiveDcCycle, state = {}, deadlineMs,
+  snapshotStore = null, createCapture = createEventCapture,
 }) {
   const at = now();
   const status = { lastRunAt: iso(at), dcWrite: 'skipped', reason: null, tokenExpiresAt: null, fl511: payload?.sourceStatus ?? null, summary: null };
@@ -136,9 +134,11 @@ export async function runLiveDcStep({
         writer: { findClassByName: (...args) => state.writer.findClassByName(...args), readAll: (...args) => state.writer.readAll(...args) },
         refreshSeconds: Number(env.LIVE_DC_ASSET_REFRESH_SECONDS) > 0 ? Number(env.LIVE_DC_ASSET_REFRESH_SECONDS) : 3600,
       });
+      // Snapshots (S3 when a store is wired) and weather at first sight; direct upstream fetches, not the DataConnect fetch.
+      state.capture ??= createCapture({ snapshotStore, logger });
       const service = { refresh: async () => {}, snapshot: async () => payload };
       const report = await withDeadline(runCycle({
-        writer, service, now, assetCache: state.assetCache, memory: state.memory, logger, ...liveDcCycleOptions(env),
+        writer, service, now, assetCache: state.assetCache, memory: state.memory, logger, capture: state.capture, ...liveDcCycleOptions(env),
       }), deadlineMs);
       status.summary = summarize(report);
       status.dcWrite = report.errors?.length ? 'error' : 'ok';
@@ -166,7 +166,7 @@ export async function runLiveDcStep({
 // ── Handler ───────────────────────────────────────────────────────────────────────────────────────
 
 export function createPollerHandler({
-  getService, ddb, emit, tokenStore = null, env = process.env, now = Date.now, logger = console, liveDc = {},
+  getService, ddb, emit, tokenStore = null, snapshotStore = null, env = process.env, now = Date.now, logger = console, liveDc = {},
 }) {
   const state = {};
   return async function handler(_event, context) {
@@ -196,7 +196,7 @@ export function createPollerHandler({
     if (!tokenStore) return;
     const remaining = context?.getRemainingTimeInMillis?.();
     await runLiveDcStep({
-      payload, env, now, logger, state,
+      payload, env, now, logger, state, snapshotStore,
       readToken: tokenStore.read,
       writeStatus: tokenStore.writeStatus,
       deadlineMs: Number.isFinite(remaining) ? remaining - DEADLINE_MARGIN_MS : undefined,

@@ -22,6 +22,31 @@
  * Pure — records in, grouped records out — so the rules are unit-tested against the real export.
  */
 
+/*
+ * TODO(Arpana): show the whole LIVE incident chain in the Related tab. Comment only; nothing here
+ * changes at runtime.
+ *
+ * Live incidents already have a complete, exact chain in DataConnect's "SDNA Florida I595 Live *"
+ * classes: Live Event -> Ticket -> Tasks -> Work Order -> Inspection -> Asset Status (damaged).
+ * Live event records are INCIDENT-type items with `live: true`; their id is the event key
+ * (code / keyInSource), which is the value every other live class stores in `source_event_id`.
+ *
+ * Live tickets/tasks/work orders are normalised by the historical normalisers (via
+ * src/maintenance/liveDcSource.js viaHistorical), so the Bentley-named joins above already work
+ * for them: task -> ticket and work order -> ticket/task via related.ticketId / related.taskId
+ * ("Related Ticket ID" / "Related Task ID").
+ *
+ * Still to add to NAMED_REFERENCES (identifiers printed in the record's own columns, so named
+ * links, not guesses):
+ * - TICKET / TASK / WORK_ORDER / INSPECTION / ASSET_STATUS -> live event: `source_event_id`,
+ *   already normalised as related.eventId (viaHistorical and normalizeLiveAssetStatus).
+ *   Target type: 'incidentRecord'.
+ * - ASSET_STATUS -> inspection: `source_inspection_id`, already related.inspectionId (existing entry).
+ * - INSPECTION -> ticket (`related_ticket_id`) and -> work order (`related_work_order_id`): NOT
+ *   normalised yet. normalizeInspection's `related` has no ticketId / workOrderId; add them there
+ *   (or in liveDcSource.js viaHistorical for inspections) before referencing them here.
+ */
+
 /** The reference columns each class carries, as the normalizer already parsed them onto `related`. */
 const NAMED_REFERENCES = Object.freeze({
   WORK_ORDER: [
