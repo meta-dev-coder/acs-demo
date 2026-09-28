@@ -79,14 +79,18 @@ function CameraSnapshot({ camera, height = 176, badge = true }) {
     border: 1, borderColor: 'divider', bgcolor: 'action.hover',
     display: 'grid', placeItems: 'center',
   };
+  // No camera near enough to show: the panel simply has no live view, and an empty grey box saying
+  // so takes a third of the panel to tell an operator nothing they can act on. The absence is its
+  // own answer — the Cameras tab already reports how many are in range.
+  if (!camera) return null;
+  // A camera we DID offer and cannot draw is worth a line, because the operator is waiting on it.
   if (!url || failed) {
     return (
       <Box sx={frame}>
         <Stack spacing={0.5} sx={{ alignItems: 'center', color: 'text.secondary', px: 2, textAlign: 'center' }}>
           <VideocamOutlinedIcon fontSize="small" />
           <Typography variant="caption">
-            {!camera ? 'No corridor camera within range of this incident'
-              : !url ? `${camera.label} has no public snapshot feed` : `${camera.label} did not return a frame`}
+            {url ? `${camera.label} did not return a frame` : `${camera.label} has no public snapshot feed`}
           </Typography>
         </Stack>
       </Box>
