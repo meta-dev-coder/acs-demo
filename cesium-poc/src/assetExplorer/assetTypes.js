@@ -700,10 +700,11 @@ export const ASSET_TYPES = Object.freeze({
     // What kind it was and where, since the list mixes all five kinds together.
     getSubtitle: asset => [LIVE_EVENT_LABELS[asset.source?.type], liveOpsPlace(asset) ?? text(asset.source?.roadway) ?? positionLabel(asset)]
       .filter(Boolean).join(' · '),
-    // When it cleared is the fact that distinguishes one of these from the next.
+    // Severity, not the cleared time: getCardDate already prints when it cleared, and a card that
+    // says "Sep 28" twice in two different truncations is noise where the severity should be.
     getStatus: asset => {
-      const when = clearedAtLabel(asset.source);
-      return when ? { label: when, tone: 'muted' } : null;
+      const severity = text(asset.source?.severity);
+      return severity ? { label: severity, tone: 'warn' } : null;
     },
     /** The Event type dropdown: the five kinds, each counted, in the strip's own filter row. */
     getFilters: (assets, counted = assets) =>

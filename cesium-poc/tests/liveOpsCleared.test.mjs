@@ -12,6 +12,17 @@ const events = [
   ev('d', 'INCIDENT', true, '2026-09-28T03:34:54.463Z'),
 ];
 
+test('cleared events are browsable by the day they cleared, in corridor time', () => {
+  const config = assetTypeConfig('clearedEvent');
+  assert.equal(config.dateLabel, 'Cleared');
+  // 22:08 UTC is still the 28th on I-595; keyed from UTC it would file under the 29th and fall out
+  // of a range that should hold it.
+  assert.equal(config.getDateKey({ source: { clearedAt: '2026-09-28T22:08:32.437Z' } }), '2026-09-28');
+  assert.equal(config.getDateKey({ source: { clearedAt: '2026-09-29T02:00:00.000Z' } }), '2026-09-28');
+  // No readable stamp is OUT of every range, never silently inside one.
+  assert.equal(config.getDateKey({ source: {} }), null);
+});
+
 test('the cleared card opens the clearedEvent explorer type, which owns no map layer', () => {
   assert.equal(CLEARED_CARD.assetType, 'clearedEvent');
   const config = assetTypeConfig('clearedEvent');
@@ -35,7 +46,9 @@ test('the Event type dropdown counts each kind and is one grouped filter', () =>
 test('a cleared card states which kind it was, since the list mixes all five', () => {
   const config = assetTypeConfig('clearedEvent');
   assert.match(config.getSubtitle({ name: 'b', source: events[1] }), /Closure/);
-  assert.equal(config.getStatus({ source: events[1] }).label, 'Sep 28, 6:08 PM EDT');
+  // The chip carries severity; the cleared time is the card's date, so neither repeats the other.
+  assert.equal(config.getStatus({ source: { ...events[1], severity: 'Minor' } }).label, 'Minor');
+  assert.equal(config.getCardDate({ source: events[1] }), 'Sep 28, 6:08 PM EDT');
 });
 
 test('the five live cards never count a cleared event', () => {
