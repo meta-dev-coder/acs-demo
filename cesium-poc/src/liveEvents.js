@@ -15,17 +15,19 @@ import { focusMapPoints } from './bridgeCamera.js';
 import {
   LIVE_EVENT_LABELS, LIVE_EVENT_SOURCE_STATUS, LIVE_EVENT_TYPES, diffLiveEvents,
   liveEventAssociationRows, liveEventConditionsRows, liveEventLabel, liveEventNotice, liveEventSnapshots, liveEventSourceRows, liveEventWeatherLine,
-  liveEventStatusText, liveEventTooltip, liveEventsEndpoint,
+  liveEventStatusText, liveEventTooltip, liveEventsEndpoint, DEFAULT_EVENT_WINDOW, clearedDateKey,
 } from './liveEventsData.js';
 import { liveDcEnabled } from './maintenance/liveDcSource.js';
 import { ICON_FOR_EVENT_TYPE, OPS_ICONS, opsIconMarkup, opsPinDataUrl } from './liveOps/opsIcons.js';
 
 // Vite mounts the API locally; a production override must not bypass it in development.
 // With live DataConnect on (liveDcSource.js flags) the same API reads the Live Events class instead.
-export const LIVE_EVENTS_API = liveEventsEndpoint(
-  import.meta.env.DEV ? '/api/i595/live-events' : (import.meta.env.VITE_LIVE_EVENTS_API || '/api/i595/live-events'),
-  liveDcEnabled(),
-);
+const LIVE_EVENTS_BASE = import.meta.env.DEV
+  ? '/api/i595/live-events' : (import.meta.env.VITE_LIVE_EVENTS_API || '/api/i595/live-events');
+/** The URL for one history window; the default one is the URL this module has always requested. */
+export const liveEventsUrl = (eventWindow = DEFAULT_EVENT_WINDOW) =>
+  liveEventsEndpoint(LIVE_EVENTS_BASE, liveDcEnabled(), eventWindow);
+export const LIVE_EVENTS_API = liveEventsUrl();
 const REFRESH_MS = 60_000;
 
 // The markers come from the same definitions as the Live Ops layers panel, so the row an operator
@@ -35,7 +37,41 @@ const ICONS = Object.fromEntries(Object.entries(ICON_FOR_EVENT_TYPE)
 
 const CONNECTOR_COLOR = Color.fromCssColorString('#ff8a8a');
 
-export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_API, refreshMs = REFRESH_MS, fetchImpl = fetch } = {}) {
+export function installLiveEvents(container, viewer, {
+  endpoint = LIVE_EVENTS_API, refreshMs = REFRESH_MS, fetchImpl = fetch, urlFor = liveEventsUrl,
+} = {}) {
+  // The history window is switchable at runtime (the Live Ops dropdown), so the URL is state rather
+  // than a constant. Polling always re-reads whatever window is currently selected.
+  let currentUrl = endpoint;
+  let eventWindow = DEFAULT_EVENT_WINDOW;
+  /**
+   * Whether the map is showing CLEARED events instead of live ones.
+   *
+   * The two are never mixed. Live Ops browses cleared events behind their own KPI card and their own
+   * bottom strip, so the map follows: normally it shows only what is live, and while that card is
+   * open it shows only what has cleared. Because nothing is ever mixed, a cleared pin needs no
+   * fading to tell it apart — it is the only thing on screen.
+   */
+  let clearedOnly = false;
+  /**
+   * The cleared-event date range, as inclusive corridor-day keys ("2026-09-28") or null.
+   *
+   * Set from the Cleared browser's own range filter, so narrowing the strip narrows the map with
+   * it — an operator filtering to one day should not be left with pins from every other day still
+   * on the globe. It only ever applies to cleared events; the live picture has no date range.
+   */
+  let clearedRange = { from: null, to: null };
+  const inClearedRange = event => {
+    if (!clearedRange.from && !clearedRange.to) return true;
+    const key = clearedDateKey(event);
+    // A cleared event with no readable stamp is OUT of every range: "when this ended is unknown"
+    // is not "it ended inside your window" — the same rule the explorer's own filter applies.
+    return Boolean(key) && (!clearedRange.from || key >= clearedRange.from) && (!clearedRange.to || key <= clearedRange.to);
+  };
+  /** Whether this event belongs to the mode the map is currently in. */
+  const inMode = event => (clearedOnly ? Boolean(event?.cleared) && inClearedRange(event) : !event?.cleared);
+  /** Whether it should be drawn: its type must be switched on, and it must belong to the mode. */
+  const shouldShow = event => Boolean(visible[event?.type]) && inMode(event);
   // ---- Asset Explorer bridge -------------------------------------------------------------------
   // Live events keep their own details panel, provenance rendering and framing; the Asset Explorer
   // adds browsing on top and shares one selection with them.
@@ -227,7 +263,7 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
   function applyVisibility() {
     for (const [id, entity] of entityById) {
       const event = records.get(entity);
-      entity.show = visible[event.type];
+      entity.show = shouldShow(event);
       const connector = source.entities.getById(`${id}::connector`);
       if (connector) connector.show = entity.show;
     }
@@ -244,7 +280,7 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
     const entity = source.entities.add({
       id: event.id, name: liveEventLabel(event),
       position: Cartesian3.fromDegrees(event.longitude, event.latitude),
-      show: visible[event.type],
+      show: shouldShow(event),
       billboard: {
         image: ICONS[event.type] ?? ICONS[LIVE_EVENT_TYPES.INCIDENT], width: 44, height: 52, scale: 1,
         verticalOrigin: VerticalOrigin.BOTTOM, heightReference: HeightReference.CLAMP_TO_GROUND,
@@ -266,9 +302,9 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
     }
     const positions = [Cartesian3.fromDegrees(event.longitude, event.latitude),
       Cartesian3.fromDegrees(event.secondaryLongitude, event.secondaryLatitude)];
-    if (existing) { existing.polyline.positions = positions; existing.show = visible[event.type]; return; }
+    if (existing) { existing.polyline.positions = positions; existing.show = shouldShow(event); return; }
     source.entities.add({
-      id, show: visible[event.type],
+      id, show: shouldShow(event),
       polyline: {
         positions, width: 4, clampToGround: true, zIndex: 25,
         material: new PolylineDashMaterialProperty({ color: CONNECTOR_COLOR, gapColor: Color.TRANSPARENT, dashLength: 14 }),
@@ -298,16 +334,25 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
     records.delete(entity); entityById.delete(id);
   }
 
+  /**
+   * The layer panel's badges. Counts follow the mode: while cleared events are being browsed the
+   * panel counts those, not the live ones the map is no longer drawing.
+   */
+  function renderCounts() {
+    const inScope = events.filter(inMode);
+    for (const [type, badge] of [...group.querySelectorAll('[data-live-count]')].map(node => [node.dataset.liveCount, node])) {
+      badge.textContent = String(inScope.filter(event => event.type === type).length);
+    }
+    group.querySelector('summary .badge').textContent = String(inScope.length);
+  }
+
   function render(next) {
     const { added: fresh, updated, removed } = diffLiveEvents(events, next);
     for (const id of removed) removeEntity(id);
     for (const event of fresh) createEntity(event);
     for (const event of updated) updateEntity(event);
     events = next;
-    for (const [type, badge] of [...group.querySelectorAll('[data-live-count]')].map(node => [node.dataset.liveCount, node])) {
-      badge.textContent = String(events.filter(event => event.type === type).length);
-    }
-    group.querySelector('summary .badge').textContent = String(events.length);
+    renderCounts();
     applyVisibility();
   }
 
@@ -316,7 +361,7 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
     controller?.abort();
     controller = new AbortController();
     try {
-      const response = await fetchImpl(endpoint, { signal: controller.signal, cache: 'no-store', headers: { accept: 'application/json' } });
+      const response = await fetchImpl(currentUrl, { signal: controller.signal, cache: 'no-store', headers: { accept: 'application/json' } });
       const body = await response.json().catch(() => null);
       if (disposed) return;
       if (!body || !Array.isArray(body.events)) throw new Error(`Live events request failed: ${response.status}`);
@@ -340,7 +385,7 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
         sourceStatus: LIVE_EVENT_SOURCE_STATUS.SERVICE_UNREACHABLE,
         counts: { total: events.length },
         dataFreshness: { ageSeconds: receivedAt == null ? null : (Date.now() - receivedAt) / 1000 },
-        endpoint,
+        endpoint: currentUrl,
       };
       status.textContent = liveEventStatusText(unreachable);
       provenance.hidden = false;
@@ -368,7 +413,7 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
     button.onclick = () => {
       const type = button.dataset.liveType;
       visible[type] = true; applyVisibility(); select(null);
-      const points = events.filter(event => event.type === type).flatMap(pointsOf);
+      const points = events.filter(event => event.type === type && inMode(event)).flatMap(pointsOf);
       if (points.length) focusMapPoints(viewer, points, '.live-event-details');
       else status.textContent = `No live ${LIVE_EVENT_LABELS[type].toLowerCase()}s on the corridor right now.`;
     };
@@ -394,6 +439,48 @@ export function installLiveEvents(container, viewer, { endpoint = LIVE_EVENTS_AP
 
   return {
     ready, entityById, refresh: load,
+    get eventWindow() { return eventWindow; },
+    get clearedOnly() { return clearedOnly; },
+    /**
+     * Show cleared events instead of live ones, or go back. The two are never on the map together:
+     * Live Ops' Cleared card owns the history, every other card owns the live picture.
+     */
+    setClearedOnly(on) {
+      const next = Boolean(on);
+      if (next === clearedOnly) return;
+      clearedOnly = next;
+      applyVisibility();
+      renderCounts();
+    },
+    get clearedRange() { return { ...clearedRange }; },
+    /**
+     * Whether this event belongs to what the map is currently showing — the right mode, and inside
+     * the cleared date range. Deliberately NOT affected by the per-type layer toggles: switching
+     * the Congestion markers off hides pins, it does not mean the congestion stopped happening.
+     */
+    inScope(event) { return inMode(event); },
+    /**
+     * Narrow the cleared events on the map to a range of corridor days, or clear it with two nulls.
+     * @param {{from: string|null, to: string|null}} range inclusive "YYYY-MM-DD" keys
+     */
+    setClearedRange({ from = null, to = null } = {}) {
+      if (from === clearedRange.from && to === clearedRange.to) return false;
+      clearedRange = { from: from || null, to: to || null };
+      applyVisibility();
+      renderCounts();
+      return true;
+    },
+    /**
+     * Switch how much cleared history is requested and reload at once, so the dropdown answers
+     * immediately instead of at the next 60s poll.
+     * @param {string} key one of EVENT_WINDOW_OPTIONS
+     */
+    setEventWindow(key) {
+      const next = urlFor(key);
+      if (next === currentUrl) return Promise.resolve();
+      currentUrl = next; eventWindow = key;
+      return load();
+    },
     onUpdate(fn) { updateListeners.add(fn); return () => updateListeners.delete(fn); },
     records,
     /** Select a live event by id — its own panel, provenance and framing, driven from the explorer. */

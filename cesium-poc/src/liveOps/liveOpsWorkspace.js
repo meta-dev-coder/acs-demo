@@ -15,14 +15,20 @@
  */
 import { Color } from 'cesium';
 import { installWorkspaceStrip } from '../workspaceStrip.js';
-import { LIVE_EVENT_TYPES, liveEventSourceNote } from '../liveEventsData.js';
+import { clearedAtLabel, DEFAULT_EVENT_WINDOW, EVENT_WINDOW_OPTIONS, LIVE_EVENT_TYPES, liveEventLabel, liveEventSourceNote } from '../liveEventsData.js';
 import { CARRIAGEWAYS, placeLabel } from './carriagewayModel.js';
 import { aggregateImpact, explainImpact, OPERATIONAL_LEVELS, OPERATIONAL_LEVEL_COLORS } from './operationalImpact.js';
+import { aggregateRampImpact } from './rampImpact.js';
+import { interchangeLabel, rampDisplayType } from '../i595RampData.js';
 import { DEFAULT_VISIBLE, installLiveOpsLayers } from './liveOpsLayers.js';
-import { OPS_ICONS } from './opsIcons.js';
+import { ICON_FOR_EVENT_TYPE, OPS_ICONS, opsIconMarkup } from './opsIcons.js';
 
-/** The corridor's own carriageway lines — what Operational Impact paints. */
-const IMPACT_ROAD_LAYERS = ['mainline-eb', 'mainline-wb'];
+/**
+ * The road geometry Operational Impact paints: the carriageways, and the ramps and connectors.
+ * Events occur inside interchanges as well as on the mainline, and a ramp scored but not drawn is
+ * a score nobody can see.
+ */
+const IMPACT_ROAD_LAYERS = ['mainline-eb', 'mainline-wb', 'ramps'];
 
 /**
  * Live counts and source-reported severity for all five operational event types.
@@ -36,13 +42,29 @@ export const LIVE_OPS_CARDS = Object.freeze([
 ]);
 
 /**
+ * The sixth card: how many events have CLEARED within the selected history window.
+ *
+ * Deliberately not one of LIVE_OPS_CARDS — it carries no `type`, contributes to no score and
+ * colours no road. It counts what is no longer happening, which is the opposite of what the other
+ * five mean, and clicking it opens the cleared-event browser rather than an asset explorer.
+ */
+export const CLEARED_CARD = Object.freeze({
+  key: 'cleared', label: 'Cleared', icon: 'cleared', color: '#8aa0b4', assetType: 'clearedEvent',
+});
+
+/** Every card in the strip, in the order an operator reads them: what is live, then what is over. */
+export const STRIP_CARDS = Object.freeze([...LIVE_OPS_CARDS, CLEARED_CARD]);
+
+/**
  * What one chip shows: a count, and a note only when there is something worth saying.
  *
  * Deliberately terse. Five chips each repeating "None on the corridor now" is five lines of nothing,
  * and the strip has to stay out of the map's way.
  */
 export function liveOpsCard(events, card) {
-  const mine = (events ?? []).filter(event => event?.type === card.type);
+  // Cleared events arrive with the live ones when a history window is selected. They are deliberately
+  // not counted: "Closures 5" has to keep meaning five closures on the road right now.
+  const mine = (events ?? []).filter(event => event?.type === card.type && !event.cleared);
   if (!mine.length) return { state: 'ready', count: 0, note: null };
   const severe = mine.filter(event => /major|severe|serious/i.test(String(event.severity ?? ''))).length;
 
@@ -57,7 +79,7 @@ export function liveOpsCard(events, card) {
  * @param {{assetExplorer: object, liveEvents: object, layerStore: object, segments: object,
  *          host?: HTMLElement}} deps
  */
-export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, layerStore, segments, roadShields, host = document.body }) {
+export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, layerStore, segments, ramps, roadShields, host = document.body }) {
   const store = assetExplorer.store;
   const root = document.createElement('div');
   root.className = 'liveops-workspace';
@@ -65,8 +87,33 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
   host.append(root);
 
   const strip = installWorkspaceStrip(root, {
-    cards: LIVE_OPS_CARDS, label: 'Live Ops summary', onSelect: key => void choose(key),
+    cards: STRIP_CARDS, label: 'Live Ops summary', onSelect: key => void choose(key),
   });
+
+  // ── History window ──────────────────────────────────────────────────────────────────────────
+  // Sits with the KPI cards because it changes what they are drawn from. Active events always come
+  // back; this only widens how much CLEARED history arrives alongside them, for the map.
+  const history = document.createElement('label');
+  history.className = 'liveops-history';
+  // The label sits ABOVE the control, and the count is the Cleared card's job alone — saying it
+  // twice, a few pixels apart, only invites the two to disagree.
+  history.innerHTML = `<span class="liveops-history-label">History</span>
+    <select class="liveops-history-select" aria-label="How much cleared event history to show">${
+      EVENT_WINDOW_OPTIONS.map(option =>
+        `<option value="${option.key}"${option.key === DEFAULT_EVENT_WINDOW ? ' selected' : ''}>${option.label}</option>`).join('')}
+    </select>`;
+  strip.root.append(history);
+  const historySelect = history.querySelector('select');
+  historySelect.onchange = async () => {
+    const key = historySelect.value;
+    historySelect.disabled = true;
+    try {
+      await liveEvents?.setEventWindow?.(key);
+    } finally {
+      historySelect.disabled = false;
+      render();
+    }
+  };
   // A single line, shown only while the overlay is on. A colour with no key is decoration.
   const legend = document.createElement('div');
   legend.className = 'liveops-legend';
@@ -98,10 +145,23 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
     Promise.resolve(promise).catch(error => console.warn('[LiveOps] operational impact overlay failed', error));
 
   let activeExplorer = null, active = false;
+  /** Whether the cleared-event browser is open. It is a sixth card, never an Asset Explorer type. */
+  let clearedOpen = false;
   /** Whether Live Ops was the one that switched the corridor lines on, so it can put them back. */
   let borrowedCorridor = false;
   /** segmentId -> scored section, recomputed on every feed refresh. */
   let impact = new Map();
+  /** ramp id -> scored ramp, from the events the carriageway sections could not place. */
+  let rampImpact = new Map();
+  /** How many unsectioned events landed on a ramp, and how many matched nothing at all. */
+  let rampMatch = { matched: 0, unmatched: 0 };
+  /**
+   * The events the carriageway sections could not place, kept so ramp scoring can be redone once
+   * the ramp layer has actually loaded. The layer loads lazily — the first recompute usually runs
+   * with no ramp geometry at all, and without this the interchanges would stay uncoloured until
+   * the next feed refresh.
+   */
+  let unplaced = [];
 
   // ── operational state ───────────────────────────────────────────────────────────────────────
   /** The corridor's sections, read from the segment layer the map already draws. */
@@ -118,10 +178,25 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
       }));
   }
 
+  /** Every loaded ramp with its source geometry; empty until the ramp layer has loaded. */
+  function rampSections() {
+    const paths = ramps?.rampPaths;
+    if (!paths?.size) return [];
+    return [...(ramps?.records?.values?.() ?? [])]
+      .map(ramp => ({
+        id: ramp.id, rampType: ramp.rampType, path: paths.get(ramp.id),
+        label: `${rampDisplayType(ramp.rampType)} · ${interchangeLabel(ramp.interchange)}`,
+      }))
+      .filter(ramp => ramp.path?.length);
+  }
+
   function recompute() {
-    const events = liveEvents?.events ?? [];
+    const events = liveOpsEvents();
     const result = aggregateImpact(events, sections());
     impact = result.bySegmentId;
+    // Only what the carriageways could not place is offered to the ramps, so nothing scores twice.
+    unplaced = result.unsectioned;
+    scoreRamps();
     if (active && layers.isOn('operationalImpact')) void applyImpact(true);
     render();
     diagnose(events, result);
@@ -166,10 +241,6 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
    */
   async function applyImpact(on) {
     legend.hidden = !on;
-    const mapped = [...impact.values()].reduce((sum, section) => sum + section.events.length, 0);
-    notice.hidden = !on || mapped > 0;
-    const total = (liveEvents?.events ?? []).length;
-    notice.textContent = `Operational Impact — No currently mapped EB/WB operational events. ${total} live events could not be reliably associated with an I-595 GP segment.`;
     if (on) {
       // Enable only the EB/WB geometry this overlay scores. The composite Traffic Flow switch
       // also enables Express, whose blue line can cover GP heat at overview scale.
@@ -182,11 +253,23 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
         borrowedCorridor = true;
         await layerStore.setVisible(id, true);
       }
+      // The ramp layer has loaded by now, so score against geometry that actually exists.
+      scoreRamps();
     }
+    const mapped = [...impact.values()].reduce((sum, section) => sum + section.events.length, 0);
+    // Ramp matches are mapped events too: the notice must not claim nothing was placed when an
+    // interchange is lit up.
+    notice.hidden = !on || mapped + rampMatch.matched > 0;
+    const total = liveOpsEvents().length;
+    notice.textContent = `Operational Impact — No currently mapped operational events. ${total} ${clearedOpen ? 'cleared' : 'live'} events could not be reliably associated with an I-595 GP segment, ramp or connector.`;
     // Only the styling is superseded by a newer call; the version is taken after the awaits above.
     const version = ++impactVersion;
     if (version !== impactVersion || !segments?.setImpactResolver) return;
-    if (!on) { segments.setImpactResolver(null); segments.setImpactEmphasis?.(false); return; }
+    if (!on) {
+      segments.setImpactResolver(null); segments.setImpactEmphasis?.(false);
+      ramps?.setImpactResolver?.(null); ramps?.setImpactEmphasis?.(false);
+      return;
+    }
     // Over photorealistic tiles a thin translucent line disappears. The overlay asks the segment
     // layer for extra width and opacity while it is on, and gives them back when it is off.
     segments.setImpactEmphasis?.(true);
@@ -197,15 +280,86 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
       if (!section || section.operationalLevel === 'NORMAL') return undefined;
       return Color.fromCssColorString(OPERATIONAL_LEVEL_COLORS[section.operationalLevel]);
     });
+    // Ramps and connectors are scored and coloured on exactly the same terms as the carriageways.
+    ramps?.setImpactEmphasis?.(true);
+    ramps?.setImpactResolver?.(ramp => {
+      const scored = rampImpact.get(ramp?.id);
+      if (!scored || scored.operationalLevel === 'NORMAL') return undefined;
+      return Color.fromCssColorString(OPERATIONAL_LEVEL_COLORS[scored.operationalLevel]);
+    });
   }
+
+  /**
+   * What one event did to the stretch it sits on: the section's (or ramp's) Operational Impact,
+   * and every event that contributed to it.
+   *
+   * This is what the details panel's Impact tab asks for. Two events cleared on the same section
+   * are not two separate stories — the section carried both at once, and the score says so. The
+   * event being inspected is flagged so the panel can say "this one" against "also here".
+   *
+   * Deliberately NOT gated on the Operational Impact layer being switched on: the score is always
+   * computed, and a panel that answers "how bad was this" should not depend on a map toggle.
+   */
+  function operationalImpactOf(event) {
+    if (!event) return null;
+    const scored = impact.get(event.liveOps?.segmentId)
+      ?? [...rampImpact.values()].find(ramp => ramp.events.some(other => other.id === event.id));
+    if (!scored?.events?.length) return null;
+    const why = explainImpact(scored);
+    return {
+      level: scored.operationalLevel,
+      label: OPERATIONAL_LEVELS.find(item => item.id === scored.operationalLevel)?.label ?? 'Normal',
+      score: scored.operationalScore,
+      sectionLabel: scored.sectionLabel,
+      summary: why.summary,
+      // Heaviest first, as explainImpact orders them, so the reason for the colour reads first.
+      reasons: why.reasons.map(reason => ({ ...reason, isThis: reason.id === event.id })),
+    };
+  }
+
+  /** Re-score the ramps from the latest unplaced events against whatever ramp geometry is loaded. */
+  function scoreRamps() {
+    const onRamps = aggregateRampImpact(unplaced, rampSections());
+    rampImpact = onRamps.byRampId;
+    rampMatch = { matched: onRamps.matched, unmatched: onRamps.unmatched };
+  }
+
+  /**
+   * What Operational Impact scores: whatever the map is currently showing.
+   *
+   * Normally that is the live corridor. While the Cleared card is open the map has swapped to
+   * cleared events, so the overlay swaps with it and colours the roads by what HAPPENED there —
+   * same weights, same severity model, same levels, so a red section means the same thing in both
+   * modes. The two are never scored together, exactly as they are never drawn together.
+   */
+  function liveOpsEvents() {
+    const all = liveEvents?.events ?? [];
+    // In cleared mode the map has already applied the browser's date range, so the overlay scores
+    // exactly what is on screen: narrowing to one day repaints the roads for that day alone rather
+    // than leaving heat from events the operator just filtered away.
+    return all.filter(event => (clearedOpen ? Boolean(event.cleared) && liveEvents?.inScope?.(event) !== false : !event.cleared));
+  }
+  /** Everything that cleared inside the selected window, newest first (the server's own order). */
+  function clearedEvents() { return (liveEvents?.events ?? []).filter(event => event.cleared); }
 
   // ── KPI strip ───────────────────────────────────────────────────────────────────────────────
   function render() {
     const events = liveEvents?.events ?? [];
     for (const card of LIVE_OPS_CARDS) strip.set(card.key, liveOpsCard(events, card));
+    const windowKey = liveEvents?.eventWindow ?? DEFAULT_EVENT_WINDOW;
+    // The cleared card counts the window, not the corridor: with no window chosen there is nothing
+    // to count, and the card says how to get some rather than showing a bare zero.
+    strip.set(CLEARED_CARD.key, {
+      state: 'ready',
+      count: clearedEvents().length,
+      note: windowKey === DEFAULT_EVENT_WINDOW ? 'Choose a window' : EVENT_WINDOW_OPTIONS.find(o => o.key === windowKey)?.label ?? null,
+    });
     strip.setActive(activeExplorer);
     const note = liveEventSourceNote(liveEvents?.payload ?? {});
     strip.setSource(note.text, note);
+    // The window is a DataConnect read; the direct FL511 feed publishes no history to widen to.
+    const payload = liveEvents?.payload ?? {};
+    history.hidden = payload.source !== 'DataConnect';
     layers.renderCounts();
   }
 
@@ -217,8 +371,26 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
    * explorer simply points at one of them.
    */
   async function choose(key) {
+    if (key === CLEARED_CARD.key) {
+      clearedOpen = !clearedOpen;
+      // The map follows the card: cleared events replace the live ones rather than joining them,
+      // so nothing on screen has to be told apart from anything else.
+      liveEvents?.setClearedOnly?.(clearedOpen);
+      // Browsed through the Asset Explorer like every other card, which is what gives it the same
+      // carousel, the corridor rail, the mini-map and the details panel as Maintenance and the five
+      // live types. Its Event type dropdown is the type's own getFilters().
+      activeExplorer = clearedOpen ? CLEARED_CARD.key : null;
+      store.setActiveExplorerType(clearedOpen ? CLEARED_CARD.assetType : null);
+      // The overlay now has a different set of events to score, so repaint at once rather than
+      // leaving the previous mode's heat on the roads until the next feed refresh.
+      recompute();
+      return;
+    }
     const card = LIVE_OPS_CARDS.find(item => item.key === key);
     if (!card) return;
+    // Likewise the other way round: browsing a live type puts the history away and the live
+    // events back on the map.
+    if (clearedOpen) { clearedOpen = false; liveEvents?.setClearedOnly?.(false); recompute(); }
     if (activeExplorer === key) {
       activeExplorer = null;
       store.setActiveExplorerType(null);
@@ -251,6 +423,21 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
     })));
   }
 
+  /**
+   * Relay the Cleared browser's date range to the map.
+   *
+   * The Asset Explorer filters its own cards; nothing in it touches Cesium. So the range is pushed
+   * into the live-event layer, which hides the cleared pins outside it, and the overlay is rescored
+   * so the road heat matches the days on screen.
+   */
+  const stopRangeRelay = store.subscribe(() => {
+    if (!active) return;
+    const { activeExplorerType, filter } = store.getState();
+    const mine = activeExplorerType === CLEARED_CARD.assetType;
+    const changed = liveEvents?.setClearedRange?.(mine ? { from: filter?.from ?? null, to: filter?.to ?? null } : {});
+    if (changed) recompute();
+  });
+
   // The feed refreshes on its own schedule. Nothing here touches the camera, the layer choices or
   // the active explorer — a refresh updates numbers and colours, never the operator's place.
   const stopUpdates = liveEvents?.onUpdate?.(() => recompute()) ?? (() => {});
@@ -270,6 +457,7 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
       // A control room shows everything at once; every other workspace keeps one tool at a time.
       assetExplorer.setExclusiveLayers?.(false);
       segments?.setOverlayDetails?.(overlayDetails, overlayTooltip);
+      assetExplorer.setOperationalImpact?.(operationalImpactOf);
       // Only the shields at either end of I-595; the interchanges between them repeat the same
       // route number across a corridor-wide frame.
       roadShields?.setEndpointsOnly?.(true);
@@ -286,9 +474,12 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
       active = false;
       root.hidden = true;
       activeExplorer = null;
+      clearedOpen = false;
+      liveEvents?.setClearedOnly?.(false);
       assetExplorer.setExclusiveLayers?.(true);
       roadShields?.setEndpointsOnly?.(false);
       segments?.setOverlayDetails?.(null, null);
+      assetExplorer.setOperationalImpact?.(null);
       layers.setOpen(false);
       // The corridor's own colours come back; Live Ops borrowed them, it does not own them.
       void applyImpact(false);
@@ -298,6 +489,6 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
       }
       if (store.getState().activeExplorerType) store.setActiveExplorerType(null);
     },
-    destroy() { legendPosition.disconnect(); stopUpdates(); layers.destroy(); strip.destroy(); root.remove(); },
+    destroy() { legendPosition.disconnect(); stopRangeRelay(); stopUpdates(); layers.destroy(); strip.destroy(); root.remove(); },
   };
 }

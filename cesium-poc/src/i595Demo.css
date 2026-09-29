@@ -891,6 +891,23 @@ body[data-layers-open="false"] .layers { display: none; }
 .liveops-legend-item { display: inline-flex; align-items: center; gap: 5px; }
 .liveops-legend-item i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 
+/* The Live Ops history window, riding with the KPI cards because it changes what they show. */
+.liveops-history {
+  /* Label stacked above its control, the way the KPI cards stack their own label over their value. */
+  display: inline-flex; flex-direction: column; align-items: stretch; gap: 4px; flex: none; align-self: center;
+  padding: 6px 10px; border: 1px solid var(--ui-border); border-radius: 8px;
+  background: var(--ui-surface-translucent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  color: var(--ui-text); font-size: 11px; pointer-events: auto;
+}
+.liveops-history[hidden] { display: none; }
+.liveops-history-label { font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--ui-text-dim); }
+.liveops-history-select {
+  background: var(--ui-surface); color: var(--ui-text); border: 1px solid var(--ui-border);
+  border-radius: 6px; padding: 3px 6px; font: inherit; font-size: 11.5px;
+}
+.liveops-history-select:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+.liveops-history-select:disabled { opacity: .6; }
+
 .ws-kpis { position: absolute; top: 16px; left: calc(var(--app-nav-w) + 16px); display: flex; align-items: stretch; gap: 8px;
   max-width: calc(100vw - var(--app-nav-w) - 560px); pointer-events: auto; min-width: 0; }
 /* The cards are the part that scrolls when the strip runs out of room; the source pills stay put. */

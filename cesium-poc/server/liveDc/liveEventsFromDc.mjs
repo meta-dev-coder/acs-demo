@@ -11,6 +11,19 @@ import { EVENT_TYPES, enrichForLiveOps, normalizeEvent } from '../liveEvents.mjs
 import { LIVE_CLASS } from './classes.mjs';
 import { ENRICHMENT_FIELDS, NA } from './eventEnrichment.mjs';
 
+/**
+ * How far back cleared events are carried, by dropdown key. `active` is the default and reads
+ * exactly as this endpoint always did; `all` carries every cleared record the class holds.
+ * Active events are ALWAYS returned — the window only ever widens what history comes with them.
+ */
+export const EVENT_WINDOWS = Object.freeze({
+  active: null, '1h': 3_600_000, '2h': 7_200_000, '6h': 21_600_000, '24h': 86_400_000, all: Infinity,
+});
+export const DEFAULT_EVENT_WINDOW = 'active';
+/** An unknown or absent key is the default, never an error: a stale bookmark still loads the map. */
+export const parseEventWindow = value =>
+  (typeof value === 'string' && Object.hasOwn(EVENT_WINDOWS, value) ? value : DEFAULT_EVENT_WINDOW);
+
 export const DC_SOURCE = 'DataConnect';
 export const DC_LIVE_EVENTS_LABEL = 'FL511 via DataConnect';
 /** Slack past the sync heartbeat (LIVE_DC_HEARTBEAT_SECONDS) before an unchanged active record means the sync stopped. */
@@ -62,9 +75,12 @@ export function liveDcRowToEvent(row, network, options = {}) {
 }
 
 /** `{event}` on success, else `{event: null, outsideBuffer}` saying whether only the corridor buffer rejected it. */
-function convertRow(row, network, { bufferMeters = Infinity, segmentToleranceMeters } = {}) {
+function convertRow(row, network, { bufferMeters = Infinity, segmentToleranceMeters, allowCleared = false } = {}) {
   const none = { event: null, outsideBuffer: false };
-  if (!isActive(row)) return none;
+  // A cleared row is history. It is converted only when a window asked for it, and it is marked so
+  // nothing downstream can count it as a live condition.
+  const cleared = !isActive(row);
+  if (cleared && !allowCleared) return none;
   const a = attributesOf(row);
   const type = text(a.event_type);
   const latitude = number(a.latitude ?? a.y_coordinates), longitude = number(a.longitude ?? a.x_coordinates);
@@ -92,8 +108,10 @@ function convertRow(row, network, { bufferMeters = Infinity, segmentToleranceMet
     ...Object.fromEntries(Object.entries(details).filter(([, value]) => value !== undefined)),
     detailsAvailable: Boolean(title || details.description),
     detailFields: DETAIL_LABELS.filter(([, name]) => text(a[name])).map(([label, name]) => ({ label, value: text(a[name]) })),
+    ...(cleared ? { cleared: true, clearedAt: text(a.cleared_at) ?? null } : {}),
     dataConnect: {
-      keyInSource: text(row.keyInSource) ?? text(a.code), status: 'active',
+      keyInSource: text(row.keyInSource) ?? text(a.code), status: cleared ? 'cleared' : 'active',
+      clearedAt: text(a.cleared_at) ?? null,
       firstSeenAt: text(a.first_seen_at) ?? null, lastSeenAt: text(a.last_seen_at) ?? null,
     },
     // Only the DataConnect source has these; the direct-feed fields above are unchanged.
@@ -113,6 +131,7 @@ const countsOf = events => {
 /** Every Live Events row -> the /api/i595/live-events payload, labelled as DataConnect. */
 export function liveDcEventsPayload(rows, network, {
   now = Date.now(), bufferMeters, segmentToleranceMeters, refreshSeconds = 60, staleAfterSeconds = DC_STALE_AFTER_SECONDS, totalRecords,
+  windowMs = null, eventWindow = DEFAULT_EVENT_WINDOW,
 } = {}) {
   const all = rows ?? [];
   const active = all.filter(isActive);
@@ -121,6 +140,15 @@ export function liveDcEventsPayload(rows, network, {
   const converted = active.map(row => convertRow(row, network, { bufferMeters, segmentToleranceMeters }));
   const outsideBuffer = converted.filter(result => result.outsideBuffer).length;
   const events = converted.map(result => result.event).filter(Boolean).sort((a, b) => a.id.localeCompare(b.id));
+  // Cleared events ride along for context, newest first, and are excluded from `counts` on purpose:
+  // "Closures 5" has to keep meaning five closures on the road right now.
+  const since = windowMs == null ? null : windowMs === Infinity ? -Infinity : now - windowMs;
+  const clearedRows = since == null ? [] : all.filter(row => !isActive(row)
+    && (since === -Infinity || (time(attributesOf(row).cleared_at) ?? -Infinity) >= since));
+  const clearedEvents = clearedRows
+    .map(row => convertRow(row, network, { bufferMeters, segmentToleranceMeters, allowCleared: true }).event)
+    .filter(Boolean)
+    .sort((a, b) => (Date.parse(b.clearedAt ?? '') || 0) - (Date.parse(a.clearedAt ?? '') || 0));
   // Freshness is proven only by active records: the sync writes nothing while the corridor is quiet.
   const newest = Math.max(-Infinity, ...active.map(row => time(attributesOf(row).last_seen_at)).filter(ms => ms != null));
   const at = Number.isFinite(newest) ? newest : null;
@@ -137,11 +165,14 @@ export function liveDcEventsPayload(rows, network, {
     bufferMeters,
     segmentToleranceMeters,
     counts: countsOf(events),
-    events,
+    eventWindow,
+    clearedCounts: countsOf(clearedEvents),
+    events: [...events, ...clearedEvents],
     diagnostics: {
       lastError: null,
       dataConnect: {
         className: LIVE_CLASS.EVENTS, records, active: active.length, cleared: records - active.length,
+        clearedInWindow: clearedEvents.length, clearedRead: clearedRows.length,
         skipped: active.length - events.length - outsideBuffer, outsideBuffer,
       },
     },
@@ -149,30 +180,55 @@ export function liveDcEventsPayload(rows, network, {
 }
 
 export const ACTIVE_FILTER = Object.freeze({ field: 'attributes.status', operator: 'equals', value: 'active' });
+export const CLEARED_FILTER = Object.freeze({ field: 'attributes.status', operator: 'equals', value: 'cleared' });
+/**
+ * Cleared rows are read newest-first and stopped once a page reaches past the window. Curated-data
+ * filters are AND-only and `cleared_at` is a String attribute, so the window cannot be expressed as
+ * a datetime filter — it is a sort plus an early stop, and liveDcEventsPayload applies it exactly.
+ */
+const NEWEST_CLEARED_FIRST = Object.freeze({ field: 'attributes.cleared_at', direction: 'desc' });
 /** Browser tabs poll every refresh; this many ms of reuse keeps N tabs to one upstream read. */
 export const DC_EVENTS_CACHE_MS = 20_000;
+/** readApi -> Map<windowKey, entry>: each window caches separately, so one does not serve another. */
 const rowCache = new WeakMap();
 
-async function fetchActiveRows(readApi, { pageSize, maxPages, logger }) {
-  const target = (await readApi.liveClasses()).find(entry => entry.className === LIVE_CLASS.EVENTS);
-  if (!target) throw new Error(`${LIVE_CLASS.EVENTS} not found`);
-  // Record count for diagnostics; never left unhandled.
-  const everything = readApi.curatedData(target.id, { page: 0, pageSize: 1 }).then(result => ({ result }), error => ({ error }));
+/** Every page of one filtered read; `enough(batch)` ends it early, which is not a truncation. */
+async function readAll(readApi, id, { pageSize, maxPages, filters, sort, enough = () => false }) {
   const rows = [];
   let truncated = false, total = NaN;
   for (let page = 0; ; page++) {
     if (page >= maxPages) { truncated = rows.length < total; break; }
-    const { data, totalCount } = await readApi.curatedData(target.id, { page, pageSize, filters: [ACTIVE_FILTER] });
+    const { data, totalCount } = await readApi.curatedData(id, { page, pageSize, filters, ...(sort ? { sort } : {}) });
     rows.push(...data);
     total = totalCount == null || totalCount === '' ? NaN : Number(totalCount);
     // A server may cap pageSize below the request: only totalCount says when the read is done.
-    if (!data.length || (Number.isFinite(total) ? rows.length >= total : data.length < pageSize)) break;
+    if (!data.length || (Number.isFinite(total) ? rows.length >= total : data.length < pageSize) || enough(data)) break;
   }
+  return { rows, truncated, total };
+}
+
+async function fetchEventRows(readApi, { pageSize, maxPages, logger, windowMs, now }) {
+  const target = (await readApi.liveClasses()).find(entry => entry.className === LIVE_CLASS.EVENTS);
+  if (!target) throw new Error(`${LIVE_CLASS.EVENTS} not found`);
+  // Record count for diagnostics; never left unhandled.
+  const everything = readApi.curatedData(target.id, { page: 0, pageSize: 1 }).then(result => ({ result }), error => ({ error }));
+  const active = await readAll(readApi, target.id, { pageSize, maxPages, filters: [ACTIVE_FILTER] });
+  const since = windowMs == null ? null : windowMs === Infinity ? -Infinity : now - windowMs;
+  const cleared = since == null ? { rows: [], truncated: false, total: 0 } : await readAll(readApi, target.id, {
+    pageSize, maxPages, filters: [CLEARED_FILTER], sort: NEWEST_CLEARED_FIRST,
+    enough: batch => since !== -Infinity
+      && (Date.parse(attributesOf(batch.at(-1)).cleared_at ?? '') || -Infinity) < since,
+  });
   const counted = await everything;
   if (counted.error) throw counted.error;
   const totalRecords = Number(counted.result?.totalCount);
-  if (truncated) logger.warn?.(`Live events: DataConnect read truncated at ${rows.length} of ${total} active records (maxPages=${maxPages})`);
-  return { rows, totalRecords: Number.isFinite(totalRecords) ? totalRecords : undefined, truncated, total };
+  if (active.truncated) logger.warn?.(`Live events: DataConnect read truncated at ${active.rows.length} of ${active.total} active records (maxPages=${maxPages})`);
+  if (cleared.truncated) logger.warn?.(`Live events: DataConnect cleared read truncated at ${cleared.rows.length} of ${cleared.total} records (maxPages=${maxPages})`);
+  return {
+    rows: [...active.rows, ...cleared.rows],
+    totalRecords: Number.isFinite(totalRecords) ? totalRecords : undefined,
+    truncated: active.truncated, total: active.total,
+  };
 }
 
 /**
@@ -191,18 +247,23 @@ export function liveDcUnavailablePayload(reason, { bufferMeters } = {}) {
 
 export async function readLiveDcEvents({
   readApi, network, config, now = Date.now(), pageSize = 500, maxPages = 50, cacheMs = DC_EVENTS_CACHE_MS, clock = Date.now,
-  logger = console,
+  logger = console, eventWindow = DEFAULT_EVENT_WINDOW,
 }) {
-  let entry = rowCache.get(readApi);
+  const key = parseEventWindow(eventWindow);
+  const windowMs = EVENT_WINDOWS[key];
+  let byWindow = rowCache.get(readApi);
+  if (!byWindow) { byWindow = new Map(); rowCache.set(readApi, byWindow); }
+  let entry = byWindow.get(key);
   if (!entry || (entry.at != null && clock() - entry.at >= cacheMs)) {
-    entry = { at: null, read: fetchActiveRows(readApi, { pageSize, maxPages, logger }) };
-    rowCache.set(readApi, entry);
-    entry.read.then(() => { entry.at = clock(); }, () => { if (rowCache.get(readApi) === entry) rowCache.delete(readApi); });
+    entry = { at: null, read: fetchEventRows(readApi, { pageSize, maxPages, logger, windowMs, now }) };
+    byWindow.set(key, entry);
+    entry.read.then(() => { entry.at = clock(); }, () => { if (byWindow.get(key) === entry) byWindow.delete(key); });
   }
   const { rows, totalRecords, truncated, total } = await entry.read;
   const payload = liveDcEventsPayload(rows, network, {
     now, bufferMeters: config.bufferMeters, segmentToleranceMeters: config.segmentToleranceMeters, refreshSeconds: config.refreshSeconds,
     totalRecords, staleAfterSeconds: liveDcStaleAfterSeconds(readApi.config?.heartbeatSeconds ?? DC_DEFAULT_HEARTBEAT_SECONDS),
+    windowMs, eventWindow: key,
   });
   if (!truncated) return payload;
   return {

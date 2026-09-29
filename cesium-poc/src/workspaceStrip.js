@@ -21,6 +21,8 @@ const ICONS = Object.freeze({
   workOrder: '<path d="M12.6 3.4a3.8 3.8 0 0 0-4.9 4.8l-4 4a1.6 1.6 0 0 0 2.2 2.3l4-4a3.8 3.8 0 0 0 4.8-4.9l-2 2-1.8-.4-.4-1.8z"/>',
   damagedAsset: '<path d="M10 3 2 17h16L10 3Z"/><path d="m7.5 11 2-2 1 2 2-2"/>',
   inspection: '<rect x="4" y="3.5" width="12" height="13" rx="2"/><path d="M7.5 2.5h5v2.5h-5z"/><path d="M7.5 9h5M7.5 12h3"/>',
+  // Cleared: a clock, for something that was happening and is not any more.
+  cleared: '<circle cx="10" cy="10" r="7"/><path d="M10 6v4.3l2.8 1.7"/>',
 });
 const icon = name => `<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">${ICONS[name] ?? ICONS.workOrder}</svg>`;
 

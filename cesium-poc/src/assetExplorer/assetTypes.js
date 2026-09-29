@@ -9,6 +9,7 @@
  * absent is reported as absent — nothing here invents a value to fill a row.
  */
 import { corridorPositionOf } from './corridorPosition.js';
+import { clearedAtLabel, clearedDateKey, LIVE_EVENT_LABELS } from '../liveEventsData.js';
 import EVENT_FIELDS from '../../config/liveDc/eventFields.json' with { type: 'json' };
 
 /** Framing for the close inspection view, per type. Replaces per-layer magic numbers. */
@@ -666,6 +667,56 @@ export const ASSET_TYPES = Object.freeze({
       ['Roadway', text(asset.source?.roadway)],
       ['Direction', text(asset.source?.direction)],
       ['Status', text(asset.source?.status)],
+    ],
+  }),
+
+  /**
+   * Everything that has CLEARED inside Live Ops' selected history window.
+   *
+   * One type rather than five, because "what has finished" is browsed as a single list: an operator
+   * reviewing the last six hours does not care whether it was a queue or a closure until they filter
+   * for it, which the Event type dropdown below does. It is the only type that mixes all five event
+   * kinds, so its card carries which kind each one was.
+   *
+   * It has no layerId: cleared events have no layer of their own. Live Ops swaps the whole live-event
+   * layer into cleared mode while this type is open (liveEvents.setClearedOnly), so there is nothing
+   * here for the explorer to switch on.
+   */
+  clearedEvent: Object.freeze({
+    id: 'clearedEvent',
+    label: 'Cleared Events',
+    singular: 'Cleared event',
+    detailsTitle: 'Cleared Event Details',
+    icon: 'cleared',
+    layerId: null,
+    emptyMessage: 'Nothing has cleared in the selected history window.',
+    errorMessage: 'Unable to load cleared events.',
+    // Browsable by the day it cleared, which is the only date one of these has. `getDateKey` is what
+    // the range filter compares; both are corridor days, so the filter agrees with the card.
+    dateLabel: 'Cleared',
+    getDateKey: asset => clearedDateKey(asset.source),
+    getCardDate: asset => clearedAtLabel(asset.source),
+    getTitle: asset => asset.name,
+    // What kind it was and where, since the list mixes all five kinds together.
+    getSubtitle: asset => [LIVE_EVENT_LABELS[asset.source?.type], liveOpsPlace(asset) ?? text(asset.source?.roadway) ?? positionLabel(asset)]
+      .filter(Boolean).join(' · '),
+    // When it cleared is the fact that distinguishes one of these from the next.
+    getStatus: asset => {
+      const when = clearedAtLabel(asset.source);
+      return when ? { label: when, tone: 'muted' } : null;
+    },
+    /** The Event type dropdown: the five kinds, each counted, in the strip's own filter row. */
+    getFilters: (assets, counted = assets) =>
+      valueFilters(assets, {
+        group: 'Event type', prefix: 'cleared-type', counted,
+        read: source => LIVE_EVENT_LABELS[source?.type] ?? null,
+      }),
+    details: asset => [
+      ['Event type', LIVE_EVENT_LABELS[asset.source?.type] ?? null],
+      ['Cleared', clearedAtLabel(asset.source)],
+      ['Severity', text(asset.source?.severity)],
+      ['Roadway', text(asset.source?.roadway)],
+      ['Direction', text(asset.source?.direction)],
     ],
   }),
 

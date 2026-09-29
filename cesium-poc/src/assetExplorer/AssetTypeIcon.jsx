@@ -15,6 +15,7 @@ import EngineeringOutlinedIcon from '@mui/icons-material/EngineeringOutlined';
 import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined';
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import HorizontalRuleOutlinedIcon from '@mui/icons-material/HorizontalRuleOutlined';
+import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import { IncidentTypeIcon } from './IncidentTypeIcon.jsx';
 
 const ICONS = {
@@ -34,6 +35,8 @@ const ICONS = {
   construction: EngineeringOutlinedIcon,
   congestion: TrafficOutlinedIcon,
   disabledVehicle: CarRepairOutlinedIcon,
+  // A clock, matching the Cleared KPI card: this is the one type that is already over.
+  clearedEvent: HistoryOutlinedIcon,
 };
 
 /**

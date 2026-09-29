@@ -11,7 +11,7 @@ import { loadConfig } from './config.mjs';
 import { loadI595Network } from './i595Network.mjs';
 import { createFl511Service, SOURCE_STATUS } from './fl511Service.mjs';
 import { createLiveDcReadApi } from './liveDc/liveReadApi.mjs';
-import { liveDcUnavailablePayload, readLiveDcEvents } from './liveDc/liveEventsFromDc.mjs';
+import { DEFAULT_EVENT_WINDOW, liveDcUnavailablePayload, parseEventWindow, readLiveDcEvents } from './liveDc/liveEventsFromDc.mjs';
 
 export const API_BASE = '/api/i595/live-events';
 const DEFAULT_DATA_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'data');
@@ -27,11 +27,15 @@ export function createLiveEventsApi({ config = loadConfig(), dataDir = DEFAULT_D
     return resolved;
   })().catch(error => { ready = null; throw error; }));
 
-  /** `?source=dataconnect`: the Live Events class only. The direct FL511 feed is never a substitute. */
-  async function fromDataConnect() {
+  /**
+   * `?source=dataconnect`: the Live Events class only. The direct FL511 feed is never a substitute.
+   * `?window=` widens the read to cleared events as well (see EVENT_WINDOWS); active events are
+   * returned either way, so the default is what this endpoint always served.
+   */
+  async function fromDataConnect(eventWindow = DEFAULT_EVENT_WINDOW) {
     try {
       liveDc ??= createLiveDcReadApi({ logger });
-      const payload = await readLiveDcEvents({ readApi: liveDc, network: await loadNetwork(), config, now: now() });
+      const payload = await readLiveDcEvents({ readApi: liveDc, network: await loadNetwork(), config, now: now(), eventWindow });
       dcError = null;
       return { status: 200, payload };
     } catch (error) {
@@ -69,7 +73,9 @@ export function createLiveEventsApi({ config = loadConfig(), dataDir = DEFAULT_D
     }
     try {
       const { status, payload } = url.searchParams.get('source') === 'dataconnect'
-        ? await fromDataConnect() : { status: 200, payload: await (await start()).getI595LiveEvents() };
+        ? await fromDataConnect(parseEventWindow(url.searchParams.get('window')))
+        // The direct feed has no history to widen to: it only ever publishes what is current.
+        : { status: 200, payload: await (await start()).getI595LiveEvents() };
       if (!type) { send(response, status, payload); return true; }
       // Sub-resources are the same payload narrowed; the frontend uses the combined one.
       const wanted = type === 'incidents' ? 'INCIDENT' : 'CLOSURE';

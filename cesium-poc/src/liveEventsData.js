@@ -151,9 +151,67 @@ const ageSuffix = payload => {
   return Number.isFinite(age) ? ` from ${formatAge(age)} ago` : '';
 };
 
-/** The live-event URL; `?source=dataconnect` reads only the Live Events class, never the direct feed. */
-export const liveEventsEndpoint = (base, dataConnect) =>
-  dataConnect ? `${base}${base.includes('?') ? '&' : '?'}source=dataconnect` : base;
+/**
+ * How much history the Live Ops dropdown asks for. The keys are the server's (EVENT_WINDOWS in
+ * server/liveDc/liveEventsFromDc.mjs); active events come back for every one of them, so the choice
+ * only ever widens what CLEARED events arrive alongside.
+ */
+export const EVENT_WINDOW_OPTIONS = Object.freeze([
+  Object.freeze({ key: 'active', label: 'Active only' }),
+  Object.freeze({ key: '1h', label: 'Last 1 hour' }),
+  Object.freeze({ key: '2h', label: 'Last 2 hours' }),
+  Object.freeze({ key: '6h', label: 'Last 6 hours' }),
+  Object.freeze({ key: '24h', label: 'Last 24 hours' }),
+  Object.freeze({ key: 'all', label: 'All' }),
+]);
+export const DEFAULT_EVENT_WINDOW = 'active';
+
+/**
+ * The calendar day a cleared event cleared, as "YYYY-MM-DD" in CORRIDOR time, or null.
+ *
+ * The date-range filter compares these as plain strings, which is exactly what an operator means by
+ * "between these two days" and needs no timezone maths of its own — but the KEY has to be Florida's
+ * day, not UTC's and not the viewer's. An event cleared at 22:08 EDT is the 28th on I-595; keyed
+ * from UTC it would file itself under the 29th and vanish from a range that should hold it.
+ */
+export function clearedDateKey(event) {
+  const ms = Date.parse(event?.clearedAt ?? '');
+  if (!Number.isFinite(ms)) return null;
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date(ms)).map(part => [part.type, part.value]));
+  return `${p.year}-${p.month}-${p.day}`;
+}
+
+/**
+ * When a cleared event cleared, in CORRIDOR time, or null when the record carries no usable stamp.
+ *
+ * Florida time, not the viewer's: this is the same convention liveEventsData.js's floridaTime() uses
+ * for every other event timestamp in the app. A demo driven from another timezone would otherwise
+ * print an hour that never existed on I-595. Shortened (no year) to fit the card's meta line.
+ */
+export function clearedAtLabel(event) {
+  const ms = Date.parse(event?.clearedAt ?? '');
+  if (!Number.isFinite(ms)) return null;
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+    hour12: true, timeZoneName: 'short',
+  }).formatToParts(new Date(ms)).map(part => [part.type, part.value]));
+  return `${p.month} ${p.day}, ${p.hour}:${p.minute} ${p.dayPeriod} ${p.timeZoneName}`;
+}
+
+
+/**
+ * The live-event URL; `?source=dataconnect` reads only the Live Events class, never the direct feed.
+ * The default window is left off the URL so the request is byte-for-byte what it always was.
+ */
+export const liveEventsEndpoint = (base, dataConnect, eventWindow = DEFAULT_EVENT_WINDOW) => {
+  if (!dataConnect) return base;
+  const wanted = EVENT_WINDOW_OPTIONS.some(option => option.key === eventWindow) ? eventWindow : DEFAULT_EVENT_WINDOW;
+  const query = `source=dataconnect${wanted === DEFAULT_EVENT_WINDOW ? '' : `&window=${wanted}`}`;
+  return `${base}${base.includes('?') ? '&' : '?'}${query}`;
+};
+
 
 /** "FL511 via DataConnect", or plain "FL511" as the direct feed always was. */
 export const liveEventSourceName = payload => payload?.sourceLabel ?? payload?.source ?? 'FL511';

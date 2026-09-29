@@ -79,14 +79,18 @@ try {
   await page.locator('.liveops-workspace .ws-kpis').waitFor({ timeout: 30000 });
   await page.waitForFunction(() => window.__liveOps?.impact?.size === 16, null, { timeout: 60000 });
   console.log('✓ Live Ops opens: five KPI cards over the map, 16 corridor sections scored');
-  // Operational Impact is on when the workspace opens, as the brief specifies, and the corridor's
-  // own carriageways are drawn with it — the overlay colours those lines, so with them off it
-  // scored correctly and painted nothing.
-  assert.equal(await page.locator('[data-liveops-layer="operationalImpact"]').isChecked(), true,
-    'Operational Impact is on by default');
+  // Operational Impact is OFF when the workspace opens: it is a derived reading that repaints the
+  // corridor, so the operator asks for it rather than arriving at it. Switching it on still brings
+  // the carriageways with it — the overlay colours those lines, so without them it would score
+  // correctly and paint nothing.
+  await page.locator('.liveops-layers-trigger').click();
+  assert.equal(await page.locator('[data-liveops-layer="operationalImpact"]').isChecked(), false,
+    'Operational Impact is off until it is asked for');
+  await page.locator('[data-liveops-layer="operationalImpact"]').check();
+  await page.locator('.liveops-layers-close').click();
   await page.waitForFunction(() => window.__viewer.dataSources.getByName('I-595 FDOT Traffic Segments')[0]
     .entities.values.filter(entity => entity.show).length === 16, null, { timeout: 30000 });
-  console.log('✓ Operational Impact on by default, with all 16 carriageway sections drawn');
+  console.log('✓ Operational Impact off by default; switching it on draws all 16 carriageway sections');
 
   // 2. The KPI counts the live feed, and says what the corridor model could not place.
   const kpi = key => page.locator(`.liveops-workspace .ws-kpi[data-kpi="${key}"]`);

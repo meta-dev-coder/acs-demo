@@ -37,12 +37,17 @@ const GROUPS = Object.freeze([
 ]);
 
 /**
- * What Live Ops opens with: the impact overlay and every operational event. An operator needs the
- * whole picture at once — that is the point of the workspace. Cameras and message signs stay off,
- * because 74 camera pins is the statewide-map clutter this view exists to avoid.
+ * What Live Ops opens with: every operational event, so an operator sees the whole picture at once
+ * — that is the point of the workspace. Cameras and message signs stay off, because 74 camera pins
+ * is the statewide-map clutter this view exists to avoid.
+ *
+ * Operational Impact is NOT among them. It is a derived reading rather than an observation, and it
+ * repaints the corridor's own carriageways and ramps to say so; that is a conclusion the operator
+ * asks for, not one the workspace opens by asserting. It also borrows the road layers to paint
+ * them, so leaving it off keeps the first view the corridor's own colours.
  */
 export const DEFAULT_VISIBLE = Object.freeze([
-  'operationalImpact', 'incidents', 'closures', 'disabledVehicles', 'construction', 'congestion',
+  'incidents', 'closures', 'disabledVehicles', 'construction', 'congestion',
 ]);
 
 export const LIVE_OPS_LAYER_GROUPS = GROUPS;

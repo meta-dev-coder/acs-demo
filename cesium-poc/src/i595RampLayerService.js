@@ -15,13 +15,24 @@ export function createI595RampLayerService(viewer, { onSelect, onHover, onChange
   const colors = new Map(RAMP_CATEGORIES.map(category =>
     [category.type, Color.fromCssColorString(category.color).withAlpha(ROAD_STYLE.ramp.opacity)]));
   const selectedColor = Color.fromCssColorString(ROAD_STYLE.selected.color).withAlpha(ROAD_STYLE.selected.opacity);
+  /** Ordered [{lon, lat}] per ramp id, kept from the source GeoJSON so Live Ops can measure against it. */
+  const rampPaths = new Map();
+  /** Live Ops' Operational Impact colour for one ramp, or undefined to leave it its own colour. */
+  let impactResolver = null;
+  /** Over photorealistic tiles a thin translucent line vanishes; a heated ramp asks for more weight. */
+  let impactEmphasis = false;
   const restyle = entity => {
     if (!entity) return;
-    const base = colors.get(records.get(entity).rampType);
-    entity.polyline.width = entity === selected ? 6 : entity === hovered ? 5 : near ? 3 : 2;
+    const ramp = records.get(entity);
+    // The overlay only ever ADDS colour: a ramp with nothing on it keeps its own category colour.
+    const heat = impactResolver?.(ramp);
+    const base = heat ?? colors.get(ramp.rampType);
+    entity.polyline.width = entity === selected ? 6 : entity === hovered ? 5
+      : heat && impactEmphasis ? 5 : near ? 3 : 2;
     entity.polyline.material = entity === selected ? selectedColor
       : entity === hovered ? base.withAlpha(ROAD_STYLE.hoverOpacity) : base;
   };
+  const restyleAll = () => { for (const entity of records.keys()) restyle(entity); viewer.scene.requestRender(); };
   function hover(entity, position) {
     const previous = hovered; hovered = entity; restyle(previous); restyle(hovered);
     viewer.canvas.style.cursor = entity ? 'pointer' : '';
@@ -67,7 +78,13 @@ export function createI595RampLayerService(viewer, { onSelect, onHover, onChange
     onChange({ total: records.size, visible: [...records.keys()].filter(entity => entity.show).length, near });
   });
   return {
-    byType, byInterchange, records,
+    byType, byInterchange, records, rampPaths,
+    /**
+     * Colour ramps by Operational Impact. `resolver(ramp)` returns a Cesium Color or undefined;
+     * null clears the overlay and every ramp goes back to its category colour.
+     */
+    setImpactResolver(resolver) { impactResolver = resolver ?? null; restyleAll(); },
+    setImpactEmphasis(on) { impactEmphasis = Boolean(on); restyleAll(); },
     load() {
       loading ??= (async () => {
         const response = await fetch(`${import.meta.env.BASE_URL}data/i595_ramps_connectors_classified.geojson`);
@@ -80,6 +97,7 @@ export function createI595RampLayerService(viewer, { onSelect, onHover, onChange
           if (ids.has(ramp.id) || feature.geometry?.type !== 'LineString') throw new Error('Invalid or duplicate ramp feature.');
           ids.add(ramp.id);
           feature.id = `i595-ramp:${ramp.id}`;
+          rampPaths.set(ramp.id, feature.geometry.coordinates.map(([lon, lat]) => ({ lon, lat })));
         }
         const loaded = await GeoJsonDataSource.load(data, { clampToGround: true, strokeWidth: 3 });
         if (disposed) return;
@@ -109,7 +127,7 @@ export function createI595RampLayerService(viewer, { onSelect, onHover, onChange
         if (action) handler.setInputAction(action, event); else handler.removeInputAction(event);
       }
       if (source) viewer.dataSources.remove(source, true);
-      records.clear(); byType.clear(); byInterchange.clear();
+      records.clear(); byType.clear(); byInterchange.clear(); rampPaths.clear();
       viewer.canvas.style.cursor = '';
     },
   };

@@ -244,6 +244,36 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
     });
   }
 
+  // Cleared events are ONE browsable type across all five kinds, unlike the live ones above: an
+  // operator reviewing the last six hours reads them as a single list and filters by kind inside it.
+  // Live Ops puts the map into cleared mode while this type is open, so these entities are the only
+  // ones on screen and a pick can only be one of them.
+  if (liveEvents) {
+    sources.push({
+      assetType: 'clearedEvent',
+      group: 'liveEvents',
+      subscribeChanges: fn => liveEvents.onUpdate(fn),
+      read: () => [...liveEvents.entityById.entries()]
+        .map(([id, entity]) => [id, entity, liveEvents.records.get(entity)])
+        .filter(([, , event]) => event?.cleared)
+        .map(([id, entity, event]) => {
+          const carto = pointOf(entity);
+          return normalize({
+            id, assetType: 'clearedEvent', name: liveEventLabel(event),
+            longitude: carto?.longitude, latitude: carto?.latitude,
+            source: event,
+          });
+        }),
+      highlight: id => (id == null ? liveEvents.clearSelection() : liveEvents.selectById(id)),
+      listen: report => liveEvents.onSelection(event => {
+        if (event && !event.cleared) return;   // a live pick, not ours
+        report(event ? String(event.id) : null);
+      }),
+      own: owned => liveEvents.setExternallyOwned('clearedEvent', owned),
+      silence: () => liveEvents.onSelection(null),
+    });
+  }
+
   // The three FDOT sign-structure types share one module, so each becomes its own source over the
   // same handle — a type is a data entry here, not another branch.
   for (const typeId of signStructures ? ['overlane', 'cantilever', 'unclassified'] : []) {

@@ -54,5 +54,6 @@ export function installRampLayerControls(container, viewer) {
   }
   retry.onclick = load;
   load();
-  return { destroy() { service.destroy(); panel.destroy(); container.replaceChildren(); } };
+  // `service` is exposed so Live Ops can score and colour ramps; the controls still own its lifetime.
+  return { service, destroy() { service.destroy(); panel.destroy(); container.replaceChildren(); } };
 }

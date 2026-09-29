@@ -122,7 +122,9 @@ export const incidentScore = eventScore;
  * @param {object[]} events   live events carrying the server's `liveOps` enrichment
  * @param {{sectionId: string, sectionIndex: number, sectionLabel: string, carriageway: string,
  *          segmentId: string}[]} sections  every section of the corridor, scored or not
- * @returns {{bySegmentId: Map<string, object>, sections: object[], excluded: object}}
+ * @returns {{bySegmentId: Map<string, object>, sections: object[], excluded: object,
+ *            unsectioned: object[]}}  `unsectioned` is every scorable event that matched no section,
+ *            including those whose carriageway could not be read — what the ramp overlay is offered
  */
 export function aggregateImpact(events, sections) {
   const bySegmentId = new Map();
@@ -134,15 +136,25 @@ export function aggregateImpact(events, sections) {
   }
 
   const excluded = { express: 0, unknown: 0, unsectioned: 0, notScored: 0 };
+  // Scorable events that landed on no section — a ramp or an interchange. Carried out so the ramp
+  // overlay can score exactly these and nothing the carriageways already counted.
+  const unsectioned = [];
   for (const event of events ?? []) {
     // A type with no weight is not part of the model; it stays on the map and out of every score.
     if (!OPERATIONAL_IMPACT_WEIGHTS[event?.type]) { excluded.notScored += 1; continue; }
     const ops = event.liveOps;
     if (ops?.carriageway === CARRIAGEWAYS.EXPRESS) { excluded.express += 1; continue; }
-    if (!ops || ops.carriageway === CARRIAGEWAYS.UNKNOWN) { excluded.unknown += 1; continue; }
+    // An event whose carriageway could not be read is still an event somewhere. It is kept out of
+    // every CARRIAGEWAY score, as before — but it is offered to the ramp overlay, because matching
+    // it against real ramp geometry within a few tens of metres is evidence, not the guess this
+    // exclusion exists to prevent. An event sitting on a ramp is exactly the case FL511's wording
+    // most often fails to state a carriageway for.
+    if (!ops || ops.carriageway === CARRIAGEWAYS.UNKNOWN) { excluded.unknown += 1; unsectioned.push(event); continue; }
     const section = ops.segmentId ? bySegmentId.get(ops.segmentId) : null;
     // Classified to a carriageway but off every one of its sections — a ramp or an interchange.
-    if (!section || section.carriageway !== ops.carriageway || ops.contributesToImpact === false || ops.spatialMatch?.confidence === 'LOW') { excluded.unsectioned += 1; continue; }
+    if (!section || section.carriageway !== ops.carriageway || ops.contributesToImpact === false || ops.spatialMatch?.confidence === 'LOW') {
+      excluded.unsectioned += 1; unsectioned.push(event); continue;
+    }
     section.events.push(event);
     if (event.type === 'INCIDENT') section.incidents.push(event);
   }
@@ -158,7 +170,7 @@ export function aggregateImpact(events, sections) {
     section.level = section.operationalLevel;
     section.reasons = explainImpact(section).reasons;
   }
-  return { bySegmentId, sections: [...bySegmentId.values()], excluded };
+  return { bySegmentId, sections: [...bySegmentId.values()], excluded, unsectioned };
 }
 
 /**

@@ -69,6 +69,7 @@ export function AssetExplorer({
   /** Where the details panel's top edge goes — measured, so it clears this workspace's own strip. */
   panelTop = 220,
   onInspect, onReturn, onViewCamera, lookupRecords = null, onOpenRecord = null, onHighlightCameras = null,
+  operationalImpactOf = null,
 }) {
   const state = useAssetStore(store);
   // Rebuilt only when the mode actually changes; a new theme object on every render would remount
@@ -180,6 +181,7 @@ export function AssetExplorer({
             onInspect={onInspect}
             onReturn={onReturn}
             onViewCamera={onViewCamera}
+            operationalImpactOf={operationalImpactOf}
             lookupRecords={lookupRecords}
             onOpenRecord={onOpenRecord}
             onHighlightCameras={onHighlightCameras}
@@ -224,9 +226,11 @@ export function AssetExplorer({
         >
           {/* Column 1, pushed to its right edge so it sits immediately beside the browser. */}
           <Box sx={{ justifySelf: 'end', pointerEvents: 'auto' }}>
-            {/* Live Ops gives the lower-left corner back to the map: the Cesium view already
-                provides the spatial context a second map would repeat. */}
-            {showMiniMap && explorerExpanded && document.body.dataset.section !== 'liveOps' && (
+            {/* Shown in every workspace. Live Ops used to give this corner back to the Cesium view,
+                on the grounds that a second map repeated its spatial context — but at corridor scale
+                the globe is zoomed too far in to show where along the 15 miles a card sits, which is
+                exactly what this strip answers. */}
+            {showMiniMap && explorerExpanded && (
               <AssetMiniMap
                 centerline={centerline}
                 assets={assets}

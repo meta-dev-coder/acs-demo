@@ -443,6 +443,7 @@ try {
   // data and no geometry of its own.
   const liveOps = installLiveOpsWorkspace(viewer, {
     assetExplorer, liveEvents: liveEventControls, layerStore, segments: mainlineSegments,
+    ramps: rampControls.service,
     roadShields,
   });
   const eventPulses = installEventPulses(viewer, { liveEvents: liveEventControls, cameras: cameraControls, messageSigns: messageSignControls });
@@ -463,9 +464,16 @@ try {
     if (CORRIDOR_VIEW_SECTIONS.has(section)) flyToOperationsView();
     cameraControls.setIconMarkers(section === "liveOps");
     messageSignControls.setIconMarkers(section === "liveOps");
-    for (const [name, workspace] of Object.entries(workspaces)) {
-      if (name === section) workspace.activate(); else workspace.deactivate();
-    }
+    // Order matters. Every outgoing workspace is torn down BEFORE the incoming one is built:
+    // deactivate() clears the shared Asset Explorer selection, so activating first let the
+    // outgoing workspace's cleanup run last and fight the new screen — which is how a bottom
+    // strip from the previous section survived a role change.
+    for (const [name, workspace] of Object.entries(workspaces)) if (name !== section) workspace.deactivate();
+    // Then clear the browser outright. A workspace's own deactivate() cannot be relied on for
+    // this: assetSelectionStore.selectAsset() re-opens a type as a side effect of any selection,
+    // so a late pick from a module still shutting down could put the old strip back.
+    assetExplorer.store.setActiveExplorerType(null);
+    workspaces[section]?.activate();
   });
   cameraControls.setIconMarkers(appNav.section === "liveOps");
   messageSignControls.setIconMarkers(appNav.section === "liveOps");

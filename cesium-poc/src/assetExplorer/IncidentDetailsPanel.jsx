@@ -33,6 +33,7 @@ import {
   liveEventWeatherLine,
 } from './liveEventPresentation.js';
 import { LiveEventBadge } from './LiveEventIcon.jsx';
+import { OPERATIONAL_LEVEL_COLORS } from '../liveOps/operationalImpact.js';
 import { detailFacts, impactRows, incidentFacts, incidentHeadline, incidentNarrative, reportedAt, RECOMMENDED_STEPS } from './incidentNarrative.js';
 
 /** Wider than the generic panel: this one carries a camera image and a tab strip, not a field list. */
@@ -195,10 +196,52 @@ function FactGrid({ rows }) {
   );
 }
 
+
+/**
+ * What the section (or ramp) this event sits on was carrying, and what put it at that level.
+ *
+ * An event is rarely alone: two that cleared on the same stretch were not two separate stories, the
+ * road held both at once. This states the level, the score behind it, and every contributing event
+ * heaviest-first — with the one being inspected marked, so "this one" and "also here" are not
+ * confused. The colours are Live Ops' own level colours, so the block and the road agree.
+ */
+function SectionImpact({ impact }) {
+  const tone = OPERATIONAL_LEVEL_COLORS[impact.level] ?? 'text.secondary';
+  return (
+    <Box sx={{ p: 1.25, borderRadius: 1.5, border: 1, borderColor: 'divider', borderLeft: 3, borderLeftColor: tone }}>
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'baseline', flexWrap: 'wrap' }}>
+        <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600 }}>
+          Operational Impact
+        </Typography>
+        <Typography sx={{ fontSize: 15, fontWeight: 700, color: tone, lineHeight: 1.2 }}>{impact.label}</Typography>
+        <Typography variant="caption" color="text.secondary">{`${impact.score} pts`}</Typography>
+      </Stack>
+      <Typography variant="body2" sx={{ mt: 0.25 }}>{impact.sectionLabel}</Typography>
+      <Typography variant="caption" color="text.secondary" component="div">{impact.summary}</Typography>
+      <Stack spacing={0.25} sx={{ mt: 0.75 }}>
+        {impact.reasons.map(reason => (
+          <Stack key={reason.id} direction="row" spacing={1} sx={{ alignItems: 'baseline' }}>
+            <Typography
+              variant="caption"
+              sx={{ flex: 1, minWidth: 0, fontWeight: reason.isThis ? 700 : 400 }}
+              noWrap
+            >
+              {`${reason.isThis ? '▸ ' : ''}${reason.title}${reason.severity ? ` · ${reason.severity}` : ''}`}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+              {`${reason.points} pts`}
+            </Typography>
+          </Stack>
+        ))}
+      </Stack>
+    </Box>
+  );
+}
+
 export function IncidentDetailsPanel({
   // The same top edge as the generic panel: below the app header and the workspace's KPI strip,
   // which this must not cover. The panel scrolls rather than growing past it.
-  asset, inspecting, onClose, onInspect, onReturn, onViewCamera,
+  asset, inspecting, onClose, onInspect, onReturn, onViewCamera, operationalImpactOf = null,
   lookupRecords = null, onOpenRecord = null, onHighlightCameras = null,
   top = 220, bottom = 16, right = 16,
 }) {
@@ -266,6 +309,9 @@ export function IncidentDetailsPanel({
   const severity = liveEvent ? liveEventSeverity(record) : incidentSeverity(record);
   const headline = liveEvent ? liveEventHeadline(facts) : incidentHeadline(facts);
   const narrative = liveEvent ? liveEventNarrative(record, place) : incidentNarrative(record, place);
+  // What the whole stretch carried, not just this event. Only Live Ops can answer it, so it is
+  // absent everywhere else rather than shown empty.
+  const sectionImpact = liveEvent ? operationalImpactOf?.(record) ?? null : null;
   const reported = liveEvent ? liveEventReportedAt(facts) : reportedAt(facts);
   const showRelated = Boolean(lookupRecords);
   const weatherLine = liveEvent ? liveEventWeatherLine(record) : null;
@@ -373,6 +419,7 @@ export function IncidentDetailsPanel({
 
       {tab === 1 && (
         <Stack spacing={1.25}>
+          {sectionImpact && <SectionImpact impact={sectionImpact} />}
           {narrative.map(sentence => (
             <Typography key={sentence} variant="body2" sx={{ lineHeight: 1.5 }}>{sentence}</Typography>
           ))}

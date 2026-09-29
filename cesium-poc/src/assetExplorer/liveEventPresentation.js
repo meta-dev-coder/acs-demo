@@ -23,8 +23,12 @@ import { OPS_ICONS } from '../liveOps/opsIcons.js';
 import { incidentVisual } from './incidentTypes.js';
 import { carriagewayLabel } from './incidentContext.js';
 
-/** The explorer's asset types this module speaks for — the five operational layers. */
-export const LIVE_EVENT_ASSET_TYPES = Object.freeze(['incident', 'closure', 'construction', 'congestion', 'disabledVehicle']);
+/**
+ * The explorer's asset types this module speaks for — the five operational layers, plus the cleared
+ * history that mixes all five. A cleared event is still FL511's words: it gets the same panel, so
+ * reviewing what happened reads exactly like watching it happen.
+ */
+export const LIVE_EVENT_ASSET_TYPES = Object.freeze(['incident', 'closure', 'construction', 'congestion', 'disabledVehicle', 'clearedEvent']);
 const LIVE_EVENT_ASSET_TYPE_SET = new Set(LIVE_EVENT_ASSET_TYPES);
 export const isLiveEventAssetType = assetType => LIVE_EVENT_ASSET_TYPE_SET.has(assetType);
 

@@ -183,6 +183,12 @@ export function installAssetExplorer(container, viewer, {
     render();
   }
 
+  /**
+   * Live Ops' section scoring, registered after install because the workspace is built later.
+   * Null in every other workspace, which is what hides the block rather than showing an empty one.
+   */
+  let operationalImpactOf = null;
+
   function render() {
     root.render(
       <AssetExplorer
@@ -198,6 +204,7 @@ export function installAssetExplorer(container, viewer, {
         lookupRecords={lookupMaintenanceRecords}
         onOpenRecord={revealRecord}
         onHighlightCameras={highlightCameras}
+        operationalImpactOf={operationalImpactOf}
       />);
   }
   render();
@@ -301,10 +308,12 @@ export function installAssetExplorer(container, viewer, {
       .filter(([layerId]) => VISIBLE_STATES.has(layerStore.stateOf(layerId)))
       .map(([, assetType]) => assetType);
     const current = store.getState().activeExplorerType;
-    // A type with no map layer belongs to a workspace (Maintenance), not to the Map Explorer. With
-    // no asset layer on, "nothing is visible" says nothing about it — closing the explorer here
-    // would drop the workspace's own selection every time a layer count changed.
-    if (current && !assetTypeConfig(current)?.layerId && !visibleTypes.length) {
+    // A type with no map layer belongs to a workspace (Maintenance's classes, Live Ops' cleared
+    // events), not to the Map Explorer. Layer visibility says nothing about it at all: it cannot
+    // appear in `visibleTypes` however many layers are on, so judging it by them would close the
+    // explorer the moment it opened. Live Ops proved that — it browses cleared events with five
+    // event layers switched on, and the type was dropped in the same tick it was set.
+    if (current && !assetTypeConfig(current)?.layerId) {
       store.setVisibleAssetLayers(visibleTypes);
       previousTypes = visibleTypes;
       return;
@@ -497,6 +506,12 @@ export function installAssetExplorer(container, viewer, {
     navigation,
     sources,
     searchableAssets,
+    /**
+     * Register who can say what a live event did to the stretch it sits on — Live Ops, while it
+     * owns the workspace. Null takes it away again, and the Impact tab goes back to the event's
+     * own rows alone.
+     */
+    setOperationalImpact(resolver) { operationalImpactOf = resolver ?? null; render(); },
     /**
      * Whether switching one asset layer on switches the others off. True everywhere except Live
      * Ops, which shows the whole operational picture at once.
