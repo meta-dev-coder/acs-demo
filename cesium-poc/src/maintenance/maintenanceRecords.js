@@ -9,10 +9,12 @@
  * unit-tested directly against the committed export.
  */
 
-/** @typedef {'WORK_ORDER'|'TICKET'|'TASK'|'INCIDENT'|'INSPECTION'} MaintenanceType */
+/** @typedef {'WORK_ORDER'|'TICKET'|'TASK'|'INCIDENT'|'INSPECTION'|'ASSET_RISK'} MaintenanceType */
 
 export const MAINTENANCE_TYPES = Object.freeze({
   WORK_ORDER: 'WORK_ORDER', TICKET: 'TICKET', TASK: 'TASK', INCIDENT: 'INCIDENT', INSPECTION: 'INSPECTION',
+  /** Not a class of its own: an asset the other classes show to be at risk (see atRiskAssets). */
+  ASSET_RISK: 'ASSET_RISK',
 });
 
 const text = value => {
@@ -274,6 +276,67 @@ function idColumn(key) {
 }
 
 /** The asset registry, indexed for lookup. Ids are compared as text (some rows store numbers). */
+/**
+ * Assets the maintenance record says are at safety risk, and why.
+ *
+ * The asset registry carries no criticality of its own — the column exists and is empty on every
+ * one of the 5,015 rows — so risk is not read from the asset, it is read from what has happened to
+ * it. Three pieces of evidence count, each traceable to a record an operator can open:
+ *
+ *   a FAILED inspection,
+ *   an OPEN high-priority work order,
+ *   live damaged status.
+ *
+ * Nothing is inferred from age, category or position. An asset with no such record is not "low
+ * risk" here, it is simply not listed: this counts what is known, not what is guessed.
+ *
+ * `priority` is the asset's own, derived from the worst evidence against it, so the map ring over
+ * it means the same thing as every other priority ring: High for damage or high-priority work in
+ * hand, Medium for a failed inspection alone.
+ *
+ * @param {Map<string, object>} assets    assetIndex() output
+ * @param {{inspections?: object[], workOrders?: object[], damaged?: object[]}} evidence normalised records
+ * @returns {object[]} one record per at-risk asset, in the shape the workspace's other classes use
+ */
+export function atRiskAssets(assets, { inspections = [], workOrders = [], damaged = [] } = {}) {
+  const hits = new Map();
+  const add = (record, kind) => {
+    const id = assetKey(record?.assetId);
+    if (!id || !assets.has(id)) return;   // evidence against an asset the registry does not carry
+    const entry = hits.get(id) ?? { failed: [], highWork: [], damaged: [] };
+    entry[kind].push(record);
+    hits.set(id, entry);
+  };
+  for (const record of inspections) if (/fail/i.test(record?.status ?? '')) add(record, 'failed');
+  for (const record of workOrders) if (isOpen(record) && isHighPriority(record)) add(record, 'highWork');
+  for (const record of damaged) add(record, 'damaged');
+
+  return [...hits].map(([id, entry]) => {
+    const asset = assets.get(id);
+    const all = [...entry.failed, ...entry.highWork, ...entry.damaged];
+    // The asset's date is its most recent piece of evidence, so a period filter narrows these the
+    // same way it narrows every other class: by when something happened, not by when it was built.
+    const createdDate = all.map(record => record.createdDate).filter(Boolean)
+      .sort((a, b) => String(b).localeCompare(String(a)))[0] ?? null;
+    const reasons = [
+      entry.damaged.length ? `${entry.damaged.length} damaged (live)` : null,
+      entry.highWork.length ? `${entry.highWork.length} open high-priority work order${entry.highWork.length === 1 ? '' : 's'}` : null,
+      entry.failed.length ? `${entry.failed.length} failed inspection${entry.failed.length === 1 ? '' : 's'}` : null,
+    ].filter(Boolean);
+    return Object.freeze({
+      id, type: MAINTENANCE_TYPES.ASSET_RISK, assetId: id,
+      longitude: asset.longitude, latitude: asset.latitude,
+      category: asset.category, systemClass: asset.systemClass, segment: asset.segment,
+      status: 'At risk',
+      priority: entry.damaged.length || entry.highWork.length ? 'High' : 'Medium',
+      reasons, reasonText: reasons.join(' · '),
+      failedInspections: entry.failed.length, openHighWorkOrders: entry.highWork.length, damagedLive: entry.damaged.length,
+      createdDate,
+      source: asset.raw,
+    });
+  }).sort((a, b) => String(a.id).localeCompare(String(b.id)));
+}
+
 export function assetIndex(rows) {
   const index = new Map();
   for (const row of rows ?? []) {

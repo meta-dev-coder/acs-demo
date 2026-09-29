@@ -22,6 +22,8 @@ export const WORKSPACE_ICONS = Object.freeze({
   workOrder: '<path d="M12.6 3.4a3.8 3.8 0 0 0-4.9 4.8l-4 4a1.6 1.6 0 0 0 2.2 2.3l4-4a3.8 3.8 0 0 0 4.8-4.9l-2 2-1.8-.4-.4-1.8z"/>',
   damagedAsset: '<path d="M10 3 2 17h16L10 3Z"/><path d="m7.5 11 2-2 1 2 2-2"/>',
   inspection: '<rect x="4" y="3.5" width="12" height="13" rx="2"/><path d="M7.5 2.5h5v2.5h-5z"/><path d="M7.5 9h5M7.5 12h3"/>',
+  // An asset the records show to be at risk: a shield with a warning stroke through it.
+  assetRisk: '<path d="M10 2.6 4 5v4.4c0 3.5 2.5 6.6 6 7.9 3.5-1.3 6-4.4 6-7.9V5l-6-2.4Z"/><path d="M10 7.4v3.1M10 12.6v.4"/>',
   // Cleared: a clock, for something that was happening and is not any more.
   cleared: '<circle cx="10" cy="10" r="7"/><path d="M10 6v4.3l2.8 1.7"/>',
 });

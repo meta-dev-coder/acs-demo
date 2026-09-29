@@ -132,6 +132,75 @@ export function assetIdMarker({ id, selected = false, stem = STEM, tone = 'norma
 }
 
 /**
+ * A pill carrying a WORD rather than a record id — an asset's category, in its class's own colour.
+ *
+ * Same geometry as assetIdMarker (pill, stem, dot, bottom anchor) so an at-risk asset sits on the
+ * map exactly like every other marker. It exists because the text belongs INSIDE the marker: a
+ * separate floating label is a second thing to read, and it drifts over whatever tile is beneath it.
+ *
+ * @param {{text: string, color: string, selected?: boolean, stem?: number}} options
+ */
+export function assetPillMarker({ text, color, selected = false, stem = STEM }) {
+  const label = String(text ?? '').trim();
+  const key = `pill:${label}:${color}:${selected ? 'selected' : 'normal'}:${stem}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+
+  // Selection keeps the shared warm yellow it has everywhere else; the class colour moves to the
+  // border, so a selected pill still says which class it belongs to.
+  const fill = selected ? MARKER_COLORS.selected.fill : color;
+  const border = selected ? color : '#FFFFFF';
+  // Dark ink on these mid-brightness class colours; the same choice the KPI chips make.
+  const ink = selected ? MARKER_COLORS.selected.text : '#12180A';
+
+  const font = `600 ${FONT_PX}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+  const measure = document.createElement('canvas').getContext('2d');
+  measure.font = font;
+  const pillWidth = Math.ceil(measure.measureText(label).width) + PADDING_X * 2;
+  const width = Math.max(pillWidth, DOT_RADIUS * 2 + 4);
+  const height = PILL_HEIGHT + stem + DOT_RADIUS * 2 + 2;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width * SUPERSAMPLE;
+  canvas.height = height * SUPERSAMPLE;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(SUPERSAMPLE, SUPERSAMPLE);
+
+  roundedRect(ctx, (width - pillWidth) / 2, 0, pillWidth, PILL_HEIGHT, RADIUS);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = border;
+  ctx.stroke();
+
+  ctx.font = font;
+  ctx.fillStyle = ink;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, width / 2, PILL_HEIGHT / 2 + 0.5);
+
+  ctx.beginPath();
+  ctx.moveTo(width / 2, PILL_HEIGHT);
+  ctx.lineTo(width / 2, PILL_HEIGHT + stem);
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = fill;
+  ctx.stroke();
+
+  const dotY = PILL_HEIGHT + stem + DOT_RADIUS;
+  ctx.beginPath();
+  ctx.arc(width / 2, dotY, DOT_RADIUS, 0, Math.PI * 2);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.stroke();
+
+  const marker = Object.freeze({ image: canvas, width, height });
+  cache.set(key, marker);
+  return marker;
+}
+
+/**
  * Just the marker's location dot, with the same anchor: drawn at the bottom-anchored position the
  * full marker's dot occupies, so promoting a dot to an ID marker grows the pill above the same
  * point rather than shifting it. One shared texture, for layers too dense to label every asset.

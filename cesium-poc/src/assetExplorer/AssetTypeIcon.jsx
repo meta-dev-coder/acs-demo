@@ -16,6 +16,7 @@ import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined';
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import HorizontalRuleOutlinedIcon from '@mui/icons-material/HorizontalRuleOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
+import GppMaybeOutlinedIcon from '@mui/icons-material/GppMaybeOutlined';
 import { IncidentTypeIcon } from './IncidentTypeIcon.jsx';
 
 const ICONS = {
@@ -37,6 +38,8 @@ const ICONS = {
   disabledVehicle: CarRepairOutlinedIcon,
   // A clock, matching the Cleared KPI card: this is the one type that is already over.
   clearedEvent: HistoryOutlinedIcon,
+  // A shield with a warning: the asset itself is fine, what has happened to it is not.
+  riskAsset: GppMaybeOutlinedIcon,
 };
 
 /**

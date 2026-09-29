@@ -12,7 +12,7 @@ import { SELECTION_SOURCES } from '../assetExplorer/assetSelectionStore.js';
 import { assetTypeConfig, currentDateWindow, maintenanceDate, maintenanceDateKey } from '../assetExplorer/assetTypes.js';
 import { installWorkspaceStrip, WORKSPACE_ICONS } from '../workspaceStrip.js';
 import { clearCache, DataConnectError, getCuratedData, isLive, MissingClassError, needsSignIn, signIn, sourceLabel, debugEnabled } from './dataConnectService.js';
-import { assetIndex, isOpen, normalizeAll, resolveLocations, summarize } from './maintenanceRecords.js';
+import { assetIndex, atRiskAssets, isOpen, normalizeAll, resolveLocations, summarize } from './maintenanceRecords.js';
 import { EVENT_PULSE_COLORS } from '../liveOps/eventPulseModel.js';
 import { createLiveDcFeed, liveDcConnection, liveDcEnabled, mergeLiveRecords } from './liveDcSource.js';
 import { DC_NOT_CONNECTED } from '../liveEventsData.js';
@@ -28,6 +28,10 @@ export const KPI_CARDS = Object.freeze([
   Object.freeze({ key: 'tasks', label: 'Tasks', icon: 'task', assetType: 'task', color: '#8b5cf6' }),
   Object.freeze({ key: 'workOrders', label: 'Work Orders', icon: 'workOrder', assetType: 'workOrder', color: '#f97316' }),
   Object.freeze({ key: 'inspections', label: 'Inspections', icon: 'inspection', assetType: 'inspection', color: '#14b8a6' }),
+  // Assets the other classes show to be at risk. Derived, not loaded: the registry carries no
+  // criticality of its own (the column is empty on all 5,015 rows), so this counts assets a failed
+  // inspection, an open high-priority work order or live damage can be pointed at.
+  Object.freeze({ key: 'atRiskAssets', label: 'Assets at risk', icon: 'assetRisk', assetType: 'riskAsset', color: '#eab308', derived: true }),
 ]);
 
 /** Live DataConnect damage status: shown only while the Live feed is on (see liveDcSource.js). */
@@ -219,7 +223,7 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
 
   // ── data ────────────────────────────────────────────────────────────────────────────────────
   const assetsReady = getCuratedData('assets')
-    .then(({ rows }) => { assets = assetIndex(rows); return assets; })
+    .then(({ rows }) => { assets = assetIndex(rows); recomputeDerived(); return assets; })
     .catch(error => { console.warn('[maintenance] assets unavailable', error); return assets; });
 
   // ── live DataConnect: merged beside the historical records, refreshed every 60 s ────────────
@@ -267,6 +271,7 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
       mergeLive(key);
       // On the map as soon as it exists, rather than only once its card is clicked.
       if (active) pushToMap(key);
+      recomputeDerived();
       if (debugEnabled()) {
         console.info(`[DataConnect][${key}]`, {
           total: rows.length, normalized: records.length,
@@ -329,10 +334,24 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
       // what an operator can act on now. The window and the totals are unchanged behind it — the
       // list, the map and the search still work from the same records, and `summary.total` still
       // carries the backlog for anything that wants it.
-      // The map marker takes the card's own icon and colour before any record is drawn with it.
-    maintenanceLayer.setTypeTone(card.assetType, { color: card.color, glyphSvg: WORKSPACE_ICONS[card.icon] });
-    const loaded = shownRecords(entry, { live: withLive });
+      const loaded = shownRecords(entry, { live: withLive });
       const records = within(loaded, windowOf());
+      if (card.derived) {
+        // An asset has no open/closed state of its own, so summarize() has nothing to say about it:
+        // the count is the assets at risk, and the note names the evidence that put them there.
+        const damaged = records.filter(item => item.damagedLive).length;
+        const highWork = records.filter(item => item.openHighWorkOrders).length;
+        const failed = records.filter(item => item.failedInspections).length;
+        strip.set(card.key, {
+          state: 'ready',
+          count: records.length,
+          countLabel: 'At risk',
+          note: [damaged ? `${damaged} damaged` : null, highWork ? `${highWork} high-priority work` : null,
+            failed ? `${failed} failed inspection` : null].filter(Boolean).slice(0, 2).join(' · ') || 'None at risk',
+          title: `${records.length} of ${assets.size.toLocaleString('en-US')} assets carry a failed inspection, an open high-priority work order or live damage`,
+        });
+        continue;
+      }
       const summary = summarize(records, card.key);
       strip.set(card.key, {
         state: 'ready',
@@ -410,6 +429,11 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
     const entry = datasets.get(key);
     if (!card?.assetType || entry?.state !== 'ready') return;
     maintenanceLayer.setTypeTone(card.assetType, { color: card.color, glyphSvg: WORKSPACE_ICONS[card.icon] });
+    // An at-risk asset carries its category beside the pin — "Lighting", "Drainage", "Camera" —
+    // so the operator reads WHAT each marker is without opening it. Only while that card is the one
+    // being browsed: as context beside four other classes it would be 167 words over the corridor.
+    maintenanceLayer.setTypeCaption(card.assetType,
+      card.key === 'atRiskAssets' && key === activeKey ? item => item.category : null);
     const loaded = shownRecords(entry, { live: withLive });
     // The class being browsed keeps the old rule exactly: the map shows what the browser shows.
     // Every OTHER class is context, and context is exactly what its card counts — the OPEN records
@@ -423,6 +447,28 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
     maintenanceLayer.setRecords(card.assetType,
       key === activeKey ? loaded : within(loaded, windowOf()).filter(contextOf));
     for (const fn of pulseListeners) fn();
+  }
+
+  /**
+   * Re-derive the at-risk assets from whatever evidence has loaded.
+   *
+   * Cheap and idempotent, so it simply runs again whenever an input class lands rather than trying
+   * to work out which ones matter. Stays 'loading' until the registry and all three evidence
+   * classes are in — a partial answer here would understate the risk, which is the one direction
+   * this number must not be wrong in.
+   */
+  function recomputeDerived() {
+    const entry = datasets.get('atRiskAssets');
+    if (!entry) return;
+    const inputs = ['inspections', 'workOrders', 'damagedAssets'];
+    if (!assets.size || inputs.some(key => datasets.get(key)?.state === 'loading')) return;
+    const of = key => shownRecords(datasets.get(key), { live: withLive });
+    const records = atRiskAssets(assets, {
+      inspections: of('inspections'), workOrders: of('workOrders'), damaged: of('damagedAssets'),
+    });
+    Object.assign(entry, { state: 'ready', historical: records, records, summary: null });
+    if (active) pushToMap('atRiskAssets');
+    if (activeKey === 'atRiskAssets') applyRecords();
   }
 
   /** Every class that has finished loading, drawn at once. */
@@ -512,6 +558,8 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
     if (!card || !entry) return;
     if (card.assetType) {
       const records = shownRecords(entry, { live: withLive });
+      maintenanceLayer.setTypeCaption(card.assetType,
+        card.key === 'atRiskAssets' ? item => item.category : null);
       maintenanceLayer.setRecords(card.assetType, records);
       maintenanceLayer.show(card.assetType);
       assetExplorer.refresh();
@@ -626,7 +674,7 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
       await signIn(popup);
       // The cached rejections are what "failed" means to the service; drop them and ask again.
       clearCache();
-      for (const entry of classes) Object.assign(datasets.get(entry.key), { state: 'loading', error: null, note: null });
+      for (const entry of classes) if (!entry.derived) Object.assign(datasets.get(entry.key), { state: 'loading', error: null, note: null });
       renderStrip();
       await Promise.all(classes.map(entry => load(entry.key)));
     } catch (error) {
@@ -690,7 +738,7 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
         // `classes`, not `cards`: the incident register has no card and is exactly what Live Ops
         // needs to resolve an event's Related records. Preloading only the carded classes left
         // every Related tab reading (0) until Maintenance happened to be opened.
-        ...classes.filter(entry => datasets.get(entry.key).state === 'loading').map(entry => load(entry.key)),
+        ...classes.filter(entry => !entry.derived && datasets.get(entry.key).state === 'loading').map(entry => load(entry.key)),
         // One live read, not a poll. The live records are no longer this workspace's alone: Live Ops
         // reads them to answer what has been raised for the event on screen, and a search can be
         // asked for a live ticket before Maintenance has ever been opened. Polling still starts only
@@ -717,7 +765,7 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
       pushAllToMap();
       legend.hidden = false;
       void liveControl.show();
-      for (const entry of classes) if (datasets.get(entry.key).state === 'loading') void load(entry.key);
+      for (const entry of classes) if (!entry.derived && datasets.get(entry.key).state === 'loading') void load(entry.key);
       // Maintenance always opens on the map: the KPI strip, nothing chosen, no browser. The current
       // view is still written to the URL (below) so it can be read or shared, but it is never
       // replayed on load — arriving here, refreshing, or coming back later all start the same way.

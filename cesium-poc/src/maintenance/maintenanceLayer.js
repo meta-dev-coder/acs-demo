@@ -10,7 +10,7 @@
  * nearest the camera and for the selection, because a type can hold several hundred records.
  */
 import { CustomDataSource, Cartesian2, Cartesian3, HeightReference, NearFarScalar, ScreenSpaceEventType, VerticalOrigin } from 'cesium';
-import { assetDotMarker, assetIdMarker, assetPinMarker, assetSquareMarker } from '../assetIdMarker.js';
+import { assetDotMarker, assetIdMarker, assetPillMarker, assetPinMarker, assetSquareMarker } from '../assetIdMarker.js';
 import { incidentVisual } from '../assetExplorer/incidentTypes.js';
 
 export const LABEL_BUDGET = 60;
@@ -83,7 +83,13 @@ export function installMaintenanceLayer(viewer) {
    * so it is drawn as its family's coloured pin instead. A `tone` carrying a glyph IS an incident;
    * the string tones are the shared charcoal/live/damaged ones.
    */
-  function markerFor(id, tone, state) {
+  function markerFor(id, tone, state, caption = null) {
+    // A caption belongs INSIDE the marker: the word IS the marker, rather than a second thing
+    // floating beside it that drifts over whatever tile is underneath.
+    if (caption) {
+      return state === 'dot' ? assetDotMarker(tone)
+        : assetPillMarker({ text: caption, color: tone?.color ?? '#eab308', selected: state === 'selected' });
+    }
     if (tone?.glyph || tone?.glyphSvg) {
       // A class icon is drawn at Live Ops' pin weight (1.6×) so the corridor reads the same in both
       // workspaces; an incident's crash pictogram keeps the size it was designed at.
@@ -106,8 +112,9 @@ export function installMaintenanceLayer(viewer) {
     // spinout call for different people — and a corridor-wide frame is exactly where an operator
     // reads that. The other classes keep the dot-until-near rule: a thousand work-order pins over
     // fifteen miles is a texture, not a map.
+    const caption = layer.captions?.get(id) ?? null;
     const state = isSelected ? 'selected'
-      : tone?.glyph || tone?.glyphSvg ? 'id'
+      : caption || tone?.glyph || tone?.glyphSvg ? 'id'
         : labelled.has(id) && assetType === active ? 'id' : 'dot';
     if (layer.drawn.get(id) === state) return;
     layer.drawn.set(id, state);
@@ -116,7 +123,7 @@ export function installMaintenanceLayer(viewer) {
     // the other classes are context and stay whole.
     entity.show = !isSelected && typeShown(assetType) && !hiddenBySelection(layer, id)
       && (assetType !== active || !layer.visible || layer.visible.has(id));
-    const marker = markerFor(id, tone, state);
+    const marker = markerFor(id, tone, state, caption);
     entity.billboard.image = marker.image;
     entity.billboard.width = marker.width;
     entity.billboard.height = marker.height;
@@ -139,7 +146,7 @@ export function installMaintenanceLayer(viewer) {
     const layer = layerOf(selectedType);
     const position = selected ? layer?.positions.get(selected) : null;
     if (!position) return;
-    const marker = markerFor(selected, layer?.tones.get(selected), 'selected');
+    const marker = markerFor(selected, layer?.tones.get(selected), 'selected', layer?.captions?.get(selected) ?? null);
     selectionSource.entities.add({
       id: `maintenance-${selectedType}-${selected}`, name: selected, show: true, position,
       // A coincident group is spread in screen space. Keep the selected copy at the original
@@ -176,6 +183,22 @@ export function installMaintenanceLayer(viewer) {
   /** assetType -> {color, glyphSvg} from its KPI card, so a marker looks like the card it came from. */
   const typeTones = new Map();
   function setTypeTone(assetType, tone) { typeTones.set(assetType, tone ?? null); }
+
+  /**
+   * assetType -> (record) => text drawn beside its marker, or null for none.
+   *
+   * Only some classes have a word worth carrying on the map: an asset's category says what the pin
+   * IS, which its id cannot. Kept as a per-type function rather than a field the layer knows about,
+   * so this module still holds no knowledge of what any class contains.
+   */
+  const typeCaptions = new Map();
+  function setTypeCaption(assetType, fn) { typeCaptions.set(assetType, typeof fn === 'function' ? fn : null); }
+  const captionFor = (assetType, item) => {
+    const of = typeCaptions.get(assetType);
+    const text = of ? of(item) : null;
+    return text ? String(text) : null;
+  };
+
 
   /**
    * Records in different classes commonly refer to the same asset and therefore have exactly the
@@ -222,7 +245,7 @@ export function installMaintenanceLayer(viewer) {
     if (previous) {
       for (const [id, entity] of previous.entities) { source.entities.remove(entity); byKey.delete(`${assetType}:${id}`); }
     }
-    const entities = new Map(), positions = new Map(), drawn = new Map(), atPoint = new Map(), tones = new Map();
+    const entities = new Map(), positions = new Map(), drawn = new Map(), atPoint = new Map(), tones = new Map(), captions = new Map();
     source.entities.suspendEvents();
     try {
       for (const item of records) {
@@ -241,11 +264,13 @@ export function installMaintenanceLayer(viewer) {
         // A class drawn as pictograms is built that way from the start. present() is only called
         // for the markers near the camera, so a record beyond that range would otherwise keep the
         // dot it was created with however far the operator zoomed out to look at the corridor.
-        const initial = tone?.glyph || tone?.glyphSvg ? 'id' : 'dot';
+        const caption = captionFor(assetType, item);
+        if (caption) captions.set(item.id, caption);
+        const initial = caption || tone?.glyph || tone?.glyphSvg ? 'id' : 'dot';
         const position = Cartesian3.fromDegrees(item.longitude, item.latitude);
         const entity = source.entities.add({
           id: entityId(assetType, item.id), name: item.id, show: visibleNow,
-          position, billboard: { ...BILLBOARD, ...markerFor(item.id, tone, initial) },
+          position, billboard: { ...BILLBOARD, ...markerFor(item.id, tone, initial, caption) },
         });
         entities.set(item.id, entity);
         byKey.set(`${assetType}:${item.id}`, entity);
@@ -256,7 +281,7 @@ export function installMaintenanceLayer(viewer) {
         atPoint.set(key, [...(atPoint.get(key) ?? []), item.id]);
       }
     } finally { source.entities.resumeEvents(); }
-    layers.set(assetType, { records, entities, positions, drawn, atPoint, tones, offsets: new Map() });
+    layers.set(assetType, { records, entities, positions, drawn, atPoint, tones, captions, offsets: new Map() });
     separateCoincidentMarkers();
     if (assetType === active || showAll) { labelled = new Set(); updateLabels(); drawSelection(); }
     viewer.scene.requestRender();
@@ -370,6 +395,7 @@ export function installMaintenanceLayer(viewer) {
   return {
     setRecords,
     setTypeTone,
+    setTypeCaption,
     setVisibleIds,
     show,
     setShowAllTypes,

@@ -722,6 +722,56 @@ export const ASSET_TYPES = Object.freeze({
     ],
   }),
 
+  /**
+   * An asset the maintenance record shows to be at safety risk.
+   *
+   * Not a DataConnect class: the registry carries no criticality (empty on all 5,015 rows), so this
+   * type is derived from what has happened to each asset — a failed inspection, an open
+   * high-priority work order, or live damage. Its card, its markers and this list all count the
+   * same set, and every one of them can be traced back to a record.
+   */
+  riskAsset: Object.freeze({
+    id: 'riskAsset',
+    label: 'Assets at Risk',
+    singular: 'Asset',
+    detailsTitle: 'Asset Risk',
+    icon: 'assetRisk',
+    layerId: null,
+    emptyMessage: 'No asset has a failed inspection, an open high-priority work order or live damage.',
+    errorMessage: 'Unable to work out which assets are at risk.',
+    dateLabel: 'Last evidence',
+    getDateKey: asset => maintenanceDateKey(asset.source?.createdDate),
+    getCardDate: asset => maintenanceDate(asset.source?.createdDate),
+    getTitle: asset => asset.name,
+    getSubtitle: asset => [asset.source?.category, asset.source?.segment].filter(Boolean).join(' · ') || positionLabel(asset),
+    getStatus: asset => {
+      const priority = text(asset.source?.priority);
+      return priority ? { label: priority, tone: /high/i.test(priority) ? 'warn' : 'muted' } : null;
+    },
+    /** Why each asset is listed, so the set can be narrowed to one kind of evidence. */
+    getFilters: (assets, counted = assets) => {
+      const of = (id, label, has) => {
+        const count = counted.filter(asset => has(asset.source ?? {})).length;
+        return counted.length && assets.some(asset => has(asset.source ?? {}))
+          ? [{ id, label, group: 'Evidence', count, match: asset => has(asset.source ?? {}) }] : [];
+      };
+      return [
+        ...of('risk-damaged', 'Damaged (live)', item => item.damagedLive > 0),
+        ...of('risk-high-work', 'Open high-priority work', item => item.openHighWorkOrders > 0),
+        ...of('risk-failed', 'Failed inspection', item => item.failedInspections > 0),
+      ];
+    },
+    details: asset => [
+      ['Why', text(asset.source?.reasonText)],
+      ['Asset category', text(asset.source?.category)],
+      ['System class', text(asset.source?.systemClass)],
+      ['Segment', text(asset.source?.segment)],
+      ['Failed inspections', asset.source?.failedInspections || null],
+      ['Open high-priority work orders', asset.source?.openHighWorkOrders || null],
+      ['Damaged (live)', asset.source?.damagedLive || null],
+    ],
+  }),
+
   overlane: Object.freeze({
     id: 'overlane',
     // The card omits status: it repeats the layer's own name on every card.
