@@ -7,6 +7,7 @@ import { assetTypeConfig } from '../src/assetExplorer/assetTypes.js';
 const ev = (id, type, cleared, clearedAt) => ({ id, type, ...(cleared ? { cleared: true, clearedAt } : {}) });
 const events = [
   ev('a', 'CLOSURE', false),
+  ev('disabled', 'DISABLED', false),
   ev('b', 'CLOSURE', true, '2026-09-28T22:08:32.437Z'),
   ev('c', 'CONGESTION', true, '2026-09-28T13:45:09.411Z'),
   ev('d', 'INCIDENT', true, '2026-09-28T03:34:54.463Z'),
@@ -45,20 +46,25 @@ test('the Event type dropdown counts each kind and is one grouped filter', () =>
 
 test('a cleared card states which kind it was, since the list mixes all five', () => {
   const config = assetTypeConfig('clearedEvent');
-  assert.match(config.getSubtitle({ name: 'b', source: events[1] }), /Closure/);
+  const closure = events.find(event => event.id === 'b');
+  assert.match(config.getSubtitle({ name: 'b', source: closure }), /Closure/);
   // The chip carries severity; the cleared time is the card's date, so neither repeats the other.
-  assert.equal(config.getStatus({ source: { ...events[1], severity: 'Minor' } }).label, 'Minor');
-  assert.equal(config.getCardDate({ source: events[1] }), 'Sep 28, 6:08 PM EDT');
+  assert.equal(config.getStatus({ source: { ...closure, severity: 'Minor' } }).label, 'Minor');
+  assert.equal(config.getCardDate({ source: closure }), 'Sep 28, 6:08 PM EDT');
 });
 
-test('the five live cards never count a cleared event', () => {
+test('live cards never count a cleared event and Incidents includes disabled vehicles', () => {
   const closures = LIVE_OPS_CARDS.find(c => c.key === 'closures');
   // one live closure + one cleared closure -> the card shows 1
   assert.equal(liveOpsCard(events, closures).count, 1);
+  const incidents = LIVE_OPS_CARDS.find(c => c.key === 'incidents');
+  assert.equal(liveOpsCard(events, incidents).count, 1);
+  assert.equal(liveOpsCard(events, incidents).note, '1 disabled');
 });
 
-test('the strip is the five live cards plus Cleared, in that order', () => {
-  assert.equal(STRIP_CARDS.length, LIVE_OPS_CARDS.length + 1);
+test('the strip folds Disabled into Incidents and ends with Cleared', () => {
+  assert.equal(STRIP_CARDS.length, LIVE_OPS_CARDS.length);
+  assert.ok(!STRIP_CARDS.some(card => card.key === 'disabledVehicles'));
   assert.equal(STRIP_CARDS.at(-1).key, CLEARED_CARD.key);
   assert.equal(CLEARED_CARD.type, undefined, 'the cleared card must carry no event type');
 });

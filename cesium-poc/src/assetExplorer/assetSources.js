@@ -215,16 +215,16 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
 
   // Incidents, closures and construction come from one feed but are separate layers and separate
   // asset types, so each browses on its own.
-  for (const [assetType, eventType] of liveEvents
-    ? [['incident', 'INCIDENT'], ['closure', 'CLOSURE'], ['construction', 'CONSTRUCTION'], ['congestion', 'CONGESTION'],
-      ['disabledVehicle', 'DISABLED']] : []) {
+  for (const [assetType, eventTypes] of liveEvents
+    ? [['incident', ['INCIDENT', 'DISABLED']], ['closure', ['CLOSURE']], ['construction', ['CONSTRUCTION']], ['congestion', ['CONGESTION']],
+      ['disabledVehicle', ['DISABLED']]] : []) {
     sources.push({
       assetType,
       group: 'liveEvents',
       subscribeChanges: fn => liveEvents.onUpdate(fn),
       read: () => [...liveEvents.entityById.entries()]
         .map(([id, entity]) => [id, entity, liveEvents.records.get(entity)])
-        .filter(([, , event]) => event?.type === eventType)
+        .filter(([, , event]) => eventTypes.includes(event?.type))
         .map(([id, entity, event]) => {
           const carto = pointOf(entity);
           return normalize({
@@ -235,9 +235,14 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
         }),
       highlight: id => (id == null ? liveEvents.clearSelection() : liveEvents.selectById(id)),
       listen: report => liveEvents.onSelection(event => {
-        if (event && event.type !== eventType) return;   // the other feed's pick, not ours
+        if (event && !eventTypes.includes(event.type)) return;   // the other feed's pick, not ours
         report(event ? String(event.id) : null);
       }),
+      // While the combined Incidents browser is open, a blue disabled-vehicle map pick belongs to
+      // that combined list rather than switching selection to the hidden standalone type.
+      selectionType: assetType === 'disabledVehicle'
+        ? state => state.activeExplorerType === 'incident' ? 'incident' : 'disabledVehicle'
+        : null,
       // One module backs all five types, so ownership is reported per type — see setExternallyOwned.
       own: owned => liveEvents.setExternallyOwned(assetType, owned),
       silence: () => liveEvents.onSelection(null),
@@ -365,9 +370,11 @@ export function connectAssetSources(store, sources, { logger = console } = {}) {
     source.listen(id => {
       if (applying) return;
       if (id == null) { store.selectAsset(null, SELECTION_SOURCES.CESIUM); return; }
-      const asset = (store.getState().assetsByType[source.assetType] ?? []).find(candidate => candidate.id === id);
+      const state = store.getState();
+      const selectionType = source.selectionType?.(state) ?? source.assetType;
+      const asset = (state.assetsByType[selectionType] ?? []).find(candidate => candidate.id === id);
       if (asset) store.selectAsset(asset, SELECTION_SOURCES.CESIUM);
-      else logger.warn?.(`[asset-explorer] picked ${source.assetType} ${id} is not in the normalized list`);
+      else logger.warn?.(`[asset-explorer] picked ${selectionType} ${id} is not in the normalized list`);
     });
   }
 

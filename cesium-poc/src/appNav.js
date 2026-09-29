@@ -78,7 +78,7 @@ export function installAppNav(host, {
   nav.innerHTML = `
     <label class="app-role"><select aria-label="Role">${APP_ROLES.map(role => `<option value="${role.id}">${role.label}</option>`).join('')}</select></label>
     <div class="app-nav-sections">${sections.map(entry => item(entry.id, entry.label, entry.icon, 'aria-current="false"')).join('')}</div>
-    <div class="app-nav-foot">${item('layers', 'Layers', 'layers', 'data-action="layers" aria-pressed="false" aria-controls="layer-content"')}</div>`;
+    <div class="app-nav-foot">${item('layers', 'Explorer', 'layers', 'data-action="layers" aria-pressed="false" aria-controls="layer-content"')}</div>`;
   host.append(nav);
 
   const buttons = new Map([...nav.querySelectorAll('[data-section]')].map(button => [button.dataset.section, button]));

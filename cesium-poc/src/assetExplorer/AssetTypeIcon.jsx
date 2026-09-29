@@ -49,6 +49,9 @@ export function AssetTypeIcon({ assetType, asset = null, tinted = true, ...props
   if (assetType === 'incidentRecord' && asset?.source?.title) {
     return <IncidentTypeIcon incidentType={asset.source.title} tinted={tinted} {...props} />;
   }
-  const Icon = ICONS[assetType] ?? LocationOnOutlinedIcon;
+  // Live Ops browses incidents and disabled vehicles together. The record remains an incident-list
+  // item, but its source type keeps the blue vehicle glyph visible in the slider.
+  const visualType = assetType === 'incident' && asset?.source?.type === 'DISABLED' ? 'disabledVehicle' : assetType;
+  const Icon = ICONS[visualType] ?? LocationOnOutlinedIcon;
   return <Icon {...props} />;
 }

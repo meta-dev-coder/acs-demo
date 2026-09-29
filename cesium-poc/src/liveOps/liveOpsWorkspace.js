@@ -34,7 +34,8 @@ const IMPACT_ROAD_LAYERS = ['mainline-eb', 'mainline-wb', 'ramps'];
  * Live counts and source-reported severity for all five operational event types.
  */
 export const LIVE_OPS_CARDS = Object.freeze([
-  Object.freeze({ key: 'incidents', color: OPS_ICONS.incidents.color, label: 'Incidents', icon: 'incident', type: LIVE_EVENT_TYPES.INCIDENT, assetType: 'incident', layerId: 'incidents' }),
+  Object.freeze({ key: 'incidents', color: OPS_ICONS.incidents.color, label: 'Incidents', icon: 'incident', type: LIVE_EVENT_TYPES.INCIDENT,
+    types: Object.freeze([LIVE_EVENT_TYPES.INCIDENT, LIVE_EVENT_TYPES.DISABLED]), assetType: 'incident', layerId: 'incidents' }),
   Object.freeze({ key: 'closures', color: OPS_ICONS.closures.color, label: 'Closures', icon: 'closure', type: LIVE_EVENT_TYPES.CLOSURE, assetType: 'closure', layerId: 'closures' }),
   Object.freeze({ key: 'disabledVehicles', color: OPS_ICONS.disabledVehicles.color, label: 'Disabled', icon: 'disabledVehicle', type: LIVE_EVENT_TYPES.DISABLED, assetType: 'disabledVehicle', layerId: 'disabled-vehicles' }),
   Object.freeze({ key: 'congestion', color: OPS_ICONS.congestion.color, label: 'Congestion', icon: 'congestion', type: LIVE_EVENT_TYPES.CONGESTION, assetType: 'congestion', layerId: 'congestion' }),
@@ -53,7 +54,10 @@ export const CLEARED_CARD = Object.freeze({
 });
 
 /** Every card in the strip, in the order an operator reads them: what is live, then what is over. */
-export const STRIP_CARDS = Object.freeze([...LIVE_OPS_CARDS, CLEARED_CARD]);
+export const STRIP_CARDS = Object.freeze([
+  ...LIVE_OPS_CARDS.filter(card => card.key !== 'disabledVehicles'),
+  CLEARED_CARD,
+]);
 
 /**
  * What one chip shows: a count, and a note only when there is something worth saying.
@@ -64,12 +68,17 @@ export const STRIP_CARDS = Object.freeze([...LIVE_OPS_CARDS, CLEARED_CARD]);
 export function liveOpsCard(events, card) {
   // Cleared events arrive with the live ones when a history window is selected. They are deliberately
   // not counted: "Closures 5" has to keep meaning five closures on the road right now.
-  const mine = (events ?? []).filter(event => event?.type === card.type && !event.cleared);
+  const accepted = card.types ?? [card.type];
+  const mine = (events ?? []).filter(event => accepted.includes(event?.type) && !event.cleared);
   if (!mine.length) return { state: 'ready', count: 0, note: null };
   const severe = mine.filter(event => /major|severe|serious/i.test(String(event.severity ?? ''))).length;
 
   const parts = [];
   if (severe) parts.push(`${severe} severe`);
+  if (card.key === 'incidents') {
+    const disabled = mine.filter(event => event.type === LIVE_EVENT_TYPES.DISABLED).length;
+    if (disabled) parts.push(`${disabled} disabled`);
+  }
 
   return { state: 'ready', count: mine.length, note: parts.join(' · ') || null };
 }
@@ -352,7 +361,7 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
     strip.set(CLEARED_CARD.key, {
       state: 'ready',
       count: clearedEvents().length,
-      note: windowKey === DEFAULT_EVENT_WINDOW ? 'Choose a window' : EVENT_WINDOW_OPTIONS.find(o => o.key === windowKey)?.label ?? null,
+      note: windowKey === DEFAULT_EVENT_WINDOW ? null : EVENT_WINDOW_OPTIONS.find(o => o.key === windowKey)?.label ?? null,
     });
     strip.setActive(activeExplorer);
     const note = liveEventSourceNote(liveEvents?.payload ?? {});
@@ -399,9 +408,15 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
     }
     activeExplorer = key;
     if (!layers.isOn(card.key)) layers.set(card.key, true);
+    // Disabled vehicles are operational incidents in this view: one KPI and one browser, while the
+    // map retains the blue vehicle marker that distinguishes them from red incident triangles.
+    if (key === 'incidents' && !layers.isOn('disabledVehicles')) layers.set('disabledVehicles', true);
     render();
-    // Its own layer only. Every other visible layer is left exactly as it was.
-    await layerStore.setVisible(card.layerId, true);
+    // Its own layer only, except the combined Incidents view which deliberately includes Disabled.
+    await Promise.all([
+      layerStore.setVisible(card.layerId, true),
+      ...(key === 'incidents' ? [layerStore.setVisible('disabled-vehicles', true)] : []),
+    ]);
     if (activeExplorer === key) store.setActiveExplorerType(card.assetType);
     render();
   }

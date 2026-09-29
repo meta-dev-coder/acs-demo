@@ -22,12 +22,12 @@ try {
   const layers = nav.locator('[data-action="layers"]');
   const panel = page.locator('.layers');
 
-  // 1. The four workspaces, with Layers kept separate at the foot.
+  // 1. The four workspaces, with the Explorer (the layer tray) kept separate at the foot.
   assert.deepEqual(await items.allInnerTexts(), ['Overview', 'Traffic', 'Maintenance', 'Safety', 'Live Ops']);
-  assert.equal(await layers.innerText(), 'Layers');
-  assert.ok((await layers.boundingBox()).y > (await items.last().boundingBox()).y, 'Layers sits at the bottom');
+  assert.equal(await layers.innerText(), 'Explorer');
+  assert.ok((await layers.boundingBox()).y > (await items.last().boundingBox()).y, 'Explorer sits at the bottom');
   assert.equal(await items.first().getAttribute('aria-current'), 'page', 'Overview is chosen on load');
-  console.log('✓ four workspaces (Overview, Traffic, Maintenance, Safety) with Layers at the foot');
+  console.log('✓ four workspaces (Overview, Traffic, Maintenance, Safety) with Explorer at the foot');
 
   // 2. The map is there from the start and stays through every workspace.
   const mapRunning = () => page.evaluate(() => {

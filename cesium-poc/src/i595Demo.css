@@ -37,7 +37,9 @@
   --ui-accent-contrast: #0b1729;    /* text on an accent fill */
 
   /* The left navigation bar's width — everything anchored to the left edge clears it. */
-  --app-nav-w: 76px;
+  /* Wide enough for the longest workspace name. At 76px "Maintenance" ran the full width of its
+     button with nothing either side of it, which read as overflow rather than a label. */
+  --app-nav-w: 92px;
 
   /* Scrollbars */
   --ui-surface-translucent: #0b1729d9;   /* rail and floating bars, over the map */
@@ -803,6 +805,8 @@ body:has(.clip-editor) .base-environment--bar { left: calc(var(--app-nav-w) + 38
 /* The chosen workspace and an open Layers panel read the same: tinted, accented, never colour alone. */
 .app-nav-item[aria-current="page"], .app-nav-item[aria-pressed="true"] { background: var(--ui-accent-tint); color: var(--ui-accent); }
 .app-nav-label { line-height: 1.2; }
+/* A long name stays on one line and keeps a margin either side rather than touching the corners. */
+.app-nav-item { padding-inline: 6px; }
 
 /* The Map Explorer belongs to the Layers button now, and waits until it is asked for. */
 body[data-layers-open="false"] .layers { display: none; }
