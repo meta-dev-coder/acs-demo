@@ -61,8 +61,16 @@ const MAX_PIXELS = 460;
  */
 const GROUND_RING_VISIBLE_TO_M = 4_000;
 
-export function installEventPulses(viewer, { liveEvents, cameras, messageSigns }) {
-  const source = new CustomDataSource('Live Ops event pulses');
+/**
+ * @param {object} options
+ * @param {{events: object[], entityById: Map, onUpdate?: Function, selectById?: Function}} options.feed
+ *   What to pulse. Live Ops passes its live-event layer; Maintenance passes an adapter over its own
+ *   records, severity read from priority. Anything with these four members works — the module never
+ *   asks what the things are, only where they are and how urgent.
+ * @param {string} [options.name] the data source name, so two instances never collide.
+ */
+export function installEventPulses(viewer, { liveEvents, feed = liveEvents, cameras, messageSigns, name = 'Live Ops event pulses' }) {
+  const source = new CustomDataSource(name);
   source.show = false;
   let active = false, disposed = false, frame = 0;
   const added = viewer.dataSources.add(source);
@@ -142,7 +150,7 @@ export function installEventPulses(viewer, { liveEvents, cameras, messageSigns }
         semiMinorAxis: MIN_GROUND_RADIUS_M,
         classificationType: ClassificationType.BOTH,
         material: new ColorMaterialProperty(
-          Color.fromCssColorString(record.style.color).withAlpha(0.13)),
+          Color.fromCssColorString(record.style.color).withAlpha(0.2)),
         // Only worth drawing once the operator is close enough for 100 m to mean something.
         distanceDisplayCondition: new DistanceDisplayCondition(0, GROUND_RING_VISIBLE_TO_M),
       },
@@ -156,17 +164,20 @@ export function installEventPulses(viewer, { liveEvents, cameras, messageSigns }
           pixelSize: new CallbackProperty(
             time => pixelsFor(record, position, 0.3 + 0.7 * phaseAt(time, ring)), false),
           color: new CallbackProperty(time => {
-            // Brightest as it leaves the centre, then away quickly — that is what reads as motion.
+            // Brightest as it leaves the centre, then away — that is what reads as motion. The
+            // falloff is LINEAR rather than squared: squaring it spent most of the travel almost
+            // transparent, which at corridor zoom (where the circle is only a few pixels across)
+            // left barely anything to notice. The point of the ring is to be noticed.
             const remaining = 1 - phaseAt(time, ring);
-            const fade = reducedMotion.matches ? 0.28 : 0.55 * remaining * remaining;
+            const fade = reducedMotion.matches ? 0.42 : 0.8 * remaining;
             return Color.fromCssColorString(record.style.color).withAlpha(fade);
           }, false),
           outlineColor: new CallbackProperty(time => {
             const remaining = 1 - phaseAt(time, ring);
-            return Color.fromCssColorString(record.style.color).withAlpha(reducedMotion.matches ? 0.5 : 0.85 * remaining);
+            return Color.fromCssColorString(record.style.color).withAlpha(reducedMotion.matches ? 0.7 : remaining);
           }, false),
           // The outline is what makes it read as a circle rather than a smudge.
-          outlineWidth: 2,
+          outlineWidth: 2.5,
           heightReference: HeightReference.CLAMP_TO_GROUND,
           // Sits on top of the imagery rather than being swallowed by a bridge deck.
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
@@ -180,7 +191,7 @@ export function installEventPulses(viewer, { liveEvents, cameras, messageSigns }
     if (!active || disposed) return;
     const infrastructure = assets();
     const live = new Set();
-    for (const event of liveEvents.events ?? []) {
+    for (const event of feed.events ?? []) {
       if (!Number.isFinite(event.latitude) || !Number.isFinite(event.longitude)) continue;
       live.add(event.id);
       let record = records.get(event.id);
@@ -208,8 +219,10 @@ export function installEventPulses(viewer, { liveEvents, cameras, messageSigns }
    */
   function applyVisibility() {
     for (const [id, record] of records) {
-      const marker = liveEvents.entityById?.get(id);
-      const show = Boolean(marker?.show);
+      // A feed may draw its selected marker from a second source, leaving the original entity
+      // hidden — the ring must not vanish just because the operator selected the thing it marks.
+      // `isVisible` lets the feed answer that properly; without one, the marker's own flag stands.
+      const show = feed.isVisible ? Boolean(feed.isVisible(id)) : Boolean(feed.entityById?.get(id)?.show);
       for (const entity of record.entities) entity.show = show;
     }
   }
@@ -229,7 +242,7 @@ export function installEventPulses(viewer, { liveEvents, cameras, messageSigns }
   }
 
   const refresh = setInterval(sync, 5000);
-  const unsubscribe = liveEvents.onUpdate?.(sync) ?? (() => {});
+  const unsubscribe = feed.onUpdate?.(sync) ?? (() => {});
 
   // Clicking a ring selects the event it belongs to, as clicking its marker would.
   const handler = new ScreenSpaceEventHandler(viewer.canvas);
@@ -238,7 +251,7 @@ export function installEventPulses(viewer, { liveEvents, cameras, messageSigns }
     const picked = viewer.scene.pick(click.position)?.id;
     if (!picked) return;
     for (const [id, record] of records) {
-      if (record.entities.includes(picked)) { liveEvents.selectById?.(id); return; }
+      if (record.entities.includes(picked)) { feed.selectById?.(id); return; }
     }
   }, ScreenSpaceEventType.LEFT_CLICK);
 

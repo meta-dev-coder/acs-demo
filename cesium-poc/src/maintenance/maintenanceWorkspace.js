@@ -10,23 +10,28 @@
  */
 import { SELECTION_SOURCES } from '../assetExplorer/assetSelectionStore.js';
 import { assetTypeConfig, currentDateWindow, maintenanceDate, maintenanceDateKey } from '../assetExplorer/assetTypes.js';
-import { installWorkspaceStrip } from '../workspaceStrip.js';
+import { installWorkspaceStrip, WORKSPACE_ICONS } from '../workspaceStrip.js';
 import { clearCache, DataConnectError, getCuratedData, isLive, MissingClassError, needsSignIn, signIn, sourceLabel, debugEnabled } from './dataConnectService.js';
-import { assetIndex, normalizeAll, resolveLocations, summarize } from './maintenanceRecords.js';
+import { assetIndex, isOpen, normalizeAll, resolveLocations, summarize } from './maintenanceRecords.js';
+import { EVENT_PULSE_COLORS } from '../liveOps/eventPulseModel.js';
 import { createLiveDcFeed, liveDcConnection, liveDcEnabled, mergeLiveRecords } from './liveDcSource.js';
 import { DC_NOT_CONNECTED } from '../liveEventsData.js';
 
 /** The classes the strip shows, in order. `assetType` is set for the ones the map can browse. */
 export const KPI_CARDS = Object.freeze([
-  Object.freeze({ key: 'incidents', label: 'Incidents', icon: 'incident', assetType: 'incidentRecord' }),
-  Object.freeze({ key: 'tickets', label: 'Tickets', icon: 'ticket', assetType: 'ticket' }),
-  Object.freeze({ key: 'tasks', label: 'Tasks', icon: 'task', assetType: 'task' }),
-  Object.freeze({ key: 'workOrders', label: 'Work Orders', icon: 'workOrder', assetType: 'workOrder' }),
-  Object.freeze({ key: 'inspections', label: 'Inspections', icon: 'inspection', assetType: 'inspection' }),
+  // Incidents are deliberately absent: a crash record is Live Ops' and Safety's material, not a
+  // maintenance backlog. The incidentRecord class is still loaded and still reachable through
+  // related records and Ask the Twin — only the card is gone.
+  // Each class carries its own colour, the way Live Ops' cards do: five identical teal chips make
+  // the strip one block of colour, and the card, its map markers and its pulse all read as one thing.
+  Object.freeze({ key: 'tickets', label: 'Tickets', icon: 'ticket', assetType: 'ticket', color: '#3b82f6' }),
+  Object.freeze({ key: 'tasks', label: 'Tasks', icon: 'task', assetType: 'task', color: '#8b5cf6' }),
+  Object.freeze({ key: 'workOrders', label: 'Work Orders', icon: 'workOrder', assetType: 'workOrder', color: '#f97316' }),
+  Object.freeze({ key: 'inspections', label: 'Inspections', icon: 'inspection', assetType: 'inspection', color: '#14b8a6' }),
 ]);
 
 /** Live DataConnect damage status: shown only while the Live feed is on (see liveDcSource.js). */
-export const LIVE_KPI_CARD = Object.freeze({ key: 'damagedAssets', label: 'Damaged (live)', icon: 'damagedAsset', assetType: 'damagedAsset', liveOnly: true });
+export const LIVE_KPI_CARD = Object.freeze({ key: 'damagedAssets', label: 'Damaged (live)', icon: 'damagedAsset', assetType: 'damagedAsset', liveOnly: true, color: '#e5484d' });
 
 /** URL slugs, so the current view is readable in the address bar. It is never replayed on load. */
 export const TYPE_SLUGS = Object.freeze({ incidents: 'incidents', tickets: 'tickets', tasks: 'tasks', workOrders: 'work-orders', inspections: 'inspections', damagedAssets: 'damaged-assets' });
@@ -103,16 +108,112 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
   const store = assetExplorer.store;
   const liveOn = liveDcEnabled();
   const cards = liveOn ? [...KPI_CARDS, LIVE_KPI_CARD] : KPI_CARDS;
+  /**
+   * Classes the workspace LOADS but does not show a card for.
+   *
+   * Incidents were dropped from the strip because a crash record is not a maintenance backlog — but
+   * dropping the card stopped the class loading, and every live event's Related tab went empty:
+   * liveEventRelatedGroups() finds an event's own row in the incident register first, and with no
+   * register there is nothing to hang tickets, tasks or work orders off. The card is hidden; the
+   * data is not.
+   */
+  const HIDDEN_CLASSES = Object.freeze([
+    Object.freeze({ key: 'incidents', label: 'Incidents', icon: 'incident', assetType: 'incidentRecord', hidden: true }),
+  ]);
+  /** Everything with a dataset: the cards, plus the classes loaded for their records alone. */
+  const classes = [...cards, ...HIDDEN_CLASSES];
   const root = document.createElement('div');
   root.className = 'maintenance-workspace';
   root.hidden = true;
   host.append(root);
+  /**
+   * Priority in the pulse model's own vocabulary.
+   *
+   * Mapped explicitly rather than left to pulseSeverity(), which reads the word "high" as its
+   * amber-orange band. A maintenance operator reads High as RED — the top of the scale — so High is
+   * `major`, and the legend under the strip says exactly that.
+   */
+  const PRIORITY_SEVERITY = Object.freeze({ high: 'major', urgent: 'major', critical: 'major', medium: 'moderate', low: 'low' });
+  const prioritySeverity = value => PRIORITY_SEVERITY[String(value ?? '').trim().toLowerCase()] ?? null;
+  /** The priority legend under the KPI strip, in the order an operator reads it. */
+  const PRIORITY_LEGEND = Object.freeze([
+    Object.freeze({ label: 'High', severity: 'major' }),
+    Object.freeze({ label: 'Medium', severity: 'moderate' }),
+    Object.freeze({ label: 'Low', severity: 'low' }),
+  ]);
+
+  const legend = document.createElement('div');
+  legend.className = 'maintenance-legend';
+  legend.hidden = true;
+
   const strip = installWorkspaceStrip(root, {
     cards, label: 'Maintenance summary', onSelect: key => choose(key),
   });
+  // Connection state still drives loading and refreshes, but it does not need a permanent badge
+  // beside the KPI cards. Individual cards continue to report connection errors when relevant.
+  strip.root.querySelector('[data-source]').hidden = true;
+  /**
+   * How far back the whole workspace looks. Every card's count, the map, and the date range the
+   * browser opens on are all measured over this one window — change it and they move together.
+   * `months: null` is "All", which is no window at all rather than a very long one.
+   */
+  const WINDOW_OPTIONS = Object.freeze([
+    Object.freeze({ key: '1m', label: '1 Month', months: 1 }),
+    Object.freeze({ key: '3m', label: '3 Months', months: 3 }),
+    Object.freeze({ key: '6m', label: '6 Months', months: 6 }),
+    Object.freeze({ key: '1y', label: '1 Year', months: 12 }),
+    Object.freeze({ key: '2y', label: '2 Years', months: 24 }),
+    Object.freeze({ key: 'all', label: 'All', months: null }),
+  ]);
+  const DEFAULT_WINDOW_KEY = '6m';
+  let windowKey = DEFAULT_WINDOW_KEY;
+  // `?? 6` would be wrong here: "All" carries months: null on purpose, and a nullish fallback
+  // turned it straight back into six months. Not-found and no-window are different answers.
+  const monthsOf = key => {
+    const option = WINDOW_OPTIONS.find(entry => entry.key === key);
+    return option ? option.months : monthsOf(DEFAULT_WINDOW_KEY);
+  };
+  const windowOf = () => {
+    const months = monthsOf(windowKey);
+    return months == null ? null : currentDateWindow({ months });
+  };
+
+  // The lookback control, riding with the cards because it is what every one of them counts over.
+  const windowControl = document.createElement('label');
+  windowControl.className = 'maintenance-window';
+  windowControl.innerHTML = `<span class="maintenance-window-label">Period</span>
+    <select class="maintenance-window-select" aria-label="How far back to count">${
+      WINDOW_OPTIONS.map(option =>
+        `<option value="${option.key}"${option.key === DEFAULT_WINDOW_KEY ? ' selected' : ''}>${option.label}</option>`).join('')}
+    </select>`;
+  strip.root.append(windowControl);
+  windowControl.querySelector('select').onchange = event => {
+    windowKey = event.target.value;
+    // Every card recounts, the map redraws, and the browser's own date range is re-applied — the
+    // operator's later hand-narrowing is deliberately dropped, because it was a range inside a
+    // window that no longer exists.
+    defaultedType = null;
+    renderStrip();
+    pushAllToMap();
+    if (activeKey) {
+      const card = cards.find(item => item.key === activeKey);
+      if (card?.assetType) { applyDefaultWindow(card.assetType); applyRecords(); }
+    }
+  };
+
+  // The priority key, under the KPI strip exactly where Live Ops puts its Operational Impact key.
+  // The rings are the thing an operator is meant to notice, and a colour with no key is decoration.
+  legend.innerHTML = `<span class="maintenance-legend-title">Priority</span>${
+    PRIORITY_LEGEND.map(entry =>
+      `<span class="maintenance-legend-item"><i style="background:${EVENT_PULSE_COLORS[entry.severity]}"></i>${entry.label}</span>`).join('')}`;
+  root.append(legend);
+  const legendPosition = new ResizeObserver(() => {
+    root.style.setProperty('--maintenance-kpi-bottom', `${strip.root.offsetTop + strip.root.offsetHeight + 10}px`);
+  });
+  legendPosition.observe(strip.root);
 
   /** key -> { state: 'loading'|'ready'|'error'|'unavailable', records, summary, error } */
-  const datasets = new Map(cards.map(card => [card.key, { state: 'loading', records: [], summary: null }]));
+  const datasets = new Map(classes.map(entry => [entry.key, { state: 'loading', records: [], summary: null }]));
   let assets = new Map();
   let activeKey = null, active = false, withLive = true;
 
@@ -127,7 +228,7 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
   const liveSignatures = new Map();
   function mergeLive(key) {
     const entry = datasets.get(key);
-    Object.assign(entry, mergeLiveEntry(entry, key, { live, connection, liveOnly: cards.find(card => card.key === key)?.liveOnly, assets }));
+    Object.assign(entry, mergeLiveEntry(entry, key, { live, connection, liveOnly: classes.find(item => item.key === key)?.liveOnly, assets }));
   }
   const onLiveError = error => console.warn('[maintenance] live DataConnect unavailable', error);
   const liveFeed = liveOn ? createLiveDcFeed({
@@ -151,11 +252,12 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
   async function load(key) {
     const entry = datasets.get(key);
     try {
-      if (cards.find(card => card.key === key)?.liveOnly) {
+      if (classes.find(item => item.key === key)?.liveOnly) {
         await assetsReady;
         entry.historical = [];
         mergeLive(key);
         renderStrip();
+        if (active) pushToMap(key);
         if (activeKey === key) applyRecords();
         return;
       }
@@ -163,6 +265,8 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
       const records = resolveLocations(normalizeAll(key, rows), assets);
       Object.assign(entry, { state: 'ready', historical: records, records, summary: summarize(records, key) });
       mergeLive(key);
+      // On the map as soon as it exists, rather than only once its card is clicked.
+      if (active) pushToMap(key);
       if (debugEnabled()) {
         console.info(`[DataConnect][${key}]`, {
           total: rows.length, normalized: records.length,
@@ -207,8 +311,6 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
    * The six months every card counts and every class opens on: this month and the five before it,
    * ending today. One window for the whole strip, so the cards are comparable with each other.
    */
-  const windowOf = () => currentDateWindow();
-
   /** The records inside a window. A record with no readable date is outside every window. */
   function within(records, window) {
     if (!window) return records;
@@ -223,19 +325,24 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
     for (const card of cards) {
       const entry = datasets.get(card.key);
       if (entry.state !== 'ready') { strip.set(card.key, { state: entry.state, note: entry.note, warning: entry.warning, title: entry.title }); continue; }
-      // The card counts the six months the class opens on, not its whole history: the strip is a
-      // picture of what is happening on the corridor now, and 1,549 inspections going back two years
-      // is not that. Summarised over the same records, so the note can never contradict the count.
-      const loaded = shownRecords(entry, { live: withLive });
+      // The card counts what is still OPEN, not the six-month backlog: the strip is a picture of
+      // what an operator can act on now. The window and the totals are unchanged behind it — the
+      // list, the map and the search still work from the same records, and `summary.total` still
+      // carries the backlog for anything that wants it.
+      // The map marker takes the card's own icon and colour before any record is drawn with it.
+    maintenanceLayer.setTypeTone(card.assetType, { color: card.color, glyphSvg: WORKSPACE_ICONS[card.icon] });
+    const loaded = shownRecords(entry, { live: withLive });
       const records = within(loaded, windowOf());
       const summary = summarize(records, card.key);
-      const unplaced = records.length - summary.located;
       strip.set(card.key, {
         state: 'ready',
-        count: summary.total,
+        count: summary.headline,
+        countLabel: card.key === 'inspections' ? 'Failed' : ['tickets', 'tasks', 'workOrders'].includes(card.key) ? 'Open' : null,
         // The card counts the class, not the feed: a "3 live" prefix on every note said the same
         // thing five times over, and the strip's own source pill already says the feed is on.
-        note: summary.note ?? (summary.total ? `${unplaced} without location` : 'None recorded'),
+        note: summary.note ?? (summary.open ? null : 'None open'),
+        // The backlog is still worth having, just not as the headline.
+        title: `${summary.open} open of ${summary.total} in the last six months`,
       });
     }
     strip.setActive(activeKey);
@@ -257,7 +364,16 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
 
   // ── selection, shared with the map and the bottom explorer ──────────────────────────────────
   let lastFilter = '';
+  let previousExplorerType = store.getState().activeExplorerType;
+  let overviewCamera = null;
   function onStoreChange(state) {
+    const previous = previousExplorerType;
+    previousExplorerType = state.activeExplorerType;
+    if (active && activeKey && !state.activeExplorerType
+        && cards.some(card => card.assetType === previous)) {
+      closeType();
+      return;
+    }
     // Every part of the filter, not just the ones that existed first: a date range that was left
     // out of this signature narrowed the cards and the rail while the map kept drawing all 181.
     const { query, id, from, to } = state.filter;
@@ -277,8 +393,117 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
   function applyDefaultWindow(assetType) {
     if (defaultedType === assetType) return;
     defaultedType = assetType;
-    store.setFilter(windowOf());
+    // "All" clears the range rather than setting one; the operator can still narrow it by hand.
+    store.setFilter(windowOf() ?? { from: null, to: null });
   }
+
+  /**
+   * Put one loaded class onto the map whether or not it is the class being browsed.
+   *
+   * The whole maintenance picture belongs on the corridor — an operator should see the tickets,
+   * tasks, work orders and inspections together, not only whichever card they last clicked. The
+   * browsed class is still the one that carries ID labels and answers the list's search; the rest
+   * are quiet dots beside it.
+   */
+  function pushToMap(key) {
+    const card = cards.find(item => item.key === key);
+    const entry = datasets.get(key);
+    if (!card?.assetType || entry?.state !== 'ready') return;
+    maintenanceLayer.setTypeTone(card.assetType, { color: card.color, glyphSvg: WORKSPACE_ICONS[card.icon] });
+    const loaded = shownRecords(entry, { live: withLive });
+    // The class being browsed keeps the old rule exactly: the map shows what the browser shows.
+    // Every OTHER class is context, and context is exactly what its card counts — the OPEN records
+    // inside the same six-month window. Anything else and the map contradicts the number above it:
+    // "3 open tickets" beside 179 ticket markers is two different claims about one corridor.
+    // Context is exactly what the card counts: open for most classes, FAILED for inspections —
+    // their card leads with failures, and 32 passed inspections on the corridor say nothing.
+    const contextOf = key === 'inspections'
+      ? item => /fail/i.test(item.status ?? '')
+      : isOpen;
+    maintenanceLayer.setRecords(card.assetType,
+      key === activeKey ? loaded : within(loaded, windowOf()).filter(contextOf));
+    for (const fn of pulseListeners) fn();
+  }
+
+  /** Every class that has finished loading, drawn at once. */
+  function pushAllToMap() { for (const card of cards) pushToMap(card.key); pulseListeners.forEach(fn => fn()); }
+
+  /**
+   * Clicking a marker opens the class it belongs to and its record — including a class that is not
+   * the one being browsed, which is the whole point of drawing them all at once.
+   */
+  /**
+   * A click on the map, from a marker or from the pulse ring over it.
+   *
+   * When the class is ALREADY being browsed the selection goes through the Asset Explorer's own
+   * source, which selects the record and leaves the filters exactly as the operator set them.
+   * revealRecord() is deliberately not used there: it clears the date range and the type filter to
+   * guarantee the record is reachable, which turned a click on one of 3 open tickets into all
+   * 1,034. That widening is only right when the class was not open yet and the operator has
+   * chosen nothing to preserve.
+   */
+  function revealFromMap(assetType, id, { fromRing = false } = {}) {
+    if (!active) return;
+    const card = cards.find(item => item.assetType === assetType);
+    if (!card) return;
+    if (activeKey === card.key) {
+      // A marker click has already told the source; only a ring click still needs to.
+      if (fromRing) maintenanceLayer.selectFromMap(assetType, id);
+      return;
+    }
+    openType(card.key);
+    writeUrl();
+    // The class opens on its default filter (Open, or Failed for inspections). Try the ordinary
+    // selection first: a record that passes that filter — which a clicked marker almost always
+    // does, since the map is drawn from the same set — is selected with the filter left alone.
+    maintenanceLayer.selectFromMap(assetType, id);
+    if (store.getState().selectedAsset?.id === String(id)) return;
+    // Only a record the default filter genuinely hides is worth widening for; revealRecord clears
+    // the date range and the type filter to guarantee it can be reached.
+    void assetExplorer.revealRecord?.(assetType, id);
+  }
+  const stopPicks = maintenanceLayer.onPick((assetType, id) => revealFromMap(assetType, id));
+
+  const pulseListeners = new Set();
+  /**
+   * What the priority pulses circle: the OPEN records carrying a priority the model recognises.
+   *
+   * Only open ones, because a finished work order needs nobody's attention; only ones with a real
+   * priority, because a ring drawn in "unknown" grey around every inspection is decoration rather
+   * than a signal. The same module Live Ops uses draws these — High reads red, Medium amber, Low
+   * green, exactly as a Major/Moderate/Minor event does, so one ring means one thing on this map.
+   */
+  const pulseFeed = {
+    get events() {
+      return maintenanceLayer.placedAll()
+        // Only what is actually drawn: a ring for a marker the browser's filter has hidden is three
+        // entities Cesium builds and never shows. Browsing one class used to build 465 of them to
+        // display 6.
+        .filter(item => maintenanceLayer.isRecordVisible(item.assetType, item.id))
+        .filter(item => isOpen(item) && prioritySeverity(item.priority))
+        .map(item => ({
+          id: `${item.assetType}:${item.id}`,
+          latitude: item.latitude, longitude: item.longitude,
+          severity: prioritySeverity(item.priority),
+        }));
+    },
+    entityById: maintenanceLayer.entityByKey,
+    isVisible(key) {
+      const cut = String(key).indexOf(':');
+      return cut < 0 ? false : maintenanceLayer.isRecordVisible(key.slice(0, cut), key.slice(cut + 1));
+    },
+    onUpdate(fn) { pulseListeners.add(fn); return () => pulseListeners.delete(fn); },
+    /**
+     * A pulse ring sits over its own marker and is what `scene.pick` finds first, so clicking the
+     * ring has to do exactly what clicking the marker does — open the class and its record. Merely
+     * highlighting here made the marker look unclickable: the ring silently ate the click.
+     */
+    selectById(key) {
+      const cut = String(key).indexOf(':');
+      if (cut < 0) return;
+      revealFromMap(key.slice(0, cut), key.slice(cut + 1), { fromRing: true });
+    },
+  };
 
   /** Put the records into the explorer and onto the map. */
   function applyRecords() {
@@ -294,24 +519,62 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
       // After setActiveExplorerType, which clears the previous class's filter, and after refresh()
       // has put the records in the store — so the window is measured against what is actually there.
       applyDefaultWindow(card.assetType);
+      // Then narrow to what the card counted, if that filter exists for this class.
+      const wanted = defaultFilterFor(activeKey);
+      if (assetTypeConfig(card.assetType)?.getFilters?.(store.getState().assetsByType[card.assetType] ?? [])
+        ?.some(filter => filter.id === wanted)) store.setFilter({ id: wanted });
       store.setStatus(card.assetType, { loading: entry.state === 'loading', error: entry.state === 'ready' ? null : assetTypeConfig(card.assetType)?.errorMessage ?? 'Unavailable' });
     }
     syncMap();
     renderStrip();
   }
 
+  /**
+   * The filter a class opens on — the one whose count the card is showing.
+   *
+   * Clicking "Tickets 3 · 1 high priority" should put those 3 on the map, not all 24 in the window;
+   * High priority is then one chip away, and All shows the whole class. Inspections open on Failed,
+   * because that is the number their card leads with.
+   */
+  const DEFAULT_FILTER = Object.freeze({ inspections: 'failed', damagedAssets: 'open' });
+  const defaultFilterFor = key => DEFAULT_FILTER[key] ?? 'open';
+
   function openType(key) {
+    if (!activeKey) overviewCamera = {
+      destination: viewer.camera.positionWC.clone(),
+      orientation: { direction: viewer.camera.directionWC.clone(), up: viewer.camera.upWC.clone() },
+    };
+    const previous = activeKey;
     activeKey = key;
+    // One class at a time while it is being browsed: the others are context for the overview, and
+    // an operator who asked for tickets should not have to read them out of four other classes.
+    maintenanceLayer.setShowAllTypes(false);
+    if (previous && previous !== key) pushToMap(previous);
     const entry = datasets.get(key);
     if (entry.state === 'loading') { renderStrip(); return; }
     applyRecords();
   }
 
   function closeType() {
+    const previouslyBrowsed = activeKey;
     activeKey = null;
     defaultedType = null;
+    // Nothing is browsed now, but every class stays drawn: show(null) clears the ID labels and the
+    // selection, and setShowAllTypes keeps the dots. The class just closed goes back to being
+    // context — its open records only.
     maintenanceLayer.show(null);
+    // Back to the overview: every class that the KPI cards count, drawn together again.
+    maintenanceLayer.setShowAllTypes(true);
+    if (previouslyBrowsed) pushToMap(previouslyBrowsed);
+    pushAllToMap();
     store.setActiveExplorerType(null);
+    store.setFilter({ query: '', id: null, from: null, to: null });
+    if (overviewCamera) {
+      viewer.camera.cancelFlight();
+      viewer.camera.setView(overviewCamera);
+      overviewCamera = null;
+      viewer.scene.requestRender();
+    }
     renderStrip();
     writeUrl();
   }
@@ -363,9 +626,9 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
       await signIn(popup);
       // The cached rejections are what "failed" means to the service; drop them and ask again.
       clearCache();
-      for (const card of cards) Object.assign(datasets.get(card.key), { state: 'loading', error: null, note: null });
+      for (const entry of classes) Object.assign(datasets.get(entry.key), { state: 'loading', error: null, note: null });
       renderStrip();
-      await Promise.all(cards.map(card => load(card.key)));
+      await Promise.all(classes.map(entry => load(entry.key)));
     } catch (error) {
       popup?.close();
       for (const card of cards) {
@@ -392,9 +655,11 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
      */
     assetIndex: () => assets,
     /** Every loaded record of one asset type, whether or not that type is the one on screen. */
+    // Every loaded class, not just the ones with a card: the incident register has no card and is
+    // exactly what liveEventRelatedGroups() needs to resolve an event's Related records.
     recordsForType: (assetType, options) => {
-      const card = cards.find(item => item.assetType === assetType);
-      return shownRecords(card ? datasets.get(card.key) : null, options);
+      const entry = classes.find(item => item.assetType === assetType);
+      return shownRecords(entry ? datasets.get(entry.key) : null, options);
     },
     /**
      * Make one maintenance type the workspace's current view, loading it first if need be.
@@ -415,12 +680,17 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
       if (activeKey !== card.key || withLive !== live) { withLive = live; openType(card.key); writeUrl(); }
       return true;
     },
+    /** What the priority pulses circle — passed to installEventPulses by the app. */
+    pulseFeed,
     /** Put away whatever this workspace is drawing, without changing which tab is open. */
     hide() { if (activeKey) closeType(); },
     /** Load every class without showing any of them, so a search can see records first. */
     preload() {
       return Promise.all([
-        ...cards.filter(card => datasets.get(card.key).state === 'loading').map(card => load(card.key)),
+        // `classes`, not `cards`: the incident register has no card and is exactly what Live Ops
+        // needs to resolve an event's Related records. Preloading only the carded classes left
+        // every Related tab reading (0) until Maintenance happened to be opened.
+        ...classes.filter(entry => datasets.get(entry.key).state === 'loading').map(entry => load(entry.key)),
         // One live read, not a poll. The live records are no longer this workspace's alone: Live Ops
         // reads them to answer what has been raised for the event on screen, and a search can be
         // asked for a live ticket before Maintenance has ever been opened. Polling still starts only
@@ -443,8 +713,11 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
       roadShields?.setEndpointsOnly?.(true);
       renderStrip();
       strip.measure();
+      maintenanceLayer.setShowAllTypes(true);
+      pushAllToMap();
+      legend.hidden = false;
       void liveControl.show();
-      for (const card of cards) if (datasets.get(card.key).state === 'loading') void load(card.key);
+      for (const entry of classes) if (datasets.get(entry.key).state === 'loading') void load(entry.key);
       // Maintenance always opens on the map: the KPI strip, nothing chosen, no browser. The current
       // view is still written to the URL (below) so it can be read or shared, but it is never
       // replayed on load — arriving here, refreshing, or coming back later all start the same way.
@@ -458,12 +731,15 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
       corridorStatus?.setSuppressed?.(false, 'maintenance');
       roadShields?.setEndpointsOnly?.(false);
       liveControl.hide();
+      legend.hidden = true;
       maintenanceLayer.show(null);
+      maintenanceLayer.setShowAllTypes(false);
       if (activeKey) store.setActiveExplorerType(null);
       activeKey = null;
       renderStrip();
     },
     destroy() {
+      stopPicks(); legendPosition.disconnect();
       liveFeed?.stop(); unsubscribe(); strip.destroy(); root.remove();
       // Never leave the corridor without its roads, its shields or its status strip because this
       // workspace went away.

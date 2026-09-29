@@ -321,7 +321,7 @@ test('a throw in onUpdate on an interval tick goes to onError, never an unhandle
   feed.stop();
 });
 
-test('the explorer shows live records as LIVE, with a Live filter and a damaged-asset type', () => {
+test('the explorer marks live records but filters them by work state rather than provenance', () => {
   const [ticket] = normalizeLiveRows('tickets', [TICKET], { now: NOW });
   const asset = { id: ticket.id, assetType: 'ticket', source: ticket };
   assert.match(ASSET_TYPES.ticket.getCardStatus(asset).label, /^LIVE · Assigned/);
@@ -332,11 +332,13 @@ test('the explorer shows live records as LIVE, with a Live filter and a damaged-
   assert.equal(ASSET_TYPES.ticket.getCardStatus(historicalAsset).label, 'Open', 'historical cards unchanged');
   assert.ok(!detailRows(historicalAsset).some(([label]) => label === 'Source'));
   const filters = maintenanceFilters([asset, historicalAsset]);
-  const live = filters.find(f => f.id === 'live');
-  assert.ok(live);
-  assert.equal(live.match(asset), true);
-  assert.equal(live.match(historicalAsset), false);
-  assert.ok(!maintenanceFilters([historicalAsset]).some(f => f.id === 'live'));
+  assert.ok(!filters.some(filter => filter.id === 'live'), 'Live is not a separate slider chip');
+  const open = filters.find(filter => filter.id === 'open');
+  assert.equal(open.match(asset), true, 'an open live record remains under Open');
+  assert.equal(open.match(historicalAsset), true, 'an open historical record remains under Open');
+  const highLiveAsset = { ...asset, source: { ...asset.source, priority: 'High' } };
+  const high = maintenanceFilters([highLiveAsset, historicalAsset]).find(filter => filter.id === 'high');
+  assert.equal(high.match(highLiveAsset), true, 'a high-priority live record remains under High priority');
 
   const [damaged] = normalizeLiveRows('damagedAssets', [ASSET_STATUS], { now: NOW });
   const config = assetTypeConfig('damagedAsset');

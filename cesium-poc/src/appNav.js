@@ -32,10 +32,16 @@ export const NAV_SECTIONS = Object.freeze([
   Object.freeze({ id: 'liveOps', label: 'Live Ops', icon: 'liveOps' }),
 ]);
 
+/**
+ * Safety is built and still in NAV_SECTIONS, but no role carries it: the workspace exists and is
+ * simply not offered. `allowedSections()` is what the bar renders and what resolveSection() falls
+ * back through, so dropping it here hides it from the nav AND from a ?section=safety deep link,
+ * without deleting a workspace that may be offered again.
+ */
 export const APP_ROLES = Object.freeze([
-  { id: 'roadOperator', label: 'Road Operator', sections: ['liveOps', 'safety'] },
-  { id: 'maintenanceTeam', label: 'Maintenance Team', sections: ['maintenance', 'safety'] },
-  { id: 'agency', label: 'Agency', sections: ['traffic', 'safety'] },
+  { id: 'roadOperator', label: 'Road Operator', sections: ['liveOps'] },
+  { id: 'maintenanceTeam', label: 'Maintenance Team', sections: ['maintenance'] },
+  { id: 'agency', label: 'Agency', sections: ['traffic'] },
 ]);
 export const DEFAULT_SECTION = 'liveOps';
 export const resolveRole = id => APP_ROLES.find(role => role.id === id) ?? APP_ROLES[0];

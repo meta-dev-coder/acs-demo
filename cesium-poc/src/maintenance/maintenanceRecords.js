@@ -320,20 +320,38 @@ export const hasLocation = item => Number.isFinite(item?.longitude) && Number.is
  * What a KPI card shows: the total, and a second line counted from the records themselves.
  * @returns {{total: number, note: string|null, located: number, linked: number}}
  */
+export const CLOSED_STATUSES = Object.freeze(new Set(['closed', 'completed', 'resolved', 'cancelled', 'cleared']));
+/** Open means "not in a finished state". A record with no status at all is not counted as open. */
+export const isOpen = item => Boolean(item?.status) && !CLOSED_STATUSES.has(String(item.status).toLowerCase());
+export const isHighPriority = item => /high|urgent|critical|p1/i.test(String(item?.priority ?? ''));
+
+/**
+ * What a KPI card shows.
+ *
+ * `count` is what an operator can still act on — the OPEN records — not how many the class holds.
+ * The six-month total is still returned as `total`, because the list, the map and the search all
+ * work from the same records; it is simply not the headline any more. A backlog of 24 tickets of
+ * which 3 are open is a corridor with 3 problems, and the card should say 3.
+ *
+ * The note is the second figure that matters for that class, always counted within the open set so
+ * it can never exceed the number above it.
+ */
 export function summarize(records, key) {
   const total = records.length;
   const located = records.filter(hasLocation).length;
   const linked = records.filter(item => item.assetId).length;
-  const count = predicate => records.filter(predicate).length;
-  const closed = new Set(['closed', 'completed', 'resolved', 'cancelled', 'cleared']);
-  const open = count(item => item.status && !closed.has(item.status.toLowerCase()));
-  const note = key === 'workOrders' ? `${open} open · ${count(item => item.priority === 'High')} high priority`
-    : key === 'tickets' ? `${open} open`
-      : key === 'tasks' ? `${count(item => /in progress/i.test(item.status ?? ''))} in progress`
-        : key === 'inspections' ? `${count(item => /fail/i.test(item.status ?? ''))} failed`
-          : key === 'incidents' ? `${count(item => /^y/i.test(item.related?.laneClosure ?? ''))} with lane closure`
-            : null;
-  return { total, note: total ? note : null, located, linked };
+  const open = records.filter(isOpen);
+  const count = predicate => open.filter(predicate).length;
+  const failed = count(item => /fail/i.test(item.status ?? ''));
+  // Inspections are the exception: an inspection that passed needs nobody, so what matters is how
+  // many FAILED. Every other class leads with what is still open.
+  const headline = key === 'inspections' ? failed : open.length;
+  const note = key === 'tickets' || key === 'workOrders' ? `${count(isHighPriority)} high priority`
+    : key === 'tasks' ? `${count(item => /in progress/i.test(item.status ?? ''))} in progress`
+      : key === 'inspections' ? `${open.length} inspected`
+        : key === 'incidents' ? `${count(item => /^y/i.test(item.related?.laneClosure ?? ''))} with lane closure`
+          : null;
+  return { total, open: open.length, failed, headline, note: open.length ? note : null, located, linked };
 }
 
 /**

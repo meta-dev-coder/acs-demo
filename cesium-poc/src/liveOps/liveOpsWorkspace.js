@@ -483,11 +483,16 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
       layers.setOpen(false);
       // The corridor's own colours come back; Live Ops borrowed them, it does not own them.
       void applyImpact(false);
-      if (borrowedCorridor) {
-        borrowedCorridor = false;
-        for (const id of IMPACT_ROAD_LAYERS) void layerStore.setVisible(id, false);
-      }
+      // Live Ops switched its event layers on; it switches them off again, and RETURNS the promise
+      // so the next workspace does not open while they are still going. Left on, they followed the
+      // operator into Maintenance, where the Asset Explorer opened an "Incidents · 0 assets" panel
+      // for a layer nothing on that screen had asked for — and because layerStore.setVisible is
+      // async, switching them off without awaiting lost that race every time.
+      const returning = [...LIVE_OPS_CARDS.map(card => card.layerId), ...(borrowedCorridor ? IMPACT_ROAD_LAYERS : [])];
+      borrowedCorridor = false;
+      for (const card of LIVE_OPS_CARDS) layers.set(card.key, false);
       if (store.getState().activeExplorerType) store.setActiveExplorerType(null);
+      return Promise.all(returning.map(id => Promise.resolve(layerStore.setVisible(id, false)).catch(() => {})));
     },
     destroy() { legendPosition.disconnect(); stopRangeRelay(); stopUpdates(); layers.destroy(); strip.destroy(); root.remove(); },
   };

@@ -447,6 +447,11 @@ try {
     roadShields,
   });
   const eventPulses = installEventPulses(viewer, { liveEvents: liveEventControls, cameras: cameraControls, messageSigns: messageSignControls });
+  // The same rings over the maintenance backlog, keyed on each record's PRIORITY rather than an
+  // event's severity — High reads red, Medium amber, Low green, so one ring means one thing on
+  // this map whichever workspace drew it. No cameras or signs: a work order's urgency is its own,
+  // not a function of what infrastructure happens to stand near it.
+  const maintenancePulses = installEventPulses(viewer, { feed: maintenance.pulseFeed, name: 'Maintenance priority pulses' });
   // Live Ops and Maintenance open on the whole corridor: an operator watching for what is happening
   // — or reading a maintenance backlog spread over fifteen miles — needs all of it in frame, not the
   // close hero shot the rest of the app opens on. Derived from the centerline, and only applied on
@@ -459,8 +464,9 @@ try {
   /** The workspaces that open on the whole corridor rather than on whatever the camera was doing. */
   const CORRIDOR_VIEW_SECTIONS = new Set(["liveOps", "maintenance"]);
   const workspaces = { maintenance, safety, traffic, liveOps };
-  appNav.onSelect(section => {
+  appNav.onSelect(async section => {
     eventPulses.setActive(section === "liveOps");
+    maintenancePulses.setActive(section === "maintenance");
     if (CORRIDOR_VIEW_SECTIONS.has(section)) flyToOperationsView();
     cameraControls.setIconMarkers(section === "liveOps");
     messageSignControls.setIconMarkers(section === "liveOps");
@@ -468,7 +474,12 @@ try {
     // deactivate() clears the shared Asset Explorer selection, so activating first let the
     // outgoing workspace's cleanup run last and fight the new screen — which is how a bottom
     // strip from the previous section survived a role change.
-    for (const [name, workspace] of Object.entries(workspaces)) if (name !== section) workspace.deactivate();
+    // Awaited: a workspace's teardown switches its own map layers off, and layerStore.setVisible is
+    // async. Activating before those settle let the Asset Explorer see a layer that was on its way
+    // out and open a panel for it on the next screen.
+    await Promise.all(Object.entries(workspaces)
+      .filter(([name]) => name !== section)
+      .map(([, workspace]) => Promise.resolve(workspace.deactivate()).catch(() => {})));
     // Then clear the browser outright. A workspace's own deactivate() cannot be relied on for
     // this: assetSelectionStore.selectAsset() re-opens a type as a side effect of any selection,
     // so a late pick from a module still shutting down could put the old strip back.
@@ -482,6 +493,7 @@ try {
   // same corridor view as arriving by the nav bar, once the intro has finished with the camera.
   if (CORRIDOR_VIEW_SECTIONS.has(appNav.section)) void startupSettled.then(() => flyToOperationsView());
   eventPulses.setActive(appNav.section === "liveOps");
+  maintenancePulses.setActive(appNav.section === "maintenance");
   if (import.meta.env.DEV) { window.__maintenance = maintenance; window.__safety = safety; window.__traffic = traffic; window.__liveOps = liveOps; window.__liveEvents = liveEventControls; window.__layerStore = layerStore; window.__segments = mainlineSegments; }
 
   explorerToggle = document.querySelector("#menu-toggle");
@@ -499,7 +511,7 @@ try {
     assetIndex: () => maintenanceWorkspace?.assetIndex?.() ?? new Map(),
   });
   if (import.meta.env.DEV) window.__askTwin = askTwin;
-  if (import.meta.hot) import.meta.hot.dispose(() => { eventPulses.destroy(); liveOps.destroy(); traffic.destroy(); safety.destroy(); maintenance.destroy(); maintenanceLayer.destroy(); appNav.destroy(); assetExplorer.destroy(); lightingControls.destroy(); messageSignControls.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
+  if (import.meta.hot) import.meta.hot.dispose(() => { maintenancePulses.destroy(); eventPulses.destroy(); liveOps.destroy(); traffic.destroy(); safety.destroy(); maintenance.destroy(); maintenanceLayer.destroy(); appNav.destroy(); assetExplorer.destroy(); lightingControls.destroy(); messageSignControls.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
   for (const input of inputs) {
     // Layers with their own loader, plus display options that are not data layers at all: this loop
     // fetches `data/<id>.geojson`, and "flow-direction" has no such file — being swept up here

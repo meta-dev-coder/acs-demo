@@ -221,7 +221,8 @@ export function maintenanceFilters(assets) {
   const has = predicate => items.some(predicate);
   const isOpen = item => item.status && !/closed|completed|resolved|cleared/i.test(item.status);
   return [
-    ...(has(item => item.live) ? [{ id: 'live', label: 'Live', match: asset => asset.source?.live === true }] : []),
+    // Live is provenance, not a separate work state. A live record belongs in All and in every
+    // operational filter it actually satisfies (Open, High priority, Failed, and so on).
     ...(has(isOpen) ? [{ id: 'open', label: 'Open', match: asset => isOpen(asset.source ?? {}) }] : []),
     ...(has(item => item.priority === 'High') ? [{ id: 'high', label: 'High priority', match: asset => asset.source?.priority === 'High' }] : []),
     ...(has(item => /fail/i.test(item.status ?? '')) ? [{ id: 'failed', label: 'Failed', match: asset => /fail/i.test(asset.source?.status ?? '') }] : []),

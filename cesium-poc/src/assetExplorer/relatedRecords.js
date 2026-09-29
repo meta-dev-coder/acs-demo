@@ -202,7 +202,12 @@ export function liveEventRelatedGroups(event, lookup) {
   if (!fl511Id) return [];
   const incident = lookup('incidentRecord').find(item =>
     key(item.related?.fl511ItemId) === fl511Id || item.id === `FL511-${fl511Id}`);
-  if (!incident) return [];
+  // No register row is the ordinary answer for an event nothing has been raised for — but it is
+  // also what happens to a CLEARED event older than the register's own six-hour cleared window,
+  // whose tickets and work orders are still very much there. They carry the event's id in their
+  // own (TIC-FL511-999003, WO-FL511-999003), so they are found directly rather than reported as
+  // "nothing related" when something plainly is.
+  if (!incident) return byEventIdGroups(fl511Id, lookup);
   // Everything hanging off the register's row for this event, plus that row itself — it is the
   // event's own record, not something related to it, so it leads its group.
   const groups = relatedRecordGroups(incident, lookup);
@@ -214,6 +219,25 @@ export function liveEventRelatedGroups(event, lookup) {
     items: [own, ...(incidents?.items ?? [])],
   });
   return RELATED_ORDER.filter(assetType => byType.get(assetType)?.items.length).map(assetType => byType.get(assetType));
+}
+
+/**
+ * The records naming this FL511 event in their own id or in `source_event_id`, with no register
+ * row in between. Deliberately narrow: an id match is a statement by the record itself, not an
+ * inference from where or when it happened.
+ */
+function byEventIdGroups(fl511Id, lookup) {
+  const suffix = `FL511-${fl511Id}`;
+  const groups = [];
+  for (const assetType of RELATED_ORDER) {
+    const items = lookup(assetType)
+      .filter(record => key(record.related?.eventId) === fl511Id
+        || key(record.related?.fl511ItemId) === fl511Id
+        || String(record.id ?? '').includes(suffix))
+      .map(record => ({ record, reason: `Raised for road event ${suffix}`, named: true }));
+    if (items.length) groups.push({ assetType, label: LABELS[assetType] ?? assetType, items });
+  }
+  return groups;
 }
 
 /** How many related records there are in total — what the tab's badge counts. */

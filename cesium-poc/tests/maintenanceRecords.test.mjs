@@ -58,13 +58,42 @@ test('a work order has no coordinates of its own and takes its asset\'s', () => 
 
 test('KPI counts come from the records, never from a constant', () => {
   const summary = summarize(workOrders, 'workOrders');
+  // The backlog is still carried — it is simply no longer what the card shows.
   assert.equal(summary.total, 854);
   assert.equal(summary.located, 853);
   assert.equal(summary.linked, 854);
-  const open = workOrders.filter(item => !['Closed', 'Completed'].includes(item.status)).length;
-  const high = workOrders.filter(item => item.priority === 'High').length;
-  assert.equal(summary.note, `${open} open · ${high} high priority`);
-  assert.deepEqual(summarize([], 'workOrders'), { total: 0, note: null, located: 0, linked: 0 });
+  const open = workOrders.filter(item => !['Closed', 'Completed'].includes(item.status));
+  assert.equal(summary.open, open.length);
+  // High priority is counted WITHIN the open set, so the note can never exceed the count above it.
+  assert.equal(summary.note, `${open.filter(item => item.priority === 'High').length} high priority`);
+  assert.ok(summary.open <= summary.total);
+  assert.equal(summarize(workOrders, 'workOrders').headline, summarize(workOrders, 'workOrders').open);
+  assert.deepEqual(summarize([], 'workOrders'),
+    { total: 0, open: 0, failed: 0, headline: 0, note: null, located: 0, linked: 0 });
+});
+
+test('the note never counts a record the headline has already excluded', () => {
+  const records = [
+    { id: 'W-1', status: 'Open', priority: 'High' },
+    { id: 'W-2', status: 'Completed', priority: 'High' },   // high, but finished
+  ];
+  const summary = summarize(records, 'workOrders');
+  assert.equal(summary.open, 1);
+  assert.equal(summary.note, '1 high priority', 'the closed high-priority order is not counted');
+});
+
+test('each class notes the second figure that matters to it, within its open set', () => {
+  const of = (key, records) => summarize(records, key);
+  assert.equal(of('tasks', [{ id: 'T', status: 'In Progress' }, { id: 'U', status: 'Open' }]).note, '1 in progress');
+  // Inspections lead with the FAILED count, not the open one: a passed inspection needs nobody.
+  const inspections = of('inspections', [{ id: 'I', status: 'Failed' }, { id: 'J', status: 'Open' }]);
+  assert.equal(inspections.headline, 1, 'the headline is the failures');
+  assert.equal(inspections.failed, 1);
+  assert.equal(inspections.open, 2);
+  assert.equal(inspections.note, '2 inspected');
+  assert.equal(of('tickets', [{ id: 'K', status: 'Open', priority: 'High' }]).note, '1 high priority');
+  // Nothing open at all says so rather than printing a zero beside a zero.
+  assert.equal(of('tickets', [{ id: 'L', status: 'Closed' }]).note, null);
 });
 
 test('tickets and tasks keep their own coordinates; inspections read three sheets', () => {
@@ -246,5 +275,7 @@ test('incident type filters are built from the data, ordered by how many records
 
 test('a cleared record is not counted as open', () => {
   const records = [{ id: 'T-1', status: 'Open' }, { id: 'T-2', status: 'Cleared' }];
-  assert.equal(summarize(records, 'tickets').note, '1 open');
+  const summary = summarize(records, 'tickets');
+  assert.equal(summary.open, 1, 'the cleared ticket is not open');
+  assert.equal(summary.total, 2, 'but it is still in the six-month total behind the card');
 });

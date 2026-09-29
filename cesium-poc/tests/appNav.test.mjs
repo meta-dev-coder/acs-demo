@@ -16,11 +16,21 @@ test('an unknown section falls back to the first rather than leaving nothing cho
 });
 
 test('each role exposes only its assigned workspaces and rejects disallowed navigation', () => {
-  for (const [role, expected] of Object.entries({ roadOperator: ['liveOps', 'safety'], maintenanceTeam: ['maintenance', 'safety'], agency: ['traffic', 'safety'] })) {
+  for (const [role, expected] of Object.entries({ roadOperator: ['liveOps'], maintenanceTeam: ['maintenance'], agency: ['traffic'] })) {
     const sections = sectionsForRole(role);
     assert.deepEqual(sections.map(s => s.id), expected);
     assert.equal(resolveSection('overview', sections), expected[0]);
-    assert.equal(resolveSection('safety', sections), 'safety');
     for (const section of NAV_SECTIONS.filter(s => !expected.includes(s.id))) assert.equal(resolveSection(section.id, sections), expected[0]);
+  }
+});
+
+test('Safety is built but offered to nobody, including through a deep link', () => {
+  // Still a workspace — it is simply not on any role's bar, so it cannot be navigated to and
+  // ?section=safety falls back to whatever that role does have.
+  assert.ok(NAV_SECTIONS.some(section => section.id === 'safety'));
+  for (const [role, expected] of Object.entries({ roadOperator: 'liveOps', maintenanceTeam: 'maintenance', agency: 'traffic' })) {
+    const sections = sectionsForRole(role);
+    assert.ok(!sections.some(section => section.id === 'safety'));
+    assert.equal(resolveSection('safety', sections), expected);
   }
 });

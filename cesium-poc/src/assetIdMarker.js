@@ -179,8 +179,15 @@ export function assetDotMarker(tone = 'normal') {
  *   `glyph` is SVG path data in a 24×24 box; `key` names the family for the texture cache.
  * @returns {{image: string, width: number, height: number}}
  */
-export function assetPinMarker({ color, glyph, rotate = 0, selected = false, key = color }) {
-  const cacheKey = `pin:${key}:${rotate}:${selected}`;
+/**
+ * @param {object} tone
+ * @param {string} [tone.glyph]     a single filled path in a 24×24 box (the incident families).
+ * @param {string} [tone.glyphSvg]  raw inner markup in a 20×20 box, drawn as STROKE — this is what
+ *   the KPI strip's own icons are, so a ticket on the map is the same shape as the ticket on its
+ *   card. Takes precedence over `glyph` when both are given.
+ */
+export function assetPinMarker({ color, glyph, glyphSvg = null, rotate = 0, selected = false, key = color, size = 1 }) {
+  const cacheKey = `pin:${key}:${rotate}:${selected}:${glyphSvg ? 'svg' : 'path'}:${size}`;
   const hit = cache.get(cacheKey);
   if (hit) return hit;
   // Selection keeps the shared warm yellow it has everywhere else on this map; the family colour
@@ -190,12 +197,46 @@ export function assetPinMarker({ color, glyph, rotate = 0, selected = false, key
   const stroke = selected ? color : '#FFFFFF';
   // The 24×24 glyph is placed in the pin's 26px head, centred on it.
   const turn = rotate ? ` transform="rotate(${rotate} 12 12)"` : '';
+  // The strip's icons are a 20×20 stroked set; the incident families are 24×24 filled paths. Both
+  // land in the pin's 26px head, so one is scaled up and drawn as stroke, the other as fill.
+  const art = glyphSvg
+    ? `<g transform="translate(7 6) scale(1.2)" fill="none" stroke="${ink}" stroke-width="1.5"`
+      + ` stroke-linecap="round" stroke-linejoin="round"${turn}>${glyphSvg}</g>`
+    : `<g transform="translate(7 6) scale(1)" fill="${ink}"><path d="${glyph}"${turn}/></g>`;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="152" height="184" viewBox="0 0 38 46">`
     + `<path d="M19 45.5 7.5 29.5A14.5 14.5 0 1 1 30.5 29.5Z" fill="${fill}" stroke="${stroke}" stroke-width="2.4" stroke-linejoin="round"/>`
-    + `<g transform="translate(7 6) scale(1)" fill="${ink}"><path d="${glyph}"${turn}/></g></svg>`;
+    + `${art}</svg>`;
   const marker = Object.freeze({
     image: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
-    width: selected ? 30 : 26, height: selected ? 36 : 31,
+    // `size` scales the whole pin. Maintenance draws at Live Ops' weight so a work order reads from
+    // the same distance a closure does; the incident families keep the original size.
+    width: Math.round((selected ? 30 : 26) * size), height: Math.round((selected ? 36 : 31) * size),
+  });
+  cache.set(cacheKey, marker);
+  return marker;
+}
+
+/**
+ * A rounded-square operational marker with a short pointer, matching the badges used by Live Ops.
+ * Maintenance supplies the KPI strip's 20x20 stroked glyphs, so the same category shape appears in
+ * the card and on the map. Selection keeps the shared yellow treatment without changing dimensions.
+ */
+export function assetSquareMarker({ color, glyphSvg, selected = false, key = color }) {
+  const cacheKey = `square:${key}:${selected}:${glyphSvg}`;
+  const hit = cache.get(cacheKey);
+  if (hit) return hit;
+  const fill = selected ? '#F5B51B' : color;
+  const ink = selected ? '#172033' : '#FFFFFF';
+  const outline = selected ? color : '#FFFFFF';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="176" height="208" viewBox="0 0 44 52">
+<path d="M17 40 22 49 27 40" fill="${fill}" stroke="${outline}" stroke-width="2.5" stroke-linejoin="round"/>
+<rect x="2" y="2" width="40" height="40" rx="10" fill="${outline}"/>
+<rect x="4" y="4" width="36" height="36" rx="8" fill="${fill}"/>
+<g transform="translate(10 10) scale(1.2)" fill="none" stroke="${ink}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${glyphSvg}</g></svg>`;
+  const marker = Object.freeze({
+    image: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
+    width: 44,
+    height: 52,
   });
   cache.set(cacheKey, marker);
   return marker;

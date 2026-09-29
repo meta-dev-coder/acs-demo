@@ -10,7 +10,8 @@
 import { subscribeCloudSync } from './liveDcCloudSync.js';
 
 /** Line icons, drawn to the weight the quick rail and the left bar already use. */
-const ICONS = Object.freeze({
+/** The strip's icon set, exported so the map can draw a record as the same shape as its card. */
+export const WORKSPACE_ICONS = Object.freeze({
   incident: '<path d="M10 3 2 17h16L10 3Z"/><path d="M10 8v4M10 14.5v.5"/>',
   closure: '<path d="M3 6h14v8H3z"/><path d="m6 6 3 8M11 6l3 8"/>',
   construction: '<path d="M4 16h12"/><path d="M10 4 6.5 16h7L10 4Z"/><path d="M8.4 10h3.2"/>',
@@ -24,7 +25,7 @@ const ICONS = Object.freeze({
   // Cleared: a clock, for something that was happening and is not any more.
   cleared: '<circle cx="10" cy="10" r="7"/><path d="M10 6v4.3l2.8 1.7"/>',
 });
-const icon = name => `<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">${ICONS[name] ?? ICONS.workOrder}</svg>`;
+const icon = name => `<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">${WORKSPACE_ICONS[name] ?? WORKSPACE_ICONS.workOrder}</svg>`;
 
 /** The warning mark the app already uses in status text (main.js), so a warning needs no new styling. */
 export const WARNING_ICON = '⚠';
@@ -52,7 +53,7 @@ export function installWorkspaceStrip(host, { cards, label, onSelect }) {
       <span class="ws-kpi-icon">${icon(card.icon)}</span>
       <span class="ws-kpi-body">
         <span class="ws-kpi-label">${card.label}</span>
-        <span class="ws-kpi-count" data-count>…</span>
+        <span class="ws-kpi-number"><span class="ws-kpi-count" data-count>…</span><span class="ws-kpi-count-label" data-count-label hidden></span></span>
         <span class="ws-kpi-note" data-note>Loading…</span>
       </span>
       <span class="ws-kpi-chevron" aria-hidden="true">›</span>
@@ -94,7 +95,7 @@ export function installWorkspaceStrip(host, { cards, label, onSelect }) {
      * @param {{state: 'loading'|'ready'|'unavailable'|'error', count?: number, note?: string|null,
      *          warning?: boolean, title?: string|null}} card
      */
-    set(key, { state, count, note, warning = false, title = null }) {
+    set(key, { state, count, countLabel, note, warning = false, title = null }) {
       const button = buttons.get(key);
       if (!button) return;
       button.dataset.state = state;
@@ -102,6 +103,9 @@ export function installWorkspaceStrip(host, { cards, label, onSelect }) {
       if (title) button.title = title; else button.removeAttribute('title');
       const countEl = button.querySelector('[data-count]');
       const noteEl = button.querySelector('[data-note]');
+      const labelEl = button.querySelector('[data-count-label]');
+      labelEl.textContent = countLabel ?? '';
+      labelEl.hidden = state !== 'ready' || !countLabel;
       if (state === 'loading') { countEl.textContent = '…'; noteEl.textContent = 'Loading…'; return; }
       if (state !== 'ready') {
         countEl.textContent = '—';
