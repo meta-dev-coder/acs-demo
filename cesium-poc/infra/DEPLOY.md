@@ -8,7 +8,7 @@ This stack deploys:
 - **CloudFront** — CDN in front of S3; routes `/api/i595/*` paths to Lambda Function URLs
 - **DynamoDB** — two tables: `I595LiveEvents` (FL511 event state + TTL) and `I595WsConnections` (active WebSocket connections + TTL)
 - **Lambda functions** — 9 functions (see [Lambda functions](#lambda-functions) below)
-- **EventBridge Scheduler** — triggers the FL511 poller every minute (`i595-poller`)
+- **EventBridge Scheduler** — triggers the FL511 poller every 5 minutes (`i595-poller`)
 - **EventBridge custom bus** — `i595-events`; routes poller output to the broadcaster
 - **API Gateway WebSocket API** — `i595-websocket-api`; real-time push to connected browsers
 
@@ -36,8 +36,7 @@ Full outputs are also in `cdk-outputs.json` after a deploy.
 
 | CDK logical ID | Runtime | Purpose |
 |----------------|---------|---------|
-| `PollerFn` | Node.js 22 | Polls FL511 every minute; diffs against DynamoDB; emits `EventsChanged` to EventBridge; TEMPORARY: writes the same events to Live DataConnect with the hand-off token |
-| `DcTokenIntakeFn` | Node.js 22 | TEMPORARY: POST (Function URL) of a `dcm-admin` DataConnect token; stores it SSE-KMS at `secrets/dc-token.txt` |
+| `PollerFn` | Node.js 22 | Polls FL511 every 5 minutes; diffs against DynamoDB; emits `EventsChanged` to EventBridge; writes the same events to Live DataConnect, signed in with the DataConnect service client from Secrets Manager |
 | `SnapshotProxyFn` | Node.js 22 | Proxies DIVAS JPEG snapshots; validates channel IDs against `KNOWN_CHAN_IDS` env var |
 | `WsConnectFn` | Node.js 22 | Handles `$connect`; writes connection record to DynamoDB |
 | `WsDisconnectFn` | Node.js 22 | Handles `$disconnect`; removes connection record from DynamoDB |
@@ -274,29 +273,55 @@ Built `src/askTheTwin.js` — floating "Ask the Twin" button at the bottom-cente
 
 ---
 
-## DataConnect token hand-off (TEMPORARY)
+## Live DataConnect cloud writer (service client)
 
-This stays in place until Bentley provides refresh tokens or a service client. Design: `server/liveDc/README.md`, "Cloud writer token hand-off".
+The poller signs in to DataConnect itself with the Bentley service client (`client_credentials`, scope `itwin-platform`, `https://ims.bentley.com/connect/token`). Design: `server/liveDc/README.md`, "Cloud writer (AWS poller)".
 
-- **KMS key `DcTokenKey`** (new, rotation on). Only `DcTokenIntakeFn` (Encrypt/GenerateDataKey) and `PollerFn` (Decrypt) are granted it. CloudFront's OAC is not, and the bucket policy also denies CloudFront `s3:GetObject` on `secrets/*`.
-- **Lifecycle rule `ExpireDcTokenSecrets`** on `secrets/`: current objects and noncurrent versions expire after 1 day.
-- **Grants.** Intake: `s3:PutObject secrets/*`. Poller: `s3:GetObject secrets/dc-token.txt`, `s3:ListBucket` (prefix `secrets/*`, so a missing token is a 404), `s3:PutObject status/*`.
-- **Poller env.** `DC_TOKEN_BUCKET`, `DC_WRITER_BASE_URL` (gateway, `/api/data-mgmt/v1`), `DC_WRITER_LOAD_BASE_URL`, `DC_WRITER_*_TIMEOUT_MS` (tight, so a cycle fits the 55 s timeout; the step stops 5 s early and reports `timeout`), `LIVE_DC_*`, `LIVE_DC_DATA_DIR=/var/task/data`. The timeout is 55 s, below the 1-minute schedule, so runs do not overlap. Memory is 512 MB.
-- **Intake env.** `DC_TOKEN_ALLOWED_SUBJECTS` is optional (`npx cdk deploy -c dcTokenAllowedSubjects=you@example.com,...`). `DC_TOKEN_ALLOWED_ORIGINS` is set to localhost dev plus the Pages origin. CORS is owned by the handler, not by the Function URL.
-- **Outputs.** `DcTokenIntakeFunctionUrl` and `LiveDcStatusUrl`.
+- **Secret.** Secrets Manager `i595/dataconnect/service-client`, JSON `{"client_id": "...", "client_secret": "..."}`. The stack only imports it by name (`Secret.fromSecretNameV2`) and grants `PollerFn` read. It never creates the secret or holds its value, so create it once by hand (below) before deploying.
+- **Grants.** Poller: `secretsmanager:GetSecretValue`/`DescribeSecret` on that secret, `s3:PutObject status/*` and `snapshots/*`.
+- **Poller env.** `DC_SERVICE_CLIENT_SECRET_NAME`, `LIVE_DC_STATUS_BUCKET`, `LIVE_DC_HOLD_OPEN` (from `-c liveDcHoldOpen=FL511-123,FL511-456`, default empty), `DC_WRITER_BASE_URL` (gateway, `/api/data-mgmt/v1`), `DC_WRITER_LOAD_BASE_URL`, `DC_WRITER_*_TIMEOUT_MS` (tight, so a cycle fits the 55 s timeout; the step stops 5 s early and reports `timeout`), `LIVE_DC_*`, `LIVE_DC_DATA_DIR=/var/task/data`. The timeout is 55 s, below the 1-minute schedule, so runs do not overlap. Memory is 512 MB.
+- **Output.** `LiveDcStatusUrl`.
 
-After deploy:
+### One-time: create the secret
+
+Run in `cesium-poc/` with the service client in `.env.local` as `DC_WRITER_CLIENT_ID` / `DC_WRITER_CLIENT_SECRET`. Nothing is echoed; the temporary JSON file is private (`umask 077`) and deleted afterwards.
 
 ```bash
-# cesium-poc/.env.local on the machine that runs `npm run dc:login` + `npm run dev` (or `npm run api`)
-DC_TOKEN_HANDOFF_URL=<DcTokenIntakeFunctionUrl>
-# page indicator (optional; defaults to the origin of VITE_LIVE_EVENTS_API)
-VITE_LIVE_DC_STATUS_URL=<LiveDcStatusUrl>
+cd cesium-poc
+(
+  umask 077
+  tmp="$(mktemp)"
+  trap 'rm -f "$tmp"' EXIT
+  node --env-file=.env.local -e '
+    const { writeFileSync } = require("node:fs");
+    const { DC_WRITER_CLIENT_ID: id, DC_WRITER_CLIENT_SECRET: secret } = process.env;
+    if (!id || !secret) { console.error("DC_WRITER_CLIENT_ID / DC_WRITER_CLIENT_SECRET missing in .env.local"); process.exit(1); }
+    writeFileSync(process.argv[1], JSON.stringify({ client_id: id, client_secret: secret }), { mode: 0o600 });
+  ' "$tmp" &&
+  aws secretsmanager create-secret --region us-east-1 \
+    --name i595/dataconnect/service-client \
+    --description "I-595 DataConnect service client (poller Lambda)" \
+    --secret-string "file://$tmp" --query Name --output text
+)
 ```
 
-Then check `<LiveDcStatusUrl>`: `dcWrite` goes from `skipped` (`no_token`) to `ok` within a minute of the first hand-off.
+To rotate, run the same with `aws secretsmanager put-secret-value --region us-east-1 --secret-id i595/dataconnect/service-client --secret-string "file://$tmp"`. A warm poller re-reads the secret when the token endpoint rejects the cached credentials.
 
-**Single writer rule.** Stop any local `npm run live-dc:sync` once the lambda writes (`dcWrite: ok`). Two writers duplicate loads.
+### Deploy
+
+```bash
+cd cesium-poc/infra
+npm run build
+export CDK_DEFAULT_ACCOUNT=589391957147 CDK_DEFAULT_REGION=us-east-1
+npx cdk diff I595StackV5
+npx cdk deploy I595StackV5 --require-approval never --outputs-file cdk-outputs.json
+# optional: keep specific Live Events keys active
+# npx cdk deploy I595StackV5 -c liveDcHoldOpen=FL511-123 --require-approval never --outputs-file cdk-outputs.json
+```
+
+Then check `<LiveDcStatusUrl>`: `dcWrite` is `ok` within a minute. `error` with `credentials_unavailable` means the secret is missing, unreadable or lacks `client_id`/`client_secret`; `auth_rejected` means DataConnect or IMS refused the service client. Optional page indicator override: `VITE_LIVE_DC_STATUS_URL=<LiveDcStatusUrl>` (default: the origin of `VITE_LIVE_EVENTS_API`).
+
+**Single writer rule.** Stop any local `npm run live-dc:sync` once the poller writes (`dcWrite: ok`). Two writers duplicate loads and fight over the diff.
 
 ## Poller internals
 
@@ -310,7 +335,7 @@ lambdas/poller/index.mjs
                                        → server/liveEvents.mjs → server/geo.mjs
                                                                → server/fl511Tooltip.mjs
                                                                → server/i595Network.mjs
-  └── ./poller.mjs → ../../../server/liveDc/{dcWriter,cycle,workflow,eventSync,eventEnrichment,classes,assetCatalog,tokenHandoff}.mjs
+  └── ./poller.mjs → ../../../server/liveDc/{dcWriter,cycle,workflow,eventSync,eventEnrichment,classes,assetCatalog}.mjs
                                                    → config/liveDc/*.json (JSON imports, inlined)
                                                    → src/liveOps/{operationalImpact,carriagewayModel}.js
 ```

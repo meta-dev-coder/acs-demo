@@ -5,7 +5,7 @@ import {
 } from '../server/liveDc/classes.mjs';
 import { mapEventToRecord } from '../server/liveDc/eventSync.mjs';
 import { loadWorkflowConfig } from '../server/liveDc/workflow.mjs';
-import { createAssetCache, createCycleMemory, mergeReadBack, runLiveDcCycle } from '../server/liveDc/cycle.mjs';
+import { createAssetCache, createCycleMemory, mergeReadBack, parseHoldOpen, runLiveDcCycle } from '../server/liveDc/cycle.mjs';
 import { createFl511Service } from '../server/fl511Service.mjs';
 import {
   UsageError, createFixtureClient, formatCycleSummary, parseSyncArgs, writerSetup,
@@ -395,9 +395,10 @@ describe('createAssetCache', () => {
 describe('live-dc-sync runner helpers', () => {
   test('parseSyncArgs reads every flag and rejects unknown ones, including the removed --standin/--remote', () => {
     assert.deepEqual(parseSyncArgs(['--once', '--interval', '30', '--profile', 'realistic', '--feed', 'f.json']), {
-      once: true, interval: 30, profile: 'realistic', feed: 'f.json',
+      once: true, interval: 30, profile: 'realistic', feed: 'f.json', hashPassword: false,
     });
-    assert.deepEqual(parseSyncArgs([]), { once: false, interval: null, profile: null, feed: null });
+    assert.deepEqual(parseSyncArgs([]), { once: false, interval: null, profile: null, feed: null, hashPassword: false });
+    assert.equal(parseSyncArgs(['--hash-password']).hashPassword, true);
     assert.throws(() => parseSyncArgs(['--bogus']), UsageError);
     assert.throws(() => parseSyncArgs(['--interval', '0']), UsageError);
     assert.throws(() => parseSyncArgs(['--feed']), UsageError);
@@ -464,4 +465,16 @@ describe('live-dc-sync runner helpers', () => {
     assert.match(line, /Events=2/);
     assert.match(line, /warnings=1/);
   });
+});
+
+test('parseHoldOpen: comma list of event keys, trimmed, blanks dropped; shared by the CLI and the poller', async () => {
+  assert.deepEqual([...parseHoldOpen(' INCIDENT:1, ,CLOSURE:2 ')], ['INCIDENT:1', 'CLOSURE:2']);
+  assert.deepEqual([...parseHoldOpen('')], []);
+  assert.deepEqual([...parseHoldOpen(undefined)], []);
+  const { readFileSync } = await import('node:fs');
+  for (const path of ['tools/live-dc-sync.mjs', 'infra/lambdas/poller/poller.mjs']) {
+    const source = readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+    assert.match(source, /parseHoldOpen\(/, path);
+    assert.ok(!/LIVE_DC_HOLD_OPEN \?\? ''\)\.split/.test(source), path);
+  }
 });

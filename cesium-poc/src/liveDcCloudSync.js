@@ -1,10 +1,8 @@
 /**
  * "Cloud sync" indicator: what the AWS poller last did with Live DataConnect, read from the
- * non-secret status/live-dc-status.json it writes (served by CloudFront). TEMPORARY while the cloud
- * writer depends on a token handed off from a signed-in machine (`npm run dc:login`).
+ * non-secret status/live-dc-status.json it writes (served by CloudFront).
  */
 export const CLOUD_SYNC_STATUS_PATH = '/status/live-dc-status.json';
-const TOKEN_REASONS = new Set(['no_token', 'token_expired', 'token_unreadable', 'token_rejected']);
 // The poller runs every minute; several missed runs mean it is not running at all.
 const SILENT_AFTER_MS = 5 * 60_000;
 const REFRESH_MS = 60_000;
@@ -22,12 +20,11 @@ export function liveDcStatusUrl(env = {}) {
 export function cloudSyncNote(status, { now = Date.now() } = {}) {
   const ranAt = Date.parse(status?.lastRunAt ?? '');
   if (!status || typeof status !== 'object' || !Number.isFinite(ranAt)) return null;
-  if (now - ranAt > SILENT_AFTER_MS) {
+  // A host that states a longer cycle (the EC2 demo, 300 s) is silent only after three missed cycles.
+  const interval = Number(status.intervalSeconds);
+  const silentAfter = Number.isFinite(interval) && interval > 0 ? Math.max(SILENT_AFTER_MS, (3 * interval + 120) * 1000) : SILENT_AFTER_MS;
+  if (now - ranAt > silentAfter) {
     return { text: 'Cloud sync: not running', warning: true, title: `The cloud poller last ran ${status.lastRunAt}` };
-  }
-  if (TOKEN_REASONS.has(status.reason)) {
-    return { text: 'Cloud sync: needs sign-in', warning: true,
-      title: 'The cloud writer has no valid DataConnect token. Run npm run dc:login on the machine with DC_TOKEN_HANDOFF_URL set.' };
   }
   if (status.dcWrite === 'ok') return { text: 'Cloud sync: on', warning: false, title: `Last DataConnect write ${status.lastRunAt}` };
   if (status.dcWrite === 'error') return { text: 'Cloud sync: error', warning: true, title: status.reason || 'DataConnect write failed' };

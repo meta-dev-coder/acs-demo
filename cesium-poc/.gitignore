@@ -19,3 +19,7 @@ public/models/i595/*.glb
 
 # State files of the former local DataConnect stand-in (now a test double only).
 .dc-standin/
+
+# EC2 live-dc bundle (npm run live-dc:bundle)
+deploy/ec2/dist/
+deploy/ec2/releases/

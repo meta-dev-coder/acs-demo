@@ -1,0 +1,18 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PutAndGetLiveDcReleases",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject"],
+      "Resource": "arn:aws:s3:::i595stackv5-i595corridordata41064a5b-oixfpv0dyrzj/releases/live-dc/*"
+    },
+    {
+      "Sid": "ListLiveDcReleases",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::i595stackv5-i595corridordata41064a5b-oixfpv0dyrzj",
+      "Condition": { "StringLike": { "s3:prefix": ["releases/live-dc/*"] } }
+    }
+  ]
+}

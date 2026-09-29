@@ -17,6 +17,8 @@
     "dc:classes": "node tools/dc-classes.mjs",
     "dc:login": "node tools/dc-login.mjs",
     "live-dc:sync": "node tools/live-dc-sync.mjs",
+    "live-dc:bundle": "node tools/build-live-dc-bundle.mjs",
+    "live-dc:release": "node tools/release-live-dc.mjs",
     "live-dc:classes": "node tools/live-dc-classes.mjs"
   },
   "dependencies": {

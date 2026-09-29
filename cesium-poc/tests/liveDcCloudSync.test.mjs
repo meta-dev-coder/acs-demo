@@ -14,12 +14,13 @@ test('status URL: explicit override, else the CloudFront origin of the live-even
   assert.equal(liveDcStatusUrl(undefined), null);
 });
 
-test('note: token-related skips ask for a sign-in, as a warning', () => {
-  for (const reason of ['no_token', 'token_expired', 'token_unreadable', 'token_rejected']) {
-    const note = cloudSyncNote({ lastRunAt: at(30), dcWrite: reason === 'token_rejected' ? 'error' : 'skipped', reason }, { now: NOW });
-    assert.equal(note.text, 'Cloud sync: needs sign-in');
-    assert.equal(note.warning, true);
-    assert.match(note.title, /npm run dc:login/);
+test('note: there is no sign-in state any more; old token reasons read as plain error/off', () => {
+  for (const reason of ['no_token', 'token_expired', 'token_unreadable', 'token_rejected', 'credentials_unavailable']) {
+    const dcWrite = reason === 'no_token' ? 'skipped' : 'error';
+    const note = cloudSyncNote({ lastRunAt: at(30), dcWrite, reason }, { now: NOW });
+    assert.notEqual(note.text, 'Cloud sync: needs sign-in');
+    assert.ok(!/dc:login|sign-in/i.test(note.title));
+    assert.equal(note.text, dcWrite === 'error' ? 'Cloud sync: error' : 'Cloud sync: off');
   }
 });
 
@@ -55,7 +56,7 @@ test('watch: no URL means no fetch; otherwise fetches now and on the interval, r
     fetchImpl: async (url, init) => {
       fetches++;
       assert.equal(init.cache, 'no-store');
-      return new Response(JSON.stringify({ lastRunAt: at(10), dcWrite: 'skipped', reason: 'no_token' }));
+      return new Response(JSON.stringify({ lastRunAt: at(10), dcWrite: 'ok', reason: null }));
     },
     onChange: note => notes.push(note),
     now: () => NOW,
@@ -64,7 +65,7 @@ test('watch: no URL means no fetch; otherwise fetches now and on the interval, r
   });
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(fetches, 1);
-  assert.equal(notes.at(-1).text, 'Cloud sync: needs sign-in');
+  assert.equal(notes.at(-1).text, 'Cloud sync: on');
   timers[0].fn();
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(fetches, 2);
@@ -83,4 +84,10 @@ test('watch: an unreachable status reads as nothing, not as an error banner', as
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.deepEqual(notes, [null]);
   stop();
+});
+
+test('cloud sync: a status with a longer intervalSeconds (EC2 host, 300 s) is not reported silent between cycles', () => {
+  assert.equal(cloudSyncNote({ lastRunAt: at(330), dcWrite: 'ok', intervalSeconds: 300 }, { now: NOW }).text, 'Cloud sync: on');
+  assert.equal(cloudSyncNote({ lastRunAt: at(3 * 300 + 121), dcWrite: 'ok', intervalSeconds: 300 }, { now: NOW }).text, 'Cloud sync: not running');
+  assert.equal(cloudSyncNote({ lastRunAt: at(330), dcWrite: 'ok', intervalSeconds: 'x' }, { now: NOW }).text, 'Cloud sync: not running');
 });

@@ -3,18 +3,19 @@
  *
  * Each run polls FL511 once, then:
  *   1. diffs the events against DynamoDB, writes changes and emits EventsChanged (the deployed site);
- *   2. TEMPORARY: if the hand-off token (secrets/dc-token.txt) has at least 2 minutes left, runs one
- *      Live DataConnect cycle with it, fed the same FL511 payload; then writes the non-secret
+ *   2. runs one Live DataConnect cycle with the same payload, signed in with the DataConnect service
+ *      client (client_credentials) read from Secrets Manager, and writes the non-secret
  *      status/live-dc-status.json either way. The two steps fail independently.
  */
-import { DcWriterError, WRITER_ERRORS, createDcWriter, createStaticTokenProvider, loadDcWriterConfig } from '../../../server/liveDc/dcWriter.mjs';
-import { createAssetCache, createCycleMemory, runLiveDcCycle } from '../../../server/liveDc/cycle.mjs';
+import { DcWriterError, WRITER_ERRORS, createClientCredentialsTokenProvider, createDcWriter, loadDcWriterConfig } from '../../../server/liveDc/dcWriter.mjs';
+import { createAssetCache, createCycleMemory, parseHoldOpen, runLiveDcCycle } from '../../../server/liveDc/cycle.mjs';
 import { createEventCapture } from '../../../server/liveDc/eventCapture.mjs';
 import { loadWorkflowConfig } from '../../../server/liveDc/workflow.mjs';
-import { tokenExpiresAtMs } from '../../../server/liveDc/tokenHandoff.mjs';
 import { withDeadline } from '../../../server/liveDc/timeouts.mjs';
 
-export const MIN_RUN_TOKEN_MS = 2 * 60_000;
+export const DEFAULT_SERVICE_CLIENT_SECRET_NAME = 'i595/dataconnect/service-client';
+export const LIVE_DC_STATUS_KEY = 'status/live-dc-status.json';
+export const CREDENTIALS_UNAVAILABLE = 'credentials_unavailable';
 const DEADLINE_MARGIN_MS = 5_000;
 const REASON_MAX = 300;
 
@@ -68,7 +69,43 @@ export async function syncDynamo({ payload, tableName, busName, ddb, emit, now =
   return { added: added.length, updated: updated.length, removed: removed.length };
 }
 
-// ── 2. Live DataConnect (temporary hand-off token) ────────────────────────────────────────────────
+// ── 2. Live DataConnect (service client) ──────────────────────────────────────────────────────────
+
+const unavailable = () => Object.assign(new Error('DataConnect service-client secret is unavailable'), { code: CREDENTIALS_UNAVAILABLE });
+
+/**
+ * Service-client credentials from a Secrets Manager JSON secret {"client_id", "client_secret"}, cached
+ * for the warm container. Failures are not cached and never carry the secret's content.
+ */
+export function createSecretCredentials({ secretName = DEFAULT_SERVICE_CLIENT_SECRET_NAME, readSecret, logger = console }) {
+  let cached = null;
+  let pending = null;
+  async function load() {
+    let parsed;
+    try {
+      parsed = JSON.parse(String((await readSecret(secretName)) ?? ''));
+    } catch (error) {
+      logger.error?.(`live-dc: service-client secret not readable (${error?.name ?? 'Error'})`);
+      throw unavailable();
+    }
+    const clientId = typeof parsed?.client_id === 'string' ? parsed.client_id.trim() : '';
+    const clientSecret = typeof parsed?.client_secret === 'string' ? parsed.client_secret.trim() : '';
+    if (!clientId || !clientSecret) {
+      logger.error?.('live-dc: service-client secret lacks client_id or client_secret');
+      throw unavailable();
+    }
+    cached = Object.freeze({ clientId, clientSecret });
+    return cached;
+  }
+  return {
+    async get() {
+      if (cached) return cached;
+      pending ??= load().finally(() => { pending = null; });
+      return pending;
+    },
+    invalidate() { cached = null; },
+  };
+}
 
 export function liveDcCycleOptions(env = {}) {
   const spawnTypes = (env.LIVE_DC_SPAWN_TYPES ?? '').split(',').map(t => t.trim().toUpperCase()).filter(Boolean);
@@ -82,6 +119,7 @@ export function liveDcCycleOptions(env = {}) {
     linkMode: env.LIVE_DC_LINK_MODE || 'live',
     heartbeatSeconds: env.LIVE_DC_HEARTBEAT_SECONDS && heartbeat >= 0 ? heartbeat : 900,
     publicApiBase: env.LIVE_DC_PUBLIC_API_BASE || '',
+    holdOpen: parseHoldOpen(env.LIVE_DC_HOLD_OPEN),
   };
 }
 
@@ -97,53 +135,86 @@ function summarize(report) {
   };
 }
 
-/** Messages from the writer never carry the token; the cap keeps the public status small. */
+const isRejected = error => error?.status === 400 || error?.status === 401 || error?.status === 403;
+
+/** Messages from the writer never carry credentials or tokens; the cap keeps the public status small. */
 const reasonOf = error => {
   if (error?.code === 'timeout') return 'timeout';
-  if (error?.status === 401 || error?.status === 403) return 'token_rejected';
+  if (error?.code === CREDENTIALS_UNAVAILABLE) return CREDENTIALS_UNAVAILABLE;
+  if (error?.authRejected || error?.status === 401 || error?.status === 403) return 'auth_rejected';
   return String(error?.message ?? error).slice(0, REASON_MAX);
 };
 
 /**
- * One cycle with the hand-off token, or a skip. Always resolves to the status it wrote.
- * `state` keeps the cycle memory and asset cache across warm invocations.
+ * The warm container keeps one client_credentials provider (so its token is reused for the hour);
+ * a rejected token request re-reads the secret once per run and retries, for a rotated secret.
+ */
+function serviceClientTokens({ state, credentials, config, fetchImpl, now }) {
+  const build = creds => {
+    if (state.tokenCreds !== creds) {
+      state.tokenCreds = creds;
+      state.tokens = createClientCredentialsTokenProvider({
+        tokenUrl: config.tokenUrl, clientId: creds.clientId, clientSecret: creds.clientSecret, scope: config.scope, fetchImpl, now,
+      });
+    }
+    return state.tokens;
+  };
+  let refetched = false;
+  return {
+    renewable: true,
+    invalidate: () => state.tokens?.invalidate(),
+    async getToken() {
+      try {
+        return await build(await credentials.get()).getToken();
+      } catch (error) {
+        if (refetched || !isRejected(error)) throw error;
+        refetched = true;
+        credentials.invalidate();
+        try {
+          return await build(await credentials.get()).getToken();
+        } catch (retryError) {
+          if (isRejected(retryError)) retryError.authRejected = true;
+          throw retryError;
+        }
+      }
+    },
+  };
+}
+
+/**
+ * One cycle with the service client, or a skip. Always resolves to the status it wrote.
+ * `state` keeps the cycle memory, asset cache and token across warm invocations.
  */
 export async function runLiveDcStep({
-  payload, readToken, writeStatus, env = {}, now = Date.now, logger = console, fetchImpl = fetch,
+  payload, credentials, writeStatus, env = {}, now = Date.now, logger = console, fetchImpl = fetch,
   createWriter = createDcWriter, runCycle = runLiveDcCycle, state = {}, deadlineMs,
   snapshotStore = null, createCapture = createEventCapture,
 }) {
   const at = now();
-  const status = { lastRunAt: iso(at), dcWrite: 'skipped', reason: null, tokenExpiresAt: null, fl511: payload?.sourceStatus ?? null, summary: null };
+  const status = { lastRunAt: iso(at), dcWrite: 'skipped', reason: null, fl511: payload?.sourceStatus ?? null, summary: null };
 
   try {
-    const token = String((await readToken()) ?? '').trim();
-    const expiresAt = token ? tokenExpiresAtMs(token) : null;
-    if (expiresAt != null) status.tokenExpiresAt = iso(expiresAt);
-    if (!token) status.reason = 'no_token';
-    else if (expiresAt == null) status.reason = 'token_unreadable';
-    else if (expiresAt - at < MIN_RUN_TOKEN_MS) status.reason = 'token_expired';
-    else {
-      const writer = createWriter({
-        config: loadDcWriterConfig(env), tokenProvider: createStaticTokenProvider(token), fetchImpl, logger,
-      });
-      state.memory ??= createCycleMemory();
-      state.writer = writer;
-      state.assetCache ??= createAssetCache({
-        // The cache outlives one run's writer; it always reads through the current one.
-        writer: { findClassByName: (...args) => state.writer.findClassByName(...args), readAll: (...args) => state.writer.readAll(...args) },
-        refreshSeconds: Number(env.LIVE_DC_ASSET_REFRESH_SECONDS) > 0 ? Number(env.LIVE_DC_ASSET_REFRESH_SECONDS) : 3600,
-      });
-      // Snapshots (S3 when a store is wired) and weather at first sight; direct upstream fetches, not the DataConnect fetch.
-      state.capture ??= createCapture({ snapshotStore, logger });
-      const service = { refresh: async () => {}, snapshot: async () => payload };
-      const report = await withDeadline(runCycle({
-        writer, service, now, assetCache: state.assetCache, memory: state.memory, logger, capture: state.capture, ...liveDcCycleOptions(env),
-      }), deadlineMs);
-      status.summary = summarize(report);
-      status.dcWrite = report.errors?.length ? 'error' : 'ok';
-      status.reason = report.errors?.length ? String(report.errors[0]).slice(0, REASON_MAX) : null;
-    }
+    const config = loadDcWriterConfig(env);
+    if (!config.baseUrl || !config.loadBaseUrl) throw new DcWriterError(WRITER_ERRORS.NOT_CONFIGURED, 'writer URLs not set');
+    await credentials.get();
+    const tokenProvider = serviceClientTokens({ state, credentials, config, fetchImpl, now });
+    const writer = createWriter({ config, tokenProvider, fetchImpl, logger });
+    state.memory ??= createCycleMemory();
+    state.writer = writer;
+    state.assetCache ??= createAssetCache({
+      // The cache outlives one run's writer; it always reads through the current one.
+      writer: { findClassByName: (...args) => state.writer.findClassByName(...args), readAll: (...args) => state.writer.readAll(...args) },
+      refreshSeconds: Number(env.LIVE_DC_ASSET_REFRESH_SECONDS) > 0 ? Number(env.LIVE_DC_ASSET_REFRESH_SECONDS) : 3600,
+    });
+    // Snapshots (S3 when a store is wired) and weather at first sight; direct upstream fetches, not the DataConnect fetch.
+    state.capture ??= createCapture({ snapshotStore, logger });
+    const service = { refresh: async () => {}, snapshot: async () => payload };
+    const report = await withDeadline(runCycle({
+      writer, service, now, assetCache: state.assetCache, memory: state.memory, logger, capture: state.capture, ...liveDcCycleOptions(env),
+    }), deadlineMs);
+    status.summary = summarize(report);
+    status.dcWrite = report.errors?.length ? 'error' : 'ok';
+    status.reason = report.errors?.length ? String(report.errors[0]).slice(0, REASON_MAX) : null;
   } catch (error) {
     if (error instanceof DcWriterError && error.code === WRITER_ERRORS.NOT_CONFIGURED) {
       status.dcWrite = 'skipped';
@@ -166,7 +237,8 @@ export async function runLiveDcStep({
 // ── Handler ───────────────────────────────────────────────────────────────────────────────────────
 
 export function createPollerHandler({
-  getService, ddb, emit, tokenStore = null, snapshotStore = null, env = process.env, now = Date.now, logger = console, liveDc = {},
+  getService, ddb, emit, credentials = null, writeStatus = async () => {}, snapshotStore = null,
+  env = process.env, now = Date.now, logger = console, liveDc = {},
 }) {
   const state = {};
   return async function handler(_event, context) {
@@ -193,12 +265,10 @@ export function createPollerHandler({
       logger.error?.('FL511 poller error:', error);
     }
 
-    if (!tokenStore) return;
+    if (!credentials) return;
     const remaining = context?.getRemainingTimeInMillis?.();
     await runLiveDcStep({
-      payload, env, now, logger, state, snapshotStore,
-      readToken: tokenStore.read,
-      writeStatus: tokenStore.writeStatus,
+      payload, env, now, logger, state, snapshotStore, credentials, writeStatus,
       deadlineMs: Number.isFinite(remaining) ? remaining - DEADLINE_MARGIN_MS : undefined,
       ...liveDc,
     });

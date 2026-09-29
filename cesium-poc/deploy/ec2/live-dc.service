@@ -1,0 +1,36 @@
+[Unit]
+Description=I-595 live FL511 -> DataConnect sync and password-gated demo host
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=livedc
+Group=livedc
+WorkingDirectory=/opt/live-dc/current
+EnvironmentFile=/etc/live-dc/env
+Environment=NODE_ENV=production
+Environment=HOME=/var/lib/live-dc
+ExecStart=/opt/live-dc/bin/node --max-old-space-size=384 /opt/live-dc/current/live-dc-sync.mjs
+KillSignal=SIGINT
+TimeoutStopSec=30
+Restart=always
+RestartSec=30
+MemoryMax=512M
+CPUQuota=50%
+StateDirectory=live-dc
+StateDirectoryMode=0750
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+ReadWritePaths=/var/lib/live-dc
+
+[Install]
+WantedBy=multi-user.target

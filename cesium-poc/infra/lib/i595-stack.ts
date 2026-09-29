@@ -8,8 +8,8 @@ import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs'
 import * as events from 'aws-cdk-lib/aws-events'
 import * as eventsTargets from 'aws-cdk-lib/aws-events-targets'
 import * as iam from 'aws-cdk-lib/aws-iam'
-import * as kms from 'aws-cdk-lib/aws-kms'
 import * as scheduler from 'aws-cdk-lib/aws-scheduler'
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager'
 import * as apigw from 'aws-cdk-lib/aws-apigatewayv2'
 import * as path from 'path'
 import { Construct } from 'constructs'
@@ -32,20 +32,6 @@ export class I595Stack extends cdk.Stack {
       ],
     })
 
-    // TEMPORARY DataConnect token hand-off (see server/liveDc/README.md). The token lives under
-    // secrets/ with a dedicated KMS key that CloudFront's OAC cannot use, so no behaviour can serve it.
-    const dcTokenKey = new kms.Key(this, 'DcTokenKey', {
-      description: 'I-595 DataConnect hand-off token (secrets/dc-token.txt)',
-      enableKeyRotation: true,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      pendingWindow: cdk.Duration.days(7),
-    })
-    dataBucket.addLifecycleRule({
-      id: 'ExpireDcTokenSecrets',
-      prefix: 'secrets/',
-      expiration: cdk.Duration.days(1),
-      noncurrentVersionExpiration: cdk.Duration.days(1),
-    })
     // Incident camera snapshots are evidence for the demo, not an archive: keep 90 days.
     dataBucket.addLifecycleRule({
       id: 'ExpireIncidentSnapshots',
@@ -53,7 +39,9 @@ export class I595Stack extends cdk.Stack {
       expiration: cdk.Duration.days(90),
       noncurrentVersionExpiration: cdk.Duration.days(1),
     })
-    const DC_TOKEN_KEY = 'secrets/dc-token.txt'
+    // DataConnect service client (client_credentials), created once by hand (infra/DEPLOY.md); never in code.
+    const DC_SERVICE_CLIENT_SECRET_NAME = 'i595/dataconnect/service-client'
+    const dcServiceClientSecret = secretsmanager.Secret.fromSecretNameV2(this, 'DcServiceClientSecret', DC_SERVICE_CLIENT_SECRET_NAME)
     const DC_GATEWAY_URL = 'https://dataconnect-demo-dqa3.cohesivecloud.app'
 
     // ── 2. DynamoDB: live events ──────────────────────────────────────────────
@@ -99,8 +87,11 @@ export class I595Stack extends cdk.Stack {
         LIVE_EVENTS_TABLE: liveEventsTable.tableName,
         EVENTS_BUS_ARN: eventsBus.eventBusArn,
         DATA_DIR: '/var/task/data',
-        // TEMPORARY Live DataConnect writer, using the hand-off token (skipped without one).
-        DC_TOKEN_BUCKET: dataBucket.bucketName,
+        // Live DataConnect writer, signed in with the service client.
+        DC_SERVICE_CLIENT_SECRET_NAME,
+        LIVE_DC_STATUS_BUCKET: dataBucket.bucketName,
+        // Optional: comma list of Live Events keys kept active (cdk deploy -c liveDcHoldOpen=...).
+        LIVE_DC_HOLD_OPEN: String(this.node.tryGetContext('liveDcHoldOpen') ?? ''),
         LIVE_DC_DATA_DIR: '/var/task/data',
         DC_WRITER_BASE_URL: DC_GATEWAY_URL,
         DC_WRITER_DATA_MGMT_PREFIX: '/api/data-mgmt/v1',
@@ -109,6 +100,7 @@ export class I595Stack extends cdk.Stack {
         DC_WRITER_PROCESS_TIMEOUT_MS: '15000',
         DC_WRITER_CURATION_TIMEOUT_MS: '15000',
         LIVE_DC_PROFILE: 'demo',
+        LIVE_DC_SPAWN_TYPES: 'INCIDENT,CLOSURE,CONSTRUCTION,CONGESTION,DISABLED',
         LIVE_DC_LINK_MODE: 'live',
         LIVE_DC_HEARTBEAT_SECONDS: '900',
         LIVE_DC_ASSET_REFRESH_SECONDS: '3600',
@@ -117,16 +109,7 @@ export class I595Stack extends cdk.Stack {
 
     liveEventsTable.grantReadWriteData(pollerFn)
     eventsBus.grantPutEventsTo(pollerFn)
-    pollerFn.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['s3:GetObject'],
-      resources: [dataBucket.arnForObjects(DC_TOKEN_KEY)],
-    }))
-    // Without ListBucket a missing token reads as 403 instead of 404 (NoSuchKey).
-    pollerFn.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['s3:ListBucket'],
-      resources: [dataBucket.bucketArn],
-      conditions: { StringLike: { 's3:prefix': ['secrets/*'] } },
-    }))
+    dcServiceClientSecret.grantRead(pollerFn)
     pollerFn.addToRolePolicy(new iam.PolicyStatement({
       actions: ['s3:PutObject'],
       resources: [dataBucket.arnForObjects('status/*')],
@@ -136,37 +119,6 @@ export class I595Stack extends cdk.Stack {
       actions: ['s3:PutObject'],
       resources: [dataBucket.arnForObjects('snapshots/*')],
     }))
-    dcTokenKey.grantDecrypt(pollerFn)
-
-    // ── 5b. Lambda: DataConnect token intake (TEMPORARY) ─────────────────────
-    const dcTokenIntakeFn = new NodejsFunction(this, 'DcTokenIntakeFn', {
-      entry: path.join(__dirname, '../lambdas/dc-token-intake/index.mjs'),
-      runtime: lambda.Runtime.NODEJS_22_X,
-      handler: 'handler',
-      timeout: cdk.Duration.seconds(15),
-      bundling: {
-        format: OutputFormat.ESM,
-        externalModules: ['@aws-sdk/*'],
-      },
-      environment: {
-        DC_TOKEN_BUCKET: dataBucket.bucketName,
-        DC_TOKEN_KMS_KEY_ARN: dcTokenKey.keyArn,
-        DC_PERMISSION_URL: `${DC_GATEWAY_URL}/api/user-mgmt/permission`,
-        // Optional: comma list of JWT sub/email values allowed to hand off (cdk deploy -c dcTokenAllowedSubjects=...).
-        DC_TOKEN_ALLOWED_SUBJECTS: String(this.node.tryGetContext('dcTokenAllowedSubjects') ?? ''),
-        DC_TOKEN_ALLOWED_ORIGINS: 'http://localhost:5180,http://localhost:5188,http://127.0.0.1:5188,https://meta-dev-coder.github.io',
-      },
-    })
-    dcTokenIntakeFn.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['s3:PutObject'],
-      resources: [dataBucket.arnForObjects('secrets/*')],
-    }))
-    dcTokenKey.grant(dcTokenIntakeFn, 'kms:Encrypt', 'kms:GenerateDataKey')
-
-    // CORS is owned by the handler (see DEPLOY.md: never both).
-    const dcTokenIntakeFnUrl = dcTokenIntakeFn.addFunctionUrl({
-      authType: lambda.FunctionUrlAuthType.NONE,
-    })
 
     // ── 6. EventBridge Scheduler: run poller every 1 minute ──────────────────
     const schedulerRole = new iam.Role(this, 'PollerSchedulerRole', {
@@ -181,7 +133,7 @@ export class I595Stack extends cdk.Stack {
 
     new scheduler.CfnSchedule(this, 'PollerSchedule', {
       name: 'i595-poller',
-      scheduleExpression: 'rate(1 minute)',
+      scheduleExpression: 'rate(5 minutes)',
       flexibleTimeWindow: {
         mode: 'OFF',
       },
@@ -466,16 +418,6 @@ export class I595Stack extends cdk.Stack {
       }),
     )
 
-    // Defence in depth: even without the KMS key, CloudFront may never read the hand-off token.
-    dataBucket.addToResourcePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.DENY,
-        actions: ['s3:GetObject'],
-        principals: [new iam.ServicePrincipal('cloudfront.amazonaws.com')],
-        resources: [dataBucket.arnForObjects('secrets/*')],
-      }),
-    )
-
     // ── 14. CfnOutputs ────────────────────────────────────────────────────────
     new cdk.CfnOutput(this, 'CloudFrontDomain', {
       value: distribution.distributionDomainName,
@@ -499,10 +441,6 @@ export class I595Stack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'AskTheTwinFunctionUrl', {
       value: askTheTwinFnUrl.url,
-    })
-
-    new cdk.CfnOutput(this, 'DcTokenIntakeFunctionUrl', {
-      value: dcTokenIntakeFnUrl.url,
     })
 
     new cdk.CfnOutput(this, 'LiveDcStatusUrl', {

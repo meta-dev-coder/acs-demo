@@ -1,0 +1,23 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadDataConnectServiceClient",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": "arn:aws:secretsmanager:us-east-1:589391957147:secret:i595/dataconnect/service-client-*"
+    },
+    {
+      "Sid": "WriteEventSnapshots",
+      "Effect": "Allow",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::i595stackv5-i595corridordata41064a5b-oixfpv0dyrzj/snapshots/*"
+    },
+    {
+      "Sid": "ReadLiveDcReleases",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::i595stackv5-i595corridordata41064a5b-oixfpv0dyrzj/releases/live-dc/*"
+    }
+  ]
+}

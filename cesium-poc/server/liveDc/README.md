@@ -234,17 +234,14 @@ What happens when something goes wrong:
 
 `runLiveDcCycle` has no timers and no CLI dependencies, so the AWS poller lambda calls it too (below).
 
-## Cloud writer token hand-off (TEMPORARY)
+## Cloud writer (AWS poller)
 
-Until Bentley provides refresh tokens or a service client, the AWS poller lambda writes with an access token handed off from a signed-in machine:
+The EventBridge poller lambda (`infra/lambdas/poller/`) writes Live DataConnect itself, signed in with the Bentley DataConnect service client (`client_credentials`):
 
-1. The machine running the app (`npm run dev` or `npm run api`) holds the token in `.dc-access-token`, renewed by `npm run dc:login`. With `DC_TOKEN_HANDOFF_URL` set (the `DcTokenIntakeFunctionUrl` stack output), `server/dcTokenPusher.mjs` POSTs it as `Authorization: Bearer` whenever the file changes and at least every 50 minutes. It is server-side only (never in browser JS), a no-op when the URL is unset, and never logs the token.
-2. The intake lambda (`infra/lambdas/dc-token-intake/`) checks the token has at least 5 minutes left, that `GET /api/user-mgmt/permission` grants `dcm-admin`, and (optionally) that its `sub`/`email` is in `DC_TOKEN_ALLOWED_SUBJECTS`. It then stores it at `secrets/dc-token.txt` in the data bucket, SSE-KMS with a dedicated key. CloudFront cannot decrypt that key and is also explicitly denied `secrets/*`. A lifecycle rule expires `secrets/` objects and old versions after 1 day.
-3. Each poller run fetches FL511 once. It writes DynamoDB exactly as before, then runs one `runLiveDcCycle` on the same payload if the token has at least 2 minutes left. Either way it writes the non-secret `status/live-dc-status.json` (`{lastRunAt, dcWrite: ok|skipped|error, reason, tokenExpiresAt, fl511, summary}`), which CloudFront serves at `/status/live-dc-status.json`. The workspace strips show it as "Cloud sync: …", for example "needs sign-in" when there is no valid token (`src/liveDcCloudSync.js`).
+1. The credentials live in Secrets Manager (`DC_SERVICE_CLIENT_SECRET_NAME`, default `i595/dataconnect/service-client`, JSON `{"client_id", "client_secret"}`), read once per warm container and re-read once when the token endpoint rejects them. The writer uses `createClientCredentialsTokenProvider`, so one token serves the hour. Neither the secret nor a token is ever logged or published. Creation and deploy: `infra/DEPLOY.md`.
+2. Each poller run fetches FL511 once. It writes DynamoDB exactly as before, then runs one `runLiveDcCycle` on the same payload (`LIVE_DC_HOLD_OPEN` is parsed as for `npm run live-dc:sync`). Either way it writes the non-secret `status/live-dc-status.json` (`{lastRunAt, dcWrite: ok|skipped|error, reason, fl511, summary}`; reasons include `credentials_unavailable`, `auth_rejected`, `timeout`, `not_configured`), which CloudFront serves at `/status/live-dc-status.json`. The workspace strips show it as "Cloud sync: on / error / not running" (`src/liveDcCloudSync.js`).
 
 **Single writer rule.** Once the lambda is writing (status `dcWrite: ok`), stop any local `npm run live-dc:sync`. Two writers would duplicate loads and fight over the diff.
-
-The token lasts about an hour. If the signed-in machine stops (no `dc:login`, or no dev/api server running), the cloud writer skips with `token_expired` until someone signs in again.
 
 ## Configuration (env only)
 

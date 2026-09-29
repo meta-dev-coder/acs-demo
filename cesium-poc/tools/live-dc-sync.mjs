@@ -4,6 +4,7 @@
  * into the "SDNA Florida I595 Live *" DataConnect classes.
  *
  *   node tools/live-dc-sync.mjs [--once] [--interval <s>] [--profile demo|realistic] [--feed <fixture.json>]
+ *   node tools/live-dc-sync.mjs --hash-password      (reads a password on stdin, prints LIVE_DEMO_PASSWORD_HASH)
  *
  * Reads DataConnect at DC_WRITER_BASE_URL and writes through its load service at DC_WRITER_LOAD_BASE_URL
  * (both required) with DC_WRITER_ACCESS_TOKEN,
@@ -12,10 +13,13 @@
  *            {incidents:[{itemId,latitude,longitude,title?}], closures:[], construction:[], congestion:[],
  *             disabledVehicles:[], details:{<itemId>:{title, description, fields:[]}}}
  *
+ * LIVE_DC_HTTP_PORT (EC2 demo, deploy/ec2/) also serves the built frontend (LIVE_DC_WEB_DIR) and the read-only API
+ * behind a password gate (LIVE_DEMO_PASSWORD_HASH) from this process; unset = sync only.
+ * LIVE_DC_SERVICE_CLIENT_SECRET_NAME reads the client from Secrets Manager via the AWS CLI (EC2: deploy/ec2/).
  * Env: see the "Live DataConnect writer" block in .env.example. LIVE_DC_SNAPSHOT_BUCKET + LIVE_DC_SNAPSHOT_PUBLIC_BASE
  * store event camera snapshots with the AWS CLI; LIVE_DC_PUBLIC_API_BASE makes camera_snapshot_url absolute.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadServerEnv } from '../server/loadEnv.mjs';
@@ -25,10 +29,13 @@ import { createFl511Service } from '../server/fl511Service.mjs';
 import { LINK_MODES } from '../server/liveDc/classes.mjs';
 import { WRITER_ERRORS, createDcWriter, loadDcWriterConfig, missingWriterConfig } from '../server/liveDc/dcWriter.mjs';
 import { loadWorkflowConfig } from '../server/liveDc/workflow.mjs';
-import { createAssetCache, createCycleMemory, runLiveDcCycle } from '../server/liveDc/cycle.mjs';
+import { createAssetCache, createCycleMemory, parseHoldOpen, runLiveDcCycle } from '../server/liveDc/cycle.mjs';
 import { createEventCapture } from '../server/liveDc/eventCapture.mjs';
 import { snapshotStoreFromEnv } from '../server/liveDc/eventSnapshots.mjs';
 import { publicBaseUrl } from '../server/liveDc/eventEnrichment.mjs';
+import { applyServiceClientSecret } from '../server/liveDc/awsSecret.mjs';
+import { hashPassword } from '../server/liveDc/demoAuth.mjs';
+import { createSyncStatus, loadDemoHttpConfig, startDemoHttp } from '../server/liveDc/demoServer.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const REMOVED_FLAGS = Object.freeze(['--standin', '--remote']);
@@ -48,7 +55,7 @@ const positive = (value, name) => {
 };
 
 export function parseSyncArgs(argv) {
-  const args = { once: false, interval: null, profile: null, feed: null };
+  const args = { once: false, interval: null, profile: null, feed: null, hashPassword: false };
   const value = (i, flag) => {
     if (i + 1 >= argv.length || argv[i + 1].startsWith('--')) throw new UsageError(`${flag} needs a value`);
     return argv[i + 1];
@@ -57,6 +64,7 @@ export function parseSyncArgs(argv) {
     const flag = argv[i];
     switch (flag) {
       case '--once': args.once = true; break;
+      case '--hash-password': args.hashPassword = true; break;
       case '--interval': args.interval = positive(value(i, flag), flag); i++; break;
       case '--profile': args.profile = value(i, flag); i++; break;
       case '--feed': args.feed = value(i, flag); i++; break;
@@ -118,6 +126,43 @@ const MISSING_CLASSES_HINT = 'The Live classes must be created by a DataConnect 
   + 'config/liveDc/live-classes.create-requests.json (POST /class, then POST /class/{id} with `add`, in order) '
   + 'and server/liveDc/README.md. Never use /admin/data/import.';
 
+/** One line from stdin; on a terminal the input is not echoed. */
+function readSecretLine(prompt) {
+  const input = process.stdin;
+  return new Promise((resolve, reject) => {
+    let buffer = '';
+    const tty = input.isTTY && typeof input.setRawMode === 'function';
+    if (tty) { process.stderr.write(prompt); input.setRawMode(true); }
+    input.setEncoding('utf8');
+    const finish = value => {
+      input.off('data', onData);
+      input.off('end', onEnd);
+      if (tty) { input.setRawMode(false); process.stderr.write('\n'); }
+      input.pause();
+      resolve(value);
+    };
+    const onData = chunk => {
+      for (const ch of chunk) {
+        if (ch === '\u0003') { if (tty) input.setRawMode(false); reject(new UsageError('cancelled')); return; }
+        if (ch === '\r' || ch === '\n') { finish(buffer); return; }
+        if (ch === '\u007f' || ch === '\b') buffer = buffer.slice(0, -1); else buffer += ch;
+      }
+    };
+    const onEnd = () => finish(buffer);
+    input.on('data', onData);
+    input.on('end', onEnd);
+    input.resume();
+  });
+}
+
+async function printPasswordHash() {
+  const password = await readSecretLine('Demo password: ');
+  if (!password) throw new UsageError('empty password');
+  if (process.stdin.isTTY && password !== await readSecretLine('Repeat: ')) throw new UsageError('passwords do not match');
+  console.log(hashPassword(password));
+  return 0;
+}
+
 async function main(argv) {
   let args;
   try {
@@ -126,10 +171,18 @@ async function main(argv) {
     console.error(`live-dc-sync: ${error.message}`);
     return 2;
   }
+  if (args.hashPassword) {
+    try {
+      return await printPasswordHash();
+    } catch (error) {
+      console.error(`live-dc-sync: ${error.message}`);
+      return error instanceof UsageError ? 2 : 1;
+    }
+  }
   loadServerEnv();
   const env = process.env;
 
-  let workflowConfig, profileName, linkMode, holdOpen, heartbeatSeconds, assetRefreshSeconds, intervalSeconds;
+  let workflowConfig, profileName, linkMode, holdOpen, heartbeatSeconds, assetRefreshSeconds, intervalSeconds, httpConfig;
   try {
     const spawnTypes = (env.LIVE_DC_SPAWN_TYPES ?? '').split(',').map(t => t.trim().toUpperCase()).filter(Boolean);
     workflowConfig = loadWorkflowConfig(spawnTypes.length ? { spawnTypes } : {});
@@ -137,11 +190,16 @@ async function main(argv) {
     if (!workflowConfig.profiles[profileName]) throw new UsageError(`unknown profile '${profileName}'`);
     linkMode = env.LIVE_DC_LINK_MODE || 'live';
     if (!LINK_MODES.includes(linkMode)) throw new UsageError(`LIVE_DC_LINK_MODE must be one of ${LINK_MODES.join(', ')}`);
-    holdOpen = new Set((env.LIVE_DC_HOLD_OPEN ?? '').split(',').map(k => k.trim()).filter(Boolean));
+    holdOpen = parseHoldOpen(env.LIVE_DC_HOLD_OPEN);
     heartbeatSeconds = env.LIVE_DC_HEARTBEAT_SECONDS ? Number(env.LIVE_DC_HEARTBEAT_SECONDS) : 900;
     if (!Number.isFinite(heartbeatSeconds) || heartbeatSeconds < 0) throw new UsageError('LIVE_DC_HEARTBEAT_SECONDS must be >= 0');
     assetRefreshSeconds = env.LIVE_DC_ASSET_REFRESH_SECONDS ? positive(env.LIVE_DC_ASSET_REFRESH_SECONDS, 'LIVE_DC_ASSET_REFRESH_SECONDS') : 3600;
     intervalSeconds = args.interval ?? (env.LIVE_DC_INTERVAL_SECONDS ? positive(env.LIVE_DC_INTERVAL_SECONDS, 'LIVE_DC_INTERVAL_SECONDS') : 60);
+    try {
+      httpConfig = args.once ? null : loadDemoHttpConfig(env);
+    } catch (error) {
+      throw new UsageError(error.message);
+    }
   } catch (error) {
     console.error(`live-dc-sync: ${error.message}`);
     return error instanceof UsageError ? 2 : 1;
@@ -149,6 +207,7 @@ async function main(argv) {
 
   let setup;
   try {
+    await applyServiceClientSecret({ env });
     setup = writerSetup({ env });
   } catch (error) {
     console.error(`live-dc-sync: ${error.message}`);
@@ -167,9 +226,11 @@ async function main(argv) {
     return 2;
   }
   const feedPath = args.feed ? resolve(process.cwd(), args.feed) : null;
+  const dataDir = env.LIVE_DC_DATA_DIR || join(ROOT, 'public', 'data');
+  const network = await loadI595Network(dataDir);
   const service = createFl511Service({
     config: loadConfig(env),
-    network: await loadI595Network(join(ROOT, 'public', 'data')),
+    network,
     client: feedPath ? createFixtureClient(() => JSON.parse(readFileSync(feedPath, 'utf8'))) : undefined,
     logger: console,
   });
@@ -182,14 +243,34 @@ async function main(argv) {
   console.log(`live-dc capture=${capture ? 'on' : 'off (--feed)'} snapshots=${snapshotStore
     ? `s3://${env.LIVE_DC_SNAPSHOT_BUCKET}/snapshots/ (aws cli)` : 'off'} camera links=${publicApiBase || 'relative'}`);
 
+  const status = createSyncStatus({ intervalSeconds });
+  let http = null;
+  if (httpConfig) {
+    try {
+      http = await startDemoHttp({
+        env, httpConfig: { ...httpConfig, webDir: httpConfig.webDir || join(ROOT, 'dist') }, service, network, dataDir, status, logger: console,
+      });
+    } catch (error) {
+      console.error(`live-dc-sync: HTTP host failed to start on ${httpConfig.host}:${httpConfig.port}: ${error.message}`);
+      service.stop();
+      return 1;
+    }
+    console.log(`live-dc http listening on ${http.url} (password required; /healthz open)`);
+  }
+
   let stopping = false;
   let wake = null;
-  const shutdown = async () => { service.stop(); };
-  process.once('SIGINT', () => {
-    stopping = true;
-    wake?.();
-    shutdown().finally(() => process.exit(0));
-  });
+  const shutdown = async () => {
+    service.stop();
+    await http?.close().catch(() => {});
+  };
+  for (const signal of ['SIGINT', 'SIGTERM']) {
+    process.once(signal, () => {
+      stopping = true;
+      wake?.();
+      shutdown().finally(() => process.exit(0));
+    });
+  }
 
   let exitCode = 0;
   while (!stopping) {
@@ -199,6 +280,7 @@ async function main(argv) {
         writer, service, workflowConfig, profileName, heartbeatSeconds, assetCache, memory, linkMode, logger: console, capture, publicApiBase, holdOpen,
       });
       console.log(formatCycleSummary(report));
+      status.recordCycle(report);
       if (args.once && report.errors.length) exitCode = 1;
     } catch (error) {
       if (error?.code === WRITER_ERRORS.LIVE_CLASS_MISSING) {
@@ -207,6 +289,7 @@ async function main(argv) {
         break;
       }
       console.error(`live-dc-sync: cycle failed: ${error.message}`);
+      status.recordFailure(error);
       if (args.once) exitCode = 1;
     }
     if (args.once || stopping) break;
@@ -222,7 +305,11 @@ async function main(argv) {
   return exitCode;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+const isMain = () => {
+  try { return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
+};
+
+if (process.argv[1] && isMain()) {
   main(process.argv.slice(2)).then(code => { process.exitCode = code; }, (error) => {
     console.error(`live-dc-sync: ${error.message}`);
     process.exitCode = 1;

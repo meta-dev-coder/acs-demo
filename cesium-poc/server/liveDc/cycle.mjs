@@ -65,6 +65,11 @@ export function createAssetCache({ writer, refreshSeconds = 3600, now = Date.now
   };
 }
 
+/** LIVE_DC_HOLD_OPEN: comma list of Live Events keys kept active even when FL511 no longer lists them. */
+export function parseHoldOpen(value) {
+  return new Set(String(value ?? '').split(',').map(key => key.trim()).filter(Boolean));
+}
+
 export async function runLiveDcCycle({
   holdOpen = new Set(),
   writer, service, now = Date.now, workflowConfig = loadWorkflowConfig(), profileName = workflowConfig.defaultProfile,
