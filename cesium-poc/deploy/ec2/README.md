@@ -1,5 +1,18 @@
 # Live DataConnect on EC2 (one-day demo host)
 
+> **For Claude Code / AI assistants deploying this:** the repo git-ignores `CLAUDE.md`, so this file is the
+> shared source. To load it automatically, add the line `@cesium-poc/deploy/ec2/README.md` to your local
+> `CLAUDE.md`. Rules:
+> - **Ask the user before running any AWS command**, even read-only ones (`aws ec2 describe-*`, `aws s3 cp`, `cdk diff`).
+> - The host `i-02402cca42da52edd` (34.237.187.140) is **shared** with another app (`aws-import`: gunicorn 5959,
+>   nginx 80/443, Docker 8080). Never touch those. Ours lives only in `/opt/live-dc` and `/etc/live-dc`, port 8095.
+> - **One DataConnect writer at a time:** stop any laptop `npm run live-dc:sync` before starting the EC2 service.
+> - `/etc/live-dc/env` must have each key **once** (systemd uses the last value), including
+>   `LIVE_DC_HOLD_OPEN=FL511-876573,FL511-876564` - if it is empty, the next cycle clears the 2 demo closures.
+> - **Never commit or print secrets.** The DataConnect service client is in Secrets Manager
+>   (`i595/dataconnect/service-client`) and in the git-ignored `cesium-poc/.env.local`.
+> - The service uses its own Node at `/opt/live-dc/bin/node` (system Node is 12); `install.sh` sets it up.
+
 One Node process (`live-dc-sync.mjs`, systemd unit `live-dc`) on an EC2 instance with an IAM instance role:
 
 - the live sync loop (FL511 -> DataConnect Live classes) every `LIVE_DC_INTERVAL_SECONDS` (300),
