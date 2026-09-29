@@ -213,6 +213,11 @@ export function installMaintenanceLayer(viewer) {
   }
 
   function setRecords(assetType, records) {
+    // Whether this class is on the map, answered WITHOUT typeShown(): that asks `layers.has()`, and
+    // this class is not registered until the end of this function. Asking it here made every marker
+    // of a class's first load come out hidden whenever the records arrived before the workspace
+    // opened — the preload path, which is exactly what Live Ops warms up.
+    const visibleNow = showAll || assetType === active;
     const previous = layerOf(assetType);
     if (previous) {
       for (const [id, entity] of previous.entities) { source.entities.remove(entity); byKey.delete(`${assetType}:${id}`); }
@@ -239,7 +244,7 @@ export function installMaintenanceLayer(viewer) {
         const initial = tone?.glyph || tone?.glyphSvg ? 'id' : 'dot';
         const position = Cartesian3.fromDegrees(item.longitude, item.latitude);
         const entity = source.entities.add({
-          id: entityId(assetType, item.id), name: item.id, show: typeShown(assetType),
+          id: entityId(assetType, item.id), name: item.id, show: visibleNow,
           position, billboard: { ...BILLBOARD, ...markerFor(item.id, tone, initial) },
         });
         entities.set(item.id, entity);
