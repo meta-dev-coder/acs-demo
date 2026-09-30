@@ -20,6 +20,8 @@ export const EVENT_WINDOWS = Object.freeze({
   active: null, '1h': 3_600_000, '2h': 7_200_000, '6h': 21_600_000, '24h': 86_400_000, all: Infinity,
 });
 export const DEFAULT_EVENT_WINDOW = 'active';
+/** The widest window: its rows are a superset of every other window's. */
+export const ALL_WINDOW = 'all';
 /** An unknown or absent key is the default, never an error: a stale bookmark still loads the map. */
 export const parseEventWindow = value =>
   (typeof value === 'string' && Object.hasOwn(EVENT_WINDOWS, value) ? value : DEFAULT_EVENT_WINDOW);
@@ -253,12 +255,26 @@ export async function readLiveDcEvents({
   const windowMs = EVENT_WINDOWS[key];
   let byWindow = rowCache.get(readApi);
   if (!byWindow) { byWindow = new Map(); rowCache.set(readApi, byWindow); }
+  const fresh = candidate => candidate && (candidate.at == null || clock() - candidate.at < cacheMs);
   let entry = byWindow.get(key);
-  if (!entry || (entry.at != null && clock() - entry.at >= cacheMs)) {
+  /**
+   * A fresh read of the WIDEST window already answers every narrower one.
+   *
+   * `all` holds every cleared record and the payload below does its own filtering by `windowMs`, so
+   * once history has been read at its widest, moving the dropdown to 6h or 1h costs nothing at all.
+   *
+   * Only ever wider serving narrower — the reverse would silently drop records. And never widening
+   * the read itself: fetching `all` up front to make later picks cheap was measured and made the
+   * FIRST pick markedly slower (1.4 s -> 2.0-6.1 s), which is the one an operator actually waits
+   * for. Each window still reads only as much as it needs; this just reuses what is already held.
+   */
+  if (!fresh(entry) && key !== ALL_WINDOW && fresh(byWindow.get(ALL_WINDOW))) entry = byWindow.get(ALL_WINDOW);
+  if (!fresh(entry)) {
     entry = { at: null, read: fetchEventRows(readApi, { pageSize, maxPages, logger, windowMs, now }) };
     byWindow.set(key, entry);
     entry.read.then(() => { entry.at = clock(); }, () => { if (byWindow.get(key) === entry) byWindow.delete(key); });
   }
+
   const { rows, totalRecords, truncated, total } = await entry.read;
   const payload = liveDcEventsPayload(rows, network, {
     now, bufferMeters: config.bufferMeters, segmentToleranceMeters: config.segmentToleranceMeters, refreshSeconds: config.refreshSeconds,

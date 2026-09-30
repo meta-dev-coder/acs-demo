@@ -176,6 +176,31 @@ test('paging follows totalCount when the server caps the page below the requeste
   assert.equal(payload.events.length, direct.events.length);
 });
 
+test('a narrower history window is served from the widest one already read', async () => {
+  // Changing the History dropdown cost a DataConnect round trip per window — 0.7-1.4 s measured,
+  // which was the whole of the pause an operator felt. `all` reads every cleared record and the
+  // payload filters by window itself, so a fresh `all` can answer any narrower window for free.
+  const { rows } = await dcRows();
+  const history = Array.from({ length: 30 }, (_, n) => clearedCopy(rows[0], n));
+  const readApi = fakeReadApi([...rows, ...history]);
+  await readLiveDcEvents({ ...readOptions, readApi, eventWindow: 'all' });
+  const afterAll = readApi.calls.length;
+  const narrowed = await readLiveDcEvents({ ...readOptions, readApi, eventWindow: '24h' });
+  assert.equal(readApi.calls.length, afterAll, 'the narrower window asked DataConnect for nothing');
+  assert.ok(narrowed.events.length > 0, 'and still answered');
+});
+
+test('an ordinary load still reads no cleared history, whatever the cache holds', async () => {
+  // The default window reads active records and nothing else. Any attempt to make the History
+  // dropdown faster must not reach back into this path: widening or warming here would have every
+  // ordinary map load pulling cleared history it never shows.
+  const { rows } = await dcRows();
+  const readApi = fakeReadApi([...rows, ...Array.from({ length: 5 }, (_, n) => clearedCopy(rows[0], n))]);
+  await readLiveDcEvents({ ...readOptions, readApi });
+  const cleared = readApi.calls.filter(body => JSON.stringify(body.filters ?? '').includes('cleared'));
+  assert.equal(cleared.length, 0, 'an ordinary load reads no cleared history at all');
+});
+
 test('only status=active records are requested from DataConnect; cleared history is not read', async () => {
   const { direct, rows } = await dcRows();
   const history = Array.from({ length: 30 }, (_, n) => clearedCopy(rows[0], n));
