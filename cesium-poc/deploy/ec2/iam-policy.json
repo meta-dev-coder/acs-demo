@@ -4,8 +4,17 @@
     {
       "Sid": "ReadDataConnectServiceClient",
       "Effect": "Allow",
-      "Action": "secretsmanager:GetSecretValue",
+      "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+      ],
       "Resource": "arn:aws:secretsmanager:us-east-1:589391957147:secret:i595/dataconnect/service-client-*"
+    },
+    {
+      "Sid": "ReadAnthropicKeyForAskTheTwin",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": "arn:aws:secretsmanager:us-east-1:589391957147:secret:i595/anthropic-key-*"
     },
     {
       "Sid": "WriteEventSnapshots",

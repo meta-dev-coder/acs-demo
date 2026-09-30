@@ -14,6 +14,7 @@ export function createReadApiHandlers({ config = loadConfig(), env = process.env
   const shared = { ...(dataDir ? { dataDir } : {}) };
   const api = createLiveEventsApi({ config, liveDc: liveDcReadApi, logger, service, network, ...shared });
   const handlers = [api, createSnapshotApi({ logger, ...shared }), createMessageSignsApi({ config, network, ...shared }), liveDcReadApi];
-  if (dataConnect) handlers.push(createDataConnectApi({ config: loadDataConnectConfig(env), logger }));
-  return { handlers, stop: () => api.stop() };
+  const historical = dataConnect ? createDataConnectApi({ config: loadDataConnectConfig(env), logger }) : null;
+  if (historical) handlers.push(historical);
+  return { handlers, liveEvents: api, liveDc: liveDcReadApi, historical, stop: () => api.stop() };
 }

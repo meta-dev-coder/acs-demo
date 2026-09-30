@@ -1,0 +1,97 @@
+{
+  "$comment": "Hand-written meaning of every data source Ask the Twin can reach. server/liveDc/dataDictionary.mjs merges it with the attribute lists from config/liveDc/*.json and the GeoJSON files; a test fails when a class or layer has no entry here.",
+  "overview": "The I-595 Digital Twin covers the I-595 corridor in Broward County, Florida (I-75 in the west to US-1/Port Everglades in the east, ~11 miles). Records live in Bentley DataConnect: the customer's historical classes (read-only, 'Florida I595 ...') and SuperDNA's live classes ('SDNA Florida I595 Live ...') filled every few minutes from the FL511 feed. Corridor geometry and roadside assets also ship as GeoJSON layers.",
+  "workspaces": {
+    "Traffic": "FDOT traffic segments coloured by level of service, express lanes, ramps and live FL511 events.",
+    "Safety": "Crash hotspots, crash trends, live crashes and weather effects on the corridor.",
+    "Maintenance": "Historical and live tickets, tasks, work orders and inspections on the asset registry, with risk scoring.",
+    "Live Ops": "Live FL511 events from DataConnect with their camera photo, weather, conditions and the automatic response chain."
+  },
+  "dataConnectClasses": {
+    "SDNA Florida I595 Live Events": {
+      "purpose": "One record per FL511 event near I-595 (incident, closure, construction, congestion, disabled vehicle). Written by the live sync; keyInSource is 'FL511-<fl511_item_id>'.",
+      "keyFields": ["event_type", "status (active|cleared)", "first_seen_at", "last_seen_at", "cleared_at", "direction", "carriageway", "nearest_facility_label", "lane_impact_label", "full_closure", "latitude", "longitude", "primary_camera_id", "camera_snapshot_url", "weather fields"],
+      "notes": "status turns 'cleared' when FL511 stops listing the event. Times are UTC ISO strings."
+    },
+    "SDNA Florida I595 Live Tickets": {
+      "purpose": "The ticket opened automatically for a live event. keyInSource 'TIC-<event key>'.",
+      "keyFields": ["Ticket ID", "Ticket Status", "Priority", "Issue Summary", "Issue Category", "Asset ID", "source_event_id", "created_at", "status_changed_at"],
+      "links": "source_event_id = the Live Events keyInSource."
+    },
+    "SDNA Florida I595 Live Tasks": {
+      "purpose": "Field tasks under a live ticket (dispatch, mitigation, inspect and verify). keyInSource 'TSK-<event key>-NN'.",
+      "keyFields": ["Task ID", "Task Type", "Task Status", "Assigned Team", "Related Ticket ID", "source_event_id"],
+      "links": "Related Ticket ID = the ticket's Ticket ID."
+    },
+    "SDNA Florida I595 Live Work Orders": {
+      "purpose": "The work order for a live event's response or repair. keyInSource 'WO-<event key>'.",
+      "keyFields": ["Work Order ID", "Work Type", "Work Order Status", "Priority", "Repair Category", "Related Ticket ID", "Related Task ID", "Close Date", "source_event_id"],
+      "links": "Related Ticket ID and Related Task ID point back up the chain."
+    },
+    "SDNA Florida I595 Live Inspections": {
+      "purpose": "The inspection recorded after a live event clears. keyInSource 'INSP-<event key>'.",
+      "keyFields": ["record_id", "inspected_at", "inspector_name", "pass_fail", "inspection_result", "asset_condition", "recommended_action", "risk_rating_1_5", "related_ticket_id", "related_work_order_id", "source_event_id"],
+      "links": "related_ticket_id / related_work_order_id point to the chain."
+    },
+    "SDNA Florida I595 Live Asset Status": {
+      "purpose": "An asset marked damaged by a live event's inspection. keyInSource 'AST-<asset code>'.",
+      "keyFields": ["asset_id", "asset_category", "status", "damaged_at", "source_inspection_id", "source_event_id"],
+      "links": "asset_id = the asset registry code; source_inspection_id = the inspection."
+    },
+    "Florida I595 Assets": {
+      "purpose": "The customer's asset registry (about 5,000 roadside assets: cameras, signs, lighting, detectors, drainage, structures ...).",
+      "keyFields": ["keyInSource", "code", "name", "asset category", "system class", "status", "criticality", "install date", "segment name", "x_coordinates (lon)", "y_coordinates (lat)"],
+      "notes": "Historical, read-only. Asset IDs used by tickets and work orders are the asset code."
+    },
+    "Florida I595 Incidents": {
+      "purpose": "Historical incidents with root cause, injuries, lane closure and damaged asset.",
+      "keyFields": ["incident_date", "incident_time", "incident_type", "root_cause", "root_cause_category", "lane_closure_y_n", "lane_closure_duration_hours", "injuries_y_n", "fatalities", "damaged_asset_id", "weather", "traffic_conditions", "segment name"]
+    },
+    "Florida I595 Tickets": {
+      "purpose": "Historical maintenance tickets.",
+      "keyFields": ["Ticket ID", "Ticket Status", "Priority", "Issue Summary", "Issue Category", "Asset ID", "Asset Type", "Ticket Opened Date", "Source Signal", "Segment"]
+    },
+    "Florida I595 Tasks": {
+      "purpose": "Historical tasks under tickets.",
+      "keyFields": ["Task ID", "Task Type", "Task Status", "Assigned Team", "Task Date", "Related Ticket ID", "Asset ID"]
+    },
+    "Florida I595 Work Orders": {
+      "purpose": "Historical work orders (about 850).",
+      "keyFields": ["Work Order ID", "Work Type", "Work Order Status", "Priority", "Repair Category", "Work Order Open Date", "Close Date", "Asset ID", "Related Ticket ID", "Related Task ID"],
+      "notes": "Dates are MM/DD/YYYY strings."
+    },
+    "Florida I595 ITS Inspections": {
+      "purpose": "Historical inspections of ITS devices (cameras, signs, detectors ...).",
+      "keyFields": ["inspection_date", "asset_id", "asset_type", "pass_or_fail", "inspection_result", "asset_condition", "risk_rating_1_5", "recommended_action", "inspector_name"]
+    },
+    "Florida I595 Roadway Inspections": {
+      "purpose": "Historical roadway inspections (pavement, drainage, markings, guardrail, signs).",
+      "keyFields": ["inspection_date", "asset_type", "pass_fail", "condition_score_1_5", "risk_rating_1_5", "issue_summary", "recommended_action", "potholes_or_surface_failures", "standing_water_in_lanes"]
+    },
+    "Florida I595 Safety Inspections": {
+      "purpose": "Historical roadside safety inspections (attenuators, guardrail, debris, clear zone).",
+      "keyFields": ["date", "asset_id", "pass_fail", "risk_rating_1_5_v3", "safety_issue_description_v3", "recommended_action_standardized", "crash_attenuator_issue", "debris_in_travel_lanes"]
+    },
+    "Florida i595 Roadway Segments": {
+      "purpose": "The DataConnect roadway segments that records are assigned to.",
+      "keyFields": ["keyInSource", "name", "roadway", "traffic_direction", "west_end_marker_id", "east_end_marker_id"]
+    }
+  },
+  "chain": "Every live event starts a chain: Live Event -> Live Ticket (source_event_id) -> Live Tasks (Related Ticket ID) -> Live Work Order (Related Ticket ID, Related Task ID) -> Live Inspection after the event clears (related_ticket_id, related_work_order_id) -> Live Asset Status for assets it damaged (source_inspection_id). All chain records also carry source_event_id. With the demo timing profile: task assigned 1 min after first seen, work order at 2 min, inspection 2 min after clearing, ticket closed 5 min after the inspection.",
+  "corridorLayers": {
+    "i595_corridor_cameras.geojson": "FDOT CCTV cameras along I-595 (camera_id, title, direction, divas_chan_id for live snapshots).",
+    "i595_corridor_traffic_signals.geojson": "Traffic signals at the interchanges (signal_id, cross_street, signal_type).",
+    "i595_bridges.geojson": "Bridge structures (structure_id, display_name, roadway, begin_post/end_post).",
+    "i595_express_gantries.geojson": "Express lane toll/DMS gantries (gantry_id, name, direction, milepost, dms_text).",
+    "i595_fdot_traffic_segments.geojson": "FDOT traffic segments with AADT (segment_id, direction, desc_from, desc_to, aadt, aadt_year).",
+    "i595_ramps_connectors_classified.geojson": "Ramps and connectors classified by function and connected road.",
+    "i595_mainline_eb.geojson": "I-595 mainline eastbound centreline.",
+    "i595_mainline_wb.geojson": "I-595 mainline westbound centreline.",
+    "express-way.geojson": "I-595 Express reversible lanes centreline.",
+    "sr84_frontage_roads.geojson": "SR-84 frontage roads alongside I-595.",
+    "main-highway.geojson": "FDOT roadway record for the I-595 mainline.",
+    "dnt-gantries.json": "Toll gantry records used by the toll-plaza demo."
+  },
+  "scoring": "Asset risk (Maintenance) is a weighted score of age ratio, open tickets, recent work orders, manufacturer end-of-life, exposure and overdue inspection; red at >= 0.62, amber at >= 0.40 (src/scoringConfig.json).",
+  "limits": "Ask the Twin reads only. It cannot create, change or close records. FL511 publishes only current events; history before the live sync started is only in the historical classes."
+}

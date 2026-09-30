@@ -74,7 +74,7 @@ function readBody(req, limit) {
 }
 
 export function createDemoHost({
-  passwordHash, webDir, apiHandlers = [], status = {}, logger = console, now = Date.now, sessionKey,
+  passwordHash, webDir, apiHandlers = [], ask = null, status = {}, logger = console, now = Date.now, sessionKey,
   sessionTtlMs = 8 * 3600_000, maxFailures = 5, lockoutMs = 15 * 60_000, home = '/?demo=i595',
 }) {
   if (!passwordHash) throw new Error('LIVE_DEMO_PASSWORD_HASH is required for the HTTP host');
@@ -170,6 +170,7 @@ export function createDemoHost({
 
     if (pathname.startsWith('/api/')) {
       if (pathname === ASK) {
+        if (ask) return ask.handle(req, res);
         return send(req, res, 503, { error: 'Free-form questions are not available in this demo deployment. Ask about assets, events or a drawn area.' });
       }
       if (SIGN_IN.test(pathname)) return send(req, res, 404, { error: 'Not found.' });

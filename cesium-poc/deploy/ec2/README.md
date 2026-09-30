@@ -91,11 +91,14 @@ principal.
 
 ## 3. Instance role
 
-Attach `iam-policy.json` (secret read, `snapshots/*` writes, `releases/live-dc/*` reads) to the instance role:
+Attach `iam-policy.json` (DataConnect service-client and Anthropic key reads, `snapshots/*` writes, `releases/live-dc/*`
+reads) to the instance role. On `i-02402cca42da52edd` it is the inline policy `live-dc` on `devteam_ssm_access`:
 
 ```text
-aws iam put-role-policy --role-name <INSTANCE_ROLE_NAME> --policy-name live-dc-sync --policy-document file://iam-policy.json
+aws iam put-role-policy --role-name devteam_ssm_access --policy-name live-dc --policy-document file://iam-policy.json
 ```
+
+`put-role-policy` replaces the whole inline policy: compare with `aws iam get-role-policy` first.
 
 Host needs: Node >= 20.12 on systemd's PATH, AWS CLI v2, `curl`, outbound HTTPS, and inbound TCP 8095.
 
@@ -143,6 +146,24 @@ sudo /opt/live-dc/livedc.sh restart | stop | start
 switches the `/opt/live-dc/current` symlink atomically, refreshes `livedc.sh` and the unit from the release, and restarts.
 It keeps the last 3 releases. The unit caps the process at `MemoryMax=512M` and `CPUQuota=50%`. A failed start (for
 example, secret access denied) is logged and retried every 30 s.
+
+## Ask the Twin (free-form questions)
+
+With `ASK_TWIN_ANTHROPIC_SECRET_NAME=i595/anthropic-key` in `/etc/live-dc/env`, `POST /api/i595/ask` (behind the
+password) answers with Claude (`ASK_TWIN_MODEL`, default `claude-sonnet-5`). Unset, it answers 503 and only the
+built-in answers work. The model can call read-only tools (`server/liveDc/askTools.mjs`): the data dictionary, live
+events, a live event's chain, filtered reads of any live or historical DataConnect class, the corridor layers and the
+current weather. The release ships `data/data-dictionary.json`, built from the code's own config plus
+`config/askTwin/dataGuide.json` (a class or layer without an entry there fails the build). The key is read on the
+first question through the instance role and never logged. The logs show `ask-the-twin: on` at start and the tools
+used for each answer.
+
+To turn it on for an existing install, add these lines once to `/etc/live-dc/env`, then `sudo /opt/live-dc/livedc.sh restart`:
+
+```text
+ASK_TWIN_ANTHROPIC_SECRET_NAME=i595/anthropic-key
+ASK_TWIN_MODEL=claude-sonnet-5
+```
 
 ## 7. Shutdown / uninstall
 

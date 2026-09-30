@@ -95,6 +95,11 @@ export function createLiveEventsApi({ config = loadConfig(), dataDir = DEFAULT_D
 
   return {
     handle,
+    /** The DataConnect live events payload for a window (default: active), or null when DataConnect cannot be read. */
+    async dataConnectEvents(eventWindow = DEFAULT_EVENT_WINDOW) {
+      const { status, payload } = await fromDataConnect(parseEventWindow(eventWindow));
+      return status === 200 ? payload : null;
+    },
     /** Express-style adapter for Vite's middleware stack. */
     middleware: (request, response, next) => { handle(request, response).then(handled => { if (!handled) next(); }, next); },
     async stop() { if (ready) (await ready).stop(); },

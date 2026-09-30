@@ -59,14 +59,18 @@ describe('EC2 bundle', () => {
   });
   after(() => rmSync(dir, { recursive: true, force: true }));
 
-  test('dist holds one ESM file, the ops files and only the corridor data the sync reads', () => {
+  test('dist holds one ESM file, the ops files, the corridor data the process reads and the data dictionary', () => {
     assert.deepEqual(readdirSync(join(dir, 'dist')).sort(), ['data', 'env.example', 'install.sh', 'live-dc-sync.mjs', 'live-dc.service', 'livedc.sh']);
     assert.deepEqual([...OPS_FILES].sort(), ['env.example', 'install.sh', 'live-dc.service', 'livedc.sh']);
-    assert.deepEqual(readdirSync(join(dir, 'dist', 'data')).sort(), [...RUNTIME_DATA_FILES].sort());
+    assert.deepEqual(readdirSync(join(dir, 'dist', 'data')).sort(), [...RUNTIME_DATA_FILES, 'data-dictionary.json'].sort());
     assert.deepEqual([...RUNTIME_DATA_FILES].sort(), [
-      'express-way.geojson', 'i595_corridor_cameras.geojson', 'i595_fdot_traffic_segments.geojson', 'i595_mainline_eb.geojson',
+      'express-way.geojson', 'i595_bridges.geojson', 'i595_corridor_cameras.geojson', 'i595_corridor_traffic_signals.geojson',
+      'i595_express_gantries.geojson', 'i595_fdot_traffic_segments.geojson', 'i595_mainline_eb.geojson',
       'i595_mainline_wb.geojson', 'i595_ramps_connectors_classified.geojson', 'sr84_frontage_roads.geojson',
     ]);
+    const dictionary = JSON.parse(readFileSync(join(dir, 'dist', 'data', 'data-dictionary.json'), 'utf8'));
+    assert.equal(dictionary.dataConnect.live.length + dictionary.dataConnect.historical.length, 15);
+    assert.equal(dictionary.corridorLayers.length, 6);
     const bundle = readFileSync(join(dir, 'dist', 'live-dc-sync.mjs'), 'utf8');
     const specifiers = [...bundle.matchAll(/(?:^|[;\s])(?:import|export)\s[^;'"]*?from\s*["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)/gm)]
       .map(m => m[1] ?? m[2]);
@@ -218,11 +222,12 @@ describe('EC2 deploy files', () => {
     assert.ok(!SECRETISH.test(env.replace(/^LIVE_DEMO_PASSWORD_HASH=$/m, '')));
   });
 
-  test('iam-policy.json: secret read, snapshot writes, release reads', () => {
+  test('iam-policy.json: secret reads, snapshot writes, release reads', () => {
     const policy = JSON.parse(read('iam-policy.json'));
     assert.equal(policy.Version, '2012-10-17');
     assert.deepEqual(policy.Statement.map(s => [s.Effect, [s.Action].flat(), [s.Resource].flat()]), [
-      ['Allow', ['secretsmanager:GetSecretValue'], ['arn:aws:secretsmanager:us-east-1:589391957147:secret:i595/dataconnect/service-client-*']],
+      ['Allow', ['secretsmanager:GetSecretValue', 'secretsmanager:DescribeSecret'], ['arn:aws:secretsmanager:us-east-1:589391957147:secret:i595/dataconnect/service-client-*']],
+      ['Allow', ['secretsmanager:GetSecretValue'], ['arn:aws:secretsmanager:us-east-1:589391957147:secret:i595/anthropic-key-*']],
       ['Allow', ['s3:PutObject'], ['arn:aws:s3:::i595stackv5-i595corridordata41064a5b-oixfpv0dyrzj/snapshots/*']],
       ['Allow', ['s3:GetObject'], ['arn:aws:s3:::i595stackv5-i595corridordata41064a5b-oixfpv0dyrzj/releases/live-dc/*']],
     ]);

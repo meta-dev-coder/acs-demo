@@ -93,6 +93,13 @@ describe('release-live-dc', () => {
     await assert.rejects(releaseLiveDc({ distDir: leaky, outDir: join(dir, 'r4'), build: false, logger: silent }), /secret-looking/);
   });
 
+  test('refuses a bundle that contains an Anthropic API key', async () => {
+    const leaky = join(dir, 'leaky-anthropic');
+    cpSync(dist, leaky, { recursive: true });
+    writeFileSync(join(leaky, 'data', 'notes.json'), '{"api_key":"sk-ant-api03-TESTONLYtestonlyTESTONLY00"}');
+    await assert.rejects(releaseLiveDc({ distDir: leaky, outDir: join(dir, 'r5'), build: false, logger: silent }), /secret-looking/);
+  });
+
   test('npm script and the release directory are wired', () => {
     assert.equal(JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).scripts['live-dc:release'], 'node tools/release-live-dc.mjs');
   });

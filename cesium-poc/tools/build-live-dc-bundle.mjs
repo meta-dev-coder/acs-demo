@@ -13,21 +13,24 @@
  * --no-env-files, from the project .env files.
  */
 import { spawn } from 'node:child_process';
-import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, statSync } from 'node:fs';
+import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
+import { ASK_LAYER_FILES, DICTIONARY_FILE, buildDataDictionary } from '../server/liveDc/dataDictionary.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const EC2_DIR = join(ROOT, 'deploy', 'ec2');
 export const DEFAULT_OUT_DIR = join(EC2_DIR, 'dist');
 
-// server/i595Network.mjs SOURCES + FDOT segments; server/liveDc/eventEnrichment.mjs + api.mjs cameras.
-export const RUNTIME_DATA_FILES = Object.freeze([
+// server/i595Network.mjs SOURCES + FDOT segments; server/liveDc/eventEnrichment.mjs + api.mjs cameras; the
+// corridor layers Ask the Twin searches (server/liveDc/askTools.mjs).
+export const RUNTIME_DATA_FILES = Object.freeze([...new Set([
   'i595_mainline_eb.geojson', 'i595_mainline_wb.geojson', 'express-way.geojson', 'sr84_frontage_roads.geojson',
   'i595_ramps_connectors_classified.geojson', 'i595_fdot_traffic_segments.geojson', 'i595_corridor_cameras.geojson',
-]);
+  ...ASK_LAYER_FILES,
+])]);
 export const OPS_FILES = Object.freeze(['install.sh', 'livedc.sh', 'live-dc.service', 'env.example']);
 
 export const WEB_BUILD_ENV = Object.freeze({
@@ -125,13 +128,16 @@ export async function buildLiveDcBundle({ outDir = DEFAULT_OUT_DIR, web = 'build
     banner: { js: BANNER }, legalComments: 'none', logLevel: 'warning',
   });
   for (const name of RUNTIME_DATA_FILES) copyFileSync(join(ROOT, 'public', 'data', name), join(outDir, 'data', name));
+  // The data dictionary Ask the Twin reasons with, built from the code's own config and these layers.
+  const dictionary = buildDataDictionary({ readLayer: name => JSON.parse(readFileSync(join(outDir, 'data', name), 'utf8')) });
+  writeFileSync(join(outDir, 'data', DICTIONARY_FILE), `${JSON.stringify(dictionary, null, 2)}\n`);
   for (const name of OPS_FILES) cpSync(join(EC2_DIR, name), join(outDir, name));
   if (web === 'build') await buildLiveDcWeb({ outDir: join(outDir, 'web'), envFiles, logger });
   else if (web) cpSync(web.from, join(outDir, 'web'), { recursive: true });
   const bytes = statSync(outfile).size;
-  logger.log?.(`live-dc bundle: ${outfile} (${Math.round(bytes / 1024)} KiB) + ${RUNTIME_DATA_FILES.length} data files`
+  logger.log?.(`live-dc bundle: ${outfile} (${Math.round(bytes / 1024)} KiB) + ${RUNTIME_DATA_FILES.length} data files + ${DICTIONARY_FILE}`
     + `${web ? ' + web/' : ' (no web/)'} + ops files`);
-  return { outfile, bytes, dataFiles: [...RUNTIME_DATA_FILES], web: Boolean(web) };
+  return { outfile, bytes, dataFiles: [...RUNTIME_DATA_FILES, DICTIONARY_FILE], web: Boolean(web) };
 }
 
 export function parseBundleArgs(argv) {

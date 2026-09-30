@@ -35,30 +35,38 @@ function runAws(spawnImpl, args, timeoutMs) {
   });
 }
 
+/**
+ * One secret's SecretString through the AWS CLI (instance role). Errors name the secret, never its value.
+ * @returns {Promise<string>}
+ */
+export async function readSecretString(name, { region = DEFAULT_REGION, spawnImpl = spawn, timeoutMs = 20_000, policyHint = POLICY_HINT } = {}) {
+  const args = ['secretsmanager', 'get-secret-value', '--secret-id', name, '--region', region, '--query', 'SecretString', '--output', 'text'];
+  let result;
+  try {
+    result = await runAws(spawnImpl, args, timeoutMs);
+  } catch (error) {
+    if (error?.code === 'ENOENT') throw new Error(`aws CLI not found on PATH: install AWS CLI v2 to read secret ${name}`);
+    throw new Error(`reading secret ${name} failed: ${error?.message ?? error}`);
+  }
+  if (result.code !== 0) {
+    if (/AccessDenied|not authorized|UnrecognizedClient|NoCredentials|Unable to locate credentials/i.test(result.stderr)) {
+      throw new Error(`access denied reading secret ${name} in ${region}: ${policyHint}`);
+    }
+    if (/ResourceNotFound/i.test(result.stderr)) throw new Error(`secret ${name} not found in ${region}`);
+    throw new Error(`aws secretsmanager exit ${result.code} reading ${name}${result.stderr ? `: ${result.stderr.trim()}` : ''}`);
+  }
+  return result.stdout;
+}
+
 export async function applyServiceClientSecret({ env = process.env, spawnImpl = spawn, logger = console, timeoutMs = 20_000 } = {}) {
   const name = String(env.LIVE_DC_SERVICE_CLIENT_SECRET_NAME ?? '').trim();
   if (!name) return { applied: false, reason: 'unset' };
   if (env.DC_WRITER_CLIENT_ID && env.DC_WRITER_CLIENT_SECRET) return { applied: false, reason: 'client already set' };
   const region = String(env.LIVE_DC_AWS_REGION ?? '').trim() || DEFAULT_REGION;
-  const args = ['secretsmanager', 'get-secret-value', '--secret-id', name, '--region', region, '--query', 'SecretString', '--output', 'text'];
-
-  let result;
-  try {
-    result = await runAws(spawnImpl, args, timeoutMs);
-  } catch (error) {
-    if (error?.code === 'ENOENT') throw new Error('aws CLI not found on PATH: install AWS CLI v2 to read the DataConnect service-client secret');
-    throw new Error(`reading secret ${name} failed: ${error?.message ?? error}`);
-  }
-  if (result.code !== 0) {
-    if (/AccessDenied|not authorized|UnrecognizedClient|NoCredentials|Unable to locate credentials/i.test(result.stderr)) {
-      throw new Error(`access denied reading secret ${name} in ${region}: ${POLICY_HINT}`);
-    }
-    if (/ResourceNotFound/i.test(result.stderr)) throw new Error(`secret ${name} not found in ${region}`);
-    throw new Error(`aws secretsmanager exit ${result.code} reading ${name}${result.stderr ? `: ${result.stderr.trim()}` : ''}`);
-  }
+  const stdout = await readSecretString(name, { region, spawnImpl, timeoutMs });
 
   let parsed = null;
-  try { parsed = JSON.parse(result.stdout.trim()); } catch { /* reported below without the content */ }
+  try { parsed = JSON.parse(stdout.trim()); } catch { /* reported below without the content */ }
   const clientId = typeof parsed?.client_id === 'string' ? parsed.client_id.trim() : '';
   const clientSecret = typeof parsed?.client_secret === 'string' ? parsed.client_secret.trim() : '';
   if (!clientId || !clientSecret) throw new Error(`secret ${name} must be JSON {"client_id","client_secret"}`);

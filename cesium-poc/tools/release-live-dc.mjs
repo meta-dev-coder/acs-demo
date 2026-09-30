@@ -26,6 +26,7 @@ const SECRET_VALUE = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
   /scrypt\$\d+\$\d+\$\d+\$[A-Za-z0-9_-]{16,}\$[A-Za-z0-9_-]{43}/,
   /aws_secret_access_key\s*[=:]\s*\S{20,}/i,
+  /sk-ant-[A-Za-z0-9_-]{20,}/,
 ];
 const TEXT = new Set(['.mjs', '.js', '.json', '.geojson', '.html', '.css', '.sh', '.service', '.example', '.txt', '.map', '.svg', '']);
 
