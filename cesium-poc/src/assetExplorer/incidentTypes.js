@@ -103,7 +103,37 @@ export const incidentVisualOf = record => incidentVisual(record?.title);
  */
 export const CRASH_SEVERITY_TIERS = Object.freeze(['severe', 'high', 'intermediate', 'minor']);
 
+/**
+ * Live event types that are NOT a crash, however they are filed.
+ *
+ * The FL511 feed files closures, roadworks and congestion under the same incident class as crashes.
+ * They are real events and belong on Live Ops, but the Safety screen answers one question — where
+ * has this corridor hurt people — and a ramp closed for construction is not an answer to it. Four
+ * such closures put themselves on the crash map and made the recent periods look busy.
+ */
+const NON_CRASH_EVENT_TYPES = Object.freeze(new Set(['CLOSURE', 'CONSTRUCTION', 'CONGESTION']));
+
+/**
+ * Whether a record is a crash, and so belongs in the safety picture.
+ *
+ * The register's own 178 records carry no event type at all — the class IS the crash register, and
+ * every row in it is a crash ("Multi-vehicle crash", "Vehicle fire", "Guardrail strike"). Only the
+ * live rows merged in from FL511 carry one, so the rule is stated the honest way round: a record is
+ * a crash unless its live event type says it is something else. Anything that reports injuries or
+ * a fatality counts regardless of how it was filed — harm is the thing being mapped.
+ */
+export function isCrashRecord(record) {
+  const related = record?.related ?? {};
+  if ((Number(related.fatalities) || 0) > 0 || /^y/i.test(related.injuries ?? '')) return true;
+  const eventType = String(related.eventType ?? '').trim().toUpperCase();
+  return !NON_CRASH_EVENT_TYPES.has(eventType);
+}
+
 export function crashSeverityTier(record) {
+  // A record may state its own tier. The live feed publishes Minor/Intermediate/Major and no injury
+  // columns at all, so the rule below cannot grade it; carrying the tier is how a feed crash keeps
+  // the severity FL511 actually published instead of being flattened to "minor".
+  if (CRASH_SEVERITY_TIERS.includes(record?.crashTier)) return record.crashTier;
   const related = record?.related ?? {};
   if ((Number(related.fatalities) || 0) > 0) return 'severe';
   if (/^y/i.test(related.injuries ?? '')) return 'high';

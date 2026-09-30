@@ -12,8 +12,12 @@ import { LIVE_EVENT_TYPES, liveEventSourceNote } from './liveEventsData.js';
 import { installWorkspaceStrip } from './workspaceStrip.js';
 import { currentDateWindow, maintenanceDateKey } from './assetExplorer/assetTypes.js';
 import { hourOfDayTrend, monthlyCrashTrend } from './safety/crashTrend.js';
-import { CallbackProperty, Cartesian2, Cartesian3, ClassificationType, Color, ColorMaterialProperty, CustomDataSource, Math as CesiumMath, ScreenSpaceEventHandler, ScreenSpaceEventType, VerticalOrigin } from 'cesium';
+import { Cartesian3, Cartographic, Color, ColorMaterialProperty, CustomDataSource, Math as CesiumMath, ScreenSpaceEventHandler, ScreenSpaceEventType, VerticalOrigin } from 'cesium';
 import { clusterCrashes, crashBreakdown, CRASH_BANDS, HOTSPOT_RADIUS_M } from './safety/crashHotspots.js';
+import { crashCountMarker } from './assetIdMarker.js';
+import { isCrashRecord } from './assetExplorer/incidentTypes.js';
+import { crashesFromLiveEvents, mergeCrashSources } from './safety/liveCrashes.js';
+import { ribbonsFor } from './safety/crashRibbon.js';
 
 /**
  * The live-event cards, each naming the Map Explorer layer that already draws it.
@@ -86,12 +90,31 @@ export function maintenanceCard(maintenance, card) {
   return { state: 'ready', count: records.length, note };
 }
 
-/** The Maintenance workspace as Safety sees it: recorded (historical) records only, counted and revealed alike. */
-export function historicalMaintenance(getWorkspace) {
+/**
+ * The Maintenance workspace as Safety sees it: the register AND what the corridor is reporting now.
+ *
+ * It was the historical records alone, which made Safety the one screen that could not see today.
+ * A crash reported this morning is the most safety-relevant thing on the corridor, and leaving it
+ * out meant the recent periods were empty of exactly the events an operator would look for there.
+ * Both are the same question — where has this corridor hurt people — so both are counted, drawn
+ * and revealed together, as the other workspaces already do.
+ *
+ * Crashes only, in both. The live feed files closures and roadworks in the same class, and those
+ * are Live Ops' business; on this screen they would be four ramp closures pretending to be a busy
+ * quarter. See `isCrashRecord`.
+ */
+export function safetyMaintenance(getWorkspace) {
+  const crashes = type => (getWorkspace()?.recordsForType(type, { live: true }) ?? []).filter(isCrashRecord);
   return {
-    reveal: type => getWorkspace()?.reveal(type, { live: false }),
+    // Revealed, then narrowed to the crashes: the bottom list must hold the same records the card
+    // counts and the map draws, never the whole incident class including its closures.
+    reveal: async type => {
+      const shown = await getWorkspace()?.reveal(type, { live: true });
+      if (shown) getWorkspace()?.showOnly?.(type, crashes(type));
+      return shown;
+    },
     hide: () => getWorkspace()?.hide(),
-    recordsForType: type => getWorkspace()?.recordsForType(type, { live: false }) ?? [],
+    recordsForType: crashes,
     showOnly: (type, records) => getWorkspace()?.showOnly(type, records) ?? false,
     whenReady: () => getWorkspace()?.preload() ?? Promise.resolve(),
   };
@@ -107,7 +130,7 @@ export function historicalMaintenance(getWorkspace) {
  *          liveEvents: object, layerStore: object, host?: HTMLElement}} deps
  */
 export function installLiveEventsWorkspace({ cards, className, label, assetExplorer, liveEvents, layerStore,
-  maintenance = null, viewer = null, resetView = null, hotspots = false, suppressCorridorStatus = false,
+  maintenance = null, viewer = null, resetView = null, segments = null, hotspots = false, suppressCorridorStatus = false,
   corridorStatus = null, host = document.body }) {
   const store = assetExplorer.store;
   const root = document.createElement('div');
@@ -125,24 +148,57 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
   // Safety only: where the recorded crashes actually sit on the corridor. Off until asked for —
   // it repaints the road, which is a conclusion the operator chooses to see.
   /**
-   * How big a hotspot circle is DRAWN, which is not the same as how crashes are grouped.
+   * How the painted stretch is drawn.
    *
-   * Grouping stays a fixed 100 m — that rule is about the data and must not move. This is about
-   * being seen: at corridor scale a true 100 m circle is a couple of pixels, and at street level a
-   * fixed one swells to cover the junction it is marking. So the drawn circle opens out to 300 m
-   * when the whole corridor is in frame and closes to 50 m once the operator is on top of it.
-   * The count on the label and the tooltip are the real figures either way.
+   * Wide enough to cover both carriageways as one band at corridor scale, which is how the risk
+   * actually reads — nobody asks which direction a pile-up was in before knowing there is one. The
+   * z-index puts it over the segment layer's own colouring (0 resting, 10 overlaid), so the band is
+   * what is seen wherever the two meet.
    */
-  const DRAW_RADIUS_NEAR_M = 50, DRAW_RADIUS_FAR_M = 700;
-  const DRAW_NEAR_DISTANCE = 2_000, DRAW_FAR_DISTANCE = 25_000;
-  function drawnRadius(position) {
-    const eye = viewer?.camera?.positionWC;
-    if (!eye) return DRAW_RADIUS_FAR_M;
-    const distance = Cartesian3.distance(eye, position);
-    const travel = (distance - DRAW_NEAR_DISTANCE) / (DRAW_FAR_DISTANCE - DRAW_NEAR_DISTANCE);
-    const eased = Math.max(0, Math.min(1, travel));
-    return DRAW_RADIUS_NEAR_M + eased * (DRAW_RADIUS_FAR_M - DRAW_RADIUS_NEAR_M);
-  }
+  const RIBBON_WIDTH_PX = 14;
+  const RIBBON_Z_INDEX = 30;
+  /**
+   * Stem lengths in SCREEN pixels: a base, a rung, and a fixed number of rungs.
+   *
+   * Pixels rather than metres because the crowding they answer is a screen problem: two numbers
+   * overlap at some zooms and not others, and a stem measured on the ground was kilometres long
+   * with the whole corridor in frame and invisible at street level.
+   *
+   * The ladder is the SAME height on every period. It was sized to the number of places on screen,
+   * which meant changing the period changed how far the marks stood off their road — the map looked
+   * like a different map for a reason that had nothing to do with the crashes. A fixed, short ladder
+   * keeps one reading at every period. Three rungs of 46 px — a rung is wider than a disc, which is
+   * what it takes for neighbours one rung apart to clear each other rather than merely not coincide.
+   */
+  const LEADER_BASE_PX = 26, LEADER_RUNG_PX = 46, LEADER_RUNGS = 3;
+  /**
+   * Every count stands on a stem, at every period.
+   *
+   * It used to be crowded maps only, which meant a mark sat ON its stretch of road at one period and
+   * above it at another — the same place drawn two different ways depending on how busy the rest of
+   * the corridor happened to be. A stem also says WHICH point on the road the number belongs to,
+   * which is worth having whether or not there is anything nearby to be confused with.
+   */
+  const stemFor = index => LEADER_BASE_PX + (index % LEADER_RUNGS) * LEADER_RUNG_PX;
+
+  /**
+   * The number on a place, in its own band colour, on a stem of the given length.
+   *
+   * The stem is drawn into the badge's image rather than as a polyline: the painted road is clamped
+   * to the ground, which is a pass that overwrites ordinary geometry, and it cut every stalk off at
+   * the very ribbon the callout was pointing at. Billboards are never overwritten.
+   */
+  const countBadge = (place, stem = 0) => {
+    const marker = crashCountMarker({ count: place.count, color: place.band.color, stem });
+    return {
+      image: marker.image, width: marker.width, height: marker.height,
+      // The anchor is the foot of the stem, on the road; with no stem the disc sits on the place.
+      verticalOrigin: stem > 0 ? VerticalOrigin.BOTTOM : VerticalOrigin.CENTER,
+      // Always drawn over the terrain, the tiles and the painted road: a number hidden behind a
+      // building is a number the operator will never know was there.
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+    };
+  };
 
   /**
    * How far back the hotspots look. Crashes are dated by when they were reported, so this is the
@@ -181,6 +237,36 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
   let hotspotsOn = true;
   // Its own source, so switching the overlay off removes the circles outright rather than leaving
   // hidden geometry behind, and nothing else on the map is touched.
+  /**
+   * Crashes the FL511 feed is carrying, which the DataConnect register does not hold yet.
+   *
+   * Read straight from the feed's own "all" window rather than from the shared live-events
+   * controller: that controller's window is Live Ops' dropdown, and what the safety map shows must
+   * not change because somebody changed a filter on another screen. Cleared ones are included —
+   * a cleared crash still happened there.
+   */
+  let liveCrashes = [];
+  async function readLiveCrashes() {
+    if (!hotspots) return;
+    try {
+      // Imported here, not at the top: liveEvents.js reads import.meta.env as it loads, which is
+      // fine in the browser and throws in a plain Node test that only wants the pure exports.
+      const { liveEventsUrl } = await import('./liveEvents.js');
+      const response = await fetch(liveEventsUrl('all'));
+      if (!response.ok) throw new Error(`live events ${response.status}`);
+      const payload = await response.json();
+      liveCrashes = crashesFromLiveEvents(payload?.events);
+    } catch {
+      // The register is still the picture; a feed that cannot be reached must not empty the map.
+      liveCrashes = [];
+    }
+  }
+  /** The register's crashes and the feed's, as one list — what the cards, map and trend all read. */
+  const crashRecords = () => mergeCrashSources(
+    maintenance?.recordsForType?.('incidentRecord') ?? [], liveCrashes);
+  /** The card reads the same merged list, so its count is what the map draws. */
+  const crashSource = { recordsForType: type => type === 'incidentRecord' ? crashRecords() : [] };
+
   const hotspotSource = new CustomDataSource('Crash hotspots');
   if (hotspots && viewer) void viewer.dataSources.add(hotspotSource);
   /** entity id -> the hotspot it draws, so a click can open the crashes behind it. */
@@ -340,6 +426,8 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
   const TREND_COLOR = '#d03b3b';
   let trendKind = 'month';
   function renderTrend() { if (trendKind === 'hour') renderHourTrend(); else renderMonthTrend(); }
+  /** Redraw an open trend once a later source lands, so it is never a picture of half the crashes. */
+  const refreshTrends = () => { if (!trendPanel.hidden) renderTrend(); };
 
   /**
    * Crashes by hour of day, as columns.
@@ -349,7 +437,7 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
    * boundary the day does not have.
    */
   function renderHourTrend() {
-    const crashes = maintenance?.recordsForType?.('incidentRecord') ?? [];
+    const crashes = crashRecords();
     const { points, total, peak, untimed } = hourOfDayTrend(crashes);
     const width = 520, height = 190;
     const pad = { top: 22, right: 14, bottom: 30, left: 34 };
@@ -390,7 +478,7 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
   }
 
   function renderMonthTrend() {
-    const crashes = maintenance?.recordsForType?.('incidentRecord') ?? [];
+    const crashes = crashRecords();
     const { points, total, peak, undated } = monthlyCrashTrend(crashes, { months: TREND_MONTHS });
     const width = 520, height = 190;
     const pad = { top: 22, right: 18, bottom: 30, left: 34 };
@@ -401,8 +489,10 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
     const y = count => pad.top + plotH - (count / top) * plotH;
     const ticks = [...new Set([0, Math.round(top / 2), top])];
     const path = points.map((point, index) => `${index ? 'L' : 'M'}${x(index).toFixed(1)},${y(point.count).toFixed(1)}`).join(' ');
+    // Every month carries its own figure. Ten points at one or two digits leave room for it, and
+    // a chart that has to be hovered to be read is a chart that cannot be glanced at, printed, or
+    // put in a slide. A zero month is labelled too — "nothing happened here" is an answer.
     const peakIndex = points.reduce((best, point, index) => (point.count > points[best].count ? index : best), 0);
-    const labelled = new Set([points.length - 1, peakIndex]);
 
     trendPanel.innerHTML = `
       <div class="safety-trend-head">
@@ -417,7 +507,7 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
         ${points.map((point, index) => `<circle cx="${x(index).toFixed(1)}" cy="${y(point.count).toFixed(1)}" r="4.5" fill="${TREND_COLOR}" stroke="var(--ui-surface-solid)" stroke-width="2" class="safety-trend-dot" data-month="${point.label}" data-count="${point.count}"/>`).join('')}
         <!-- Invisible hit targets: a 9px dot you must land on dead-centre is not a hover target. -->
         ${points.map((point, index) => `<circle cx="${x(index).toFixed(1)}" cy="${y(point.count).toFixed(1)}" r="12" fill="transparent" class="safety-trend-hit"><title>${point.label}: ${point.count} crash${point.count === 1 ? '' : 'es'}</title></circle>`).join('')}
-        ${[...labelled].filter(index => points[index]?.count > 0).map(index => `<text x="${x(index).toFixed(1)}" y="${(y(points[index].count) - 11).toFixed(1)}" class="safety-trend-value" text-anchor="middle">${points[index].count}</text>`).join('')}
+        ${points.map((point, index) => `<text x="${x(index).toFixed(1)}" y="${(y(point.count) - 11).toFixed(1)}" class="safety-trend-value${index === peakIndex && point.count > 0 ? ' is-peak' : ''}" text-anchor="middle">${point.count}</text>`).join('')}
         ${points.map((point, index) => `<text x="${x(index).toFixed(1)}" y="${height - 10}" class="safety-trend-month" text-anchor="middle">${point.label}</text>`).join('')}
       </svg>
       <table class="safety-trend-table">
@@ -427,60 +517,138 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
       </table>`;
   }
 
+  /**
+   * The corridor's own carriageways, as plain lon/lat vertices, read once and kept.
+   *
+   * Taken from the FDOT segments the rest of the application already draws, so a painted stretch
+   * lies exactly on the road the operator sees rather than on a centreline of Safety's own. Each
+   * direction is one path in travel order, so walking 100 m along it crosses segment boundaries
+   * without a seam.
+   */
+  let corridorPaths = null;
+  /** The segment layer's data source, and the band ids we put in it, so we can take them out again. */
+  let roadSource = null;
+  const ribbonIds = [];
+  function clearRibbons() {
+    const from = roadSource?.entities ?? hotspotSource.entities;
+    for (const id of ribbonIds.splice(0)) from.removeById(id);
+  }
+  async function readCorridor() {
+    if (corridorPaths) return corridorPaths;
+    if (!segments?.segmentsByDirection) return (corridorPaths = []);
+    // load() hands back the segment layer's own data source, which is where the bands have to go.
+    roadSource = (await segments.load?.()) ?? null;
+    const time = viewer?.clock?.currentTime;
+    const paths = [];
+    for (const entities of segments.segmentsByDirection.values()) {
+      const points = [];
+      for (const entity of entities) {
+        for (const position of entity.polyline?.positions?.getValue?.(time) ?? []) {
+          const carto = Cartographic.fromCartesian(position);
+          if (!carto) continue;
+          points.push({
+            longitude: CesiumMath.toDegrees(carto.longitude),
+            latitude: CesiumMath.toDegrees(carto.latitude),
+          });
+        }
+      }
+      if (points.length > 1) paths.push(points);
+    }
+    return (corridorPaths = paths);
+  }
+
+  /**
+   * Paint each place onto the road it happened on.
+   *
+   * Drawn clamped to the ground with a z-index above the carriageway's own colouring, so the risk
+   * band is what the operator reads on that stretch. A place whose road cannot be found — the
+   * geometry has not loaded, or it sits too far off the corridor to attribute — is simply not
+   * painted; its count still stands on its stalk, so nothing recorded goes missing from the map.
+   */
+  async function paintRibbons(places) {
+    const paths = await readCorridor();
+    if (!paths.length) return;
+    // Into the segment layer's OWN collection, not ours. `zIndex` orders ground geometry only
+    // within one data source's batch, so a band in a collection of its own lost to the corridor's
+    // blue whatever number it carried — the road was drawn over the risk it was meant to show.
+    const into = roadSource?.entities ?? hotspotSource.entities;
+    for (const { place, path } of ribbonsFor(places, paths, HOTSPOT_RADIUS_M)) {
+      const id = `${place.id}::road:${ribbonIds.length}`;
+      ribbonIds.push(id);
+      into.add({
+        id,
+        name: `${place.count} crashes within ${place.radiusMeters} m · ${place.band.label} risk`,
+        polyline: {
+          positions: path.map(point => Cartesian3.fromDegrees(point.longitude, point.latitude)),
+          clampToGround: true, width: RIBBON_WIDTH_PX, zIndex: RIBBON_Z_INDEX,
+          material: new ColorMaterialProperty(Color.fromCssColorString(place.band.color)),
+        },
+      });
+    }
+  }
+
+  /**
+   * The corridor's traffic colouring, switched off while the risk bands are on.
+   *
+   * On this screen the colour of the road IS the crash risk. Leaving I-595's own blue underneath
+   * put two unrelated meanings on one line, and the blue won wherever a stretch had no crashes —
+   * the operator read a blue corridor with fragments of risk on it rather than a risk map. So every
+   * road layer goes off, not only the mainline: express, ramps and frontage roads carry their own
+   * colours down the same corridor and would say the same second thing.
+   *
+   * It goes through the layer store rather than the map, so the Explorer's own checkboxes clear
+   * with it and the panel never claims a layer the map is not drawing. Whatever was on is put back
+   * when the bands go away or the operator leaves — Live Ops colours these very segments, and a
+   * screen must not leave another one dark.
+   */
+  const roadLayers = () => (layerStore?.layers ?? []).filter(layer => layer.category === 'roads').map(layer => layer.id);
+  let corridorWas = null;
+  async function setCorridorPaint(on) {
+    if (!layerStore?.setVisible) return;
+    if (!on) {
+      if (corridorWas) {
+        for (const [id, was] of corridorWas) await layerStore.setVisible(id, was);
+        corridorWas = null;
+      }
+      return;
+    }
+    // Remember once: a second call while already hidden must not record "off" as the way back.
+    corridorWas ??= roadLayers().map(id => [id, ['on', 'partial'].includes(layerStore.stateOf(id))]);
+    for (const [id] of corridorWas) await layerStore.setVisible(id, false);
+  }
+
   async function applyHotspots() {
     if (!hotspots) return;
     if (hotspotLegend) hotspotLegend.hidden = !hotspotsOn || !active;
     hotspotSource.entities.removeAll();
+    clearRibbons();
     hotspotById.clear();
     hotspotSource.show = Boolean(hotspotsOn && active);
+    await setCorridorPaint(Boolean(hotspotsOn && active));
     if (!hotspotsOn || !active) return;
 
-    const crashes = withinPeriod(maintenance?.recordsForType?.('incidentRecord') ?? []);
+    const crashes = withinPeriod(crashRecords());
     const { hotspots: places } = clusterCrashes(crashes);
     hotspotSource.entities.suspendEvents();
     try {
-      for (const place of places) {
-        const colour = Color.fromCssColorString(place.band.color);
-        const centre = Cartesian3.fromDegrees(place.longitude, place.latitude);
-        // ONE property feeding both axes. Cesium reads semiMajorAxis and semiMinorAxis in separate
-        // calls, so two callbacks can disagree mid-frame and it throws "semiMajorAxis must be
-        // greater than or equal to the semiMinorAxis" and stops rendering for good.
-        const radius = new CallbackProperty(() => drawnRadius(centre), false);
-        const worst = crashBreakdown(place)[0];
+      // Ordered along the corridor so neighbouring stalks get different heights rather than the
+      // same one — that is what actually separates the labels.
+      const ordered = [...places].sort((a, b) => a.longitude - b.longitude);
+      for (const [index, place] of ordered.entries()) {
         const detail = crashBreakdown(place).slice(0, 3).map(row => `${row.count} x ${row.title}`).join(', ');
         hotspotSource.entities.add({
           id: place.id,
           name: `${place.count} crashes within ${place.radiusMeters} m · ${place.band.label} risk${detail ? ` - ${detail}` : ''}`,
-          position: centre,
-          ellipse: {
-            semiMajorAxis: radius,
-            semiMinorAxis: radius,
-            // Draped over the terrain and the photorealistic tiles, not floating above them.
-            classificationType: ClassificationType.BOTH,
-            // Deep enough to read as a marked area over photorealistic tiles, which are busy and
-            // bright; a lighter wash disappeared into them at corridor scale.
-            material: new ColorMaterialProperty(colour.withAlpha(0.62)),
-            outline: true,
-            outlineColor: colour.withAlpha(1),
-            outlineWidth: 3,
-          },
-          // Just the count. The crash type is on the entity's name, where hovering finds it: at
-          // corridor scale fifteen two-line labels covered the very circles they were describing.
-          label: {
-            text: String(place.count),
-            font: '700 13px system-ui, -apple-system, Segoe UI, sans-serif',
-            fillColor: Color.fromCssColorString('#12180a'),
-            showBackground: true,
-            backgroundColor: colour,
-            backgroundPadding: new Cartesian2(7, 5),
-            verticalOrigin: VerticalOrigin.CENTER,
-            pixelOffset: new Cartesian2(0, 0),
-            disableDepthTestDistance: Number.POSITIVE_INFINITY,
-          },
+          position: Cartesian3.fromDegrees(place.longitude, place.latitude),
+          // Just the count, on a stem of its own. The crash type is on the entity's name, where
+          // hovering finds it: at corridor scale fifteen two-line labels covered the very stretches
+          // they were describing.
+          billboard: countBadge(place, stemFor(index)),
         });
         hotspotById.set(place.id, place);
       }
     } finally { hotspotSource.entities.resumeEvents(); }
+    await paintRibbons(places);
     viewer?.scene?.requestRender?.();
   }
 
@@ -505,7 +673,7 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
     const payload = liveEvents?.payload ?? {};
     for (const card of cards) {
       strip.set(card.key, card.source === 'maintenance'
-        ? maintenanceCard(maintenance, card)
+        ? maintenanceCard(crashSource, card)
         : safetyCard(events, card, payload));
     }
     strip.setActive(activeKey);
@@ -574,6 +742,8 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
       if (cards.some(card => card.source === 'maintenance')) void maintenance?.whenReady?.().then(() => { if (active) render(); });
       // Crashes arrive with the incident register, so the overlay is recomputed once it lands.
       if (hotspots) void maintenance?.whenReady?.().then(() => { if (active) void applyHotspots(); });
+      // ...and from the feed, which is the other half of the picture and arrives on its own clock.
+      void readLiveCrashes().then(() => { if (active) { render(); void applyHotspots(); refreshTrends(); } });
       void applyHotspots();
       strip.measure();
     },
@@ -597,6 +767,9 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
       if (suppressCorridorStatus) corridorStatus?.setSuppressed?.(false, 'safety');
       stopHotspotWatch();
       hotspotHandler?.destroy();
+      // The risk bands live in the segment layer's collection, which outlives this workspace,
+      // and so does the corridor's own colouring, which this screen switched off.
+      clearRibbons(); void setCorridorPaint(false);
       if (hotspots && viewer) viewer.dataSources.remove(hotspotSource, true); stopUpdates(); unsubscribeLayers(); strip.destroy(); root.remove(); },
   };
 }

@@ -52,6 +52,13 @@ const PILL_FONT_PX = 16;
 const PILL_PADDING_X = 11;
 const PILL_TEXT_HEIGHT = 27;
 const PILL_RADIUS = 7;
+/** The crash-count discs, read at corridor scale from a long way up. */
+const COUNT_FONT_PX = 17;
+const COUNT_MIN_DIAMETER = 32;
+const COUNT_PADDING = 11;
+const COUNT_SHADOW = 5;
+/** The dot at the foot of the stem, marking the point on the road the count belongs to. */
+const COUNT_ANCHOR_R = 3.5;
 /** Drawn oversized and scaled down by Cesium, so the text stays crisp on dense displays. */
 const SUPERSAMPLE = 3;
 
@@ -320,6 +327,86 @@ export function assetSquareMarker({ color, glyphSvg, selected = false, key = col
 }
 
 /** Test/diagnostic hook: how many textures have been drawn. */
+/**
+ * A round count badge — the number of crashes at one place, drawn as a disc in that place's own
+ * risk colour.
+ *
+ * A disc rather than the label pill Cesium gives for free: over photorealistic tiles a rectangle
+ * reads as another piece of the city, while a circle on a stalk reads as a pin. It is also the
+ * shape that stays legible as the corridor is rotated, because it has no orientation of its own.
+ *
+ * The diameter grows with the number of digits so "2" and "23" get the same ring of clear space
+ * around their text rather than the same box.
+ *
+ * @param {{count: number|string, color: string}} options `color` is the band's CSS colour.
+ * @returns {{image: HTMLCanvasElement, width: number, height: number}}
+ */
+export function crashCountMarker({ count, color, stem = 0 }) {
+  const text = String(count ?? '');
+  const key = `crashcount:${text}:${color}:${stem}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+
+  const font = `700 ${COUNT_FONT_PX}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+  const measure = document.createElement('canvas').getContext('2d');
+  measure.font = font;
+  const diameter = Math.max(COUNT_MIN_DIAMETER, Math.ceil(measure.measureText(text).width) + COUNT_PADDING * 2);
+  // Room for the drop shadow on every side, so it is not clipped by the texture's own edge.
+  const width = diameter + COUNT_SHADOW * 2;
+  const height = width + stem;
+  const centreY = width / 2;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width * SUPERSAMPLE;
+  canvas.height = height * SUPERSAMPLE;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(SUPERSAMPLE, SUPERSAMPLE);
+
+  if (stem > 0) {
+    // The stem is part of the badge rather than a polyline of its own because a polyline clamped
+    // to the ground — the painted road — is drawn in a pass that overwrites ordinary geometry, and
+    // cut every stalk off at the ribbon it was pointing at. A billboard is never overwritten, so
+    // the callout reaches its road.
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(width / 2, centreY);
+    ctx.lineTo(width / 2, height - COUNT_ANCHOR_R);
+    ctx.stroke();
+    // A dot where the stem lands, so the eye can see WHICH point on the road is being named.
+    ctx.beginPath();
+    ctx.arc(width / 2, height - COUNT_ANCHOR_R, COUNT_ANCHOR_R, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.stroke();
+  }
+
+  // The tiles underneath are bright and busy; a shadow is what separates the disc from them.
+  ctx.shadowColor = 'rgba(0,0,0,0.45)';
+  ctx.shadowBlur = COUNT_SHADOW;
+  ctx.shadowOffsetY = 1.5;
+  ctx.beginPath();
+  ctx.arc(width / 2, centreY, diameter / 2, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  ctx.stroke();
+
+  ctx.font = font;
+  ctx.fillStyle = '#FFFFFF';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, width / 2, centreY + 0.5);
+
+  const marker = Object.freeze({ image: canvas, width, height });
+  cache.set(key, marker);
+  return marker;
+}
+
 export const markerCacheSize = () => cache.size;
 export function clearMarkerCache() { cache.clear(); }
 

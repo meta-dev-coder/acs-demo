@@ -263,7 +263,10 @@ export function maintenanceDate(value) {
 export function maintenanceDateParts(value) {
   const string = text(value);
   if (!string) return null;
-  const dayFirst = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(string);
+  // A trailing time is allowed and ignored, exactly as it is for ISO below: the register writes
+  // both "17/11/2024" and "30/03/2026 00:00", and anchoring on the year alone silently dropped
+  // every value of the second kind — 107 of the 182 crash records read as having no date at all.
+  const dayFirst = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[T ]|$)/.exec(string);
   // An ISO value here carries no timezone ("2024-04-16T00:00:00"), so `new Date` reads it as LOCAL
   // midnight and formatting it in UTC moves it a day west of Greenwich. These are calendar dates,
   // not instants, so the components are taken as written in both formats.

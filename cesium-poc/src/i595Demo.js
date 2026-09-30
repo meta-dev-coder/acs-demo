@@ -36,7 +36,7 @@ import { createThemeMode } from "./themeMode.js";
 import { installAppNav } from "./appNav.js";
 import { installMaintenanceLayer } from "./maintenance/maintenanceLayer.js";
 import { installMaintenanceWorkspace } from "./maintenance/maintenanceWorkspace.js";
-import { historicalMaintenance, installSafetyWorkspace, installTrafficWorkspace } from "./safetyWorkspace.js";
+import { safetyMaintenance, installSafetyWorkspace, installTrafficWorkspace } from "./safetyWorkspace.js";
 import { installLiveOpsWorkspace } from "./liveOps/liveOpsWorkspace.js";
 import { getTrafficColor } from "./corridorVisualConfig.js";
 import { installI595RoadShields } from "./i595RoadShields.js";
@@ -439,9 +439,11 @@ try {
     // Closing a crash hotspot puts the camera back where the screen opened, rather than leaving the
     // operator parked over one junction with no way back but the mouse.
     resetView: () => flyToOperationsView(),
-    maintenance: historicalMaintenance(() => maintenanceWorkspace),
-    // Safety draws a circle over every place crashes have piled up, so it needs the viewer to put
-    // them in. It measures crash against crash, not against the road, so it needs no geometry.
+    maintenance: safetyMaintenance(() => maintenanceWorkspace),
+    // Safety paints every place crashes have piled up onto the carriageway itself, so it needs the
+    // viewer to draw into and the corridor's own FDOT geometry to paint along. It still groups
+    // crash against crash, not against the road; the geometry is only how the result is drawn.
+    segments: mainlineSegments,
     viewer };
   const safety = installSafetyWorkspace(liveEventDeps);
   const traffic = installTrafficWorkspace(liveEventDeps);

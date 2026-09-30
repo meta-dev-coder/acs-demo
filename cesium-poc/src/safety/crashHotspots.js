@@ -84,6 +84,39 @@ export const CRASH_BANDS = Object.freeze([
 /** @param {number} score the weighted score, NOT the crash count. */
 export const crashBandFor = score => CRASH_BANDS.find(band => score >= band.from) ?? null;
 
+/**
+ * The floor a single crash of each severity puts under its place's band.
+ *
+ * The score alone answers "how much harm has happened here", which is the right question for a
+ * place where crashes pile up — but it made one serious crash green, because one crash can never
+ * reach a threshold built for a pile. A fatality on an otherwise quiet stretch is not a low-risk
+ * stretch. So severity sets a floor and the score can only raise it: twenty scrapes still climb to
+ * Moderate on weight of numbers, and a single injury crash is never painted as if nothing happened.
+ */
+const BAND_FLOOR_BY_TIER = Object.freeze({
+  severe: 'SEVERE', high: 'HIGH', intermediate: 'MODERATE', minor: 'LOW',
+});
+
+/**
+ * The band for a place: whichever is worse, what its crashes add up to or the worst one in it.
+ *
+ * @param {number} score    the weighted score
+ * @param {object[]} crashes the crashes at that place
+ */
+export function crashBandForPlace(score, crashes) {
+  const byScore = crashBandFor(score);
+  let worstIndex = CRASH_BANDS.length;
+  for (const crash of crashes ?? []) {
+    const floor = BAND_FLOOR_BY_TIER[crashSeverity(crash)] ?? 'LOW';
+    worstIndex = Math.min(worstIndex, CRASH_BANDS.findIndex(band => band.id === floor));
+  }
+  const byWorst = CRASH_BANDS[worstIndex] ?? null;
+  if (!byScore) return byWorst;
+  if (!byWorst) return byScore;
+  // Lower index is the hotter band, and the hotter of the two readings is the honest one.
+  return CRASH_BANDS.indexOf(byScore) <= worstIndex ? byScore : byWorst;
+}
+
 const placed = crash => Number.isFinite(crash?.longitude) && Number.isFinite(crash?.latitude);
 
 /**
@@ -134,7 +167,7 @@ export function clusterCrashes(crashes, { radiusMeters = HOTSPOT_RADIUS_M, minCr
         id: `hotspot:${members.map(m => m.id).sort()[0]}`,
         longitude, latitude, radiusMeters: Math.round(reach),
         // `count` is what the circle prints; `score` is what decides its colour.
-        count: members.length, score, band: crashBandFor(score), crashes: members,
+        count: members.length, score, band: crashBandForPlace(score, members), crashes: members,
       });
     })
     .sort((a, b) => b.score - a.score || b.count - a.count || a.id.localeCompare(b.id));

@@ -99,21 +99,32 @@ test('the crash card counts a DataConnect class, and says how many were harmful'
   assert.deepEqual(maintenanceCard(null, card), { state: 'loading' });
 });
 
-test('the recorded-crash card counts and reveals the same historical records', async () => {
-  const { historicalMaintenance } = await import('../src/safetyWorkspace.js');
+test('the crash card counts and reveals the register AND what is being reported now', async () => {
+  const { safetyMaintenance } = await import('../src/safetyWorkspace.js');
   const { shownRecords } = await import('../src/maintenance/maintenanceWorkspace.js');
   const historical = [{ id: 'CR-1' }, { id: 'CR-2' }];
-  const entry = { state: 'ready', historical, records: [{ id: 'FL511-1', live: true }, ...historical] };
+  // Two live rows: a crash, and one of the FL511 closures that has no business on a crash map.
+  const liveCrash = { id: 'FL511-1', live: true, related: { eventType: 'INCIDENT' } };
+  const liveClosure = { id: 'FL511-CLOSE', live: true, title: 'Closure', related: { eventType: 'CLOSURE' } };
+  const entry = { state: 'ready', historical, records: [liveCrash, liveClosure, ...historical] };
   const calls = [];
+  const narrowed = [];
   const workspace = {
     recordsForType: (type, options) => shownRecords(entry, options),
     reveal: (type, options) => { calls.push(options); return shownRecords(entry, options); },
+    showOnly: (type, records) => { narrowed.push(records.map(r => r.id)); return true; },
     hide() {}, preload: () => Promise.resolve(),
   };
-  const deps = historicalMaintenance(() => workspace);
+  const deps = safetyMaintenance(() => workspace);
   const [crashes] = SAFETY_CARDS.filter(card => card.source === 'maintenance');
   const shown = await deps.reveal(crashes.assetType);
-  assert.equal(maintenanceCard(deps, crashes).count, shown.length);
-  assert.deepEqual(calls, [{ live: false }]);
-  assert.equal(historicalMaintenance(() => null).recordsForType('incidentRecord').length, 0);
+  // The card counts the CRASHES, which is no longer the whole class the workspace reveals.
+  assert.equal(maintenanceCard(deps, crashes).count, deps.recordsForType(crashes.assetType).length);
+  assert.deepEqual(calls, [{ live: true }], 'Safety asks for the live records too, not the register alone');
+  assert.equal(shown.length, 4, 'the workspace reveals the whole class');
+  // ...but what Safety counts, draws and lists is the crashes within it: the closure is dropped.
+  const counted = deps.recordsForType(crashes.assetType).map(record => record.id);
+  assert.deepEqual(counted, ['FL511-1', 'CR-1', 'CR-2'], 'a live crash is in, a live closure is out');
+  assert.deepEqual(narrowed, [counted], 'the bottom list is narrowed to exactly what the card counts');
+  assert.equal(safetyMaintenance(() => null).recordsForType('incidentRecord').length, 0);
 });

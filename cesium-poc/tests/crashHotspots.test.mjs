@@ -79,6 +79,21 @@ test('a few bad crashes outrank many scrapes', () => {
   assert.equal(crashBandFor(twentyMinor).id, 'MODERATE', 'more crashes, less harm, cooler colour');
 });
 
+test('one serious crash colours its place by how bad it was, not by how few there were', () => {
+  // The score answers "how much harm has happened here", which needs a pile to register. On its own
+  // it painted a fatality green, because one crash can never reach a threshold built for a pile.
+  const alone = related => clusterCrashes([{ id: 'X', longitude: -80.2, latitude: 26.06, related }]).hotspots[0];
+  assert.equal(alone({ fatalities: 1 }).band.id, 'SEVERE');
+  assert.equal(alone({ injuries: 'Yes' }).band.id, 'HIGH');
+  assert.equal(alone({ injuries: 'No', laneClosure: 'Yes' }).band.id, 'MODERATE');
+  assert.equal(alone({ injuries: 'No', laneClosure: 'No' }).band.id, 'LOW', 'only a scrape reads as low');
+
+  // Severity sets a FLOOR; weight of numbers can still raise it above the worst single crash.
+  const many = Array.from({ length: 20 }, (_, i) =>
+    ({ id: `m${i}`, longitude: -80.2 + i * 0.00001, latitude: 26.06, related: { injuries: 'No', laneClosure: 'No' } }));
+  assert.equal(clusterCrashes(many).hotspots[0].band.id, 'MODERATE', 'twenty scrapes still climb');
+});
+
 test('the circle contains every crash it claims', () => {
   const [spot] = clusterCrashes(Array.from({ length: 4 }, (_, i) => near(`C${i}`, i))).hotspots;
   assert.ok(spot.radiusMeters >= HOTSPOT_RADIUS_M);
