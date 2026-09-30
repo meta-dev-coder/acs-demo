@@ -51,7 +51,11 @@ import { corridorOverview, heroView, corridorOperationsView } from "./i595Corrid
 import "./i595Demo.css";
 
 document.title = "I-595-DEMO · System-of-record";
+// Keep the first-paint loader through the body replacement. It is defined inline in index.html so
+// it appears before this dynamically imported module and its stylesheet have downloaded.
+const bootLoaderMarkup = document.querySelector('#i595-boot-loader')?.outerHTML ?? '';
 document.body.innerHTML = `
+  ${bootLoaderMarkup}
   <div id="cesiumContainer" aria-label="I-595 highway map"></div>
   <aside class="layers" aria-label="Map layers">
     <div id="layer-content">
@@ -552,3 +556,8 @@ try {
   status.textContent = "The map could not start. Please reload with WebGL enabled.";
   console.error(error);
 }
+
+// Reveal the application only after startup has either completed or produced its real error UI.
+// Removing the class and overlay in the same frame prevents an intermediate legacy/unstyled paint.
+document.documentElement.classList.remove('i595-booting');
+document.querySelector('#i595-boot-loader')?.remove();

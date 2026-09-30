@@ -12,6 +12,8 @@ import { LIVE_EVENT_TYPES, liveEventSourceNote } from './liveEventsData.js';
 import { installWorkspaceStrip } from './workspaceStrip.js';
 import { currentDateWindow, maintenanceDateKey } from './assetExplorer/assetTypes.js';
 import { hourOfDayTrend, monthlyCrashTrend } from './safety/crashTrend.js';
+import { weatherTrend } from './safety/weatherTrend.js';
+import { installWeatherEffects } from './safety/weatherEffects.js';
 import { Cartesian3, Cartographic, Color, ColorMaterialProperty, CustomDataSource, Math as CesiumMath, ScreenSpaceEventHandler, ScreenSpaceEventType, VerticalOrigin } from 'cesium';
 import { clusterCrashes, crashBreakdown, CRASH_BANDS, HOTSPOT_RADIUS_M } from './safety/crashHotspots.js';
 import { crashCountMarker } from './assetIdMarker.js';
@@ -246,6 +248,8 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
    * a cleared crash still happened there.
    */
   let liveCrashes = [];
+  /** Whether the DataConnect register has finished loading, or failed trying. Either way it has spoken. */
+  let registerReady = !hotspots;
   async function readLiveCrashes() {
     if (!hotspots) return;
     try {
@@ -282,7 +286,45 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
    * one keeps its own crash-family pictogram, so four crashes read as a fire, a rollover and two
    * rear-enders rather than four identical dots.
    */
-  async function openHotspotPlace(place) {
+/**
+   * Show one weather group's crashes on the map, in place of the hotspot overlay.
+   *
+   * The two answer different questions and must not be read on top of each other: the hotspots say
+   * WHERE the corridor hurts people, this says where the crashes of one condition fell. So the
+   * overlay steps aside while a group is picked and comes back when the chart is closed, which is
+   * also what the operator asked for by opening the chart at all.
+   */
+  let weatherPick = null;
+  // One screen-space renderer for the selected historical condition. It sits over Cesium but under
+  // this workspace's controls, and owns no map input, entities or data.
+  const weatherEffects = hotspots ? installWeatherEffects(document.body) : null;
+  async function openWeatherGroup(point) {
+    if (!point?.count || !maintenance) return;
+    const revealed = await maintenance.reveal?.('incidentRecord');
+    if (!revealed) return;
+    maintenance.showOnly?.('incidentRecord', point.crashes);
+    // The group IS the filter; its crashes are spread over years, which no date window would hold.
+    store.setFilter({ from: null, to: null, id: null, query: '' });
+    weatherPick = point.key;
+    weatherEffects?.setCondition(point.key);
+    await applyHotspots();
+    renderWeatherTrend();
+  }
+
+  /** Put the corridor back the way the chart found it. */
+  function closeWeatherGroup() {
+    if (!weatherPick) return;
+    weatherPick = null;
+    weatherEffects?.clear();
+    maintenance?.hide?.();
+    void applyHotspots();
+    // Redraw the chart so nothing is left looking chosen: the bars go back to full strength and
+    // the picked one drops its pressed state. Only while the chart is still on screen — closing it
+    // is the other way to get here, and rendering into a hidden panel is wasted work.
+    if (trendKind === 'weather' && !trendPanel.hidden) renderWeatherTrend();
+  }
+
+    async function openHotspotPlace(place) {
     if (!place || !maintenance) return;
     // `openHotspot` is set only AFTER the reveal: revealing fires store changes while the browser
     // still has no type, and the watcher below would read that as "the operator closed it" and undo
@@ -351,6 +393,7 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
       <span class="safety-trend-buttons">
         <button type="button" class="safety-trend-button" data-trend="month" aria-pressed="false">Monthly trends</button>
         <button type="button" class="safety-trend-button" data-trend="hour" aria-pressed="false">Time of day</button>
+        <button type="button" class="safety-trend-button" data-trend="weather" aria-pressed="false">Weather</button>
       </span>`;
     strip.root.append(trendGroup);
     // One panel, one chart at a time: two 520px charts side by side would cover the corridor they
@@ -361,6 +404,9 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
         const closing = trendKind === wanted && !trendPanel.hidden;
         trendKind = wanted;
         trendPanel.hidden = closing;
+        // A picked group belongs to the weather chart alone — leaving it on the map behind the
+        // monthly chart would be pins with nothing on screen explaining them.
+        if (closing || wanted !== 'weather') closeWeatherGroup();
         for (const other of trendGroup.querySelectorAll('[data-trend]')) {
           other.setAttribute('aria-pressed', String(!closing && other.dataset.trend === wanted));
         }
@@ -377,6 +423,9 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
     trendPanel.addEventListener('click', event => {
       if (!event.target.closest('.safety-trend-close')) return;
       trendPanel.hidden = true;
+      // Closing the chart gives the corridor back: the hotspot overlay returns and the picked
+      // group's pins go with the chart that put them there.
+      closeWeatherGroup();
       for (const other of trendGroup.querySelectorAll('[data-trend]')) other.setAttribute('aria-pressed', 'false');
     });
 
@@ -424,8 +473,63 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
    */
   const TREND_MONTHS = 10;
   const TREND_COLOR = '#d03b3b';
+  /**
+   * The date range the charts read, independent of the map's Period.
+   *
+   * A year ending with this month by default: twelve whole calendar months is the span an operator
+   * compares a condition or an hour against, and the register's own crashes run over years. It is
+   * NOT the Period dropdown — that one decides which hotspots are drawn on the corridor, and an
+   * operator narrowing the map to a month should not silently lose eleven months of the trend they
+   * are reading beside it.
+   */
+  const DEFAULT_TREND_MONTHS = 12;
+  let trendRange = currentDateWindow({ months: DEFAULT_TREND_MONTHS });
+
+  /** The crashes inside the charts' own range. One with no readable date is outside every range. */
+  const trendCrashes = () => crashRecords().filter(crash => {
+    const key = maintenanceDateKey(crash.createdDate);
+    return Boolean(key) && key >= trendRange.from && key <= trendRange.to;
+  });
+
+  /** The range picker, drawn into whichever chart is on screen. */
+  const rangeMarkup = () => `
+    <label class="safety-trend-range">
+      <span class="safety-trend-range-label">From</span>
+      <input type="date" class="safety-trend-from" value="${trendRange.from}" aria-label="Show crashes from">
+      <span class="safety-trend-range-label">to</span>
+      <input type="date" class="safety-trend-to" value="${trendRange.to}" aria-label="Show crashes up to">
+      <button type="button" class="safety-trend-range-reset" title="Back to the last ${DEFAULT_TREND_MONTHS} months">Reset</button>
+    </label>`;
+
+  /** Re-bind the picker after a render, since each chart rewrites the panel. */
+  function bindRange() {
+    const from = trendPanel.querySelector('.safety-trend-from');
+    const to = trendPanel.querySelector('.safety-trend-to');
+    if (!from || !to) return;
+    // An end before its start is not a range; the pair is kept in order rather than refused, so a
+    // half-typed date never empties the chart with no way back.
+    const apply = () => {
+      const a = from.value || trendRange.from, b = to.value || trendRange.to;
+      trendRange = a <= b ? { from: a, to: b } : { from: b, to: a };
+      renderTrend();
+    };
+    from.onchange = apply;
+    to.onchange = apply;
+    trendPanel.querySelector('.safety-trend-range-reset').onclick = () => {
+      trendRange = currentDateWindow({ months: DEFAULT_TREND_MONTHS });
+      renderTrend();
+    };
+  }
+
   let trendKind = 'month';
-  function renderTrend() { if (trendKind === 'hour') renderHourTrend(); else renderMonthTrend(); }
+  function renderTrend() {
+    if (trendKind === 'hour') renderHourTrend();
+    else if (trendKind === 'weather') renderWeatherTrend();
+    else renderMonthTrend();
+    // The monthly chart keeps its own months-wide axis and shows no picker; the other two are
+    // filtered by the range, and each render rewrites the panel, so the inputs are bound again.
+    bindRange();
+  }
   /** Redraw an open trend once a later source lands, so it is never a picture of half the crashes. */
   const refreshTrends = () => { if (!trendPanel.hidden) renderTrend(); };
 
@@ -436,9 +540,77 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
    * compare, not a path to follow, and a line between 23:00 and 00:00 would draw a slope across a
    * boundary the day does not have.
    */
+  /**
+   * Which of the 24 bars carry an axis number.
+   *
+   * The first and the last always do, so the axis visibly runs 1 to 24 — an axis that stopped at 23
+   * looked like a bar was missing. Every fourth in between is enough orientation now that each bar
+   * prints its own count.
+   */
+  const HOUR_TICKS = Object.freeze([0, 3, 7, 11, 15, 19, 23]);
+
+/**
+   * Crashes by the weather they happened in.
+   *
+   * A correlation and nothing more: a tall bar may only mean the corridor has a lot of that
+   * weather. It is put beside the other two trends so it is read as one of three views of the same
+   * crashes, rather than as a finding of its own.
+   *
+   * Wider than the other charts because the groups are words, not numbers, and "Storm Recovery"
+   * needs room to be a label rather than an abbreviation.
+   */
+  function renderWeatherTrend() {
+    const { points, peak } = weatherTrend(trendCrashes());
+    const width = 620, height = 190;
+    const pad = { top: 22, right: 14, bottom: 34, left: 34 };
+    const plotW = width - pad.left - pad.right, plotH = height - pad.top - pad.bottom;
+    const top = Math.max(4, Math.ceil((peak || 1) * 1.15));
+    const slot = plotW / points.length;
+    const barW = Math.max(6, slot - 10);
+    const y = count => pad.top + plotH - (count / top) * plotH;
+    const ticks = [...new Set([0, Math.round(top / 2), top])];
+    const peakIndex = points.reduce((best, point, index) => (point.count > points[best].count ? index : best), 0);
+
+    trendPanel.innerHTML = `
+      <div class="safety-trend-head">
+        <span class="safety-trend-title">Crashes by weather</span>
+        ${rangeMarkup()}
+        <button class="safety-trend-close" type="button" aria-label="Close the weather trend">&#10005;</button>
+      </div>
+      <svg class="safety-trend-svg" viewBox="0 0 ${width} ${height}" role="img"
+        aria-label="Crashes by the weather they happened in">
+        ${ticks.map(value => `<line x1="${pad.left}" x2="${width - pad.right}" y1="${y(value).toFixed(1)}" y2="${y(value).toFixed(1)}" class="safety-trend-grid"/><text x="${pad.left - 8}" y="${(y(value) + 4).toFixed(1)}" class="safety-trend-tick" text-anchor="end">${value}</text>`).join('')}
+        ${points.map((point, index) => {
+          const x = pad.left + index * slot + (slot - barW) / 2;
+          const barH = Math.max(point.count ? 2 : 0, pad.top + plotH - y(point.count));
+          return point.count
+            ? `<rect x="${x.toFixed(1)}" y="${y(point.count).toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="2" fill="${TREND_COLOR}" opacity="${weatherPick && point.key !== weatherPick ? 0.35 : 1}"/>`
+            : '';
+        }).join('')}
+        ${points.map((point, index) => `<rect x="${(pad.left + index * slot).toFixed(1)}" y="${pad.top}" width="${slot.toFixed(1)}" height="${plotH}" fill="transparent" class="safety-trend-hit${point.count ? ' is-pickable' : ''}" ${point.count ? `data-weather="${point.key}" role="button" tabindex="0" aria-pressed="${point.key === weatherPick}"` : ''}><title>${point.label} — ${point.count} crash${point.count === 1 ? '' : 'es'}${point.count ? ' · click to show them on the map' : ''}</title></rect>`).join('')}
+        ${points.map((point, index) => point.count
+          ? `<text x="${(pad.left + index * slot + slot / 2).toFixed(1)}" y="${(y(point.count) - 6).toFixed(1)}" class="safety-trend-value${index === peakIndex ? ' is-peak' : ''}" text-anchor="middle">${point.count}</text>`
+          : '').join('')}
+        ${points.map((point, index) => `<text x="${(pad.left + index * slot + slot / 2).toFixed(1)}" y="${height - 10}" class="safety-trend-month" text-anchor="middle">${point.label}</text>`).join('')}
+      </svg>
+      <table class="safety-trend-table">
+        <caption>Crashes by weather</caption>
+        <thead><tr><th scope="col">Weather</th><th scope="col">Crashes</th></tr></thead>
+        <tbody>${points.map(point => `<tr><th scope="row">${point.label}</th><td>${point.count}</td></tr>`).join('')}</tbody>
+      </table>`;
+
+    // Clicking a bar puts that condition's crashes on the map; clicking it again hands the corridor
+    // back. Keyboard too — these are the only marks on this screen that do anything when picked.
+    for (const hit of trendPanel.querySelectorAll('[data-weather]')) {
+      const point = points.find(item => item.key === hit.dataset.weather);
+      const pick = () => { if (weatherPick === point.key) closeWeatherGroup(); else void openWeatherGroup(point); };
+      hit.onclick = pick;
+      hit.onkeydown = event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); pick(); } };
+    }
+  }
+
   function renderHourTrend() {
-    const crashes = crashRecords();
-    const { points, total, peak, untimed } = hourOfDayTrend(crashes);
+    const { points, peak } = hourOfDayTrend(trendCrashes());
     const width = 520, height = 190;
     const pad = { top: 22, right: 14, bottom: 30, left: 34 };
     const plotW = width - pad.left - pad.right, plotH = height - pad.top - pad.bottom;
@@ -453,11 +625,11 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
     trendPanel.innerHTML = `
       <div class="safety-trend-head">
         <span class="safety-trend-title">Crashes by time of day</span>
-        <span class="safety-trend-sub">${total} with a recorded time${untimed ? ` · ${untimed} without` : ''}</span>
+        ${rangeMarkup()}
         <button class="safety-trend-close" type="button" aria-label="Close the time-of-day trend">&#10005;</button>
       </div>
       <svg class="safety-trend-svg" viewBox="0 0 ${width} ${height}" role="img"
-        aria-label="Crashes by hour of day, midnight to 23:00">
+        aria-label="Crashes by hour of day, hour 1 to hour 24">
         ${ticks.map(value => `<line x1="${pad.left}" x2="${width - pad.right}" y1="${y(value).toFixed(1)}" y2="${y(value).toFixed(1)}" class="safety-trend-grid"/><text x="${pad.left - 8}" y="${(y(value) + 4).toFixed(1)}" class="safety-trend-tick" text-anchor="end">${value}</text>`).join('')}
         ${points.map((point, index) => {
           const x = pad.left + index * slot + (slot - barW) / 2;
@@ -466,14 +638,22 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
             ? `<rect x="${x.toFixed(1)}" y="${y(point.count).toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="2" fill="${TREND_COLOR}"/>`
             : '';
         }).join('')}
-        ${points.map((point, index) => `<rect x="${(pad.left + index * slot).toFixed(1)}" y="${pad.top}" width="${slot.toFixed(1)}" height="${plotH}" fill="transparent" class="safety-trend-hit"><title>${point.label}:00 — ${point.count} crash${point.count === 1 ? '' : 'es'}</title></rect>`).join('')}
-        ${points[peakHour].count > 0 ? `<text x="${(pad.left + peakHour * slot + slot / 2).toFixed(1)}" y="${(y(points[peakHour].count) - 6).toFixed(1)}" class="safety-trend-value" text-anchor="middle">${points[peakHour].count}</text>` : ''}
-        ${points.filter((_, index) => index % 2 === 0).map(point => `<text x="${(pad.left + point.hour * slot + slot / 2).toFixed(1)}" y="${height - 10}" class="safety-trend-month" text-anchor="middle">${point.hour}</text>`).join('')}
+        ${points.map((point, index) => `<rect x="${(pad.left + index * slot).toFixed(1)}" y="${pad.top}" width="${slot.toFixed(1)}" height="${plotH}" fill="transparent" class="safety-trend-hit"><title>Hour ${point.hour + 1} (${point.label}:00-${String(point.hour + 1).padStart(2, '0')}:00) — ${point.count} crash${point.count === 1 ? '' : 'es'}</title></rect>`).join('')}
+        <!-- Every bar carries its own figure, so the hours can be compared without hovering.
+             An empty hour is left blank rather than labelled 0: twenty-four zeroes would be noise,
+             and a bar of no height is already the answer. -->
+        ${points.map((point, index) => point.count
+          ? `<text x="${(pad.left + index * slot + slot / 2).toFixed(1)}" y="${(y(point.count) - 6).toFixed(1)}" class="safety-trend-value${index === peakHour ? ' is-peak' : ''}" text-anchor="middle">${point.count}</text>`
+          : '').join('')}
+        <!-- Numbered 1-24: the hours OF the day, not the clock's 0-23. Bar 1 is the hour after
+             midnight and bar 24 the hour before it, so the axis starts and ends where the day does.
+             The tooltip and the table give the clock range, so the number is never ambiguous. -->
+        ${points.filter((_, index) => HOUR_TICKS.includes(index)).map(point => `<text x="${(pad.left + point.hour * slot + slot / 2).toFixed(1)}" y="${height - 10}" class="safety-trend-month" text-anchor="middle">${point.hour + 1}</text>`).join('')}
       </svg>
       <table class="safety-trend-table">
         <caption>Crashes by hour of day</caption>
-        <thead><tr><th scope="col">Hour</th><th scope="col">Crashes</th></tr></thead>
-        <tbody>${points.map(point => `<tr><th scope="row">${point.label}:00</th><td>${point.count}</td></tr>`).join('')}</tbody>
+        <thead><tr><th scope="col">Hour of day</th><th scope="col">Crashes</th></tr></thead>
+        <tbody>${points.map(point => `<tr><th scope="row">${point.hour + 1} (${point.label}:00-${String(point.hour + 1).padStart(2, '0')}:00)</th><td>${point.count}</td></tr>`).join('')}</tbody>
       </table>`;
   }
 
@@ -603,30 +783,77 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
    */
   const roadLayers = () => (layerStore?.layers ?? []).filter(layer => layer.category === 'roads').map(layer => layer.id);
   let corridorWas = null;
+  /** Set while this workspace is the one changing the layers, so its own writes are not answered. */
+  let repainting = false;
   async function setCorridorPaint(on) {
-    if (!layerStore?.setVisible) return;
-    if (!on) {
-      if (corridorWas) {
-        for (const [id, was] of corridorWas) await layerStore.setVisible(id, was);
-        corridorWas = null;
+    if (!layerStore?.setVisible || repainting) return;
+    repainting = true;
+    try {
+      if (!on) {
+        if (corridorWas) {
+          for (const [id, was] of corridorWas) await layerStore.setVisible(id, was);
+          corridorWas = null;
+        }
+        return;
       }
-      return;
-    }
-    // Remember once: a second call while already hidden must not record "off" as the way back.
-    corridorWas ??= roadLayers().map(id => [id, ['on', 'partial'].includes(layerStore.stateOf(id))]);
-    for (const [id] of corridorWas) await layerStore.setVisible(id, false);
+      // Remember once: a second call while already hidden must not record "off" as the way back.
+      corridorWas ??= roadLayers().map(id => [id, ['on', 'partial'].includes(layerStore.stateOf(id))]);
+      for (const [id] of corridorWas) await layerStore.setVisible(id, false);
+    } finally { repainting = false; }
   }
+
+  /**
+   * Hold the corridor's own colouring off for as long as the bands are on.
+   *
+   * Switching it off once is not enough: a layer still loading when this screen opens comes back
+   * drawn a few seconds — sometimes minutes — later, and the startup sequence switches the mainline
+   * on for its own reasons. Either way the blue reappeared under the risk bands long after the
+   * operator had stopped expecting it. Re-asserting on every layer change is indifferent to which
+   * of them won the race.
+   */
+  /**
+   * Re-assert until it sticks.
+   *
+   * Switching a layer off is asynchronous, and while this workspace is mid-write its own guard
+   * swallows the notifications that arrive in the meantime — so a batch of changes landing together
+   * (the startup sequence enabling east and west in turn) left one of them on, with nothing to
+   * announce it again. Remembering that something happened while busy, and looping until a pass
+   * changes nothing, is indifferent to how the writes interleave.
+   */
+  let corridorDirty = false;
+  async function holdCorridorOff() {
+    if (repainting) { corridorDirty = true; return; }
+    do {
+      corridorDirty = false;
+      await setCorridorPaint(true);
+    } while (corridorDirty);
+  }
+
+  const unwatchCorridor = hotspots
+    ? layerStore?.subscribe?.(() => {
+      if (!active || !hotspotsOn || !corridorWas) return;
+      if (roadLayers().some(id => ['on', 'partial'].includes(layerStore.stateOf(id)))) void holdCorridorOff();
+    }) ?? (() => {})
+    : () => {};
 
   async function applyHotspots() {
     if (!hotspots) return;
-    if (hotspotLegend) hotspotLegend.hidden = !hotspotsOn || !active;
+    if (hotspotLegend) hotspotLegend.hidden = !hotspotsOn || !active || Boolean(weatherPick);
     hotspotSource.entities.removeAll();
     clearRibbons();
     hotspotById.clear();
-    hotspotSource.show = Boolean(hotspotsOn && active);
-    await setCorridorPaint(Boolean(hotspotsOn && active));
-    if (!hotspotsOn || !active) return;
+    // A picked weather group owns the map for as long as it is picked: the hotspot overlay answers
+    // a different question and the two must not be read on top of each other.
+    const overlayOn = Boolean(hotspotsOn && active && !weatherPick);
+    hotspotSource.show = overlayOn;
+    await setCorridorPaint(overlayOn);
+    if (!overlayOn) return;
 
+    // Nothing is drawn until the register has been asked for. It arrives about twelve seconds after
+    // the feed, and drawing in between put a map on screen built from the feed alone — four
+    // September crashes, which read as "the last month" and then silently rearranged itself. An
+    // empty map that fills once is honest; a wrong map that corrects itself is not.
+    if (!registerReady) return;
     const crashes = withinPeriod(crashRecords());
     const { hotspots: places } = clusterCrashes(crashes);
     hotspotSource.entities.suspendEvents();
@@ -663,9 +890,15 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
   }, ScreenSpaceEventType.LEFT_CLICK);
 
   // Closing the browser is what "done with this hotspot" means — whether the operator used its own
-  // close button, picked another card, or left the workspace.
+  // close button, picked another card, or left the workspace. A picked weather group is the same
+  // gesture: the slider IS that group's list, so dismissing it means dismissing the group, and the
+  // corridor goes back to the hotspot overlay with no bar left looking chosen.
   const stopHotspotWatch = hotspots
-    ? store.subscribe(() => { if (openHotspot && !store.getState().activeExplorerType) closeHotspot(); })
+    ? store.subscribe(() => {
+      if (store.getState().activeExplorerType) return;
+      if (openHotspot) closeHotspot();
+      if (weatherPick) closeWeatherGroup();
+    })
     : () => {};
 
   function render() {
@@ -740,8 +973,14 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
       render();
       // A DataConnect class may still be loading when this opens; show its count as soon as it has one.
       if (cards.some(card => card.source === 'maintenance')) void maintenance?.whenReady?.().then(() => { if (active) render(); });
-      // Crashes arrive with the incident register, so the overlay is recomputed once it lands.
-      if (hotspots) void maintenance?.whenReady?.().then(() => { if (active) void applyHotspots(); });
+      // Crashes arrive with the incident register, so the overlay is drawn once it lands — and drawn
+      // even if it fails, so a register that never answers leaves the feed's crashes visible rather
+      // than an empty map with no explanation.
+      if (hotspots) {
+        void Promise.resolve(maintenance?.whenReady?.())
+          .catch(() => {})
+          .then(() => { registerReady = true; if (active) { render(); void applyHotspots(); refreshTrends(); } });
+      }
       // ...and from the feed, which is the other half of the picture and arrives on its own clock.
       void readLiveCrashes().then(() => { if (active) { render(); void applyHotspots(); refreshTrends(); } });
       void applyHotspots();
@@ -750,6 +989,7 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
     deactivate() {
       if (!active) return;
       active = false;
+      closeWeatherGroup();
       root.hidden = true;
       if (suppressCorridorStatus) corridorStatus?.setSuppressed?.(false, 'safety');
       // The layers belong to the map, not to this panel: switching workspace puts back what it drew.
@@ -767,9 +1007,10 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
       if (suppressCorridorStatus) corridorStatus?.setSuppressed?.(false, 'safety');
       stopHotspotWatch();
       hotspotHandler?.destroy();
+      weatherEffects?.destroy();
       // The risk bands live in the segment layer's collection, which outlives this workspace,
       // and so does the corridor's own colouring, which this screen switched off.
-      clearRibbons(); void setCorridorPaint(false);
+      clearRibbons(); unwatchCorridor(); void setCorridorPaint(false);
       if (hotspots && viewer) viewer.dataSources.remove(hotspotSource, true); stopUpdates(); unsubscribeLayers(); strip.destroy(); root.remove(); },
   };
 }

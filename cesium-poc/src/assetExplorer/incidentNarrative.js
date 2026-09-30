@@ -21,6 +21,37 @@ const text = value => {
 const number = value => (value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value));
 const yes = value => /^y/i.test(String(value ?? ''));
 
+/** A measured value with its unit, or null — "NA" and a blank are not measurements. */
+const unit = (value, suffix) => {
+  const n = number(value);
+  return n == null ? null : `${n} ${suffix}`;
+};
+
+/**
+ * Wind as one readable phrase.
+ *
+ * The feed publishes speed and bearing in separate columns; a bearing on its own means nothing to
+ * a reader, so it is only shown attached to a speed.
+ */
+const windOf = (raw, record) => {
+  const sdna = record?.related?.sdna ?? {};
+  const speed = unit(field(raw, 'wind_speed_kmh') ?? sdna.wind_speed_kmh, 'km/h');
+  if (!speed) return null;
+  const degrees = number(field(raw, 'wind_direction_deg') ?? sdna.wind_direction_deg);
+  return degrees == null ? speed : `${speed} ${compass(degrees)}`;
+};
+
+/**
+ * A bearing as a compass label, to sixteen points.
+ *
+ * Sixteen and not eight because the feed's own weather line says "wind 6 km/h WNW" a few rows
+ * above: rounding to NW here would have put two different directions for the same wind on one
+ * panel, which reads as a bug whichever of them the operator believes.
+ */
+const COMPASS = Object.freeze(['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+  'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']);
+const compass = degrees => COMPASS[Math.round((((degrees % 360) + 360) % 360) / 22.5) % 16];
+
 /**
  * One incident's columns, read through the field index so the committed export and the live
  * DataConnect envelope are the same shape here.
@@ -45,8 +76,14 @@ export function incidentFacts(record) {
     fatalities: number(field(raw, 'fatalities')),
     laneClosure: yes(field(raw, 'lane_closure_y_n')),
     closureHours: number(field(raw, 'lane_closure_duration_hours')),
-    weather: text(field(raw, 'weather')),
-    traffic: text(field(raw, 'traffic_conditions')),
+    // The register writes one word ("Clear"); the live feed writes a sentence with the temperature
+    // and wind in it. Both are read, so an incident from either source answers "what was it like".
+    weather: text(field(raw, 'weather')) ?? text(record?.related?.sdna?.weather_at_event),
+    temperature: unit(field(raw, 'temperature_c') ?? record?.related?.sdna?.temperature_c, '°C'),
+    humidity: unit(field(raw, 'relative_humidity_pct') ?? record?.related?.sdna?.relative_humidity_pct, '%'),
+    wind: windOf(raw, record),
+    precipitation: unit(field(raw, 'precipitation_mm') ?? record?.related?.sdna?.precipitation_mm, 'mm'),
+    traffic: text(field(raw, 'traffic_conditions')) ?? text(record?.related?.sdna?.traffic_conditions),
     rootCause: text(field(raw, 'root_cause_category')) ?? text(field(raw, 'root_cause')),
     speeding: yes(field(raw, 'speeding_involved_y_n')),
     safetyDevices: text(field(raw, 'safety_devices_present')),
@@ -189,6 +226,17 @@ export function detailFacts(record, place = null) {
     // the row as "—" hid an answer the app already had.
     ['Segment', segmentRow(facts, place)],
     ['Location notes', facts.locationNotes],
+    // What it was like out there. The register carries one condition word and the traffic state;
+    // the live feed carries a whole observation (temperature, wind, humidity), which its own panel
+    // already prints. Both are shown here for the same reason — a crash is read against the
+    // conditions it happened in, and the Safety screen now groups crashes by exactly this column.
+    ['Weather', facts.weather],
+    ['Temperature', facts.temperature],
+    ['Humidity', facts.humidity],
+    ['Wind', facts.wind],
+    ['Precipitation', facts.precipitation],
+    ['Traffic conditions', facts.traffic],
+    ['Time of day', facts.time],
     ['Root cause', facts.rootCause],
     ['Speeding involved', facts.speeding ? 'Yes' : null],
     ['Safety devices', facts.safetyDevices],

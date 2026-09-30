@@ -4,8 +4,42 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>I-595 Toll-Plaza Flow — SUMO × Cesium</title>
+    <script>
+      // Runs before first paint. The I-595 app is dynamically imported, so without this guard the
+      // browser briefly paints the legacy HTML below before that module and its CSS arrive.
+      if (new URLSearchParams(location.search).get('demo') === 'i595') {
+        document.documentElement.classList.add('i595-booting');
+      }
+    </script>
+    <style>
+      #i595-boot-loader { display: none; }
+      html.i595-booting { background: #071525; }
+      html.i595-booting body { margin: 0; background: #071525; overflow: hidden; }
+      html.i595-booting body > :not(#i595-boot-loader) { visibility: hidden !important; }
+      html.i595-booting #i595-boot-loader {
+        position: fixed; inset: 0; z-index: 2147483647; display: grid; place-items: center;
+        visibility: visible !important; background: radial-gradient(circle at 50% 42%, #15364a 0, #0b2032 38%, #071525 72%);
+        color: #edf8ff; font: 500 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .i595-boot-loader-content { display: grid; justify-items: center; gap: 16px; }
+      .i595-boot-loader-ring {
+        width: 42px; height: 42px; box-sizing: border-box; border: 3px solid #8aa7bd42;
+        border-top-color: #55d6c2; border-radius: 50%; animation: i595-boot-spin .8s linear infinite;
+      }
+      .i595-boot-loader-title { font-size: 17px; font-weight: 650; letter-spacing: .01em; }
+      .i595-boot-loader-note { color: #9db2c4; font-size: 12px; }
+      @keyframes i595-boot-spin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) { .i595-boot-loader-ring { animation-duration: 1.8s; } }
+    </style>
   </head>
   <body>
+    <div id="i595-boot-loader" role="status" aria-live="polite" aria-label="Loading I-595 Digital Twin">
+      <div class="i595-boot-loader-content">
+        <span class="i595-boot-loader-ring" aria-hidden="true"></span>
+        <span class="i595-boot-loader-title">Loading I-595 Digital Twin</span>
+        <span class="i595-boot-loader-note">Preparing the corridor map…</span>
+      </div>
+    </div>
     <!-- Render surface. Exactly one is populated per load: Cesium by default, or the ArcGIS
          SceneView when the app is opened with ?renderer=arcgis. Both fill the viewport (style.css). -->
     <div id="cesiumContainer"></div>

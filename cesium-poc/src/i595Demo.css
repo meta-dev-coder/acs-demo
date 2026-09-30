@@ -118,6 +118,7 @@
 * { box-sizing: border-box; }
 html, body, #cesiumContainer { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 body { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ui-text); background: #0b1321; }
+.safety-weather-effect { position: fixed; inset: 0; z-index: 7; pointer-events: none; }
 button, a, summary, label { -webkit-tap-highlight-color: transparent; }
 button { font: inherit; color: inherit; cursor: pointer; }
 small { font-size: 9px; letter-spacing: .18em; color: var(--ui-accent); }
@@ -949,12 +950,15 @@ body[data-layers-open="false"] .layers { display: none; }
    corridor status strip already uses. */
 body:has(.layers) .safety-trend { left: calc(var(--app-nav-w) + 84px); }
 body:has(.layers:not(.collapsed)) .safety-trend { left: calc(var(--app-nav-w) + 420px); }
-.safety-trend-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+.safety-trend-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
 .safety-trend-title { font-size: 12.5px; font-weight: 600; }
 .safety-trend-sub { font-size: 11px; color: var(--ui-text-dim); margin-left: auto; }
 .safety-trend-close {
   background: none; border: none; color: var(--ui-text-dim); font-size: 13px; line-height: 1;
   padding: 2px 4px; border-radius: 6px; cursor: pointer;
+  /* Always the last thing on the row, hard right — it used to be carried there by the subtitle's
+     own margin, so removing that subtitle left it floating in the middle of the header. */
+  margin-left: auto;
 }
 .safety-trend-close:hover { color: var(--ui-text); background: var(--ui-surface-raised); }
 .safety-trend-svg { display: block; width: 520px; max-width: 100%; height: auto; }
@@ -1134,3 +1138,27 @@ body:has(.app-role) .liveops-layers { top: 76px; }
 
 .ws-kpi-number { display: flex; align-items: baseline; gap: 6px; }
 .ws-kpi-count-label { font-size: 11px; font-weight: 500; color: var(--ui-text-secondary); }
+
+/* A weather bar that can be picked says so, and the picked one stays marked while its crashes are
+   on the map. Bars with no crashes are not targets — there is nothing to show. */
+.safety-trend-hit.is-pickable { cursor: pointer; }
+.safety-trend-hit.is-pickable:hover,
+.safety-trend-hit.is-pickable:focus-visible { fill: rgba(255, 255, 255, 0.07); outline: none; }
+
+/* The charts' own date range. It sits in the panel head beside the title, so the reader can see
+   what span the bars cover without looking anywhere else. */
+.safety-trend-range { display: inline-flex; align-items: center; gap: 6px; margin-left: 14px; }
+.safety-trend-range-label { color: var(--ui-text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+.safety-trend-range input[type="date"] {
+  background: var(--ui-surface); color: var(--ui-text); border: 1px solid var(--ui-border);
+  border-radius: 6px; padding: 3px 6px; font-size: 12px; font-family: inherit;
+  /* A native date field needs room for its own text; without a width it collapsed to an empty
+     pill and the range it was showing could not be read at all. */
+  min-width: 118px;
+}
+.safety-trend-range input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
+.safety-trend-range-reset {
+  background: none; border: 1px solid var(--ui-border); color: var(--ui-text-dim);
+  border-radius: 6px; padding: 3px 8px; font-size: 11px; cursor: pointer;
+}
+.safety-trend-range-reset:hover { color: var(--ui-text); border-color: var(--ui-text-dim); }
