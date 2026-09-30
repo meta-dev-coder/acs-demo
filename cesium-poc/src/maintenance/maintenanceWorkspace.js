@@ -807,7 +807,7 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
       root.hidden = true;
       restoreCorridorRoads();
       corridorStatus?.setSuppressed?.(false, 'maintenance');
-      roadShields?.setEndpointsOnly?.(false);
+      // Endpoint-only route shields are the corridor-wide display rule and remain in place.
       liveControl.hide();
       legend.hidden = true;
       maintenanceLayer.show(null);
@@ -823,7 +823,7 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
       // workspace went away.
       restoreCorridorRoads();
       corridorStatus?.setSuppressed?.(false, 'maintenance');
-      roadShields?.setEndpointsOnly?.(false);
+      // Endpoint-only route shields are the corridor-wide display rule and remain in place.
     },
   };
 }

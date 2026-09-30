@@ -492,7 +492,7 @@ export function installLiveOpsWorkspace(viewer, { assetExplorer, liveEvents, lay
       clearedOpen = false;
       liveEvents?.setClearedOnly?.(false);
       assetExplorer.setExclusiveLayers?.(true);
-      roadShields?.setEndpointsOnly?.(false);
+      // Endpoint-only route shields are the corridor-wide display rule and remain in place.
       segments?.setOverlayDetails?.(null, null);
       assetExplorer.setOperationalImpact?.(null);
       layers.setOpen(false);

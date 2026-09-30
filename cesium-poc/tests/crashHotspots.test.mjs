@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { clusterCrashes, crashBandFor, crashBreakdown, metresBetween, HOTSPOT_RADIUS_M }
+import { clusterCrashes, crashBandFor, crashBreakdown, crashSeverity, hotspotScore, metresBetween, HOTSPOT_RADIUS_M }
   from '../src/safety/crashHotspots.js';
 
 /** ~111 m per 0.001 degrees of latitude, so offsets here read roughly as metres. */
@@ -48,14 +48,35 @@ test('the default radius is a spot on the road, not a stretch of it', () => {
   assert.equal(HOTSPOT_RADIUS_M, 100);
 });
 
-test('bands are absolute counts, from one crash upward', () => {
-  assert.equal(crashBandFor(0), null, 'no crash is no place');
+test('bands read a weighted score, not a crash count', () => {
+  assert.equal(crashBandFor(0), null, 'nothing recorded is no place');
   assert.equal(crashBandFor(1).id, 'LOW');
-  assert.equal(crashBandFor(2).id, 'LOW');
-  assert.equal(crashBandFor(3).id, 'MODERATE');
-  assert.equal(crashBandFor(6).id, 'HIGH');
-  assert.equal(crashBandFor(10).id, 'SEVERE');
-  assert.equal(crashBandFor(99).id, 'SEVERE');
+  assert.equal(crashBandFor(8).id, 'MODERATE');
+  assert.equal(crashBandFor(25).id, 'HIGH');
+  assert.equal(crashBandFor(40).id, 'SEVERE');
+});
+
+test('severity is read from injuries, fatalities and lane closures — the register has no severity column', () => {
+  assert.equal(crashSeverity({ related: { fatalities: 1, injuries: 'No' } }), 'severe');
+  assert.equal(crashSeverity({ related: { injuries: 'Yes' } }), 'high');
+  assert.equal(crashSeverity({ related: { injuries: 'No', laneClosure: 'Yes' } }), 'intermediate');
+  assert.equal(crashSeverity({ related: { injuries: 'No', laneClosure: 'No' } }), 'minor');
+  assert.equal(crashSeverity({ related: { injuries: 'NA' } }), 'minor', 'NA is not a yes');
+  assert.equal(crashSeverity({}), 'minor');
+});
+
+test('a few bad crashes outrank many scrapes', () => {
+  const of = (n, related) => Array.from({ length: n }, (_, i) => ({ id: `x${i}`, related }));
+  const tenHigh = hotspotScore(of(10, { injuries: 'Yes' }));
+  const twentyMinor = hotspotScore(of(20, { injuries: 'No', laneClosure: 'No' }));
+  const mixed = hotspotScore([...of(2, {}), ...of(4, { laneClosure: 'Yes' }), ...of(4, { fatalities: 1 })]);
+  assert.equal(tenHigh, 50);
+  assert.equal(twentyMinor, 20);
+  assert.equal(mixed, 54);
+  assert.ok(tenHigh > twentyMinor, 'ten injury crashes are hotter than twenty scrapes');
+  assert.equal(crashBandFor(tenHigh).id, 'SEVERE');
+  assert.equal(crashBandFor(mixed).id, 'SEVERE');
+  assert.equal(crashBandFor(twentyMinor).id, 'MODERATE', 'more crashes, less harm, cooler colour');
 });
 
 test('the circle contains every crash it claims', () => {

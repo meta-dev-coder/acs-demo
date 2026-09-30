@@ -169,6 +169,8 @@ try {
     : { destination: Cartesian3.fromDegrees(hero.lon, hero.lat, hero.height), orientation: orientationOf(hero) });
   document.querySelector("#reset-view").onclick = reset;
   const roadShields = installI595RoadShields(viewer, corridor);
+  // Two route tags identify the corridor without repeating I-595 at every interchange.
+  roadShields.setEndpointsOnly(true);
   const contextLabels = installI595ContextLabels(viewer, corridor);
   // Shields and context labels are the same layer of meaning, so they arrive together.
   const corridorMarkers = { setOpacity: alpha => { roadShields.setOpacity(alpha); contextLabels.setOpacity(alpha); } };
@@ -433,7 +435,7 @@ try {
   // Safety also carries the recorded crash history, which is a DataConnect class drawn by the
   // Maintenance workspace rather than a live layer — so it is handed that workspace to show it with.
   // Late-bound for the same reason as above: the workspace is built after the explorer it needs.
-  const liveEventDeps = { assetExplorer, liveEvents: liveEventControls, layerStore,
+  const liveEventDeps = { assetExplorer, liveEvents: liveEventControls, layerStore, corridorStatus,
     // Closing a crash hotspot puts the camera back where the screen opened, rather than leaving the
     // operator parked over one junction with no way back but the mouse.
     resetView: () => flyToOperationsView(),

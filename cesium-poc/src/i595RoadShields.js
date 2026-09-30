@@ -76,8 +76,8 @@ export function installI595RoadShields(viewer, centerline) {
      *
      * Live Ops watches all fifteen miles at once, where a shield at every interchange repeats the
      * same fact six times across the frame. The two ends still say which road this is and where it
-     * begins and finishes; the ones between are noise at that scale. Every other workspace keeps
-     * the full set.
+     * begins and finishes; the ones between are noise at that scale. The application now keeps
+     * this endpoint-only view across every workspace.
      *
      * Hidden through the billboard rather than `entity.show`, because the declutter pass owns that
      * and reassigns it every frame — setting it here would simply be overwritten.

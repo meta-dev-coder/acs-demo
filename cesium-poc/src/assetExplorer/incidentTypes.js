@@ -93,13 +93,36 @@ export const incidentVisualOf = record => incidentVisual(record?.title);
  *
  * @returns {{level: 'High'|'Moderate'|'Reported', label: string, tone: 'danger'|'warning'|'muted'}}
  */
+/**
+ * How bad one crash was, in four tiers.
+ *
+ * The incident register carries no severity column — it records what HAPPENED — so severity is read
+ * from fatalities, injuries and lane closures, in that order of seriousness. This is the single
+ * place that rule lives: the details panel prints it, and Safety's crash hotspots weight their
+ * colour by it, so a crash cannot be "High" in one place and something else in the other.
+ */
+export const CRASH_SEVERITY_TIERS = Object.freeze(['severe', 'high', 'intermediate', 'minor']);
+
+export function crashSeverityTier(record) {
+  const related = record?.related ?? {};
+  if ((Number(related.fatalities) || 0) > 0) return 'severe';
+  if (/^y/i.test(related.injuries ?? '')) return 'high';
+  if (/^y/i.test(related.laneClosure ?? '')) return 'intermediate';
+  return 'minor';
+}
+
+/** The tier as the panel shows it: a short level, what it is based on, and a tone. */
 export function incidentSeverity(record) {
   const related = record?.related ?? {};
   const fatalities = Number(related.fatalities) || 0;
-  const injuries = /^y/i.test(related.injuries ?? '');
-  const closure = /^y/i.test(related.laneClosure ?? '');
-  if (fatalities > 0) return { level: 'High', label: fatalities === 1 ? '1 fatality' : `${fatalities} fatalities`, tone: 'danger' };
-  if (injuries) return { level: 'High', label: 'Injuries reported', tone: 'danger' };
-  if (closure) return { level: 'Moderate', label: 'Lane closure', tone: 'warning' };
-  return { level: 'Reported', label: 'No injuries reported', tone: 'muted' };
+  switch (crashSeverityTier(record)) {
+    case 'severe':
+      return { level: 'High', label: fatalities === 1 ? '1 fatality' : `${fatalities} fatalities`, tone: 'danger' };
+    case 'high':
+      return { level: 'High', label: 'Injuries reported', tone: 'danger' };
+    case 'intermediate':
+      return { level: 'Moderate', label: 'Lane closure', tone: 'warning' };
+    default:
+      return { level: 'Reported', label: 'No injuries reported', tone: 'muted' };
+  }
 }

@@ -20,6 +20,10 @@
   --ui-text: #e8eef6;
   --ui-text-secondary: #92a8c3;
   --ui-text-muted: #7f93ac;
+  /* Used in thirteen places and never defined until now. On HTML that silently inherited and looked
+     fine; on SVG `fill` an invalid value falls back to the initial value, so every chart tick and
+     axis label rendered BLACK on a dark panel. */
+  --ui-text-dim: #92a8c3;
 
   /* Lines and states */
   --ui-border: #ffffff1f;
@@ -66,6 +70,7 @@
 
   --ui-text: #172033;
   --ui-text-secondary: #5f6b7a;
+  --ui-text-dim: #5f6b7a;
   --ui-text-muted: #8a96a6;
 
   --ui-border: #d8dee6;
@@ -915,6 +920,57 @@ body[data-layers-open="false"] .layers { display: none; }
   border-radius: 6px; padding: 3px 6px; font: inherit; font-size: 11.5px;
 }
 .safety-period-select:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+
+/* Safety's Trends control and its chart. */
+.safety-trend-group {
+  display: inline-flex; flex-direction: column; align-items: flex-start; gap: 4px; flex: none; align-self: center;
+  padding: 6px 10px; border: 1px solid var(--ui-border); border-radius: 8px;
+  background: var(--ui-surface-translucent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  color: var(--ui-text); pointer-events: auto; white-space: nowrap;
+}
+.safety-trend-buttons { display: inline-flex; gap: 6px; }
+.safety-trend-button {
+  padding: 3px 9px; border: 1px solid var(--ui-border); border-radius: 6px;
+  background: var(--ui-surface); color: var(--ui-text); font: inherit; font-size: 11.5px; cursor: pointer;
+}
+.safety-trend-button:hover { border-color: var(--ui-accent); }
+.safety-trend-button[aria-pressed="true"] { border-color: var(--ui-accent); color: var(--ui-accent); background: var(--ui-accent-tint); }
+.safety-trend-label { font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--ui-text-dim); }
+
+.safety-trend {
+  position: absolute; left: calc(var(--app-nav-w) + 16px); top: calc(var(--safety-kpi-bottom, 100px) + 42px);
+  z-index: 6; padding: 12px 14px 8px; border: 1px solid var(--ui-border); border-radius: 10px;
+  background: var(--ui-surface-solid); box-shadow: 0 12px 32px var(--ui-shadow-color);
+  color: var(--ui-text); pointer-events: auto;
+}
+.safety-trend[hidden] { display: none; }
+/* The Explorer tray owns this same corner and sits above it, so the chart steps aside rather than
+   hiding behind it — its y-axis and first month were underneath the collapsed rail. Same rule the
+   corridor status strip already uses. */
+body:has(.layers) .safety-trend { left: calc(var(--app-nav-w) + 84px); }
+body:has(.layers:not(.collapsed)) .safety-trend { left: calc(var(--app-nav-w) + 420px); }
+.safety-trend-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+.safety-trend-title { font-size: 12.5px; font-weight: 600; }
+.safety-trend-sub { font-size: 11px; color: var(--ui-text-dim); margin-left: auto; }
+.safety-trend-close {
+  background: none; border: none; color: var(--ui-text-dim); font-size: 13px; line-height: 1;
+  padding: 2px 4px; border-radius: 6px; cursor: pointer;
+}
+.safety-trend-close:hover { color: var(--ui-text); background: var(--ui-surface-raised); }
+.safety-trend-svg { display: block; width: 520px; max-width: 100%; height: auto; }
+/* Recessive grid and axes; text never wears the series colour. */
+.safety-trend-grid { stroke: var(--ui-border-soft); stroke-width: 1; }
+.safety-trend-tick, .safety-trend-month { fill: var(--ui-text); font-size: 11px; }
+.safety-trend-value { fill: var(--ui-text); font-size: 11px; font-weight: 600; }
+.safety-trend-dot { cursor: default; }
+.safety-trend-hit { cursor: default; }
+/* The dot grows when its hit target is hovered, not only when the 9px dot itself is. */
+.safety-trend-hit:hover + .safety-trend-dot, .safety-trend-dot:hover { r: 6; }
+/* The same numbers as a table, for screen readers and for copying out. */
+.safety-trend-table {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
 
 .safety-legend {
   position: absolute; left: calc(var(--app-nav-w) + 16px); top: var(--safety-kpi-bottom, 100px);

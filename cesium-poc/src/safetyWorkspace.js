@@ -11,6 +11,7 @@
 import { LIVE_EVENT_TYPES, liveEventSourceNote } from './liveEventsData.js';
 import { installWorkspaceStrip } from './workspaceStrip.js';
 import { currentDateWindow, maintenanceDateKey } from './assetExplorer/assetTypes.js';
+import { hourOfDayTrend, monthlyCrashTrend } from './safety/crashTrend.js';
 import { CallbackProperty, Cartesian2, Cartesian3, ClassificationType, Color, ColorMaterialProperty, CustomDataSource, Math as CesiumMath, ScreenSpaceEventHandler, ScreenSpaceEventType, VerticalOrigin } from 'cesium';
 import { clusterCrashes, crashBreakdown, CRASH_BANDS, HOTSPOT_RADIUS_M } from './safety/crashHotspots.js';
 
@@ -106,7 +107,8 @@ export function historicalMaintenance(getWorkspace) {
  *          liveEvents: object, layerStore: object, host?: HTMLElement}} deps
  */
 export function installLiveEventsWorkspace({ cards, className, label, assetExplorer, liveEvents, layerStore,
-  maintenance = null, viewer = null, resetView = null, hotspots = false, host = document.body }) {
+  maintenance = null, viewer = null, resetView = null, hotspots = false, suppressCorridorStatus = false,
+  corridorStatus = null, host = document.body }) {
   const store = assetExplorer.store;
   const root = document.createElement('div');
   root.className = className;
@@ -131,7 +133,7 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
    * when the whole corridor is in frame and closes to 50 m once the operator is on top of it.
    * The count on the label and the tooltip are the real figures either way.
    */
-  const DRAW_RADIUS_NEAR_M = 50, DRAW_RADIUS_FAR_M = 300;
+  const DRAW_RADIUS_NEAR_M = 50, DRAW_RADIUS_FAR_M = 700;
   const DRAW_NEAR_DISTANCE = 2_000, DRAW_FAR_DISTANCE = 25_000;
   function drawnRadius(position) {
     const eye = viewer?.camera?.positionWC;
@@ -174,7 +176,9 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
     });
   }
 
-  let hotspotsOn = false;
+  // On by default: the crash picture is what this screen is for, and an operator should not have to
+  // switch the map on to see it. Unticking still hands the corridor back.
+  let hotspotsOn = true;
   // Its own source, so switching the overlay off removes the circles outright rather than leaving
   // hidden geometry behind, and nothing else on the map is touched.
   const hotspotSource = new CustomDataSource('Crash hotspots');
@@ -240,10 +244,11 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
   }
 
   const hotspotControl = hotspots ? document.createElement('label') : null;
+  const trendPanel = document.createElement('section');
   const hotspotLegend = hotspots ? document.createElement('div') : null;
   if (hotspots) {
     hotspotControl.className = 'safety-hotspots';
-    hotspotControl.innerHTML = `<input type="checkbox" class="safety-hotspots-input"> <span>Crash hotspots</span>`;
+    hotspotControl.innerHTML = `<input type="checkbox" class="safety-hotspots-input" checked> <span>Crash hotspots</span>`;
     strip.root.append(hotspotControl);
     const periodControl = document.createElement('label');
     periodControl.className = 'safety-period';
@@ -253,21 +258,58 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
           `<option value="${option.key}"${option.key === DEFAULT_CRASH_PERIOD ? ' selected' : ''}>${option.label}</option>`).join('')}
       </select>`;
     strip.root.append(periodControl);
+    // ── Monthly trends ────────────────────────────────────────────────────────────────────────
+    const trendGroup = document.createElement('div');
+    trendGroup.className = 'safety-trend-group';
+    trendGroup.innerHTML = `<span class="safety-trend-label">Trends</span>
+      <span class="safety-trend-buttons">
+        <button type="button" class="safety-trend-button" data-trend="month" aria-pressed="false">Monthly trends</button>
+        <button type="button" class="safety-trend-button" data-trend="hour" aria-pressed="false">Time of day</button>
+      </span>`;
+    strip.root.append(trendGroup);
+    // One panel, one chart at a time: two 520px charts side by side would cover the corridor they
+    // are about, and the question "when" is asked after "how many", not beside it.
+    for (const button of trendGroup.querySelectorAll('[data-trend]')) {
+      button.onclick = () => {
+        const wanted = button.dataset.trend;
+        const closing = trendKind === wanted && !trendPanel.hidden;
+        trendKind = wanted;
+        trendPanel.hidden = closing;
+        for (const other of trendGroup.querySelectorAll('[data-trend]')) {
+          other.setAttribute('aria-pressed', String(!closing && other.dataset.trend === wanted));
+        }
+        if (closing) return;
+        renderTrend();
+        void maintenance?.whenReady?.().then(() => { if (active && !trendPanel.hidden) renderTrend(); });
+      };
+    }
+    trendPanel.className = 'safety-trend';
+    trendPanel.hidden = true;
+    trendPanel.setAttribute('aria-label', 'Monthly crash trend');
+    root.append(trendPanel);
+
+    trendPanel.addEventListener('click', event => {
+      if (!event.target.closest('.safety-trend-close')) return;
+      trendPanel.hidden = true;
+      for (const other of trendGroup.querySelectorAll('[data-trend]')) other.setAttribute('aria-pressed', 'false');
+    });
+
     periodControl.querySelector('select').onchange = event => {
       crashPeriod = event.target.value;
       // A hotspot open from the previous period may not exist in this one, so the browser closes
       // rather than being left showing crashes from a place that is no longer drawn.
       closeHotspot();
       void applyHotspots();
+      if (!trendPanel.hidden) renderTrend();
     };
     hotspotLegend.className = 'safety-legend';
     hotspotLegend.hidden = true;
-    hotspotLegend.innerHTML = `<span class="safety-legend-title">Crashes within ${HOTSPOT_RADIUS_M} m</span>${
-      CRASH_BANDS.map((band, index) => {
-        const next = CRASH_BANDS[index - 1];
-        const range = next ? `${band.from}\u2013${next.from - 1}` : `${band.from}+`;
-        return `<span class="safety-legend-item"><i style="background:${band.color}"></i>${band.label} (${range})</span>`;
-      }).reverse().join('')}`;
+    // Names only. The colour comes from a severity-weighted score, and printing that score would
+    // invite it to be read as the number on the circle — which is the crash COUNT.
+    hotspotLegend.innerHTML = `<span class="safety-legend-title">Crash risk within ${HOTSPOT_RADIUS_M} m</span>${
+      CRASH_BANDS.map(band =>
+        `<span class="safety-legend-item"><i style="background:${band.color}"></i>${band.label}</span>`)
+        .reverse().join('')}`;
     root.append(hotspotLegend);
     const reposition = new ResizeObserver(() => {
       root.style.setProperty('--safety-kpi-bottom', `${strip.root.offsetTop + strip.root.offsetHeight + 10}px`);
@@ -286,6 +328,105 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
    * when the crashes are in fact piled at one interchange inside it. The circle is the real ground
    * area the crashes fall in, so its size is a claim the data supports.
    */
+  /**
+   * The monthly crash trend, drawn as one line of red dots.
+   *
+   * One series, one question — is the corridor getting better or worse — so there is no legend: the
+   * title names the series. Every month in the window is a point even at zero, because a gap would
+   * read as "no data" where the truthful answer is "nothing happened". Only the peak and the current
+   * month carry a number; a value on every dot is noise.
+   */
+  const TREND_MONTHS = 10;
+  const TREND_COLOR = '#d03b3b';
+  let trendKind = 'month';
+  function renderTrend() { if (trendKind === 'hour') renderHourTrend(); else renderMonthTrend(); }
+
+  /**
+   * Crashes by hour of day, as columns.
+   *
+   * Columns rather than the monthly chart's dots: twenty-four ordered buckets are a distribution to
+   * compare, not a path to follow, and a line between 23:00 and 00:00 would draw a slope across a
+   * boundary the day does not have.
+   */
+  function renderHourTrend() {
+    const crashes = maintenance?.recordsForType?.('incidentRecord') ?? [];
+    const { points, total, peak, untimed } = hourOfDayTrend(crashes);
+    const width = 520, height = 190;
+    const pad = { top: 22, right: 14, bottom: 30, left: 34 };
+    const plotW = width - pad.left - pad.right, plotH = height - pad.top - pad.bottom;
+    const top = Math.max(4, Math.ceil((peak || 1) * 1.15));
+    const slot = plotW / points.length;
+    // A 2px surface gap between bars, and thin marks — never a border drawn round them.
+    const barW = Math.max(4, slot - 3);
+    const y = count => pad.top + plotH - (count / top) * plotH;
+    const ticks = [...new Set([0, Math.round(top / 2), top])];
+    const peakHour = points.reduce((best, point, index) => (point.count > points[best].count ? index : best), 0);
+
+    trendPanel.innerHTML = `
+      <div class="safety-trend-head">
+        <span class="safety-trend-title">Crashes by time of day</span>
+        <span class="safety-trend-sub">${total} with a recorded time${untimed ? ` · ${untimed} without` : ''}</span>
+        <button class="safety-trend-close" type="button" aria-label="Close the time-of-day trend">&#10005;</button>
+      </div>
+      <svg class="safety-trend-svg" viewBox="0 0 ${width} ${height}" role="img"
+        aria-label="Crashes by hour of day, midnight to 23:00">
+        ${ticks.map(value => `<line x1="${pad.left}" x2="${width - pad.right}" y1="${y(value).toFixed(1)}" y2="${y(value).toFixed(1)}" class="safety-trend-grid"/><text x="${pad.left - 8}" y="${(y(value) + 4).toFixed(1)}" class="safety-trend-tick" text-anchor="end">${value}</text>`).join('')}
+        ${points.map((point, index) => {
+          const x = pad.left + index * slot + (slot - barW) / 2;
+          const barH = Math.max(point.count ? 2 : 0, pad.top + plotH - y(point.count));
+          return point.count
+            ? `<rect x="${x.toFixed(1)}" y="${y(point.count).toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="2" fill="${TREND_COLOR}"/>`
+            : '';
+        }).join('')}
+        ${points.map((point, index) => `<rect x="${(pad.left + index * slot).toFixed(1)}" y="${pad.top}" width="${slot.toFixed(1)}" height="${plotH}" fill="transparent" class="safety-trend-hit"><title>${point.label}:00 — ${point.count} crash${point.count === 1 ? '' : 'es'}</title></rect>`).join('')}
+        ${points[peakHour].count > 0 ? `<text x="${(pad.left + peakHour * slot + slot / 2).toFixed(1)}" y="${(y(points[peakHour].count) - 6).toFixed(1)}" class="safety-trend-value" text-anchor="middle">${points[peakHour].count}</text>` : ''}
+        ${points.filter((_, index) => index % 2 === 0).map(point => `<text x="${(pad.left + point.hour * slot + slot / 2).toFixed(1)}" y="${height - 10}" class="safety-trend-month" text-anchor="middle">${point.hour}</text>`).join('')}
+      </svg>
+      <table class="safety-trend-table">
+        <caption>Crashes by hour of day</caption>
+        <thead><tr><th scope="col">Hour</th><th scope="col">Crashes</th></tr></thead>
+        <tbody>${points.map(point => `<tr><th scope="row">${point.label}:00</th><td>${point.count}</td></tr>`).join('')}</tbody>
+      </table>`;
+  }
+
+  function renderMonthTrend() {
+    const crashes = maintenance?.recordsForType?.('incidentRecord') ?? [];
+    const { points, total, peak, undated } = monthlyCrashTrend(crashes, { months: TREND_MONTHS });
+    const width = 520, height = 190;
+    const pad = { top: 22, right: 18, bottom: 30, left: 34 };
+    const plotW = width - pad.left - pad.right, plotH = height - pad.top - pad.bottom;
+    // A quiet corridor still needs a scale, and an axis that stops exactly at the peak crowds it.
+    const top = Math.max(4, Math.ceil((peak || 1) * 1.15));
+    const x = index => pad.left + (points.length < 2 ? plotW / 2 : (index / (points.length - 1)) * plotW);
+    const y = count => pad.top + plotH - (count / top) * plotH;
+    const ticks = [...new Set([0, Math.round(top / 2), top])];
+    const path = points.map((point, index) => `${index ? 'L' : 'M'}${x(index).toFixed(1)},${y(point.count).toFixed(1)}`).join(' ');
+    const peakIndex = points.reduce((best, point, index) => (point.count > points[best].count ? index : best), 0);
+    const labelled = new Set([points.length - 1, peakIndex]);
+
+    trendPanel.innerHTML = `
+      <div class="safety-trend-head">
+        <span class="safety-trend-title">Crashes reported per month</span>
+        <span class="safety-trend-sub">${total} in the last ${TREND_MONTHS} months${undated ? ` · ${undated} undated` : ''}</span>
+        <button class="safety-trend-close" type="button" aria-label="Close the monthly trend">&#10005;</button>
+      </div>
+      <svg class="safety-trend-svg" viewBox="0 0 ${width} ${height}" role="img"
+        aria-label="Crashes reported per month over the last ${TREND_MONTHS} months">
+        ${ticks.map(value => `<line x1="${pad.left}" x2="${width - pad.right}" y1="${y(value).toFixed(1)}" y2="${y(value).toFixed(1)}" class="safety-trend-grid"/><text x="${pad.left - 8}" y="${(y(value) + 4).toFixed(1)}" class="safety-trend-tick" text-anchor="end">${value}</text>`).join('')}
+        <path d="${path}" fill="none" stroke="${TREND_COLOR}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        ${points.map((point, index) => `<circle cx="${x(index).toFixed(1)}" cy="${y(point.count).toFixed(1)}" r="4.5" fill="${TREND_COLOR}" stroke="var(--ui-surface-solid)" stroke-width="2" class="safety-trend-dot" data-month="${point.label}" data-count="${point.count}"/>`).join('')}
+        <!-- Invisible hit targets: a 9px dot you must land on dead-centre is not a hover target. -->
+        ${points.map((point, index) => `<circle cx="${x(index).toFixed(1)}" cy="${y(point.count).toFixed(1)}" r="12" fill="transparent" class="safety-trend-hit"><title>${point.label}: ${point.count} crash${point.count === 1 ? '' : 'es'}</title></circle>`).join('')}
+        ${[...labelled].filter(index => points[index]?.count > 0).map(index => `<text x="${x(index).toFixed(1)}" y="${(y(points[index].count) - 11).toFixed(1)}" class="safety-trend-value" text-anchor="middle">${points[index].count}</text>`).join('')}
+        ${points.map((point, index) => `<text x="${x(index).toFixed(1)}" y="${height - 10}" class="safety-trend-month" text-anchor="middle">${point.label}</text>`).join('')}
+      </svg>
+      <table class="safety-trend-table">
+        <caption>Crashes reported per month</caption>
+        <thead><tr><th scope="col">Month</th><th scope="col">Crashes</th></tr></thead>
+        <tbody>${points.map(point => `<tr><th scope="row">${point.label}</th><td>${point.count}</td></tr>`).join('')}</tbody>
+      </table>`;
+  }
+
   async function applyHotspots() {
     if (!hotspots) return;
     if (hotspotLegend) hotspotLegend.hidden = !hotspotsOn || !active;
@@ -309,7 +450,7 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
         const detail = crashBreakdown(place).slice(0, 3).map(row => `${row.count} x ${row.title}`).join(', ');
         hotspotSource.entities.add({
           id: place.id,
-          name: `${place.count} crashes within ${place.radiusMeters} m${detail ? ` - ${detail}` : ''}`,
+          name: `${place.count} crashes within ${place.radiusMeters} m · ${place.band.label} risk${detail ? ` - ${detail}` : ''}`,
           position: centre,
           ellipse: {
             semiMajorAxis: radius,
@@ -427,6 +568,7 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
       if (active) return;
       active = true;
       root.hidden = false;
+      if (suppressCorridorStatus) corridorStatus?.setSuppressed?.(true, 'safety');
       render();
       // A DataConnect class may still be loading when this opens; show its count as soon as it has one.
       if (cards.some(card => card.source === 'maintenance')) void maintenance?.whenReady?.().then(() => { if (active) render(); });
@@ -439,6 +581,7 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
       if (!active) return;
       active = false;
       root.hidden = true;
+      if (suppressCorridorStatus) corridorStatus?.setSuppressed?.(false, 'safety');
       // The layers belong to the map, not to this panel: switching workspace puts back what it drew.
       const card = cards.find(item => item.key === activeKey);
       activeKey = null;
@@ -451,6 +594,7 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
       render();
     },
     destroy() {
+      if (suppressCorridorStatus) corridorStatus?.setSuppressed?.(false, 'safety');
       stopHotspotWatch();
       hotspotHandler?.destroy();
       if (hotspots && viewer) viewer.dataSources.remove(hotspotSource, true); stopUpdates(); unsubscribeLayers(); strip.destroy(); root.remove(); },
@@ -459,7 +603,8 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
 
 /** Safety: what is happening to the corridor right now. */
 export const installSafetyWorkspace = deps =>
-  installLiveEventsWorkspace({ ...deps, cards: SAFETY_CARDS, className: 'safety-workspace', label: 'Corridor safety', hotspots: true });
+  installLiveEventsWorkspace({ ...deps, cards: SAFETY_CARDS, className: 'safety-workspace', label: 'Corridor safety',
+    hotspots: true, suppressCorridorStatus: true });
 
 /** Traffic: the planned work restricting it. */
 export const installTrafficWorkspace = deps =>

@@ -11,7 +11,7 @@
 
 import { field } from '../maintenance/maintenanceRecords.js';
 import { maintenanceDate } from './assetTypes.js';
-import { incidentSeverity } from './incidentTypes.js';
+import { crashSeverityTier, incidentSeverity } from './incidentTypes.js';
 import { carriagewayLabel, segmentSpanLabel } from './incidentContext.js';
 
 const text = value => {
@@ -152,6 +152,27 @@ export function impactRows(record, place = null) {
 }
 
 /** The Details tab — the record's own columns, in the order an operator reads them. */
+/**
+ * The register's own segment name, or the FDOT segment the point actually falls on.
+ *
+ * carriagewayAt() already resolved that from the coordinates, so leaving the row blank hid an
+ * answer the app had. A dash is treated as blank: the register writes "-" where it has no segment,
+ * and a placeholder is not a value — that dash was why the fallback never fired.
+ */
+const BLANK = /^[-\u2013\u2014\s]*$/;
+function segmentRow(facts, place) {
+  const own = BLANK.test(String(facts.segment ?? '')) ? null : facts.segment;
+  return own ?? (place?.resolved ? place.segmentId : null);
+}
+
+/** "High · Injuries reported" — the tier that colours the map, and what it is based on. */
+const TIER_LABELS = Object.freeze({ severe: 'Severe', high: 'High', intermediate: 'Intermediate', minor: 'Minor' });
+function severityRow(record) {
+  const tier = crashSeverityTier(record);
+  const basis = incidentSeverity(record).label;
+  return basis ? `${TIER_LABELS[tier]} · ${basis}` : TIER_LABELS[tier];
+}
+
 export function detailFacts(record, place = null) {
   const facts = incidentFacts(record);
   return [
@@ -160,7 +181,13 @@ export function detailFacts(record, place = null) {
     ['Reported', reportedAt(facts)],
     ['Location', place?.resolved ? carriagewayLabel(place) : null],
     ['Between', segmentSpanLabel(place)],
-    ['Segment', facts.segment],
+    // Severity is not a column in the register; it is what the crash DID — see crashSeverityTier.
+    // Named the same way Safety's hotspot colours are, so a red circle and this row agree.
+    ['Severity', severityRow(record)],
+    // The register's own segment name where it has one, otherwise the FDOT segment the point
+    // actually falls on — carriagewayAt() already resolved it from the coordinates, and leaving
+    // the row as "—" hid an answer the app already had.
+    ['Segment', segmentRow(facts, place)],
     ['Location notes', facts.locationNotes],
     ['Root cause', facts.rootCause],
     ['Speeding involved', facts.speeding ? 'Yes' : null],
