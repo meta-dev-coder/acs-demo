@@ -47,6 +47,11 @@ const STEM = 9;
 export const OVERHEAD_STEM = 30;
 const DOT_RADIUS = 3.5;
 const RADIUS = 5;
+/** The caption pills (assetPillMarker) are read at corridor scale, so they are drawn larger. */
+const PILL_FONT_PX = 16;
+const PILL_PADDING_X = 11;
+const PILL_TEXT_HEIGHT = 27;
+const PILL_RADIUS = 7;
 /** Drawn oversized and scaled down by Cesium, so the text stays crisp on dense displays. */
 const SUPERSAMPLE = 3;
 
@@ -142,7 +147,7 @@ export function assetIdMarker({ id, selected = false, stem = STEM, tone = 'norma
  */
 export function assetPillMarker({ text, color, selected = false, stem = STEM }) {
   const label = String(text ?? '').trim();
-  const key = `pill:${label}:${color}:${selected ? 'selected' : 'normal'}:${stem}`;
+  const key = `pill:${label}:${color}:${selected ? 'selected' : 'normal'}:${stem}:v2`;
   const hit = cache.get(key);
   if (hit) return hit;
 
@@ -153,12 +158,15 @@ export function assetPillMarker({ text, color, selected = false, stem = STEM }) 
   // Dark ink on these mid-brightness class colours; the same choice the KPI chips make.
   const ink = selected ? MARKER_COLORS.selected.text : '#12180A';
 
-  const font = `600 ${FONT_PX}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+  // Bigger than the id pills: a category is read at corridor scale, where 12px over photorealistic
+  // tiles is a smudge. The id pills keep their own size — they are read close up, and there are
+  // sixty of them at once.
+  const font = `700 ${PILL_FONT_PX}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
   const measure = document.createElement('canvas').getContext('2d');
   measure.font = font;
-  const pillWidth = Math.ceil(measure.measureText(label).width) + PADDING_X * 2;
+  const pillWidth = Math.ceil(measure.measureText(label).width) + PILL_PADDING_X * 2;
   const width = Math.max(pillWidth, DOT_RADIUS * 2 + 4);
-  const height = PILL_HEIGHT + stem + DOT_RADIUS * 2 + 2;
+  const height = PILL_TEXT_HEIGHT + stem + DOT_RADIUS * 2 + 2;
 
   const canvas = document.createElement('canvas');
   canvas.width = width * SUPERSAMPLE;
@@ -166,10 +174,10 @@ export function assetPillMarker({ text, color, selected = false, stem = STEM }) 
   const ctx = canvas.getContext('2d');
   ctx.scale(SUPERSAMPLE, SUPERSAMPLE);
 
-  roundedRect(ctx, (width - pillWidth) / 2, 0, pillWidth, PILL_HEIGHT, RADIUS);
+  roundedRect(ctx, (width - pillWidth) / 2, 0, pillWidth, PILL_TEXT_HEIGHT, PILL_RADIUS);
   ctx.fillStyle = fill;
   ctx.fill();
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 2;
   ctx.strokeStyle = border;
   ctx.stroke();
 
@@ -177,16 +185,16 @@ export function assetPillMarker({ text, color, selected = false, stem = STEM }) 
   ctx.fillStyle = ink;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(label, width / 2, PILL_HEIGHT / 2 + 0.5);
+  ctx.fillText(label, width / 2, PILL_TEXT_HEIGHT / 2 + 0.5);
 
   ctx.beginPath();
-  ctx.moveTo(width / 2, PILL_HEIGHT);
-  ctx.lineTo(width / 2, PILL_HEIGHT + stem);
+  ctx.moveTo(width / 2, PILL_TEXT_HEIGHT);
+  ctx.lineTo(width / 2, PILL_TEXT_HEIGHT + stem);
   ctx.lineWidth = 1.5;
   ctx.strokeStyle = fill;
   ctx.stroke();
 
-  const dotY = PILL_HEIGHT + stem + DOT_RADIUS;
+  const dotY = PILL_TEXT_HEIGHT + stem + DOT_RADIUS;
   ctx.beginPath();
   ctx.arc(width / 2, dotY, DOT_RADIUS, 0, Math.PI * 2);
   ctx.fillStyle = fill;

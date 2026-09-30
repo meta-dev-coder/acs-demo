@@ -434,7 +434,13 @@ try {
   // Maintenance workspace rather than a live layer — so it is handed that workspace to show it with.
   // Late-bound for the same reason as above: the workspace is built after the explorer it needs.
   const liveEventDeps = { assetExplorer, liveEvents: liveEventControls, layerStore,
-    maintenance: historicalMaintenance(() => maintenanceWorkspace) };
+    // Closing a crash hotspot puts the camera back where the screen opened, rather than leaving the
+    // operator parked over one junction with no way back but the mouse.
+    resetView: () => flyToOperationsView(),
+    maintenance: historicalMaintenance(() => maintenanceWorkspace),
+    // Safety draws a circle over every place crashes have piled up, so it needs the viewer to put
+    // them in. It measures crash against crash, not against the road, so it needs no geometry.
+    viewer };
   const safety = installSafetyWorkspace(liveEventDeps);
   const traffic = installTrafficWorkspace(liveEventDeps);
   // Maintenance is a workspace over the same map: the KPI strip and its list appear, everything
@@ -462,7 +468,7 @@ try {
     orientation: orientationOf(opsView), duration: 1.6,
   });
   /** The workspaces that open on the whole corridor rather than on whatever the camera was doing. */
-  const CORRIDOR_VIEW_SECTIONS = new Set(["liveOps", "maintenance"]);
+  const CORRIDOR_VIEW_SECTIONS = new Set(["liveOps", "maintenance", "safety"]);
   const workspaces = { maintenance, safety, traffic, liveOps };
   appNav.onSelect(async section => {
     eventPulses.setActive(section === "liveOps");

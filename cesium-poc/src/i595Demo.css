@@ -895,6 +895,40 @@ body[data-layers-open="false"] .layers { display: none; }
 .liveops-legend-item { display: inline-flex; align-items: center; gap: 5px; }
 .liveops-legend-item i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 
+/* Safety's crash-hotspot switch, beside the cards, and its key under them. */
+.safety-hotspots {
+  display: inline-flex; align-items: center; gap: 7px; flex: none; align-self: center;
+  padding: 8px 11px; border: 1px solid var(--ui-border); border-radius: 8px;
+  background: var(--ui-surface-translucent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  color: var(--ui-text); font-size: 12px; cursor: pointer; pointer-events: auto; white-space: nowrap;
+}
+.safety-hotspots input { width: 15px; height: 15px; margin: 0; accent-color: var(--ui-accent); }
+.safety-period {
+  display: inline-flex; flex-direction: column; align-items: stretch; gap: 4px; flex: none; align-self: center;
+  padding: 6px 10px; border: 1px solid var(--ui-border); border-radius: 8px;
+  background: var(--ui-surface-translucent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  color: var(--ui-text); font-size: 11px; pointer-events: auto;
+}
+.safety-period-label { font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--ui-text-dim); }
+.safety-period-select {
+  background: var(--ui-surface); color: var(--ui-text); border: 1px solid var(--ui-border);
+  border-radius: 6px; padding: 3px 6px; font: inherit; font-size: 11.5px;
+}
+.safety-period-select:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+
+.safety-legend {
+  position: absolute; left: calc(var(--app-nav-w) + 16px); top: var(--safety-kpi-bottom, 100px);
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  max-width: calc(100vw - var(--app-nav-w) - 48px);
+  padding: 6px 10px; border: 1px solid var(--ui-border); border-radius: 8px;
+  background: var(--ui-surface-translucent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  color: var(--ui-text); font-size: 11px; pointer-events: none;
+}
+.safety-legend[hidden] { display: none; }
+.safety-legend-title { font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--ui-text-dim); }
+.safety-legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.safety-legend-item i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
 /* The maintenance lookback control, beside the cards it decides the counts for. */
 .maintenance-window {
   display: inline-flex; flex-direction: column; align-items: stretch; gap: 4px; flex: none; align-self: center;
@@ -942,6 +976,9 @@ body[data-layers-open="false"] .layers { display: none; }
 
 .ws-kpis { position: absolute; top: 16px; left: calc(var(--app-nav-w) + 16px); display: flex; align-items: stretch; gap: 8px;
   max-width: calc(100vw - var(--app-nav-w) - 560px); pointer-events: auto; min-width: 0; }
+/* Safety keeps its Crash Hotspots control, while the KPI cards and source badge stay out of view. */
+.safety-workspace .ws-kpi-cards,
+.safety-workspace .ws-source { display: none; }
 /* The cards are the part that scrolls when the strip runs out of room; the source pills stay put. */
 .ws-kpi-cards { display: flex; align-items: stretch; gap: 8px; min-width: 0;
   overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }

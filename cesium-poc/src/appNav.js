@@ -41,7 +41,7 @@ export const NAV_SECTIONS = Object.freeze([
 export const APP_ROLES = Object.freeze([
   { id: 'roadOperator', label: 'Road Operator', sections: ['liveOps'] },
   { id: 'maintenanceTeam', label: 'Maintenance Team', sections: ['maintenance'] },
-  { id: 'agency', label: 'Agency', sections: ['traffic'] },
+  { id: 'agency', label: 'Agency', sections: ['safety'] },
 ]);
 export const DEFAULT_SECTION = 'liveOps';
 export const resolveRole = id => APP_ROLES.find(role => role.id === id) ?? APP_ROLES[0];

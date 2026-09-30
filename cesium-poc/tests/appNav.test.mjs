@@ -16,7 +16,7 @@ test('an unknown section falls back to the first rather than leaving nothing cho
 });
 
 test('each role exposes only its assigned workspaces and rejects disallowed navigation', () => {
-  for (const [role, expected] of Object.entries({ roadOperator: ['liveOps'], maintenanceTeam: ['maintenance'], agency: ['traffic'] })) {
+  for (const [role, expected] of Object.entries({ roadOperator: ['liveOps'], maintenanceTeam: ['maintenance'], agency: ['safety'] })) {
     const sections = sectionsForRole(role);
     assert.deepEqual(sections.map(s => s.id), expected);
     assert.equal(resolveSection('overview', sections), expected[0]);
@@ -24,13 +24,17 @@ test('each role exposes only its assigned workspaces and rejects disallowed navi
   }
 });
 
-test('Safety is built but offered to nobody, including through a deep link', () => {
-  // Still a workspace — it is simply not on any role's bar, so it cannot be navigated to and
-  // ?section=safety falls back to whatever that role does have.
-  assert.ok(NAV_SECTIONS.some(section => section.id === 'safety'));
-  for (const [role, expected] of Object.entries({ roadOperator: 'liveOps', maintenanceTeam: 'maintenance', agency: 'traffic' })) {
+test('Safety belongs to the Agency alone; Traffic is built but offered to nobody', () => {
+  // Both are still workspaces. Who may reach one is a role question, and a role that does not carry
+  // a section cannot navigate to it — a ?section= deep link falls back to what that role does have.
+  for (const id of ['safety', 'traffic']) assert.ok(NAV_SECTIONS.some(section => section.id === id));
+  assert.deepEqual(sectionsForRole('agency').map(s => s.id), ['safety']);
+  for (const [role, expected] of Object.entries({ roadOperator: 'liveOps', maintenanceTeam: 'maintenance', agency: 'safety' })) {
     const sections = sectionsForRole(role);
-    assert.ok(!sections.some(section => section.id === 'safety'));
-    assert.equal(resolveSection('safety', sections), expected);
+    assert.ok(!sections.some(section => section.id === 'traffic'), 'no role is offered Traffic');
+    assert.equal(resolveSection('traffic', sections), expected);
   }
+  // Only the Agency reaches Safety.
+  assert.equal(resolveSection('safety', sectionsForRole('roadOperator')), 'liveOps');
+  assert.equal(resolveSection('safety', sectionsForRole('agency')), 'safety');
 });

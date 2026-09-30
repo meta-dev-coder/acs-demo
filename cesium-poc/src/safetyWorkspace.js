@@ -10,6 +10,9 @@
  */
 import { LIVE_EVENT_TYPES, liveEventSourceNote } from './liveEventsData.js';
 import { installWorkspaceStrip } from './workspaceStrip.js';
+import { currentDateWindow, maintenanceDateKey } from './assetExplorer/assetTypes.js';
+import { CallbackProperty, Cartesian2, Cartesian3, ClassificationType, Color, ColorMaterialProperty, CustomDataSource, Math as CesiumMath, ScreenSpaceEventHandler, ScreenSpaceEventType, VerticalOrigin } from 'cesium';
+import { clusterCrashes, crashBreakdown, CRASH_BANDS, HOTSPOT_RADIUS_M } from './safety/crashHotspots.js';
 
 /**
  * The live-event cards, each naming the Map Explorer layer that already draws it.
@@ -88,6 +91,7 @@ export function historicalMaintenance(getWorkspace) {
     reveal: type => getWorkspace()?.reveal(type, { live: false }),
     hide: () => getWorkspace()?.hide(),
     recordsForType: type => getWorkspace()?.recordsForType(type, { live: false }) ?? [],
+    showOnly: (type, records) => getWorkspace()?.showOnly(type, records) ?? false,
     whenReady: () => getWorkspace()?.preload() ?? Promise.resolve(),
   };
 }
@@ -101,7 +105,8 @@ export function historicalMaintenance(getWorkspace) {
  * @param {{cards: object[], className: string, label: string, assetExplorer: object,
  *          liveEvents: object, layerStore: object, host?: HTMLElement}} deps
  */
-export function installLiveEventsWorkspace({ cards, className, label, assetExplorer, liveEvents, layerStore, maintenance = null, host = document.body }) {
+export function installLiveEventsWorkspace({ cards, className, label, assetExplorer, liveEvents, layerStore,
+  maintenance = null, viewer = null, resetView = null, hotspots = false, host = document.body }) {
   const store = assetExplorer.store;
   const root = document.createElement('div');
   root.className = className;
@@ -113,6 +118,246 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
   });
 
   let activeKey = null, active = false;
+
+  // ── Crash hotspots ──────────────────────────────────────────────────────────────────────────
+  // Safety only: where the recorded crashes actually sit on the corridor. Off until asked for —
+  // it repaints the road, which is a conclusion the operator chooses to see.
+  /**
+   * How big a hotspot circle is DRAWN, which is not the same as how crashes are grouped.
+   *
+   * Grouping stays a fixed 100 m — that rule is about the data and must not move. This is about
+   * being seen: at corridor scale a true 100 m circle is a couple of pixels, and at street level a
+   * fixed one swells to cover the junction it is marking. So the drawn circle opens out to 300 m
+   * when the whole corridor is in frame and closes to 50 m once the operator is on top of it.
+   * The count on the label and the tooltip are the real figures either way.
+   */
+  const DRAW_RADIUS_NEAR_M = 50, DRAW_RADIUS_FAR_M = 300;
+  const DRAW_NEAR_DISTANCE = 2_000, DRAW_FAR_DISTANCE = 25_000;
+  function drawnRadius(position) {
+    const eye = viewer?.camera?.positionWC;
+    if (!eye) return DRAW_RADIUS_FAR_M;
+    const distance = Cartesian3.distance(eye, position);
+    const travel = (distance - DRAW_NEAR_DISTANCE) / (DRAW_FAR_DISTANCE - DRAW_NEAR_DISTANCE);
+    const eased = Math.max(0, Math.min(1, travel));
+    return DRAW_RADIUS_NEAR_M + eased * (DRAW_RADIUS_FAR_M - DRAW_RADIUS_NEAR_M);
+  }
+
+  /**
+   * How far back the hotspots look. Crashes are dated by when they were reported, so this is the
+   * same question every other period control in the app asks: what counts as recent enough to act
+   * on. `months: null` is "All", which is no window rather than a very long one.
+   */
+  const CRASH_PERIODS = Object.freeze([
+    Object.freeze({ key: '1m', label: '1 Month', months: 1 }),
+    Object.freeze({ key: '2m', label: '2 Months', months: 2 }),
+    Object.freeze({ key: '3m', label: '3 Months', months: 3 }),
+    Object.freeze({ key: '6m', label: '6 Months', months: 6 }),
+    Object.freeze({ key: '9m', label: '9 Months', months: 9 }),
+    Object.freeze({ key: '1y', label: '1 Year', months: 12 }),
+    Object.freeze({ key: 'all', label: 'All', months: null }),
+  ]);
+  const DEFAULT_CRASH_PERIOD = '6m';
+  let crashPeriod = DEFAULT_CRASH_PERIOD;
+  // A nullish fallback would turn "All"'s deliberate null straight back into six months.
+  const crashMonths = key => {
+    const option = CRASH_PERIODS.find(entry => entry.key === key);
+    return option ? option.months : 6;
+  };
+  /** The crashes inside the chosen period. One with no readable date is outside every window. */
+  function withinPeriod(crashes) {
+    const months = crashMonths(crashPeriod);
+    if (months == null) return crashes;
+    const { from, to } = currentDateWindow({ months });
+    return crashes.filter(crash => {
+      const key = maintenanceDateKey(crash.createdDate);
+      return Boolean(key) && key >= from && key <= to;
+    });
+  }
+
+  let hotspotsOn = false;
+  // Its own source, so switching the overlay off removes the circles outright rather than leaving
+  // hidden geometry behind, and nothing else on the map is touched.
+  const hotspotSource = new CustomDataSource('Crash hotspots');
+  if (hotspots && viewer) void viewer.dataSources.add(hotspotSource);
+  /** entity id -> the hotspot it draws, so a click can open the crashes behind it. */
+  const hotspotById = new Map();
+  /** The hotspot currently opened in the browser, if any. */
+  let openHotspot = null;
+
+  /**
+   * Open one hotspot: its crashes in the browser, and the camera on the place itself.
+   *
+   * The explorer's source reads the incident records out of the map layer, so narrowing the layer
+   * to this hotspot's crashes is what puts exactly those — and only those — in the slider. Each
+   * one keeps its own crash-family pictogram, so four crashes read as a fire, a rollover and two
+   * rear-enders rather than four identical dots.
+   */
+  async function openHotspotPlace(place) {
+    if (!place || !maintenance) return;
+    // `openHotspot` is set only AFTER the reveal: revealing fires store changes while the browser
+    // still has no type, and the watcher below would read that as "the operator closed it" and undo
+    // everything mid-flight.
+    const revealed = await maintenance.reveal?.('incidentRecord');
+    if (!revealed) return;
+    maintenance.showOnly?.('incidentRecord', place.crashes);
+    // The hotspot IS the filter. Its crashes are whatever happened there, which is rarely all
+    // inside the browser's own six-month default — that window listed none of them.
+    store.setFilter({ from: null, to: null, id: null, query: '' });
+    openHotspot = place;
+    flyToPlace(place);
+  }
+
+  /**
+   * Fly to one hotspot at a fixed height, looking north along the corridor.
+   *
+   * An explicit destination rather than viewer.flyTo(entity): that frames the entity's bounding
+   * sphere — the 300 m circle plus its label — and stopped about 6 km up, too far to tell which
+   * crash is where. Giving it a range instead put the camera underground, because the sphere sits
+   * on a ground-clamped ellipse. A destination and an orientation are simply what the app's own
+   * corridor view uses, and they land where they say they will.
+   */
+  const HOTSPOT_VIEW_HEIGHT_M = 1_500;
+  /** At a 45 degree pitch the camera looks this far ahead, so it stands back by the same amount. */
+  const HOTSPOT_VIEW_OFFSET_DEG = 0.0135;
+  function flyToPlace(place) {
+    if (!viewer || !place) return;
+    viewer.camera.cancelFlight();
+    viewer.camera.flyTo({
+      destination: Cartesian3.fromDegrees(place.longitude, place.latitude - HOTSPOT_VIEW_OFFSET_DEG, HOTSPOT_VIEW_HEIGHT_M),
+      orientation: { heading: 0, pitch: CesiumMath.toRadians(-45), roll: 0 },
+      duration: 1.4,
+    });
+  }
+
+  /** Put the whole register back and return the camera to the view this screen opened on. */
+  function closeHotspot() {
+    if (!openHotspot) return;
+    openHotspot = null;
+    // hide(), not "put the whole register back": closing returns the screen to how it opened —
+    // hotspot circles over a bare corridor — rather than leaving every crash pin behind.
+    maintenance?.hide?.();
+    resetView?.();
+  }
+
+  const hotspotControl = hotspots ? document.createElement('label') : null;
+  const hotspotLegend = hotspots ? document.createElement('div') : null;
+  if (hotspots) {
+    hotspotControl.className = 'safety-hotspots';
+    hotspotControl.innerHTML = `<input type="checkbox" class="safety-hotspots-input"> <span>Crash hotspots</span>`;
+    strip.root.append(hotspotControl);
+    const periodControl = document.createElement('label');
+    periodControl.className = 'safety-period';
+    periodControl.innerHTML = `<span class="safety-period-label">Period</span>
+      <select class="safety-period-select" aria-label="How far back to count crashes">${
+        CRASH_PERIODS.map(option =>
+          `<option value="${option.key}"${option.key === DEFAULT_CRASH_PERIOD ? ' selected' : ''}>${option.label}</option>`).join('')}
+      </select>`;
+    strip.root.append(periodControl);
+    periodControl.querySelector('select').onchange = event => {
+      crashPeriod = event.target.value;
+      // A hotspot open from the previous period may not exist in this one, so the browser closes
+      // rather than being left showing crashes from a place that is no longer drawn.
+      closeHotspot();
+      void applyHotspots();
+    };
+    hotspotLegend.className = 'safety-legend';
+    hotspotLegend.hidden = true;
+    hotspotLegend.innerHTML = `<span class="safety-legend-title">Crashes within ${HOTSPOT_RADIUS_M} m</span>${
+      CRASH_BANDS.map((band, index) => {
+        const next = CRASH_BANDS[index - 1];
+        const range = next ? `${band.from}\u2013${next.from - 1}` : `${band.from}+`;
+        return `<span class="safety-legend-item"><i style="background:${band.color}"></i>${band.label} (${range})</span>`;
+      }).reverse().join('')}`;
+    root.append(hotspotLegend);
+    const reposition = new ResizeObserver(() => {
+      root.style.setProperty('--safety-kpi-bottom', `${strip.root.offsetTop + strip.root.offsetHeight + 10}px`);
+    });
+    reposition.observe(strip.root);
+    hotspotControl.querySelector('input').onchange = event => {
+      hotspotsOn = event.target.checked;
+      void applyHotspots();
+    };
+  }
+
+  /**
+   * Draw a circle over every place crashes have piled up, coloured by how many.
+   *
+   * Circles rather than coloured road: a segment painted end to end says "this mile is dangerous"
+   * when the crashes are in fact piled at one interchange inside it. The circle is the real ground
+   * area the crashes fall in, so its size is a claim the data supports.
+   */
+  async function applyHotspots() {
+    if (!hotspots) return;
+    if (hotspotLegend) hotspotLegend.hidden = !hotspotsOn || !active;
+    hotspotSource.entities.removeAll();
+    hotspotById.clear();
+    hotspotSource.show = Boolean(hotspotsOn && active);
+    if (!hotspotsOn || !active) return;
+
+    const crashes = withinPeriod(maintenance?.recordsForType?.('incidentRecord') ?? []);
+    const { hotspots: places } = clusterCrashes(crashes);
+    hotspotSource.entities.suspendEvents();
+    try {
+      for (const place of places) {
+        const colour = Color.fromCssColorString(place.band.color);
+        const centre = Cartesian3.fromDegrees(place.longitude, place.latitude);
+        // ONE property feeding both axes. Cesium reads semiMajorAxis and semiMinorAxis in separate
+        // calls, so two callbacks can disagree mid-frame and it throws "semiMajorAxis must be
+        // greater than or equal to the semiMinorAxis" and stops rendering for good.
+        const radius = new CallbackProperty(() => drawnRadius(centre), false);
+        const worst = crashBreakdown(place)[0];
+        const detail = crashBreakdown(place).slice(0, 3).map(row => `${row.count} x ${row.title}`).join(', ');
+        hotspotSource.entities.add({
+          id: place.id,
+          name: `${place.count} crashes within ${place.radiusMeters} m${detail ? ` - ${detail}` : ''}`,
+          position: centre,
+          ellipse: {
+            semiMajorAxis: radius,
+            semiMinorAxis: radius,
+            // Draped over the terrain and the photorealistic tiles, not floating above them.
+            classificationType: ClassificationType.BOTH,
+            // Deep enough to read as a marked area over photorealistic tiles, which are busy and
+            // bright; a lighter wash disappeared into them at corridor scale.
+            material: new ColorMaterialProperty(colour.withAlpha(0.62)),
+            outline: true,
+            outlineColor: colour.withAlpha(1),
+            outlineWidth: 3,
+          },
+          // Just the count. The crash type is on the entity's name, where hovering finds it: at
+          // corridor scale fifteen two-line labels covered the very circles they were describing.
+          label: {
+            text: String(place.count),
+            font: '700 13px system-ui, -apple-system, Segoe UI, sans-serif',
+            fillColor: Color.fromCssColorString('#12180a'),
+            showBackground: true,
+            backgroundColor: colour,
+            backgroundPadding: new Cartesian2(7, 5),
+            verticalOrigin: VerticalOrigin.CENTER,
+            pixelOffset: new Cartesian2(0, 0),
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          },
+        });
+        hotspotById.set(place.id, place);
+      }
+    } finally { hotspotSource.entities.resumeEvents(); }
+    viewer?.scene?.requestRender?.();
+  }
+
+  // Its own handler, like the Live Ops pulses use: a hotspot circle is drawn over the corridor's
+  // own layers, and this must not consume clicks meant for them.
+  const hotspotHandler = hotspots && viewer ? new ScreenSpaceEventHandler(viewer.canvas) : null;
+  hotspotHandler?.setInputAction(click => {
+    if (!hotspotsOn || !active) return;
+    const picked = viewer.scene.pick(click.position)?.id;
+    const place = picked?.id ? hotspotById.get(picked.id) : null;
+    if (place) void openHotspotPlace(place);
+  }, ScreenSpaceEventType.LEFT_CLICK);
+
+  // Closing the browser is what "done with this hotspot" means — whether the operator used its own
+  // close button, picked another card, or left the workspace.
+  const stopHotspotWatch = hotspots
+    ? store.subscribe(() => { if (openHotspot && !store.getState().activeExplorerType) closeHotspot(); })
+    : () => {};
 
   function render() {
     const events = liveEvents?.events ?? [];
@@ -185,6 +430,9 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
       render();
       // A DataConnect class may still be loading when this opens; show its count as soon as it has one.
       if (cards.some(card => card.source === 'maintenance')) void maintenance?.whenReady?.().then(() => { if (active) render(); });
+      // Crashes arrive with the incident register, so the overlay is recomputed once it lands.
+      if (hotspots) void maintenance?.whenReady?.().then(() => { if (active) void applyHotspots(); });
+      void applyHotspots();
       strip.measure();
     },
     deactivate() {
@@ -194,18 +442,24 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
       // The layers belong to the map, not to this panel: switching workspace puts back what it drew.
       const card = cards.find(item => item.key === activeKey);
       activeKey = null;
+      // The corridor's own colours come back; this overlay borrowed them, it does not own them.
+      closeHotspot();
+      void applyHotspots();
       if (card?.source === 'maintenance') maintenance?.hide();
       else if (card) void layerStore.setVisible(card.layerId, false);
       if (store.getState().activeExplorerType) store.setActiveExplorerType(null);
       render();
     },
-    destroy() { stopUpdates(); unsubscribeLayers(); strip.destroy(); root.remove(); },
+    destroy() {
+      stopHotspotWatch();
+      hotspotHandler?.destroy();
+      if (hotspots && viewer) viewer.dataSources.remove(hotspotSource, true); stopUpdates(); unsubscribeLayers(); strip.destroy(); root.remove(); },
   };
 }
 
 /** Safety: what is happening to the corridor right now. */
 export const installSafetyWorkspace = deps =>
-  installLiveEventsWorkspace({ ...deps, cards: SAFETY_CARDS, className: 'safety-workspace', label: 'Corridor safety' });
+  installLiveEventsWorkspace({ ...deps, cards: SAFETY_CARDS, className: 'safety-workspace', label: 'Corridor safety', hotspots: true });
 
 /** Traffic: the planned work restricting it. */
 export const installTrafficWorkspace = deps =>

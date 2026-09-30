@@ -111,7 +111,10 @@ export const CORRIDOR_ROAD_LAYERS = Object.freeze(['mainline-eb', 'mainline-wb',
 export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenanceLayer, layerStore = null, corridorStatus = null, roadShields = null, host = document.body }) {
   const store = assetExplorer.store;
   const liveOn = liveDcEnabled();
-  const cards = liveOn ? [...KPI_CARDS, LIVE_KPI_CARD] : KPI_CARDS;
+  // Damaged assets have no card of their own: "Assets at risk" already counts them, and its note
+  // names them ("4 damaged"). The class still LOADS — it is one of the three pieces of evidence
+  // that card is built from, so dropping it would quietly lower the risk count.
+  const cards = KPI_CARDS;
   /**
    * Classes the workspace LOADS but does not show a card for.
    *
@@ -122,6 +125,7 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
    * data is not.
    */
   const HIDDEN_CLASSES = Object.freeze([
+    ...(liveOn ? [LIVE_KPI_CARD] : []),
     Object.freeze({ key: 'incidents', label: 'Incidents', icon: 'incident', assetType: 'incidentRecord', hidden: true }),
   ]);
   /** Everything with a dataset: the cards, plus the classes loaded for their records alone. */
@@ -200,7 +204,7 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
     renderStrip();
     pushAllToMap();
     if (activeKey) {
-      const card = cards.find(item => item.key === activeKey);
+      const card = classes.find(item => item.key === activeKey);
       if (card?.assetType) { applyDefaultWindow(card.assetType); applyRecords(); }
     }
   };
@@ -238,13 +242,16 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
   const liveFeed = liveOn ? createLiveDcFeed({
     onUpdate: result => {
       ({ live, connection } = nextLiveSnapshot(live, result));
-      for (const card of cards) {
-        const signature = liveSignature(live.byKey[card.key], live.errors[card.key], card.liveOnly ? connection : null);
-        if (liveSignatures.get(card.key) === signature) continue;
-        liveSignatures.set(card.key, signature);
-        mergeLive(card.key);
-        if (activeKey === card.key && liveRedrawNeeded(datasets.get(card.key))) applyRecords();
+      // `classes`, not `cards`: a class without a card still takes its live records, and the
+      // at-risk count is built from one of them.
+      for (const entry of classes) {
+        const signature = liveSignature(live.byKey[entry.key], live.errors[entry.key], entry.liveOnly ? connection : null);
+        if (liveSignatures.get(entry.key) === signature) continue;
+        liveSignatures.set(entry.key, signature);
+        mergeLive(entry.key);
+        if (activeKey === entry.key && liveRedrawNeeded(datasets.get(entry.key))) applyRecords();
       }
+      recomputeDerived();
       renderStrip();
     },
     onError: onLiveError,
@@ -373,7 +380,7 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
 
   /** The map shows exactly what the browser is showing: same search, same filter, same records. */
   function syncMap() {
-    const card = cards.find(item => item.key === activeKey);
+    const card = classes.find(item => item.key === activeKey);
     const entry = activeKey ? datasets.get(activeKey) : null;
     if (!card?.assetType || !entry) return;
     const shown = store.filteredAssets();
@@ -553,7 +560,8 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
 
   /** Put the records into the explorer and onto the map. */
   function applyRecords() {
-    const card = cards.find(item => item.key === activeKey);
+    // `classes`: the browsed class may have no card (Incidents, which Safety opens).
+    const card = classes.find(item => item.key === activeKey);
     const entry = datasets.get(activeKey);
     if (!card || !entry) return;
     if (card.assetType) {
@@ -607,14 +615,21 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
     const previouslyBrowsed = activeKey;
     activeKey = null;
     defaultedType = null;
-    // Nothing is browsed now, but every class stays drawn: show(null) clears the ID labels and the
-    // selection, and setShowAllTypes keeps the dots. The class just closed goes back to being
-    // context — its open records only.
     maintenanceLayer.show(null);
-    // Back to the overview: every class that the KPI cards count, drawn together again.
-    maintenanceLayer.setShowAllTypes(true);
-    if (previouslyBrowsed) pushToMap(previouslyBrowsed);
-    pushAllToMap();
+    if (active) {
+      // Maintenance's own overview: every class its KPI cards count, drawn together again, with
+      // the class just closed back to being context — its open records only.
+      maintenanceLayer.setShowAllTypes(true);
+      if (previouslyBrowsed) pushToMap(previouslyBrowsed);
+      pushAllToMap();
+    } else {
+      // Another workspace borrowed this class (Safety opens Incidents for a crash hotspot). Leaving
+      // it must leave the map as it was found, not put Maintenance's whole overview on somebody
+      // else's screen — closing a hotspot used to strand 178 crash pins over the corridor.
+      maintenanceLayer.setShowAllTypes(false);
+      const entry = classes.find(item => item.key === previouslyBrowsed);
+      if (entry?.assetType) maintenanceLayer.setRecords(entry.assetType, []);
+    }
     store.setActiveExplorerType(null);
     store.setFilter({ query: '', id: null, from: null, to: null });
     if (overviewCamera) {
@@ -632,7 +647,7 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
     if (!active) return;
     const url = new URL(window.location.href);
     const selected = store.getState().selectedAsset;
-    const assetType = cards.find(card => card.key === activeKey)?.assetType;
+    const assetType = classes.find(item => item.key === activeKey)?.assetType;
     if (activeKey) url.searchParams.set('maintenance', TYPE_SLUGS[activeKey]); else url.searchParams.delete('maintenance');
     if (selected && assetType && selected.assetType === assetType) url.searchParams.set('selected', selected.id);
     else url.searchParams.delete('selected');
@@ -720,12 +735,27 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
      * @returns {Promise<boolean>} whether the type is now the one on screen
      */
     async reveal(assetType, { live = true } = {}) {
-      const card = cards.find(item => item.assetType === assetType);
+      // `classes`, not `cards`: Incidents has no card of its own any more, and Safety's "Recorded
+      // crashes" reveals exactly that class. Looking it up among the cards silently returned false.
+      const card = classes.find(item => item.assetType === assetType);
       if (!card) return false;
       const entry = datasets.get(card.key);
       if (entry.state === 'loading') await load(card.key);
       if (datasets.get(card.key).state !== 'ready') return false;
       if (activeKey !== card.key || withLive !== live) { withLive = live; openType(card.key); writeUrl(); }
+      return true;
+    },
+    /**
+     * Draw and list a SUBSET of one class — Safety's crash hotspots, which open the incidents of
+     * one place rather than the whole register. The explorer's source reads from the layer, so
+     * narrowing the layer narrows the slider with it. `null` puts the whole class back.
+     */
+    showOnly(assetType, records) {
+      const entry = classes.find(item => item.assetType === assetType);
+      const dataset = entry && datasets.get(entry.key);
+      if (!entry || dataset?.state !== 'ready') return false;
+      maintenanceLayer.setRecords(assetType, records ?? shownRecords(dataset, { live: withLive }));
+      assetExplorer.refresh();
       return true;
     },
     /** What the priority pulses circle — passed to installEventPulses by the app. */
