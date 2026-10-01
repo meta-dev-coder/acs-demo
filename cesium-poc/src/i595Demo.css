@@ -1162,3 +1162,13 @@ body:has(.app-role) .liveops-layers { top: 76px; }
   border-radius: 6px; padding: 3px 8px; font-size: 11px; cursor: pointer;
 }
 .safety-trend-range-reset:hover { color: var(--ui-text); border-color: var(--ui-text-dim); }
+
+/* The time-of-day axis carries all 24 hours, so its numbers are a shade smaller than the other
+   charts' word labels to keep two digits clear of their neighbours. */
+.safety-trend-hour { fill: var(--ui-text); font-size: 9.5px; }
+
+/* A trend chart is a floating panel: its heading is the grab handle, as on every other panel on
+   this map. Buttons and the date inputs inside it stay clickable — makeDraggable ignores them. */
+.safety-trend-head { cursor: grab; user-select: none; }
+.safety-trend.is-dragging { cursor: grabbing; box-shadow: 0 18px 44px var(--ui-shadow-color); }
+.safety-trend.is-dragging .safety-trend-head { cursor: grabbing; }

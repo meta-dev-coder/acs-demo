@@ -10,6 +10,7 @@
  */
 import { LIVE_EVENT_TYPES, liveEventSourceNote } from './liveEventsData.js';
 import { installWorkspaceStrip } from './workspaceStrip.js';
+import { makeDraggable } from './draggablePanel.js';
 import { currentDateWindow, maintenanceDateKey } from './assetExplorer/assetTypes.js';
 import { hourOfDayTrend, monthlyCrashTrend } from './safety/crashTrend.js';
 import { weatherTrend } from './safety/weatherTrend.js';
@@ -522,10 +523,24 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
   }
 
   let trendKind = 'month';
+  /**
+   * The charts float: the operator drags one aside by its heading to see the corridor under it.
+   *
+   * Re-made after every render because each chart rewrites the panel, heading and all, so the
+   * element the last one was bound to is gone. The panel's dragged position is inline style on the
+   * panel itself, so moving between charts keeps wherever it was put.
+   */
+  let trendDrag = null;
+  function makeTrendDraggable() {
+    trendDrag?.destroy();
+    trendDrag = makeDraggable(trendPanel, trendPanel.querySelector('.safety-trend-head'));
+  }
+
   function renderTrend() {
     if (trendKind === 'hour') renderHourTrend();
     else if (trendKind === 'weather') renderWeatherTrend();
     else renderMonthTrend();
+    makeTrendDraggable();
     // The monthly chart keeps its own months-wide axis and shows no picker; the other two are
     // filtered by the range, and each render rewrites the panel, so the inputs are bound again.
     bindRange();
@@ -540,14 +555,6 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
    * compare, not a path to follow, and a line between 23:00 and 00:00 would draw a slope across a
    * boundary the day does not have.
    */
-  /**
-   * Which of the 24 bars carry an axis number.
-   *
-   * The first and the last always do, so the axis visibly runs 1 to 24 — an axis that stopped at 23
-   * looked like a bar was missing. Every fourth in between is enough orientation now that each bar
-   * prints its own count.
-   */
-  const HOUR_TICKS = Object.freeze([0, 3, 7, 11, 15, 19, 23]);
 
 /**
    * Crashes by the weather they happened in.
@@ -648,7 +655,10 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
         <!-- Numbered 1-24: the hours OF the day, not the clock's 0-23. Bar 1 is the hour after
              midnight and bar 24 the hour before it, so the axis starts and ends where the day does.
              The tooltip and the table give the clock range, so the number is never ambiguous. -->
-        ${points.filter((_, index) => HOUR_TICKS.includes(index)).map(point => `<text x="${(pad.left + point.hour * slot + slot / 2).toFixed(1)}" y="${height - 10}" class="safety-trend-month" text-anchor="middle">${point.hour + 1}</text>`).join('')}
+        <!-- Every hour is numbered, 1 to 24. Twenty-four labels fit because they are at most two
+             digits and each bar is its own slot; anything sparser left the reader counting bars to
+             work out which hour they were looking at. -->
+        ${points.map(point => `<text x="${(pad.left + point.hour * slot + slot / 2).toFixed(1)}" y="${height - 10}" class="safety-trend-hour" text-anchor="middle">${point.hour + 1}</text>`).join('')}
       </svg>
       <table class="safety-trend-table">
         <caption>Crashes by hour of day</caption>
@@ -1010,7 +1020,7 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
       weatherEffects?.destroy();
       // The risk bands live in the segment layer's collection, which outlives this workspace,
       // and so does the corridor's own colouring, which this screen switched off.
-      clearRibbons(); unwatchCorridor(); void setCorridorPaint(false);
+      clearRibbons(); unwatchCorridor(); trendDrag?.destroy(); void setCorridorPaint(false);
       if (hotspots && viewer) viewer.dataSources.remove(hotspotSource, true); stopUpdates(); unsubscribeLayers(); strip.destroy(); root.remove(); },
   };
 }
