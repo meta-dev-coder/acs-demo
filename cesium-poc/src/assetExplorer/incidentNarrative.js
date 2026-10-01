@@ -249,14 +249,38 @@ export function detailFacts(record, place = null) {
 }
 
 /**
- * Placeholder next steps.
+ * What an operator can ask the Twin about one incident.
  *
- * Deliberately static for now: each of these is a real question the Twin will be asked to answer,
- * and wiring them to a model that cannot yet answer them would be worse than showing the shape.
- * They carry `pending: true` so nothing here can be mistaken for a computed recommendation.
+ * These were static placeholders that answered nothing and said so. They are now real questions,
+ * each carrying the incident's own identity so the answer is about THIS incident rather than the
+ * corridor in general — the panel is open on one record, and a question asked from it should not
+ * have to be retyped with the record's number in it.
+ *
+ * `label` is what the operator reads; `question` is what the Twin is asked.
  */
-export const RECOMMENDED_STEPS = Object.freeze([
-  Object.freeze({ id: 'recovery', icon: 'analysis', label: 'How long until traffic recovers?', pending: true }),
-  Object.freeze({ id: 'dms', icon: 'sign', label: 'Should we update the DMS message?', pending: true }),
-  Object.freeze({ id: 'reroute', icon: 'route', label: 'Show alternate routing options', pending: true }),
+export const INCIDENT_QUESTIONS = Object.freeze([
+  Object.freeze({ id: 'steps', icon: 'analysis', label: 'What are the recommended next steps?',
+    ask: facts => `What are the recommended next steps for ${facts.what}${facts.where}?` }),
+  Object.freeze({ id: 'recovery', icon: 'analysis', label: 'How long until traffic recovers?',
+    ask: facts => `How long until traffic recovers after ${facts.what}${facts.where}?` }),
+  Object.freeze({ id: 'dms', icon: 'sign', label: 'Should we update the DMS message?',
+    ask: facts => `Should we update the DMS message for ${facts.what}${facts.where}?` }),
+  Object.freeze({ id: 'reroute', icon: 'route', label: 'Show alternate routing options',
+    ask: facts => `What are the alternate routing options around ${facts.what}${facts.where}?` }),
 ]);
+
+/**
+ * How one incident is named in a question, so the Twin is asked about the right thing.
+ *
+ * Its own identifier first — that is what the register and the operator both call it — then what
+ * kind of event it was and where, because the remote service answers from the live feed and the
+ * corridor, not from the register's record numbers.
+ */
+export function incidentQuestionSubject(record, place = null) {
+  const facts = incidentFacts(record);
+  const id = text(record?.id);
+  const kind = facts.type ?? 'the incident';
+  const what = id ? `${kind} ${id}` : kind;
+  const segment = segmentRow(facts, place);
+  return { what, where: segment ? ` on ${segment}` : '' };
+}

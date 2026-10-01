@@ -1,5 +1,7 @@
 import { Cartesian3, Cartographic, Math as CesiumMath, JulianDate } from 'cesium';
 import { makeDraggable } from './draggablePanel.js';
+import { eventLayersToShow } from './safety/answerLayers.js';
+import { ASK_THE_TWIN_EVENT } from './askTheTwinBridge.js';
 import { eventPlace, isBareSegmentRequest, MAX_REMOTE_OFFSET_M, parseFlyRequest, parseRoadRequest, parseSegmentFollowUp, parseSegmentRequests, parseTourCommand, parseTypeBrowse, resolveFlyTarget, searchAssets, segmentPoint, typeHints } from './assetExplorer/assetSearch.js';
 import { corridorPositionOf } from './assetExplorer/corridorPosition.js';
 import { assetTypeConfig } from './assetExplorer/assetTypes.js';
@@ -148,12 +150,13 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
 
   // ── Minimise ──────────────────────────────────────────────────────────
   let minimised = false;
-  minBtn.onclick = () => {
-    minimised = !minimised;
+  function minimise(next = !minimised) {
+    minimised = next;
     body.hidden = minimised;
     minBtn.textContent = minimised ? '▴' : '▾';
     panel.classList.toggle('ask-twin-panel--minimised', minimised);
-  };
+  }
+  minBtn.onclick = () => minimise();
 
   // ── Open / close ──────────────────────────────────────────────────────
   let open = false;
@@ -208,9 +211,13 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
         const flyBtn = document.createElement('button');
         flyBtn.className = 'ask-twin-fly-btn';
         flyBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg> ${isCamera ? 'Show cameras on map' : 'Show on map'}`;
-        flyBtn.onclick = () => {
-          if (isCamera) openNearestCameras(meta.action.coordinates, flyBtn);
-          else flyTo(meta.action.coordinates, flyBtn);
+        flyBtn.onclick = async () => {
+          if (isCamera) { openNearestCameras(meta.action.coordinates, flyBtn); return; }
+          // Switch the layers on BEFORE the camera moves, so the markers are already drawn when it
+          // arrives rather than appearing a beat later on a corridor that looked empty.
+          const shown = await showEventLayersFor(meta.action.coordinates);
+          flyTo(meta.action.coordinates, flyBtn);
+          if (shown.length) addMsg('assistant', `Switched on ${shown.join(' and ')} so you can see them on the map.`);
         };
         wrap.appendChild(flyBtn);
       }
@@ -295,6 +302,26 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
    */
   // ── Road visibility, through the Map Explorer's own controls ─────────
   const MAINLINE_LAYER = Object.freeze({ EB: 'mainline-eb', WB: 'mainline-wb' });
+
+  /**
+   * Switch on the layers that draw the events an answer is describing.
+   *
+   * Flying to a closure the operator cannot see is the whole of the complaint: the camera arrived
+   * and the corridor was bare, because the layer that draws closures was off and nothing turned it
+   * on. `eventLayersToShow` decides which; see it for why distance alone was not enough.
+   *
+   * @returns {string[]} the labels switched on, for the note that says what changed
+   */
+  async function showEventLayersFor(coordinates) {
+    if (!layerStore?.setVisible) return [];
+    const turnedOn = [];
+    for (const id of eventLayersToShow(currentEvents(), coordinates)) {
+      if (['on', 'partial'].includes(layerStore.stateOf(id))) continue;
+      await layerStore.setVisible(id, true);
+      turnedOn.push(layerStore.get(id)?.label ?? id);
+    }
+    return turnedOn;
+  }
   const DIRECTION_NAME = Object.freeze({ EB: 'I-595 eastbound', WB: 'I-595 westbound' });
 
   /** Ticks or clears one segment's own checkbox, so the segment list and its counts stay true. */
@@ -753,7 +780,11 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
         // auto-act on high confidence responses with coordinates
         if (data.confidence === 'high' && data.action?.coordinates) {
           if (data.action.type === 'open_camera') openNearestCameras(data.action.coordinates);
-          else flyTo(data.action.coordinates);
+          else {
+            const shown = await showEventLayersFor(data.action.coordinates);
+            flyTo(data.action.coordinates);
+            if (shown.length) addMsg('assistant', `Switched on ${shown.join(' and ')} so you can see them on the map.`);
+          }
         }
       }
     } catch {
@@ -776,11 +807,36 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
 
   renderSuggestions();
 
+  /**
+   * Ask a question from somewhere else in the app — the incident panel's own prompts.
+   *
+   * Opens the panel and sends it, so the operator sees the question they chose arrive and be
+   * answered rather than a panel that silently fills in. The question is put in the input first so
+   * `submit()` is the same path a typed question takes: one place that knows how to ask.
+   */
+  async function ask(question) {
+    const text = String(question ?? '').trim();
+    if (!text) return;
+    toggle(true);
+    if (minimised) minimise(false);
+    input.value = text;
+    await submit();
+  }
+
+  // Panels elsewhere in the app are React and have no handle on this module. A document event is
+  // the seam between them: anything can ask without this module having to know it exists.
+  const onAskEvent = event => { void ask(event.detail?.question); };
+  document.addEventListener(ASK_THE_TWIN_EVENT, onAskEvent);
+
   return {
     /** Test/diagnostic hook: the area currently scoping the conversation. */
     get spatialContext() { return activeSpatialContext; },
     selectArea: () => { selection.start(); updateAreaBar(); },
     clearArea,
-    destroy() { selection.destroy(); btn.remove(); panel.remove(); },
+    ask,
+    destroy() {
+      document.removeEventListener(ASK_THE_TWIN_EVENT, onAskEvent);
+      selection.destroy(); btn.remove(); panel.remove();
+    },
   };
 }

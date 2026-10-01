@@ -9,7 +9,9 @@
  * Everything on it is measured or quoted. The carriageway, the milepost and the cameras are
  * resolved from the incident's coordinates against the corridor's published geometry
  * (`incidentContext.js`); the prose comes from the record's own columns (`incidentNarrative.js`).
- * The one exception is Recommended next steps, which is explicitly a placeholder and says so.
+ * Recommended next steps was a placeholder that answered nothing. It is now a set of questions
+ * put to Ask the Twin, each naming this incident — currently switched off; see
+ * SHOW_INCIDENT_QUESTIONS.
  */
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Chip, IconButton, Paper, Stack, Tab, Tabs, Tooltip, Typography, Button } from '@mui/material';
@@ -34,7 +36,18 @@ import {
 } from './liveEventPresentation.js';
 import { LiveEventBadge } from './LiveEventIcon.jsx';
 import { OPERATIONAL_LEVEL_COLORS } from '../liveOps/operationalImpact.js';
-import { detailFacts, impactRows, incidentFacts, incidentHeadline, incidentNarrative, reportedAt, RECOMMENDED_STEPS } from './incidentNarrative.js';
+import { detailFacts, impactRows, incidentFacts, incidentHeadline, incidentNarrative, reportedAt, INCIDENT_QUESTIONS, incidentQuestionSubject } from './incidentNarrative.js';
+import { askTheTwin, canAskTheTwin } from '../askTheTwinBridge.js';
+
+/**
+ * Whether the panel offers its Ask the Twin questions.
+ *
+ * Off for now: the questions are wired and send the incident's own id and segment, but the answers
+ * coming back were not good enough to put in front of an operator. The block is kept rather than
+ * deleted so turning it back on is this one flag once the answers improve — and so the next person
+ * does not rebuild it from scratch.
+ */
+const SHOW_INCIDENT_QUESTIONS = false;
 
 /** Wider than the generic panel: this one carries a camera image and a tab strip, not a field list. */
 export const INCIDENT_DETAILS_WIDTH = 390;
@@ -472,30 +485,42 @@ export function IncidentDetailsPanel({
         />
       )}
 
-      <Box>
-        <Typography variant="subtitle2" sx={{ mb: 0.75 }}>Recommended next steps</Typography>
-        <Stack spacing={0.75}>
-          {RECOMMENDED_STEPS.map(step => {
-            const Icon = STEP_ICONS[step.icon] ?? InsightsOutlinedIcon;
-            return (
-              <Stack
-                key={step.id}
-                direction="row"
-                spacing={1}
-                sx={{ alignItems: 'center', p: 1, borderRadius: 1.5, border: 1, borderColor: 'divider', color: 'text.secondary' }}
-              >
-                <Icon fontSize="small" />
-                <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }}>{step.label}</Typography>
-                <ChevronRightIcon fontSize="small" />
-              </Stack>
-            );
-          })}
-        </Stack>
-        {/* Said out loud rather than implied by a greyed-out row: these do not answer anything yet. */}
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-          Placeholders — the Twin will answer these once the impact model is wired in.
-        </Typography>
-      </Box>
+      {SHOW_INCIDENT_QUESTIONS && canAskTheTwin() && (
+        <Box>
+          <Typography variant="subtitle2" sx={{ mb: 0.75 }}>Ask the Twin about this incident</Typography>
+          <Stack spacing={0.75}>
+            {INCIDENT_QUESTIONS.map(step => {
+              const Icon = STEP_ICONS[step.icon] ?? InsightsOutlinedIcon;
+              const question = step.ask(incidentQuestionSubject(record, place));
+              return (
+                <Stack
+                  key={step.id}
+                  component="button"
+                  type="button"
+                  direction="row"
+                  spacing={1}
+                  onClick={() => askTheTwin(question)}
+                  aria-label={question}
+                  sx={{
+                    alignItems: 'center', p: 1, width: '100%', textAlign: 'left', cursor: 'pointer',
+                    borderRadius: 1.5, border: 1, borderColor: 'divider', bgcolor: 'transparent',
+                    color: 'text.secondary', font: 'inherit',
+                    '&:hover': { borderColor: 'primary.main', color: 'text.primary' },
+                  }}
+                >
+                  <Icon fontSize="small" />
+                  <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }}>{step.label}</Typography>
+                  <ChevronRightIcon fontSize="small" />
+                </Stack>
+              );
+            })}
+          </Stack>
+          {/* What it will be asked, so nobody has to guess what the row sends. */}
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+            Asked about this incident by name, in the Ask the Twin panel.
+          </Typography>
+        </Box>
+      )}
 
       <Stack spacing={1}>
         <Button variant="contained" startIcon={<MyLocationOutlinedIcon />} onClick={() => onInspect(asset)}
