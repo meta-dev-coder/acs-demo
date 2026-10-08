@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Secondary Incident Risk — How the Score Is Calculated</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm 16mm 14mm; }
+  :root {
+    --ink: #11181f; --dim: #5a6673; --rule: #d6dde5; --soft: #f3f6f9;
+    --hi: #c2410c; --mod: #a16207; --low: #15803d; --sev: #b91c1c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; color: var(--ink); background: #fff;
+    font: 10.2pt/1.5 "Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  h1 { font-size: 20pt; margin: 0 0 2mm; letter-spacing: -0.2pt; }
+  h2 {
+    font-size: 12.5pt; margin: 9mm 0 2.5mm; padding-bottom: 1.5mm;
+    border-bottom: 1.5px solid var(--ink); break-after: avoid;
+  }
+  h3 { font-size: 10.5pt; margin: 5mm 0 1.5mm; break-after: avoid; }
+  p { margin: 0 0 2.5mm; }
+  .lede { color: var(--dim); font-size: 10pt; }
+  .meta { color: var(--dim); font-size: 8.5pt; margin: 0 0 6mm; }
+  table { width: 100%; border-collapse: collapse; margin: 2mm 0 4mm; font-size: 9pt; break-inside: avoid; }
+  caption { text-align: left; font-size: 8.5pt; color: var(--dim); padding-bottom: 1.2mm; }
+  th { text-align: left; font-weight: 600; font-size: 8pt; text-transform: uppercase;
+       letter-spacing: 0.5pt; color: var(--dim); border-bottom: 1px solid var(--ink); padding: 1.6mm 2mm; }
+  td { padding: 1.5mm 2mm; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  tbody tr:nth-child(even) td { background: var(--soft); }
+  td.n, th.n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  tr.total td { font-weight: 700; border-top: 1.5px solid var(--ink); border-bottom: none; background: #fff; }
+  .band { font-weight: 700; }
+  .band.sev { color: var(--sev); } .band.hi { color: var(--hi); }
+  .band.mod { color: var(--mod); } .band.low { color: var(--low); }
+  .tag { display: inline-block; padding: 0.3mm 1.6mm; border-radius: 2.5pt;
+         font-size: 7.5pt; font-weight: 700; letter-spacing: 0.3pt; }
+  .tag.unknown { background: #fde8e8; color: #9b1c1c; }
+  .tag.zero { background: #e8f0fb; color: #1e429f; }
+  .note {
+    border-left: 3px solid var(--ink); background: var(--soft);
+    padding: 2.5mm 3mm; margin: 3mm 0 4mm; font-size: 9pt; break-inside: avoid;
+  }
+  .note strong { display: block; margin-bottom: 0.8mm; }
+  code { font: 8.8pt/1.4 "SF Mono", Menlo, Consolas, monospace; background: var(--soft); padding: 0.2mm 1mm; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 6mm; }
+  footer { margin-top: 8mm; padding-top: 2.5mm; border-top: 1px solid var(--rule);
+           color: var(--dim); font-size: 8pt; }
+  .pb { break-before: page; }
+</style>
+</head>
+<body>
+
+<h1>Secondary Incident Risk</h1>
+<p class="lede">How the 0–100 score is calculated, what each band means, and a worked example of a High-risk incident.</p>
+<p class="meta">I-595 Corridor Digital Twin · Traffic Management Center · Source of truth:
+<code>src/tmc/secondaryIncidentRisk.js</code> and <code>src/liveOps/operationalImpact.js</code>.
+Worked example measured from the running application, not reconstructed.</p>
+
+<div class="note">
+  <strong>What this score is, and is not</strong>
+  It is a <em>rule-based indicator</em> built from fields that exist in the connected data. It is not a
+  prediction and not a probability: nothing here has been validated against actual secondary-crash
+  outcomes. It answers “given this incident and what is around it, how much evidence is there of
+  elevated secondary risk?” — a property of the incident. That is a different question from
+  Operational Impact, which measures disruption on a road section. Impact is one input here, never
+  the output.
+</div>
+
+<h2>1 · The bands</h2>
+<p>The score is a plain sum of factor contributions — no normalisation, no division. The band is
+simply where that sum lands.</p>
+
+<table>
+  <thead><tr><th>Band</th><th class="n">Score</th><th>Reading</th></tr></thead>
+  <tbody>
+    <tr><td class="band sev">Severe</td><td class="n">90 – 100</td><td>Multiple heavy factors firing together</td></tr>
+    <tr><td class="band hi">High</td><td class="n">60 – 89</td><td>Strong evidence of elevated secondary risk</td></tr>
+    <tr><td class="band mod">Moderate</td><td class="n">30 – 59</td><td>Some contributing conditions</td></tr>
+    <tr><td class="band low">Low</td><td class="n">0 – 29</td><td>Little evidence from what the data shows</td></tr>
+  </tbody>
+</table>
+<p class="lede">A single blocked lane (18) on its own deliberately does not reach Moderate.</p>
+
+<h2>2 · The seven factors and their weights</h2>
+<p>Every factor is scored from a field that exists in the source. A factor that <em>cannot</em> be
+evaluated is marked <span class="tag unknown">UNKNOWN</span> — it is never scored as zero risk,
+because “we cannot see it” and “it is not happening” are different answers.</p>
+
+<table>
+  <thead><tr><th style="width:21%">Factor</th><th style="width:47%">Condition</th><th class="n" style="width:14%">Points</th><th style="width:18%">Component</th></tr></thead>
+  <tbody>
+    <tr><td rowspan="6"><strong>Lane closure<br>or blockage</strong></td><td>Full carriageway closure</td><td class="n">40</td><td rowspan="6">Lane / incident</td></tr>
+    <tr><td>Per blocked lane — <strong>capped at 2 lanes</strong></td><td class="n">18 ea → 36</td></tr>
+    <tr><td>Ramp closure</td><td class="n">8</td></tr>
+    <tr><td>“Lanes closed”, count not published (register floor)</td><td class="n">18</td></tr>
+    <tr><td>Shoulder only, or none reported</td><td class="n">0</td></tr>
+    <tr><td>Lane impact not stated by the source</td><td class="n">0 <span class="tag unknown">UNKNOWN</span></td></tr>
+
+    <tr><td rowspan="4"><strong>Incident severity</strong></td><td>Major / severe</td><td class="n">20</td><td rowspan="4">Lane / incident</td></tr>
+    <tr><td>Intermediate / moderate</td><td class="n">10</td></tr>
+    <tr><td>Minor</td><td class="n">0</td></tr>
+    <tr><td>Severity not published</td><td class="n">0 <span class="tag unknown">UNKNOWN</span></td></tr>
+
+    <tr><td rowspan="4"><strong>Upstream congestion</strong></td><td>One congestion event upstream</td><td class="n">30</td><td rowspan="4">Traffic exposure</td></tr>
+    <tr><td>Each additional event — group capped at 46</td><td class="n">+8</td></tr>
+    <tr><td>None reported upstream (evaluated)</td><td class="n">0</td></tr>
+    <tr><td>Upstream direction could not be resolved</td><td class="n">0 <span class="tag unknown">UNKNOWN</span></td></tr>
+
+    <tr><td rowspan="3"><strong>Operational Impact</strong><br><span class="lede">of the affected section</span></td><td>Section SEVERE / HIGH</td><td class="n">24 / 16</td><td rowspan="3">Traffic exposure</td></tr>
+    <tr><td>Section MODERATE / LOW / NORMAL</td><td class="n">8 / 0 / 0</td></tr>
+    <tr><td>Section not resolved</td><td class="n">0 <span class="tag unknown">UNKNOWN</span></td></tr>
+
+    <tr><td rowspan="3"><strong>Time active</strong></td><td>Under 20 minutes</td><td class="n">0</td><td rowspan="3">Traffic exposure</td></tr>
+    <tr><td>From 20 min: 4 points per 10 min — <strong>capped at 16</strong> (reached ≈50 min)</td><td class="n">≤ 16</td></tr>
+    <tr><td>Start time not published</td><td class="n">0 <span class="tag unknown">UNKNOWN</span></td></tr>
+
+    <tr><td rowspan="5"><strong>Weather</strong><br><span class="lede">at incident time<br>(three separate factors)</span></td><td>Rain ≥ 7.6 / ≥ 2.5 / ≥ 0.2 mm in the hour</td><td class="n">22 / 14 / 6</td><td rowspan="5">Environment</td></tr>
+    <tr><td>Visibility &lt; 1 km / &lt; 2 km / &lt; 5 km</td><td class="n">20 / 14 / 6</td></tr>
+    <tr><td>Gust ≥ 60 km/h / sustained wind ≥ 40 km/h</td><td class="n">9 / 5</td></tr>
+    <tr><td>Rain <em>and</em> reduced visibility; again into a queue</td><td class="n">+6 / +6</td></tr>
+    <tr><td>Whole weather group capped at</td><td class="n">40</td></tr>
+
+    <tr><td rowspan="3"><strong>Location history</strong></td><td>Concentration VERY HIGH / HIGH / ELEVATED</td><td class="n">18 / 12 / 6</td><td rowspan="3">Location history</td></tr>
+    <tr><td>× spatial-confidence weight (HIGH 1.0, MEDIUM 0.7, LOW 0.5)</td><td class="n">×</td></tr>
+    <tr><td>Fewer than 3 nearby records — too few to compare</td><td class="n">0 <span class="tag unknown">UNKNOWN</span></td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <strong>Why these weights, in three sentences</strong>
+  Lane blockage leads because it is both the best-evidenced field in this feed and the factor most
+  directly implicated in secondary crashes — traffic stopping where drivers do not expect it.
+  Duration is capped at 16 so that a long-running incident can never outvote a blocked lane; it is a
+  worse exposure but weak evidence by comparison. Location history is capped at 18 and weighted down
+  for low spatial confidence, because the register’s coordinates are derived from damaged assets
+  rather than surveyed crash geometry.
+</div>
+
+<h2 class="pb">3 · Worked example — why 88 is High</h2>
+<p><strong>FL511-INCIDENT-999003</strong> · Westbound Section 04 · Major · 4:14 AM, 27 Sep 2026.
+Every figure below was read from the running application.</p>
+
+<table>
+  <caption>Factor contributions, as summed by the engine</caption>
+  <thead><tr><th style="width:34%">Factor</th><th style="width:48%">Evidence in the data</th><th class="n" style="width:18%">Points</th></tr></thead>
+  <tbody>
+    <tr><td>Lane closure</td><td>2 lanes blocked → 2 × 18</td><td class="n">36</td></tr>
+    <tr><td>Incident severity</td><td>Reported Major</td><td class="n">20</td></tr>
+    <tr><td>Operational Impact</td><td>Section Operational Impact HIGH</td><td class="n">16</td></tr>
+    <tr><td>Time active</td><td>Active 2,600 min — at the cap</td><td class="n">16</td></tr>
+    <tr><td>Upstream congestion</td><td>None reported upstream <span class="tag zero">EVALUATED</span></td><td class="n">0</td></tr>
+    <tr><td>Precipitation</td><td>No measurable rain <span class="tag zero">EVALUATED</span></td><td class="n">0</td></tr>
+    <tr><td>Visibility</td><td>14.9 km — clear <span class="tag zero">EVALUATED</span></td><td class="n">0</td></tr>
+    <tr><td>Wind</td><td>11 km/h — not operationally significant <span class="tag zero">EVALUATED</span></td><td class="n">0</td></tr>
+    <tr><td>Location history</td><td>Fewer than 3 nearby records <span class="tag unknown">UNKNOWN</span></td><td class="n">0</td></tr>
+    <tr class="total"><td colspan="2">Total → <span class="band hi">High</span> (60–89 band)</td><td class="n">88</td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <strong>What makes it High is the incident itself</strong>
+  56 of the 88 points come from two lanes being down and the severity being Major. Weather
+  contributed nothing — it was measured and clear. History contributed nothing — it could not be
+  assessed at all. The score sits 2 points below Severe on the strength of the lane blockage, the
+  section’s disruption and the fact that it had been running 43 hours.
+</div>
+
+<h3>The four component totals</h3>
+<p>Each factor carries a component tag; the breakdown panel simply sums them.</p>
+<table>
+  <thead><tr><th style="width:26%">Component</th><th style="width:50%">Factors inside it</th><th class="n" style="width:24%">This incident</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Lane / incident</strong></td><td>Lane closure + incident severity</td><td class="n">36 + 20 = 56</td></tr>
+    <tr><td><strong>Traffic exposure</strong></td><td>Upstream congestion + Operational Impact + duration</td><td class="n">0 + 16 + 16 = 32</td></tr>
+    <tr><td><strong>Environment</strong></td><td>Precipitation + visibility + wind</td><td class="n">0</td></tr>
+    <tr><td><strong>Location history</strong></td><td>Historical concentration at this location</td><td class="n">Not evaluated</td></tr>
+  </tbody>
+</table>
+<div class="note">
+  <strong>“0” and “Not evaluated” are different statements</strong>
+  Environment scored 0 because the weather was measured and found benign. Location history says
+  <em>Not evaluated</em> because fewer than 3 register records lie within the search radius — below
+  the floor at which a concentration ratio is stable enough to band. The interface keeps these apart
+  deliberately: a component scoring zero for want of data is not a reassurance.
+</div>
+
+<h2>4 · How Operational Impact HIGH is derived</h2>
+<p>This comes from a <strong>different model</strong> — Live Ops’ operational impact — and describes
+the road <em>section</em>, not the incident. Every event on the section scores
+<code>base + severity + lanes</code>, and the section’s scores are summed.</p>
+
+<div class="cols">
+<table>
+  <caption>Event weights</caption>
+  <thead><tr><th>Event type</th><th class="n">Base</th><th class="n">maj / mod / min</th></tr></thead>
+  <tbody>
+    <tr><td>Incident</td><td class="n">40</td><td class="n">40 / 20 / 0</td></tr>
+    <tr><td>Congestion</td><td class="n">24</td><td class="n">24 / 12 / 0</td></tr>
+    <tr><td>Closure</td><td class="n">20</td><td class="n">20 / 10 / 0</td></tr>
+    <tr><td>Construction</td><td class="n">12</td><td class="n">16 / 8 / 0</td></tr>
+    <tr><td>Disabled vehicle</td><td class="n">10</td><td class="n">10 / 5 / 0</td></tr>
+  </tbody>
+</table>
+<table>
+  <caption>Lane weights, and the section bands</caption>
+  <thead><tr><th>Lanes</th><th class="n">Pts</th><th>Band</th><th class="n">From</th></tr></thead>
+  <tbody>
+    <tr><td>Per blocked lane</td><td class="n">25</td><td class="band sev">Severe</td><td class="n">160</td></tr>
+    <tr><td>Full closure</td><td class="n">90</td><td class="band hi">High</td><td class="n">80</td></tr>
+    <tr><td>Ramp closure</td><td class="n">8</td><td class="band mod">Moderate</td><td class="n">40</td></tr>
+    <tr><td>Shoulder only</td><td class="n">0</td><td class="band low">Low</td><td class="n">1</td></tr>
+    <tr><td>Not stated</td><td class="n">0</td><td>Normal</td><td class="n">0</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>For section <code>I595-WB-FDOT-006680-007350</code>, this incident alone contributes
+<strong>40</strong> (incident base) + <strong>40</strong> (Major) + <strong>50</strong>
+(2 lanes × 25) = <strong>130</strong>, comfortably past the 80 threshold for HIGH.</p>
+
+<div class="note">
+  <strong>Why the lane weight differs between the two models</strong>
+  Section impact uses 25 points per blocked lane; secondary risk uses 18 and caps at two lanes. They
+  answer different questions — “how disrupted is this road” versus “how likely is another crash
+  here” — so they are weighted independently. Operational Impact enters the secondary-risk score as
+  one input worth at most 24 of 100, and never as the score itself.
+</div>
+
+<h2 class="pb">5 · Data confidence — a separate axis</h2>
+<p>Confidence measures how much of the picture was available. It is reported beside the score and
+<strong>never discounts it</strong>: a High score stands on the evidence that produced it.</p>
+<p><code>confidence = evaluated ÷ (evaluated + unknown + 4 permanently unavailable)</code> &nbsp;·&nbsp;
+High ≥ 0.60, Medium ≥ 0.35, otherwise Low.</p>
+
+<table>
+  <thead><tr><th>Incident</th><th class="n">Evaluated</th><th class="n">Unknown</th><th class="n">Unavailable</th><th class="n">Share</th><th>Confidence</th></tr></thead>
+  <tbody>
+    <tr><td>FL511-INCIDENT-999003</td><td class="n">8</td><td class="n">1</td><td class="n">4</td><td class="n">0.62</td><td>High</td></tr>
+    <tr><td>INC-200150</td><td class="n">7</td><td class="n">2</td><td class="n">4</td><td class="n">0.54</td><td>Medium</td></tr>
+  </tbody>
+</table>
+
+<p>The four permanently unavailable factors — measured as present in 0 of 61 live events — are
+<strong>responder status</strong>, <strong>DMS message content</strong>, <strong>queue length</strong>
+and <strong>traffic speed or delay</strong>. They are declared on every assessment so that a low
+score is never mistaken for a quiet corridor.</p>
+
+<h2>6 · How “Recommended attention” is ranked</h2>
+<p>The list is not re-derived from the score. Each item comes from a factor that actually fired, and
+carries a fixed priority.</p>
+
+<table>
+  <thead><tr><th style="width:22%">Priority</th><th>Bases that produce it</th></tr></thead>
+  <tbody>
+    <tr><td><strong>HIGH</strong></td><td>Lane closure · upstream congestion · weather · upstream unresolved</td></tr>
+    <tr><td><strong>MEDIUM</strong></td><td>Monitoring · Operational Impact · incident duration · historical location</td></tr>
+    <tr><td><strong>LOW</strong></td><td>Unavailable data — stated as gaps, not as actions</td></tr>
+  </tbody>
+</table>
+
+<p>Sorted by priority, stable within each priority. One escalation rule applies: <strong>if upstream
+could not be resolved, duration is promoted to HIGH</strong> — a long-running incident whose
+approach you cannot see is worse than one you can. In the worked example upstream <em>was</em>
+resolved (camera 5036), so duration stayed MEDIUM in fourth place.</p>
+
+<p>Items marked “Data gap — this is what to establish, not an action already available” are ranked
+LOW on purpose: they tell an operator what they cannot see, rather than offering an action the
+system cannot actually support.</p>
+
+<div class="note">
+  <strong>Three rules the model will not break</strong>
+  Missing data is never treated as zero risk. A record-frequency comparison is never called a crash
+  rate. An asset-derived coordinate is never called validated crash geometry.
+</div>
+
+<footer>
+  I-595 Corridor Digital Twin · Traffic Management Center · Secondary Incident Risk.
+  Weights are declared in one place and are intended to be argued with and changed.
+</footer>
+
+</body>
+</html>
