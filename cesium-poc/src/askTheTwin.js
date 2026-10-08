@@ -1,6 +1,8 @@
 import { Cartesian3, Cartographic, Math as CesiumMath, JulianDate } from 'cesium';
 import { makeDraggable } from './draggablePanel.js';
 import { eventLayersToShow } from './safety/answerLayers.js';
+import { framedDestination } from './cameraFraming.js';
+import { answerTmcQuestion, parseTmcQuestion, tmcSuggestionsForTab, TWIN_ACTIONS, TMC_HISTORICAL_INCIDENT_SUGGESTIONS, TMC_HISTORICAL_SUGGESTIONS, TMC_INCIDENT_SUGGESTIONS, TMC_SUGGESTIONS } from './tmc/tmcAnswers.js';
 import { ASK_THE_TWIN_EVENT } from './askTheTwinBridge.js';
 import { eventPlace, isBareSegmentRequest, MAX_REMOTE_OFFSET_M, parseFlyRequest, parseRoadRequest, parseSegmentFollowUp, parseSegmentRequests, parseTourCommand, parseTypeBrowse, resolveFlyTarget, searchAssets, segmentPoint, typeHints } from './assetExplorer/assetSearch.js';
 import { corridorPositionOf } from './assetExplorer/corridorPosition.js';
@@ -72,7 +74,7 @@ export function describeAsset(asset) {
  *   coordinates of their own: the position of the work IS the position of its asset
  */
 export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segments, layerStore, centerline = [],
-  liveEvents = null, maintenanceRecords = null, assetIndex = null } = {}) {
+  liveEvents = null, maintenanceRecords = null, assetIndex = null, tmc = null } = {}) {
   // ── Toggle button ──────────────────────────────────────────────────────
   const btn = document.createElement('button');
   btn.className = 'ask-twin-btn';
@@ -129,11 +131,34 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
   const areaStateEl   = panel.querySelector('.ask-twin-area-state');
 
   // ── Suggestion chips ──────────────────────────────────────────────────
-  // Rebuilt rather than written once: with an area selected the useful questions are about the
-  // area, and offering "Which cameras are near the Turnpike?" then would be offering to leave it.
+  /**
+   * Which questions to offer, for where the operator actually is.
+   *
+   * With an area selected the useful questions are about the area — offering "Which cameras are
+   * near the Turnpike?" then would be offering to leave it. On the TMC screen they are about
+   * incidents and risk, and narrow again to THIS incident once one is open, because that is what
+   * the operator is looking at.
+   */
+  function suggestionsNow() {
+    if (activeSpatialContext) return AREA_SUGGESTIONS;
+    if (tmc && document.body.dataset.section === 'tmc') {
+      // Past tense on a past date: "is congestion building upstream" read against a September
+      // record would invite an operator to think they are being told about the road now.
+      const historical = tmc.temporal?.mode === 'HISTORICAL';
+      // With an incident open, the questions follow the tab being read: the investigation panel is
+      // three different questions, and the chat should offer the one in front of the operator.
+      if (tmc.selectedIncidentId) {
+        return tmcSuggestionsForTab(tmc.activeTab,
+          historical ? TMC_HISTORICAL_INCIDENT_SUGGESTIONS : TMC_INCIDENT_SUGGESTIONS);
+      }
+      return historical ? TMC_HISTORICAL_SUGGESTIONS : TMC_SUGGESTIONS;
+    }
+    return SUGGESTIONS;
+  }
+
   function renderSuggestions() {
     suggestEl.replaceChildren();
-    for (const text of (activeSpatialContext ? AREA_SUGGESTIONS : SUGGESTIONS)) {
+    for (const text of suggestionsNow()) {
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = 'ask-twin-chip';
@@ -164,7 +189,7 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     open = force !== undefined ? force : !open;
     panel.hidden = !open;
     btn.classList.toggle('active', open);
-    if (open && !minimised) { input.focus(); scrollBottom(); }
+    if (open && !minimised) { renderSuggestions(); input.focus(); scrollBottom(); }
   }
   btn.onclick = () => toggle();
   panel.querySelector('.ask-twin-close').onclick = () => toggle(false);
@@ -228,11 +253,15 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
   }
 
   // ── Fly to ────────────────────────────────────────────────────────────
+  const FLY_PITCH_DEG = -40;
   function flyTo({ lon, lat }, flyBtn, alt = 1800) {
     if (flyBtn) { flyBtn.textContent = 'Flying…'; flyBtn.disabled = true; }
+    // The eye goes BEHIND the subject, not on top of it: a fly that lands on the coordinates and
+    // then looks down at an angle leaves the subject about two kilometres off screen.
+    const eye = framedDestination(lon, lat, alt, FLY_PITCH_DEG);
     viewer.camera.flyTo({
-      destination: Cartesian3.fromDegrees(lon, lat, alt),
-      orientation: { heading: CesiumMath.toRadians(0), pitch: CesiumMath.toRadians(-40), roll: 0 },
+      destination: Cartesian3.fromDegrees(eye.longitude, eye.latitude, eye.height),
+      orientation: { heading: CesiumMath.toRadians(0), pitch: CesiumMath.toRadians(FLY_PITCH_DEG), roll: 0 },
       duration: 2,
       complete: () => { if (flyBtn) { flyBtn.innerHTML = '✓ On map'; } },
     });
@@ -543,6 +572,77 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
    * Under a remote answer about incidents or closures, the ones on this map as buttons — the text
    * says where they are; the buttons take you there.
    */
+/**
+   * Answer a TMC question from the TMC's own deterministic service.
+   *
+   * Only while that workspace is open: these answers are about active incidents and the risk model,
+   * and offering them from another screen would answer about a corridor the operator is not looking
+   * at. Returns false when it is not a TMC question, so everything else routes on as before.
+   */
+  function answerAboutTmc(question) {
+    if (!tmc || document.body.dataset.section !== 'tmc') return false;
+    const intent = parseTmcQuestion(question);
+    if (!intent) return false;
+    const assessed = tmc.assessment;
+    const selected = assessed?.assessments?.find(entry => entry.incident.id === tmc.selectedIncidentId) ?? null;
+    const answer = answerTmcQuestion(intent, assessed, { selected });
+    if (!answer) return false;
+    addMsg('assistant', answer.answer);
+    offerTmcActions(answer.actions);
+    return true;
+  }
+
+  /** The synchronised map actions an answer offers — the screen does the moving, not the chat. */
+  function offerTmcActions(actions) {
+    if (!actions?.length) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'ask-twin-msg ask-twin-msg--assistant ask-twin-actions';
+    for (const action of actions) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'ask-twin-fly-btn';
+      button.textContent = action.label;
+      button.onclick = () => runTmcAction(action, button);
+      wrap.appendChild(button);
+    }
+    messages.appendChild(wrap);
+    scrollBottom();
+  }
+
+  /**
+   * Execute one structured action from an answer.
+   *
+   * The model picks from a list the deterministic services produced; this validates the choice
+   * against the workspace before anything moves. A refusal is reported on the button rather than
+   * silently ignored, so an operator never clicks and wonders whether it worked.
+   */
+  function runTmcAction(action, button) {
+    if (!tmc) return;
+    const done = (() => {
+      switch (action.type) {
+        case TWIN_ACTIONS.SHOW_HISTORY: return tmc.showHistoryOnMap();
+        case TWIN_ACTIONS.FILTER_HISTORY: return tmc.filterHistory(action.filterType, action.filterValue);
+        case TWIN_ACTIONS.CLEAR_HISTORY_FILTER: return tmc.clearHistoryFilter();
+        case TWIN_ACTIONS.FOCUS_AFFECTED_SECTION: return tmc.focusAffectedSection();
+        case TWIN_ACTIONS.FOCUS_RESOURCE: return tmc.focusResource(action.resourceType);
+        case TWIN_ACTIONS.SELECT_INCIDENT:
+          if (action.incidentId) { tmc.selectIncident(action.incidentId); return true; }
+          return false;
+        default:
+          // An older action shape: select, then fly if it carries a place.
+          if (action.incidentId) tmc.selectIncident(action.incidentId);
+          if (action.resource?.resource) {
+            flyTo({ lon: action.resource.resource.longitude, lat: action.resource.resource.latitude });
+          }
+          return Boolean(action.incidentId || action.resource?.resource);
+      }
+    })();
+    if (done === false) {
+      button.disabled = true;
+      button.textContent = `${action.label} — not available`;
+    }
+  }
+
   function offerFromMap(question) {
     const types = typeHints(question);
     if (types.length !== 1 || !assetExplorer) return;
@@ -562,7 +662,12 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
 
   /** @returns {Promise<boolean>} true when the question was about a map asset and is answered. */
   async function answerLocally(question) {
-    // The drawn area comes first: with one up, "any incidents here?" is a question about it, and
+    // The TMC's own questions come first while that screen is open: "which incident has the highest
+    // secondary-incident risk" is answered by a deterministic service, never by the model looking at
+    // raw incidents and deciding. The ranking an operator acts on must be the same one the screen
+    // shows, every time it is asked.
+    if (answerAboutTmc(question)) return true;
+    // The drawn area comes next: with one up, "any incidents here?" is a question about it, and
     // every other route below would answer about the corridor instead.
     if (answerAboutArea(question)) return true;
     if (!assetExplorer) return false;
@@ -832,6 +937,8 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     /** Test/diagnostic hook: the area currently scoping the conversation. */
     get spatialContext() { return activeSpatialContext; },
     selectArea: () => { selection.start(); updateAreaBar(); },
+    /** Offer the questions that suit wherever the operator now is — a new screen, a new selection. */
+    refreshSuggestions: renderSuggestions,
     clearArea,
     ask,
     destroy() {

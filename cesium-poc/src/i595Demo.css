@@ -1133,6 +1133,10 @@ body .map-nav button:focus-visible, body .map-nav label:has(input:focus-visible)
 
 body:has(.app-role) .map-nav { top: 76px; max-height: calc(100dvh - 110px); }
 body:has(.app-role) .liveops-layers { top: 76px; }
+/* The investigation panel clears the role switcher too. It sits at z-index 40 and the panel at 13,
+   so at the shared top of 16px the switcher covered the panel's own close button — the control an
+   operator reaches for first was the one hidden. Same offset the other top-right panels use. */
+body:has(.app-role) .tmc-panel { top: 76px; }
 
 .map-nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
@@ -1172,3 +1176,385 @@ body:has(.app-role) .liveops-layers { top: 76px; }
 .safety-trend-head { cursor: grab; user-select: none; }
 .safety-trend.is-dragging { cursor: grabbing; box-shadow: 0 18px 44px var(--ui-shadow-color); }
 .safety-trend.is-dragging .safety-trend-head { cursor: grabbing; }
+
+/* ── Traffic Management Center ──────────────────────────────────────────────────────────────── */
+/* Built from the same tokens as the other workspaces: the map stays dominant, the chrome stays
+   quiet, and nothing here is a dashboard panel. */
+.tmc-workspace[hidden] { display: none; }
+
+/* Historical context belongs to the KPI set it qualifies. Keep it on its own line below the cards
+   instead of letting it consume the last card's horizontal space. The live label is empty/hidden. */
+.tmc-workspace .ws-kpis { flex-direction: column; align-items: flex-start; gap: 6px; }
+.tmc-workspace .ws-kpi-cards { width: 100%; }
+.tmc-workspace .ws-source:not([hidden]) { align-self: flex-start; margin-left: 0; }
+
+/* The bottom rail of active incidents, in the place the other screens put their browser. */
+.tmc-rail {
+  position: absolute; left: calc(var(--app-nav-w) + 16px); right: 420px; bottom: 16px;
+  z-index: 12; padding: 10px 12px; border: 1px solid var(--ui-border); border-radius: 10px;
+  background: var(--ui-surface-solid); box-shadow: 0 12px 32px var(--ui-shadow-color);
+  color: var(--ui-text); pointer-events: auto;
+}
+.tmc-rail-head { font-size: 12px; font-weight: 600; margin-bottom: 8px; display: flex; gap: 8px; align-items: center; }
+.tmc-rail-count { color: var(--ui-text-dim); font-weight: 500; }
+.tmc-rail-cards { display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; padding-bottom: 2px; }
+.tmc-card {
+  display: grid; gap: 2px; min-width: 190px; text-align: left; cursor: pointer;
+  padding: 8px 10px; border: 1px solid var(--ui-border); border-radius: 8px;
+  background: var(--ui-surface); color: var(--ui-text); font: inherit;
+}
+.tmc-card:hover { border-color: var(--ui-text-dim); }
+.tmc-card[aria-pressed="true"] { border-color: var(--ui-accent); box-shadow: 0 0 0 1px var(--ui-accent) inset; }
+.tmc-card-id { font-weight: 600; font-size: 12.5px; }
+.tmc-card-risk { font-size: 11px; font-weight: 600; }
+.tmc-card-risk[data-level="LOW"] { color: #9ad97f; }
+.tmc-card-risk[data-level="MODERATE"] { color: #e5bc57; }
+.tmc-card-risk[data-level="HIGH"] { color: #ee9148; }
+.tmc-card-risk[data-level="SEVERE"] { color: #e66259; }
+.tmc-card-place, .tmc-card-age { font-size: 11px; color: var(--ui-text-dim); }
+.tmc-empty { margin: 0; font-size: 12px; color: var(--ui-text-dim); }
+
+/* The right-hand response panel. Only present when an incident is selected. */
+.tmc-panel {
+  position: absolute; right: 16px; top: 16px; bottom: 16px; width: 390px; z-index: 13;
+  overflow-y: auto; padding: 14px; border: 1px solid var(--ui-border); border-radius: 10px;
+  background: var(--ui-surface-solid); box-shadow: 0 12px 32px var(--ui-shadow-color);
+  color: var(--ui-text); pointer-events: auto;
+}
+.tmc-panel[hidden] { display: none; }
+.tmc-panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.tmc-panel-kicker { margin: 0; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ui-text-dim); }
+.tmc-panel-title { margin: 2px 0 0; font-size: 16px; }
+.tmc-panel-place { margin: 2px 0 0; font-size: 12px; color: var(--ui-text-dim); }
+.tmc-panel-close { background: none; border: none; color: var(--ui-text-dim); font-size: 13px; cursor: pointer; padding: 2px 4px; border-radius: 6px; }
+.tmc-panel-close:hover { color: var(--ui-text); background: var(--ui-surface-raised); }
+
+.tmc-risk { margin: 12px 0; padding: 10px 12px; border-radius: 8px; border-left: 3px solid var(--ui-border); background: var(--ui-surface); }
+.tmc-risk[data-level="LOW"] { border-left-color: #9ad97f; }
+.tmc-risk[data-level="MODERATE"] { border-left-color: #e5bc57; }
+.tmc-risk[data-level="HIGH"] { border-left-color: #ee9148; }
+.tmc-risk[data-level="SEVERE"] { border-left-color: #e66259; }
+.tmc-risk-label { margin: 0; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ui-text-dim); }
+.tmc-risk-level { margin: 2px 0 0; font-size: 20px; font-weight: 600; }
+.tmc-risk-note { margin: 4px 0 0; font-size: 10.5px; color: var(--ui-text-dim); }
+/* The score beside the level: the same line, quieter, so "High" still reads first. */
+.tmc-risk-score { font-size: 13px; font-weight: 500; color: var(--ui-text-dim); }
+/* Weather at incident time, in the panel's existing block rhythm. */
+.tmc-weather-grid { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 11.5px; }
+.tmc-weather-grid > div { display: contents; }
+.tmc-weather-grid span { color: var(--ui-text-dim); }
+.tmc-weather-grid strong { font-weight: 600; text-align: right; }
+.tmc-weather-note { margin: 0; font-size: 11.5px; color: var(--ui-text-dim); }
+.tmc-weather-source { margin: 6px 0 0; font-size: 10.5px; color: var(--ui-text-dim); }
+/* Data confidence, beside the risk but visually quieter — a separate axis, not a discount. */
+.tmc-confidence { margin: 6px 0 0; font-size: 10.5px; color: var(--ui-text-dim); display: flex; gap: 6px; align-items: baseline; }
+.tmc-confidence strong { font-size: 11.5px; color: var(--ui-text); }
+.tmc-confidence span { opacity: 0.8; }
+/* Collapsible evidence sections, so the panel stays short by default. */
+.tmc-fold > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 8px; }
+.tmc-fold > summary::-webkit-details-marker { display: none; }
+.tmc-fold > summary::before { content: '\25B8'; font-size: 9px; color: var(--ui-text-dim); transition: transform .15s; }
+.tmc-fold[open] > summary::before { transform: rotate(90deg); }
+.tmc-fold > summary h3 { margin: 0; }
+.tmc-fold > summary span { font-size: 10.5px; color: var(--ui-text-dim); margin-left: auto; }
+.tmc-fold h4 { margin: 8px 0 4px; font-size: 11px; font-weight: 600; color: var(--ui-text-dim); }
+.tmc-weight { display: block; font-style: normal; font-size: 10.5px; color: var(--ui-text-dim); padding-left: 16px; }
+.tmc-history .tmc-panel-foot { margin-top: 8px; }
+
+/* ── Incident investigation workspace ──────────────────────────────────────────────────────────
+   Three questions in one panel. The identity and the risk stay pinned; only the tab scrolls, so
+   the operator always knows which incident and how bad while reading the evidence. */
+.tmc-panel { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+.tmc-panel-head, .tmc-panel > .tmc-risk, .tmc-tabs { flex: none; }
+.tmc-panel-head { padding: 14px 14px 0; }
+.tmc-panel > .tmc-risk { margin: 10px 14px; }
+.tmc-tabs { display: flex; gap: 2px; padding: 0 14px; border-bottom: 1px solid var(--ui-border); }
+.tmc-tabs [role="tab"] {
+  appearance: none; background: none; border: none; border-bottom: 2px solid transparent;
+  color: var(--ui-text-dim); font: inherit; font-size: 12px; font-weight: 600;
+  padding: 7px 10px; cursor: pointer; border-radius: 6px 6px 0 0;
+}
+.tmc-tabs [role="tab"]:hover { color: var(--ui-text); }
+.tmc-tabs [role="tab"][aria-selected="true"] { color: var(--ui-text); border-bottom-color: var(--ui-accent); }
+.tmc-tabs [role="tab"]:focus-visible, .tmc-panel button:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+/* Only the tab scrolls, never the application behind it. */
+.tmc-tabpanel { flex: 1 1 auto; overflow-y: auto; padding: 12px 14px; min-height: 0; }
+.tmc-tabpanel[hidden] { display: none; }
+.tmc-tab-lede { margin: 0 0 10px; font-size: 11px; color: var(--ui-text-dim); }
+.tmc-panel > .tmc-panel-foot { flex: none; padding: 10px 14px; border-top: 1px solid var(--ui-border); }
+
+/* Data confidence as a disclosure, beside the risk but never confused with it. */
+.tmc-confidence { appearance: none; background: none; border: none; cursor: pointer; text-align: left; width: 100%; padding: 0; }
+.tmc-availability { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--ui-border); }
+
+/* Why this risk: the weight first, so the list is scannable without reading every detail. */
+.tmc-contributors { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; }
+.tmc-contributors li { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: baseline; }
+.tmc-weight-tag {
+  grid-row: span 2; align-self: start; font-size: 9.5px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; padding: 2px 6px; border-radius: 4px; color: var(--ui-text);
+  background: var(--ui-surface-raised); border: 1px solid var(--ui-border); min-width: 58px; text-align: center;
+}
+.tmc-weight-tag[data-weight="high"] { color: #ee9148; border-color: #ee914855; }
+.tmc-weight-tag[data-weight="moderate"] { color: #e5bc57; border-color: #e5bc5755; }
+.tmc-contrib-label { font-size: 12px; font-weight: 600; }
+.tmc-contrib-detail { font-size: 11px; color: var(--ui-text-dim); grid-column: 2; }
+
+/* Component breakdown: navigation, not a chart. */
+.tmc-components { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.tmc-components button {
+  display: grid; grid-template-columns: 108px 1fr auto; gap: 8px; align-items: center; width: 100%;
+  appearance: none; background: none; border: none; color: inherit; font: inherit; font-size: 11.5px;
+  padding: 3px 4px; border-radius: 6px; cursor: pointer; text-align: left;
+}
+.tmc-components button:hover { background: var(--ui-surface-raised); }
+.tmc-comp-bar { height: 7px; border-radius: 4px; background: var(--ui-surface-raised); overflow: hidden; }
+.tmc-comp-bar i { display: block; height: 100%; background: var(--ui-accent); opacity: .75; }
+.tmc-comp-score { font-variant-numeric: tabular-nums; color: var(--ui-text-dim); min-width: 72px; text-align: right; }
+/* The row stays marked after a click, so the breakdown acknowledges it even when the panel has no
+   room left to scroll. */
+.tmc-components button[aria-pressed="true"] { background: var(--ui-surface-raised); }
+.tmc-components button[aria-pressed="true"] .tmc-comp-label { color: var(--ui-accent); font-weight: 600; }
+/* And the section it points at announces itself briefly. */
+.tmc-tabpanel section.is-focused, .tmc-tabpanel details.is-focused {
+  animation: tmc-flash 1.8s ease-out;
+  border-radius: 8px;
+}
+@keyframes tmc-flash {
+  0%, 55% { box-shadow: 0 0 0 2px var(--ui-accent) inset; background: color-mix(in srgb, var(--ui-accent) 8%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; background: transparent; }
+}
+
+/* History bars. Plain DOM and CSS — no charting library for four rows. */
+.tmc-bars { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }
+.tmc-bar-row {
+  display: grid; grid-template-columns: 1fr 72px auto; gap: 8px; align-items: center; width: 100%;
+  appearance: none; background: none; border: none; color: inherit; font: inherit; font-size: 11.5px;
+  padding: 3px 4px; border-radius: 6px; text-align: left;
+}
+button.tmc-bar-row { cursor: pointer; }
+button.tmc-bar-row:hover { background: var(--ui-surface-raised); }
+button.tmc-bar-row[aria-pressed="true"] { background: var(--ui-surface-raised); box-shadow: 0 0 0 1px var(--ui-accent) inset; }
+.tmc-bar { height: 7px; border-radius: 4px; background: var(--ui-surface-raised); overflow: hidden; }
+.tmc-bar i { display: block; height: 100%; background: var(--ui-text-dim); opacity: .6; }
+button.tmc-bar-row[aria-pressed="true"] .tmc-bar i { background: var(--ui-accent); opacity: .85; }
+.tmc-bar-count { font-variant-numeric: tabular-nums; color: var(--ui-text-dim); white-space: nowrap; }
+
+/* The spatial caveat: visible, compact, expandable. */
+.tmc-caveat { margin: 8px 0 0; font-size: 10.5px; color: var(--ui-text-dim); display: flex; gap: 6px; align-items: center; }
+.tmc-info {
+  appearance: none; width: 16px; height: 16px; flex: none; border-radius: 50%; cursor: pointer;
+  border: 1px solid var(--ui-border); background: var(--ui-surface-raised); color: var(--ui-text-dim);
+  font: 600 10px/1 system-ui; display: inline-flex; align-items: center; justify-content: center;
+}
+.tmc-info:hover { color: var(--ui-text); }
+
+/* The active map filter, so it is never a mystery why only some markers are drawn. */
+.tmc-map-filter { margin: 8px 0 0; font-size: 10.5px; color: var(--ui-text-dim); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.tmc-map-filter button {
+  appearance: none; cursor: pointer; font: inherit; font-size: 10.5px; color: var(--ui-text);
+  background: var(--ui-surface-raised); border: 1px solid var(--ui-accent); border-radius: 999px; padding: 2px 8px;
+}
+
+/* Mitigation as a scannable list rather than a paragraph block. */
+.tmc-mitigation { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; counter-reset: none; }
+.tmc-mitigation li { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: start; }
+.tmc-mit-n {
+  font-size: 10px; font-weight: 700; color: var(--ui-text-dim); min-width: 18px; height: 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--ui-border); border-radius: 50%;
+}
+.tmc-mit-body { display: grid; gap: 1px; }
+.tmc-mit-body strong { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; }
+.tmc-mit-body span { font-size: 11.5px; color: var(--ui-text-dim); }
+
+/* The rail, collapsed to one line while an investigation is open. */
+.tmc-rail[data-collapsed="true"] { padding: 6px 10px; }
+.tmc-rail-strip { display: flex; gap: 10px; align-items: center; font-size: 12px; }
+.tmc-rail-strip-id { font-weight: 600; }
+.tmc-rail-strip-at, .tmc-rail-strip .tmc-rail-count { color: var(--ui-text-dim); font-size: 11px; }
+.tmc-rail-strip .tmc-action { margin-left: auto; }
+.tmc-rail-head .tmc-action { margin-left: auto; }
+
+/* Corridor position axis under the rail: where each item sits along I-595, 0 mi to the far end.
+   The same geometry the Explorer's rail uses, so a dot in the same place means the same milepost. */
+.tmc-axis { margin-top: 10px; }
+.tmc-axis-line {
+  position: relative; height: 10px; border-radius: 5px;
+  background: linear-gradient(to right, var(--ui-border), var(--ui-border));
+  background-size: 100% 2px; background-position: 0 4px; background-repeat: no-repeat;
+}
+.tmc-axis-dot {
+  position: absolute; top: 0; transform: translateX(-50%);
+  width: 10px; height: 10px; padding: 0; border-radius: 50%; cursor: pointer;
+  border: 1.5px solid var(--ui-surface-solid); background: var(--ui-text-dim);
+}
+.tmc-axis-dot:hover { background: var(--ui-text); }
+.tmc-axis-dot[aria-pressed="true"] { background: var(--ui-accent); transform: translateX(-50%) scale(1.3); }
+.tmc-axis-dot:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+.tmc-axis-scale { display: flex; justify-content: space-between; margin-top: 3px; font-size: 10px; color: var(--ui-text-dim); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* The corridor mini-map, left of the rail and sharing its baseline. */
+.tmc-minimap {
+  position: absolute; left: calc(var(--app-nav-w) + 16px); bottom: 16px; z-index: 12;
+  padding: 8px; border: 1px solid var(--ui-border); border-radius: 10px;
+  background: var(--ui-surface-solid); box-shadow: 0 12px 32px var(--ui-shadow-color); pointer-events: auto;
+}
+.tmc-minimap[hidden] { display: none; }
+/* The rail starts after the mini-map so the two sit side by side. */
+body[data-section="tmc"]:has(.tmc-minimap:not([hidden])) .tmc-rail { left: calc(var(--app-nav-w) + 290px); }
+
+/* The floating launcher sits over the investigation panel's footer buttons while an incident is
+   open, so it moves clear of it. The panel carries its own Ask the Twin button in that state. */
+body[data-section="tmc"][data-tmc-investigating="true"] .ask-twin-btn { right: 430px; }
+
+/* ── Twin insight, evidence, timeline, opportunity ────────────────────────────────────────────
+   The conclusion reads first; the sources behind it stay small. */
+.tmc-insight { background: var(--ui-surface); border-left: 2px solid var(--ui-accent); border-radius: 6px; padding: 10px 12px; }
+.tmc-insight-text { margin: 4px 0 0; font-size: 12px; line-height: 1.45; }
+.tmc-evidence-chips { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 10px; color: var(--ui-text-dim); }
+.tmc-evidence-chips em {
+  font-style: normal; padding: 1px 7px; border-radius: 999px; font-size: 10px;
+  border: 1px solid var(--ui-border); background: var(--ui-surface-raised); color: var(--ui-text);
+}
+.tmc-evidence { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--ui-border); }
+.tmc-evidence .is-dim { color: var(--ui-text-dim); font-weight: 500; }
+
+/* Priority beside the action, as a word — never colour alone. */
+.tmc-mit-body strong { display: flex; gap: 8px; align-items: baseline; }
+.tmc-priority { margin-left: auto; font-style: normal; font-size: 9.5px; font-weight: 700; letter-spacing: .05em; color: var(--ui-text-dim); }
+.tmc-priority[data-priority="HIGH"] { color: #ee9148; }
+.tmc-priority[data-priority="MEDIUM"] { color: #e5bc57; }
+.tmc-mit-gap { font-size: 10.5px; color: var(--ui-text-dim); font-style: italic; }
+
+/* The operational motion. Unavailable stages are hollow, not hidden. */
+.tmc-timeline { margin: 0; padding: 0; list-style: none; display: grid; gap: 0; }
+.tmc-timeline li { display: grid; grid-template-columns: 12px 62px 1fr; gap: 8px; align-items: start; padding: 5px 0; position: relative; }
+.tmc-timeline li::before {
+  content: ''; position: absolute; left: 5px; top: 16px; bottom: -5px; width: 1px; background: var(--ui-border);
+}
+.tmc-timeline li:last-child::before { display: none; }
+.tmc-tl-dot { width: 9px; height: 9px; margin-top: 4px; border-radius: 50%; border: 1.5px solid var(--ui-text-dim); background: var(--ui-text-dim); }
+.tmc-timeline li[data-state="unavailable"] .tmc-tl-dot { background: transparent; }
+.tmc-tl-time { font-size: 10.5px; color: var(--ui-text-dim); font-variant-numeric: tabular-nums; padding-top: 1px; }
+.tmc-tl-body { display: grid; gap: 1px; }
+.tmc-tl-body strong { font-size: 11.5px; }
+.tmc-tl-body span { font-size: 10.5px; color: var(--ui-text-dim); }
+.tmc-timeline li[data-state="unavailable"] .tmc-tl-body strong { color: var(--ui-text-dim); font-weight: 500; }
+
+.tmc-opportunity { border-left: 2px solid var(--ui-border); padding-left: 10px; }
+
+/* ── Map context chip ──────────────────────────────────────────────────────────────────────────
+   One chip, bottom-left of the map, saying which lens is on and what the colours mean. Screen
+   space rather than a tracked entity: it belongs to the view, not to a place on the ground. */
+.tmc-map-chip {
+  position: absolute; left: calc(var(--app-nav-w) + 16px); top: 150px; z-index: 12;
+  max-width: 260px; padding: 8px 10px; border: 1px solid var(--ui-border); border-radius: 8px;
+  background: var(--ui-surface-solid); box-shadow: 0 8px 24px var(--ui-shadow-color);
+  color: var(--ui-text); pointer-events: none;
+}
+.tmc-map-chip[hidden] { display: none; }
+.tmc-map-chip-kicker { margin: 0; font-size: 9.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--ui-text-dim); }
+.tmc-map-chip-title { margin: 2px 0 0; font-size: 12px; font-weight: 600; }
+.tmc-map-key { margin-top: 6px; display: grid; gap: 2px; }
+.tmc-key { font-size: 10.5px; color: var(--ui-text-dim); display: flex; gap: 6px; align-items: center; }
+.tmc-key::before { content: ''; width: 12px; height: 3px; border-radius: 2px; background: var(--ui-text-dim); flex: none; }
+.tmc-key[data-swatch="incident"]::before { width: 7px; height: 7px; border-radius: 50%; background: #ee9148; }
+.tmc-key[data-swatch="affected"]::before { background: #ee9148; height: 4px; }
+.tmc-key[data-swatch="upstream"]::before { background: #ee914877; }
+.tmc-key[data-swatch="history"]::before { width: 7px; height: 7px; border-radius: 50%; background: #c7d2e0; }
+.tmc-key[data-swatch="area"]::before { background: #8aa0b8; height: 1px; }
+.tmc-key[data-swatch="resource"]::before { background: #6ea8ff; }
+.tmc-map-caveat { margin: 6px 0 0; font-size: 10px; line-height: 1.35; color: #e5bc57; }
+/* The map chip stays small; only a clicked location adds anything to it. */
+.tmc-map-chip { max-width: 250px; }
+.tmc-key[data-glyph]::before { width: 10px; height: 10px; border-radius: 0; background: var(--ui-text-dim);
+  -webkit-mask: var(--glyph) center/contain no-repeat; mask: var(--glyph) center/contain no-repeat; }
+.tmc-key[data-swatch="pattern"]::before { width: 9px; height: 9px; border-radius: 50%; background: #c7d2e0; }
+.tmc-key[data-swatch="concentration"]::before { background: #6ea8ff; height: 4px; }
+.tmc-key[data-swatch="context"]::before { width: 8px; height: 8px; border-radius: 50%; background: var(--swatch); }
+.tmc-place { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--ui-border); max-height: 42vh; overflow-y: auto; }
+.tmc-place-head { display: flex; justify-content: space-between; align-items: flex-start; }
+.tmc-place h4 { margin: 7px 0 3px; font-size: 10px; letter-spacing: .05em; text-transform: uppercase; color: var(--ui-text-dim); }
+.tmc-place .tmc-weather-grid { font-size: 11px; }
+.tmc-place .tmc-map-caveat { color: var(--ui-text-dim); }
+
+/* The camera / sign card: floats beside its own marker, independent of the incident panel. */
+.tmc-resource-card {
+  position: fixed; z-index: 14; width: 268px; max-height: 70vh; overflow-y: auto;
+  padding: 10px 12px; border: 1px solid var(--ui-border); border-radius: 10px;
+  background: var(--ui-surface-solid); box-shadow: 0 12px 32px var(--ui-shadow-color);
+  color: var(--ui-text); pointer-events: auto;
+}
+.tmc-resource-card[hidden] { display: none; }
+/* The head is the drag handle; its close button keeps the normal cursor. */
+.tmc-resource-card .tmc-place-head { cursor: grab; touch-action: none; user-select: none; }
+.tmc-resource-card .tmc-place-head button { cursor: pointer; }
+.tmc-resource-card.is-dragging { cursor: grabbing; box-shadow: 0 18px 44px var(--ui-shadow-color); }
+.tmc-resource-card.is-dragging .tmc-place-head { cursor: grabbing; }
+.tmc-resource-card .tmc-map-chip-title span { font-size: 10.5px; font-weight: 500; color: var(--ui-text-dim); }
+.tmc-resource-card .tmc-weather-grid { margin-top: 8px; font-size: 11px; }
+.tmc-snapshot { margin-top: 8px; border-radius: 7px; overflow: hidden; background: var(--ui-surface-raised); }
+.tmc-snapshot img { display: block; width: 100%; height: auto; }
+.tmc-snapshot-note { margin: 0; padding: 14px 10px; font-size: 11px; color: var(--ui-text-dim); text-align: center; }
+.tmc-weather[data-state="loading"] .tmc-weather-note { font-style: italic; }
+
+.tmc-block { margin-top: 14px; }
+.tmc-block h3 { margin: 0 0 6px; font-size: 12px; font-weight: 600; }
+.tmc-factors { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: 11.5px; }
+.tmc-factors .is-absent { color: var(--ui-text-dim); }
+.tmc-factors--unavailable { margin-top: 6px; color: var(--ui-text-dim); }
+.tmc-facts { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 11.5px; }
+.tmc-facts dt { color: var(--ui-text-dim); }
+.tmc-facts dd { margin: 0; }
+.tmc-resource { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; font-size: 11.5px; margin-bottom: 6px; }
+.tmc-resource-title { color: var(--ui-text-dim); min-width: 100%; }
+.tmc-resource-id { font-weight: 600; }
+.tmc-resource-distance, .tmc-resource-none { color: var(--ui-text-dim); }
+.tmc-resource-caveat { margin: 4px 0 0; font-size: 10.5px; color: var(--ui-text-dim); }
+.tmc-mitigation { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 11.5px; }
+.tmc-panel-foot { display: flex; gap: 8px; margin-top: 16px; }
+.tmc-action {
+  background: var(--ui-surface); border: 1px solid var(--ui-border); color: var(--ui-text);
+  border-radius: 6px; padding: 5px 10px; font-size: 11.5px; cursor: pointer; font-family: inherit;
+}
+.tmc-action:hover { border-color: var(--ui-accent); }
+
+/* Mode and moment, beside the TMC's KPIs — the place Live Ops puts its own History control. */
+/* These controls sit over photoreal imagery, which can be any colour. They carry their own
+   surface so the labels never have to compete with whatever is on the ground beneath them. */
+.tmc-when {
+  display: inline-flex; align-items: center; gap: 12px; margin-left: 12px;
+  padding: 4px 10px; border-radius: 8px;
+  background: var(--ui-surface-solid); border: 1px solid var(--ui-border);
+}
+.tmc-when-mode, .tmc-when-at { display: inline-flex; align-items: center; gap: 6px; }
+.tmc-when-label {
+  font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase;
+  font-weight: 600; color: var(--ui-text);
+}
+.tmc-when select, .tmc-when input[type="date"], .tmc-when input[type="datetime-local"] {
+  /* Without this the native date field and its drop-down render in the browser's light default,
+     which is the white box the dark strip was showing. */
+  color-scheme: dark;
+  background: var(--ui-surface); color: var(--ui-text); border: 1px solid var(--ui-border);
+  border-radius: 6px; padding: 3px 6px; font-size: 12px; font-family: inherit;
+}
+.tmc-when input[type="date"] { min-width: 132px; }
+.tmc-when input[type="datetime-local"] { min-width: 178px; }
+.tmc-when input[type="date"]::-webkit-calendar-picker-indicator,
+.tmc-when input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
+
+/* The replay marker. Always visible while replaying, never large enough to obscure the corridor. */
+.tmc-replay {
+  position: absolute; left: 50%; transform: translateX(-50%); top: 12px; z-index: 14;
+  display: inline-flex; align-items: center; gap: 8px; pointer-events: none;
+  padding: 4px 10px; border-radius: 999px; font-size: 11.5px;
+  background: var(--ui-surface-solid); border: 1px solid #ee9148; color: var(--ui-text);
+  box-shadow: 0 6px 18px var(--ui-shadow-color);
+}
+.tmc-replay[hidden] { display: none; }
+.tmc-replay-tag { font-weight: 600; color: #ee9148; letter-spacing: .04em; text-transform: uppercase; font-size: 10.5px; }
+.tmc-panel-when { margin: 2px 0 0; font-size: 11px; color: #ee9148; }
+.tmc-when[data-loading="true"] { opacity: .6; }

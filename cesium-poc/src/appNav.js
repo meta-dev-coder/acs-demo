@@ -21,6 +21,8 @@ const ICONS = Object.freeze({
   safety: '<path d="M10 3.2 4.6 5.4v4.1c0 3.2 2.2 6.1 5.4 7.3 3.2-1.2 5.4-4.1 5.4-7.3V5.4z"/><path d="m7.8 10.2 1.6 1.6 3-3.4"/>',
   // A radar sweep over the corridor: live watching, distinct from Traffic's road glyph.
   liveOps: '<circle cx="10" cy="10" r="6.8"/><circle cx="10" cy="10" r="2.6"/><path d="M10 10 14.8 5.2"/><path d="M10 3.2v1.6M10 15.2v1.6M3.2 10h1.6M15.2 10h1.6"/>',
+  // A monitor wall with a warning triangle: the TMC watches the corridor and warns about it.
+  tmc: '<rect x="2.6" y="4" width="14.8" height="9.4" rx="1.6"/><path d="M7.4 16.4h5.2M10 13.4v3"/><path d="M10 6.6 8 10.6h4z"/>',
   layers: '<path d="m10 3.2 6.6 3.4L10 10 3.4 6.6z"/><path d="m3.4 10 6.6 3.4L16.6 10"/><path d="m3.4 13.4 6.6 3.4 6.6-3.4"/>',
 });
 
@@ -30,6 +32,7 @@ export const NAV_SECTIONS = Object.freeze([
   Object.freeze({ id: 'maintenance', label: 'Maintenance', icon: 'maintenance' }),
   Object.freeze({ id: 'safety', label: 'Safety', icon: 'safety' }),
   Object.freeze({ id: 'liveOps', label: 'Live Ops', icon: 'liveOps' }),
+  Object.freeze({ id: 'tmc', label: 'TMC', icon: 'tmc' }),
 ]);
 
 /**
@@ -42,6 +45,7 @@ export const APP_ROLES = Object.freeze([
   { id: 'roadOperator', label: 'Road Operator', sections: ['liveOps'] },
   { id: 'maintenanceTeam', label: 'Maintenance Team', sections: ['maintenance'] },
   { id: 'agency', label: 'Agency', sections: ['safety'] },
+  { id: 'tmc', label: 'TMC', sections: ['tmc'] },
 ]);
 export const DEFAULT_SECTION = 'liveOps';
 export const resolveRole = id => APP_ROLES.find(role => role.id === id) ?? APP_ROLES[0];

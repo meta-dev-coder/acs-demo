@@ -126,6 +126,7 @@ export function installWorkspaceStrip(host, { cards, label, onSelect }) {
     setSource(text, { live = false, warning = false, title = null } = {}) {
       const source = root.querySelector('[data-source]');
       source.textContent = sourceLabelText(text, { warning });
+      source.hidden = !source.textContent;
       source.dataset.live = String(live);
       source.dataset.warning = String(warning);
       const full = title ?? source.textContent;

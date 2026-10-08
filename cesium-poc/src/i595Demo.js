@@ -38,6 +38,7 @@ import { installMaintenanceLayer } from "./maintenance/maintenanceLayer.js";
 import { installMaintenanceWorkspace } from "./maintenance/maintenanceWorkspace.js";
 import { safetyMaintenance, installSafetyWorkspace, installTrafficWorkspace } from "./safetyWorkspace.js";
 import { installLiveOpsWorkspace } from "./liveOps/liveOpsWorkspace.js";
+import { installTmcWorkspace } from "./tmc/tmcWorkspace.js";
 import { getTrafficColor } from "./corridorVisualConfig.js";
 import { installI595RoadShields } from "./i595RoadShields.js";
 import { installI595ContextLabels } from "./i595ContextLabels.js";
@@ -476,8 +477,25 @@ try {
     orientation: orientationOf(opsView), duration: 1.6,
   });
   /** The workspaces that open on the whole corridor rather than on whatever the camera was doing. */
-  const CORRIDOR_VIEW_SECTIONS = new Set(["liveOps", "maintenance", "safety"]);
-  const workspaces = { maintenance, safety, traffic, liveOps };
+  // The TMC reads the same live feed and the same corridor geometry every other screen does; it
+  // adds its own question on top rather than its own data.
+  const tmc = installTmcWorkspace({
+    viewer, liveEvents: liveEventControls, segments: mainlineSegments, centerline: corridor,
+    cameras: cameraControls, signs: messageSignControls,
+    // The live feed only reaches back as far as the sync has been running; the incident register
+    // goes back years. Historical dates read both.
+    maintenance,
+    // The TMC colours the incident's own stretch of road, so it switches the corridor's colouring
+    // off through the same store the Explorer reads — the checkboxes clear with it.
+    layerStore,
+    corridorStatus,
+    resetView: () => flyToOperationsView(),
+  });
+  // Choosing an incident changes which questions are worth asking, so the chat's suggestions follow
+  // the selection rather than only the screen.
+  tmc.onSelectionChange(() => askTwin?.refreshSuggestions?.());
+  const CORRIDOR_VIEW_SECTIONS = new Set(["liveOps", "maintenance", "safety", "tmc"]);
+  const workspaces = { maintenance, safety, traffic, liveOps, tmc };
   appNav.onSelect(async section => {
     eventPulses.setActive(section === "liveOps");
     maintenancePulses.setActive(section === "maintenance");
@@ -508,7 +526,7 @@ try {
   if (CORRIDOR_VIEW_SECTIONS.has(appNav.section)) void startupSettled.then(() => flyToOperationsView());
   eventPulses.setActive(appNav.section === "liveOps");
   maintenancePulses.setActive(appNav.section === "maintenance");
-  if (import.meta.env.DEV) { window.__maintenance = maintenance; window.__safety = safety; window.__traffic = traffic; window.__liveOps = liveOps; window.__liveEvents = liveEventControls; window.__layerStore = layerStore; window.__segments = mainlineSegments; }
+  if (import.meta.env.DEV) { window.__maintenance = maintenance; window.__safety = safety; window.__traffic = traffic; window.__liveOps = liveOps; window.__tmc = tmc; window.__liveEvents = liveEventControls; window.__layerStore = layerStore; window.__segments = mainlineSegments; }
 
   explorerToggle = document.querySelector("#menu-toggle");
   // A fresh load opens on the map, not on the layer tree; the quick rail keeps the common
@@ -521,11 +539,14 @@ try {
     // What a drawn area reports on: the events the map already holds, the maintenance the workspace
     // already loaded, and the asset registry that gives a work order its position.
     liveEvents: liveEventControls,
+    // The TMC's deterministic risk service, so "which incident is riskiest" is answered by the
+    // same ranking the screen shows rather than by the model reading raw incidents.
+    tmc,
     maintenanceRecords: assetType => maintenanceWorkspace?.recordsForType(assetType) ?? [],
     assetIndex: () => maintenanceWorkspace?.assetIndex?.() ?? new Map(),
   });
   if (import.meta.env.DEV) window.__askTwin = askTwin;
-  if (import.meta.hot) import.meta.hot.dispose(() => { maintenancePulses.destroy(); eventPulses.destroy(); liveOps.destroy(); traffic.destroy(); safety.destroy(); maintenance.destroy(); maintenanceLayer.destroy(); appNav.destroy(); assetExplorer.destroy(); lightingControls.destroy(); messageSignControls.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
+  if (import.meta.hot) import.meta.hot.dispose(() => { maintenancePulses.destroy(); eventPulses.destroy(); tmc.destroy(); liveOps.destroy(); traffic.destroy(); safety.destroy(); maintenance.destroy(); maintenanceLayer.destroy(); appNav.destroy(); assetExplorer.destroy(); lightingControls.destroy(); messageSignControls.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
   for (const input of inputs) {
     // Layers with their own loader, plus display options that are not data layers at all: this loop
     // fetches `data/<id>.geojson`, and "flow-direction" has no such file — being swept up here

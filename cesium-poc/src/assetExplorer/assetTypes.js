@@ -9,6 +9,8 @@
  * absent is reported as absent — nothing here invents a value to fill a row.
  */
 import { corridorPositionOf } from './corridorPosition.js';
+// `field` resolves a DataConnect row's own columns, which live under raw.attributes.
+import { field } from '../maintenance/maintenanceRecords.js';
 import { clearedAtLabel, clearedDateKey, LIVE_EVENT_LABELS } from '../liveEventsData.js';
 import EVENT_FIELDS from '../../config/liveDc/eventFields.json' with { type: 'json' };
 
@@ -212,6 +214,20 @@ export function valueFilters(assets, { group, prefix, read, counted = assets }) 
     }));
 }
 
+/**
+ * The three inspection forms the register carries.
+ *
+ * The family is already each record's title; this makes it something to narrow by. The corridor's
+ * inspections are mostly ITS (1,046 of 1,582), so looking at the roadway safety ones meant reading
+ * past two thirds of the list. The names are the register's own — "ITS Asset Inspection V3" — rather
+ * than tidied-up labels, so what is picked here matches what the card underneath says.
+ */
+export const inspectionFamilyFilters = (assets, counted) =>
+  valueFilters(assets, {
+    group: 'Inspection form', prefix: 'inspection-family', counted,
+    read: item => field(item.raw ?? item, 'inspection_form_family'),
+  });
+
 /** The crash taxonomy the incident class carries — "Multi-vehicle crash", "Rear-end crash", … */
 export const incidentTypeFilters = (assets, counted) =>
   valueFilters(assets, { group: 'Incident type', prefix: 'incident-type', read: item => item.title, counted });
@@ -377,6 +393,9 @@ export const ASSET_TYPES = Object.freeze({
   }),
   inspection: MAINTENANCE_TYPE({
     id: 'inspection', label: 'Inspections', singular: 'Inspection', icon: 'inspection', dateLabel: 'Inspected',
+    // ITS, Roadway Safety and Post-Incident are three different forms in one list; the family is
+    // the first thing an inspector narrows by.
+    extraFilters: inspectionFamilyFilters,
     statusTone: item => {
       const status = text(item.status);
       if (!status) return null;
