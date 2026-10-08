@@ -539,3 +539,158 @@ export function leaderLine({ height = 40, color = 'rgba(199, 210, 224, 0.75)' } 
   cache.set(key, made);
   return made;
 }
+
+/**
+ * A simulated patrol vehicle.
+ *
+ * Status is carried by SHAPE as well as colour — a bar for busy, a slash for out of service, a
+ * chevron for moving — so the distinction survives a colour-blind viewer, a greyscale print and
+ * the washed-out contrast of photoreal imagery under direct sun.
+ *
+ * The body is small by design: five of these sit on a corridor already carrying an incident, its
+ * camera and its sign, and a large vehicle icon would bury the thing being investigated.
+ */
+export function patrolMarker({ status = 'AVAILABLE', color = '#14b8a6', selected = false, simulated = true }) {
+  const key = `patrol:${status}:${color}:${selected}:${simulated}:${DPR()}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+
+  const width = 30;
+  const height = 24;
+  const { canvas, ctx } = canvasOf(width, height);
+  const bodyW = 22, bodyH = 14;
+  const x = (width - bodyW) / 2, y = 3;
+
+  if (selected) {
+    ctx.fillStyle = 'rgba(245, 181, 27, 0.28)';
+    roundRect(ctx, x - 3, y - 3, bodyW + 6, bodyH + 6, 6);
+    ctx.fill();
+  }
+
+  // The vehicle body.
+  ctx.fillStyle = color;
+  ctx.strokeStyle = selected ? '#F5B51B' : 'rgba(255,255,255,0.92)';
+  ctx.lineWidth = selected ? 2.2 : 1.5;
+  roundRect(ctx, x, y, bodyW, bodyH, 3.5);
+  ctx.fill();
+  // A dashed outline says "not a real vehicle" before any label is read.
+  if (simulated) { ctx.save(); ctx.setLineDash([3, 2]); ctx.stroke(); ctx.restore(); } else ctx.stroke();
+
+  // The status glyph, in the body.
+  ctx.save();
+  ctx.strokeStyle = '#0b1220';
+  ctx.fillStyle = '#0b1220';
+  ctx.lineWidth = 1.8;
+  ctx.lineCap = 'round';
+  const cx = width / 2, cy = y + bodyH / 2;
+  if (status === 'BUSY') {
+    ctx.beginPath(); ctx.moveTo(cx - 3, cy - 3.5); ctx.lineTo(cx - 3, cy + 3.5);
+    ctx.moveTo(cx + 3, cy - 3.5); ctx.lineTo(cx + 3, cy + 3.5); ctx.stroke();
+  } else if (status === 'OUT_OF_SERVICE') {
+    ctx.beginPath(); ctx.moveTo(cx - 4, cy + 4); ctx.lineTo(cx + 4, cy - 4); ctx.stroke();
+  } else if (status === 'ON_SCENE' || status === 'SCENE_WORK') {
+    ctx.beginPath(); ctx.arc(cx, cy, 3.2, 0, Math.PI * 2); ctx.fill();
+  } else if (status === 'DISPATCHED' || status === 'EN_ROUTE') {
+    ctx.beginPath(); ctx.moveTo(cx - 4, cy - 3.5); ctx.lineTo(cx + 2, cy); ctx.lineTo(cx - 4, cy + 3.5);
+    ctx.moveTo(cx + 1, cy - 3.5); ctx.lineTo(cx + 5, cy); ctx.lineTo(cx + 1, cy + 3.5); ctx.stroke();
+  } else {
+    // Available: a tick, the only glyph that reads as "ready".
+    ctx.beginPath(); ctx.moveTo(cx - 4, cy); ctx.lineTo(cx - 1, cy + 3); ctx.lineTo(cx + 4.5, cy - 3.5); ctx.stroke();
+  }
+  ctx.restore();
+
+  // The stem down to the road surface.
+  ctx.strokeStyle = `${color}cc`;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(width / 2, y + bodyH);
+  ctx.lineTo(width / 2, height - 2);
+  ctx.stroke();
+
+  const made = { image: canvas, width, height };
+  cache.set(key, made);
+  return made;
+}
+
+/**
+ * The upstream end of a simulated queue.
+ *
+ * Deliberately unlike the incident marker: a hollow ring with a back-pointing chevron, amber, on a
+ * stem. An operator must never confuse "where the crash is" with "how far back the traffic is
+ * stopped", and those are the two most important points on this map.
+ */
+export function queueTailMarker({ label = null, sub = null, selected = false }) {
+  const key = `queuetail:${label}:${sub}:${selected}:${DPR()}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+
+  const radius = 13;
+  const stem = 26;
+  const width = radius * 2 + 10;
+  const height = stem + radius * 2 + 8;
+  const { canvas, ctx } = canvasOf(width, height);
+  const x = width / 2;
+  const cy = radius + 3;
+  const tone = '#F5B51B';
+
+  // The stem down to the road.
+  ctx.strokeStyle = `${tone}cc`;
+  ctx.lineWidth = 1.6;
+  ctx.setLineDash([4, 3]);
+  ctx.beginPath();
+  ctx.moveTo(x, cy + radius);
+  ctx.lineTo(x, height - 3);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // A hollow ring, not a filled disc: the incident owns the filled disc.
+  ctx.fillStyle = 'rgba(12, 19, 31, 0.92)';
+  ctx.beginPath();
+  ctx.arc(x, cy, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = selected ? '#ffffff' : tone;
+  ctx.lineWidth = selected ? 3 : 2.4;
+  ctx.stroke();
+
+  // A chevron pointing back upstream — the direction the queue is growing.
+  ctx.strokeStyle = tone;
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x + 3.5, cy - 4.5);
+  ctx.lineTo(x - 3, cy);
+  ctx.lineTo(x + 3.5, cy + 4.5);
+  ctx.stroke();
+
+  const made = { image: canvas, width, height };
+  cache.set(key, made);
+  return made;
+}
+
+/**
+ * A small directional arrow for the upstream approach.
+ *
+ * Drawn as repeated billboards along the resolved sections rather than as one long polyline arrow,
+ * so the direction reads at every zoom instead of only where the arrowhead happens to be.
+ */
+export function approachArrow({ color = '#3b82f6', size = 16 } = {}) {
+  const key = `approach:${color}:${size}:${DPR()}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const { canvas, ctx } = canvasOf(size, size);
+  const half = size / 2;
+  ctx.fillStyle = color;
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(half + half * 0.62, half);
+  ctx.lineTo(half - half * 0.5, half - half * 0.62);
+  ctx.lineTo(half - half * 0.2, half);
+  ctx.lineTo(half - half * 0.5, half + half * 0.62);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  const made = { image: canvas, width: size, height: size };
+  cache.set(key, made);
+  return made;
+}

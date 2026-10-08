@@ -20,13 +20,51 @@ import {
 import { installWorkspaceStrip, WORKSPACE_ICONS } from '../workspaceStrip.js';
 import { assetPinMarker } from '../assetIdMarker.js';
 import { cameraDetails, getCameraStreamUrl } from '../cctvCameras.js';
-import { CARRIAGEWAY_SHORT } from '../liveOps/carriagewayModel.js';
-import { UPSTREAM_STATUS } from './upstreamResolver.js';
+import { CARRIAGEWAYS, CARRIAGEWAY_SHORT } from '../liveOps/carriagewayModel.js';
+import { UPSTREAM_STATUS, upstreamStep } from './upstreamResolver.js';
 import { assessCorridor, TMC_FILTERS } from './tmcService.js';
 import { upstreamLabel } from './tmcResources.js';
 import { countOfType } from './tmcAnswers.js';
 import { framedDestination } from '../cameraFraming.js';
 import { registerIncidents } from './registerIncidents.js';
+import { createSimulatedPatrolProvider } from './patrol/simulatedPatrolProvider.js';
+import { assessUpstreamProtection, OBSERVATION } from './upstreamProtection/upstreamProtectionService.js';
+import {
+  compareWarningScenarios, simulatedQueueMetersAt, WARNING_ASSUMPTION_LABELS, WARNING_ASSUMPTIONS,
+} from './upstreamProtection/warningScenario.js';
+
+/**
+ * What the Response lens is emphasising.
+ *
+ * Map-focus states, not tabs. The incident stays visible in every one of them — it is the anchor
+ * the whole investigation hangs on — and the others are drawn dimmer rather than removed.
+ */
+/**
+ * Whether the queue playback controls are offered.
+ *
+ * Off for now, at the user's request — the scenario, its deterministic clock, the tail movement
+ * and both playback surfaces are all still here and tested; only the controls are withheld. The
+ * simulated queue itself still draws, at the configured activation minute, so Queue focus is
+ * unchanged. Flip this back to true to bring the bar and the panel slider back.
+ */
+const QUEUE_PLAYBACK_ENABLED = false;
+
+export const RESPONSE_FOCUS = Object.freeze({
+  INCIDENT: 'INCIDENT',
+  UPSTREAM: 'UPSTREAM',
+  PATROLS: 'PATROLS',
+  QUEUE: 'QUEUE',
+  WARNING: 'WARNING',
+  RESPONSE_SCENARIO: 'RESPONSE_SCENARIO',
+});
+import { createPatrolMapLayer } from './patrol/patrolMapLayer.js';
+import { createUpstreamProtectionMapLayer } from './upstreamProtection/upstreamProtectionMapLayer.js';
+import { simulatedQueueGeometry } from './upstreamProtection/queueGeometry.js';
+import { buildResponseScenario, compareDispatchScenarios } from './patrol/patrolDispatch.js';
+import {
+  PATROL_CONFIG, PATROL_STATUS_COLORS, PATROL_STATUS_LABELS, ROUTE_CONFIDENCE_LABELS,
+  SIMULATION_BADGE, SIMULATION_DISCLAIMER,
+} from './patrol/patrolConfig.js';
 import { createHistoricalWeatherService, localClockLabel } from '../weather/historicalWeather.js';
 import { crashInstant, filteredMatches, HISTORY_FILTERS, matchesHistoryFilter } from './historicalLocationSafety.js';
 import {
@@ -39,13 +77,14 @@ import {
   describeRoadMatch, matchIncidentRoad, ROAD_PAINT_CONFIG, roadPaintSlice, roadsFromGeoJson,
 } from './incidentRoadMatch.js';
 import { dateKeyOf } from './temporalContext.js';
-import { corridorPositionOf } from '../assetExplorer/corridorPosition.js';
+import { corridorPositionOf, metresBetween } from '../assetExplorer/corridorPosition.js';
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AssetMiniMap } from '../assetExplorer/AssetMiniMap.jsx';
 import { canAskTheTwin } from '../askTheTwinBridge.js';
 import {
-  dateLabel, describeTemporal, historicalDate, isHistorical, liveContext, recordedDates, reportedDateKey, timeLabel,
+  dateLabel, describeTemporal, historicalDate, incidentAnchor, isHistorical, liveContext, recordedDates,
+  reportedDateKey, timeLabel,
 } from './temporalContext.js';
 
 /** The KPI cards, in the order an operator reads them: what is happening, then what is worrying. */
@@ -142,6 +181,167 @@ export function installTmcWorkspace({
   mapChipEl.hidden = true;
   root.append(mapChipEl);
 
+  /**
+   * The Response map toolbar.
+   *
+   * The focus states existed but only the code could reach them — an operator had no way to
+   * discover that the map could show the upstream approach, the queue or the patrols, let alone
+   * switch between them. This is the control surface for state that was already there; it holds no
+   * state of its own and reads RESPONSE_FOCUS directly.
+   */
+  /**
+   * The queue playback bar, on the map.
+   *
+   * It lived in the Response panel below the fold, so an operator had to scroll a side panel to
+   * drive an animation happening on the map. It belongs next to the thing it moves. Positioned
+   * above the corridor slider and clear of Ask the Twin.
+   */
+  const mapPlayback = document.createElement('div');
+  mapPlayback.className = 'tmc-map-playback';
+  mapPlayback.hidden = true;
+  root.append(mapPlayback);
+
+  const mapToolbar = document.createElement('div');
+  mapToolbar.className = 'tmc-map-toolbar';
+  mapToolbar.hidden = true;
+  mapToolbar.setAttribute('role', 'group');
+  mapToolbar.setAttribute('aria-label', 'Response map focus');
+  // Beside Mode and Date, in the same control bar: these are all "what am I looking at" controls,
+  // and stacking them separately made the map focus read as a floating legend rather than a
+  // control. Appended to `when` so the two move together at any width.
+  when.append(mapToolbar);
+
+  /** Each focus, with the one condition that makes it meaningful. */
+  const FOCUS_BUTTONS = Object.freeze([
+    { focus: RESPONSE_FOCUS.INCIDENT, label: 'Incident', icon: 'incident', available: () => true },
+    { focus: RESPONSE_FOCUS.UPSTREAM, label: 'Upstream', icon: 'congestion',
+      available: entry => Boolean(upstreamProtectionFor(entry)?.upstreamResolution.resolved),
+      why: 'The upstream approach could not be resolved for this incident.' },
+    { focus: RESPONSE_FOCUS.PATROLS, label: 'Patrols', icon: 'disabledVehicle',
+      available: entry => Boolean(patrolScenarioFor(entry)),
+      why: 'Patrol simulation runs on a historical date with an incident open.' },
+    { focus: RESPONSE_FOCUS.QUEUE, label: 'Queue', icon: 'closure',
+      available: entry => Boolean(upstreamProtectionFor(entry)?.upstreamResolution.resolved),
+      why: 'A simulated queue needs a resolved approach to run back along.' },
+    { focus: RESPONSE_FOCUS.WARNING, label: 'Warnings', icon: 'damagedAsset',
+      available: entry => Boolean(upstreamProtectionFor(entry)?.nearestDms
+        || upstreamProtectionFor(entry)?.nearestCamera),
+      why: 'No upstream DMS or camera resolved for this incident.' },
+  ]);
+
+  /** The playback bar. Shown only while a simulated queue is actually on the map. */
+  function renderMapPlayback(entry) {
+    if (!QUEUE_PLAYBACK_ENABLED) { mapPlayback.hidden = true; paint(mapPlayback, ''); return; }
+    const live = entry && activeTab === 'response' && simulatedQueueVisible && warningScenarioOpen;
+    const queue = live ? queueGeometryFor(entry) : null;
+    if (!queue?.resolved) { mapPlayback.hidden = true; paint(mapPlayback, ''); return; }
+    const maximum = WARNING_ASSUMPTIONS.incidentDurationMinutes;
+    mapPlayback.hidden = false;
+    /**
+     * Built WITHOUT the values that move.
+     *
+     * The minute, the play label, the slider position and the extent are written in place by
+     * updatePlaybackReadout. Baking them into this markup meant every tick produced different
+     * HTML, so the whole bar was rebuilt once a second — replacing the slider mid-drag and
+     * blinking the control the operator was using. The structure is now constant.
+     */
+    const markup = `
+      <div class="tmc-mp-head">
+        <span class="tmc-mp-kicker">Simulated queue playback <em class="tmc-sim-badge">${SIMULATION_BADGE}</em></span>
+        <span class="tmc-mp-at" data-mp-at></span>
+      </div>
+      <div class="tmc-mp-row">
+        <button type="button" class="tmc-action" data-action="queue-play" data-mp-play></button>
+        <button type="button" class="tmc-action" data-action="queue-reset">↺ Reset</button>
+        <input type="range" class="tmc-mp-slider" data-mp-slider min="0" max="${maximum}" step="1"
+          aria-label="Simulated minutes after the incident">
+        <span class="tmc-mp-extent" data-mp-extent></span>
+      </div>
+      <div class="tmc-mp-foot">
+        <span>0 min</span>
+        <span data-mp-note></span>
+        <span>${maximum} min</span>
+      </div>`;
+    // Unchanged structure: write only the numbers and leave the elements alone.
+    if (!paint(mapPlayback, markup)) { updatePlaybackReadout(entry); return; }
+    mapPlayback.querySelector('[data-action="queue-play"]').onclick = () => {
+      if (playbackTimer === null) startPlayback(entry); else stopPlayback();
+      updatePlaybackReadout(entry);
+    };
+    mapPlayback.querySelector('[data-action="queue-reset"]').onclick = () => {
+      stopPlayback(); scenarioMinutes = 0; drawUpstream(entry, { chrome: false }); updatePlaybackReadout(entry);
+    };
+    mapPlayback.querySelector('[data-mp-slider]').oninput = event => {
+      stopPlayback();
+      scenarioMinutes = Number(event.target.value);
+      drawUpstream(entry, { chrome: false });
+      updatePlaybackReadout(entry);
+    };
+    updatePlaybackReadout(entry);
+  }
+
+  /**
+   * The last markup each overlay was given.
+   *
+   * Rebuilding innerHTML destroys and recreates every child, which the eye sees as a blink. During
+   * playback the toolbar and the legend were being rebuilt on every tick — seven times in five
+   * seconds — even though their content had not changed at all. Comparing the markup first makes a
+   * redundant render free and, more importantly, invisible.
+   */
+  const lastMarkup = new Map();
+  function paint(element, html) {
+    if (lastMarkup.get(element) === html) return false;
+    lastMarkup.set(element, html);
+    element.innerHTML = html;
+    return true;
+  }
+
+  function renderMapToolbar(entry) {
+    // Only in the Response investigation: Overview and History have their own map language.
+    if (!entry || activeTab !== 'response') { mapToolbar.hidden = true; paint(mapToolbar, ''); return; }
+    mapToolbar.hidden = false;
+    const markup = `
+      <span class="tmc-map-toolbar-kicker">Response map</span>
+      <div class="tmc-map-toolbar-row">
+        ${FOCUS_BUTTONS.map(button => {
+          const can = button.available(entry);
+          const active = responseFocus === button.focus;
+          return `<button type="button" data-focus="${button.focus}"
+            class="tmc-focus-btn${active ? ' is-active' : ''}"
+            aria-pressed="${active}" ${can ? '' : 'disabled'}
+            title="${escape(can ? button.label : button.why)}">
+            <span class="tmc-focus-icon" aria-hidden="true">${WORKSPACE_ICONS[button.icon] ?? ''}</span>
+            <span>${escape(button.label)}</span></button>`;
+        }).join('')}
+      </div>`;
+    // Handlers are re-attached only when the markup actually changed, because only then are the
+    // buttons new elements.
+    if (!paint(mapToolbar, markup)) return;
+    for (const button of mapToolbar.querySelectorAll('[data-focus]')) {
+      button.onclick = () => chooseFocus(button.dataset.focus, entry);
+    }
+  }
+
+  /**
+   * Switch focus from the toolbar.
+   *
+   * Queue and Warnings need their scenario open to show anything, so choosing them opens it — but
+   * the simulated queue itself is still never enabled without an explicit act, which is what
+   * clicking "Queue" is.
+   */
+  function chooseFocus(focus, entry) {
+    if (focus === RESPONSE_FOCUS.QUEUE) {
+      warningScenarioOpen = true;
+      simulatedQueueVisible = true;
+    } else if (focus === RESPONSE_FOCUS.WARNING) {
+      warningScenarioOpen = true;
+    } else if (focus === RESPONSE_FOCUS.PATROLS) {
+      patrolVisible = true;
+    }
+    renderPanel();
+    setResponseFocus(focus, entry);
+  }
+
   function renderMapChip(entry) {
     // An open context event is worth showing on its own: an operator can click a closure before
     // choosing any incident, and the chip is where its summary lives.
@@ -153,7 +353,7 @@ export function installTmcWorkspace({
       mapChipEl.style.pointerEvents = 'auto';
       return;
     }
-    if (!entry) { mapChipEl.hidden = true; mapChipEl.innerHTML = ''; return; }
+    if (!entry) { mapChipEl.hidden = true; paint(mapChipEl, ''); return; }
 
     /**
      * One small chip, carrying only what is SPATIAL.
@@ -196,12 +396,28 @@ export function installTmcWorkspace({
         key('area', `${entry.locationHistory.analysisWindow.distanceMeters} m analysis area`);
       }
     } else if (activeTab === 'response') {
+      /**
+       * ONE chip for the response lens, carrying the simulated-data disclosure.
+       *
+       * The patrol layer used to float its own "SIMULATED PATROL DATA" banner over the incident,
+       * which both repeated what the Response tab says directly above the toggle and covered the
+       * incident's own callout. The disclosure is not dropped — it moves here, into the single
+       * chip the workspace already owns, so there is one legend rather than two competing labels.
+       */
       kicker = 'Response context';
-      title = entry.resources.camera || entry.resources.sign
-        ? 'Nearest upstream resources' : 'No upstream resources resolved';
+      const parts = [];
+      if (patrolVisible) parts.push('simulated patrols');
+      if (simulatedQueueVisible && warningScenarioOpen) parts.push('simulated queue');
+      title = parts.length
+        ? `Simulated: ${parts.join(' · ')}`
+        : (entry.resources.camera || entry.resources.sign
+          ? 'Nearest upstream resources' : 'No upstream resources resolved');
       key('incident', 'Selected incident');
       key('affected', 'Incident vicinity');
       if (entry.resources.camera || entry.resources.sign) key('resource', 'Camera / DMS');
+      if (upstreamLayer?.dataSource?.entities?.values?.length) key('upstream', 'Upstream approach');
+      if (patrolVisible) key('context', 'Simulated patrol');
+      if (simulatedQueueVisible && warningScenarioOpen) key('concentration', 'Simulated queue — hypothetical');
     } else {
       key('incident', 'Selected incident');
       const road = roadMatchFor(entry.incident);
@@ -230,12 +446,12 @@ export function installTmcWorkspace({
     }
 
     mapChipEl.hidden = false;
-    mapChipEl.innerHTML = `<p class="tmc-map-chip-kicker">${escape(kicker)}</p>
+    paint(mapChipEl, `<p class="tmc-map-chip-kicker">${escape(kicker)}</p>
       <p class="tmc-map-chip-title">${escape(title)}</p>
       ${legend.length ? `<div class="tmc-map-key">${legend.join('')}</div>` : ''}
       ${notes.map(text => `<p class="tmc-map-caveat">${escape(text)}</p>`).join('')}
       ${openPlace ? placeSummary(openPlace) : ''}
-      ${openEvent ? eventSummary(openEvent) : ''}`;
+      ${openEvent ? eventSummary(openEvent) : ''}`);
     const close = mapChipEl.querySelector('[data-action="close-place"]');
     if (close) close.onclick = () => { openPlace = null; renderMapChip(selected()); };
     const closeEvent = mapChipEl.querySelector('[data-action="close-event"]');
@@ -359,6 +575,25 @@ export function installTmcWorkspace({
   resourceCard.className = 'tmc-resource-card';
   resourceCard.hidden = true;
   root.append(resourceCard);
+  /**
+   * The simulated patrol's own card.
+   *
+   * A SECOND floating card, not the resource card: clicking a patrol must leave both the incident
+   * panel and any open camera exactly as they were. Looking at a responder is not a new
+   * investigation.
+   */
+  const patrolCard = document.createElement('div');
+  patrolCard.className = 'tmc-resource-card tmc-patrol-card';
+  patrolCard.hidden = true;
+  root.append(patrolCard);
+  let patrolCardAt = null;
+
+  function closePatrolCard() {
+    patrolCard.hidden = true;
+    patrolCard.innerHTML = '';
+    patrolCardAt = null;
+  }
+
   /** The snapshot refresh, cleared whenever the card closes — a stray interval leaks requests. */
   let snapshotTimer = null;
 
@@ -376,28 +611,29 @@ export function installTmcWorkspace({
    * the card covers is the map, and only the operator knows what they need to see. Once dragged it
    * stops following, because a card that snapped back would undo the move on the next camera tick.
    */
-  function makeResourceCardDraggable(handle) {
+  function makeCardDraggable(handle, card, onMove) {
     handle.addEventListener('pointerdown', event => {
       if (event.button !== 0 || event.target.closest('button')) return;
-      const box = resourceCard.getBoundingClientRect();
+      const box = card.getBoundingClientRect();
       const grabX = event.clientX - box.left;
       const grabY = event.clientY - box.top;
       handle.setPointerCapture(event.pointerId);
-      resourceCard.classList.add('is-dragging');
+      card.classList.add('is-dragging');
       const move = moved => {
         const pad = 8;
-        resourceCardAt = {
+        const at = {
           x: Math.min(window.innerWidth - box.width - pad, Math.max(pad, moved.clientX - grabX)),
           y: Math.min(window.innerHeight - box.height - pad, Math.max(pad, moved.clientY - grabY)),
         };
-        resourceCard.style.left = `${Math.round(resourceCardAt.x)}px`;
-        resourceCard.style.top = `${Math.round(resourceCardAt.y)}px`;
+        onMove(at);
+        card.style.left = `${Math.round(at.x)}px`;
+        card.style.top = `${Math.round(at.y)}px`;
       };
       const up = () => {
         handle.removeEventListener('pointermove', move);
         handle.removeEventListener('pointerup', up);
         handle.removeEventListener('pointercancel', up);
-        resourceCard.classList.remove('is-dragging');
+        card.classList.remove('is-dragging');
       };
       handle.addEventListener('pointermove', move);
       handle.addEventListener('pointerup', up);
@@ -405,6 +641,9 @@ export function installTmcWorkspace({
       event.preventDefault();
     });
   }
+
+  const makeResourceCardDraggable = handle =>
+    makeCardDraggable(handle, resourceCard, at => { resourceCardAt = at; });
 
   function closeResourceCard() {
     stopSnapshot();
@@ -495,6 +734,92 @@ export function installTmcWorkspace({
     const y = Math.min(window.innerHeight - box.height - pad, Math.max(pad, screen.y - box.height / 2));
     resourceCard.style.left = `${Math.round(x)}px`;
     resourceCard.style.top = `${Math.round(y)}px`;
+  }
+
+  /**
+   * Open the selected patrol's card beside its marker.
+   *
+   * Every row is simulated except the incident it refers to, and the card says so in its header
+   * rather than relying on the section it came from.
+   */
+  function openPatrolCard(entry) {
+    const option = selectedPatrolOption(entry);
+    if (!option) { closePatrolCard(); return; }
+    const patrol = option.patrol;
+    const route = option.route;
+    const eta = etaText(option);
+    const rows = [
+      ['Status', PATROL_STATUS_LABELS[patrol.status] ?? patrol.status],
+      ['Service area', patrol.serviceArea],
+      ['Assigned route', patrol.assignedRoute],
+      ['Simulation time', timeLabel(patrol.simulationTimestamp)],
+      ['Travel ETA', eta ?? 'Unavailable'],
+      ['Route confidence', ROUTE_CONFIDENCE_LABELS[route?.confidence] ?? 'Unresolved'],
+      ['Source', 'Simulated — not FDOT AVL'],
+    ];
+    patrolCard.hidden = false;
+    patrolCard.innerHTML = `
+      <div class="tmc-place-head">
+        <p class="tmc-map-chip-kicker">Simulated patrol</p>
+        <button type="button" class="tmc-panel-close" data-action="close-patrol"
+          aria-label="Close ${escape(patrol.id)}">&#10005;</button>
+      </div>
+      <p class="tmc-map-chip-title">${escape(patrol.id)} <span class="tmc-sim-badge">${SIMULATION_BADGE}</span></p>
+      <div class="tmc-weather-grid">
+        ${rows.map(([label, value]) =>
+          `<div><span>${escape(label)}</span><strong>${escape(String(value))}</strong></div>`).join('')}
+      </div>
+      ${route?.resolved
+        ? `<div class="tmc-patrol-actions">
+             <button type="button" class="tmc-action" data-action="patrol-route">View route</button>
+             <button type="button" class="tmc-action" data-action="patrol-compare">Compare</button>
+             <button type="button" class="tmc-action" data-action="to-incident">Back to incident</button>
+           </div>`
+        : `<p class="tmc-patrol-why">Patrol route unavailable — ${escape(route?.reason ?? 'road connectivity unresolved')}.</p>
+           <div class="tmc-patrol-actions">
+             <button type="button" class="tmc-action" data-action="to-incident">Back to incident</button>
+           </div>`}
+      <p class="tmc-map-caveat">${SIMULATION_DISCLAIMER}</p>`;
+
+    patrolCard.querySelector('[data-action="close-patrol"]').onclick = () => {
+      selectedPatrolId = null; closePatrolCard(); renderPanel(); drawPatrols(selected());
+    };
+    for (const button of patrolCard.querySelectorAll('[data-action]')) {
+      const what = button.getAttribute('data-action');
+      if (what === 'close-patrol') continue;
+      button.onclick = () => {
+        const current = selected();
+        if (what === 'patrol-route') focusPatrolRoute(current);
+        else if (what === 'patrol-compare') comparePatrols(current);
+        else if (what === 'to-incident') { closePatrolCard(); selectedPatrolId = null; renderPanel(); drawPatrols(current); restoreView(current); }
+      };
+    }
+    makeCardDraggable(patrolCard.querySelector('.tmc-place-head'), patrolCard, at => { patrolCardAt = at; });
+    positionPatrolCard();
+  }
+
+  /** Beside its marker, unless the operator has dragged it somewhere else. */
+  function positionPatrolCard() {
+    if (patrolCard.hidden || !viewer?.scene) return;
+    if (patrolCardAt) {
+      patrolCard.style.left = `${Math.round(patrolCardAt.x)}px`;
+      patrolCard.style.top = `${Math.round(patrolCardAt.y)}px`;
+      return;
+    }
+    const option = selectedPatrolOption(selected());
+    if (!option) return;
+    const screen = viewer.scene.cartesianToCanvasCoordinates(
+      Cartesian3.fromDegrees(option.patrol.longitude, option.patrol.latitude));
+    if (!screen) { patrolCard.style.visibility = 'hidden'; return; }
+    patrolCard.style.visibility = 'visible';
+    const box = patrolCard.getBoundingClientRect();
+    const pad = 12;
+    const right = screen.x + 26;
+    const left = screen.x - box.width - 26;
+    const x = right + box.width + pad < window.innerWidth ? right : Math.max(pad, left);
+    const y = Math.min(window.innerHeight - box.height - pad, Math.max(pad, screen.y - box.height / 2));
+    patrolCard.style.left = `${Math.round(x)}px`;
+    patrolCard.style.top = `${Math.round(y)}px`;
   }
 
   /** What the corridor publishes about a message sign. Fields it does not state are left out. */
@@ -619,6 +944,8 @@ export function installTmcWorkspace({
     // describing an incident the new moment may not contain.
     selectedId = null;
     cameraBefore = null;
+    // A simulated scenario belongs to one incident at one instant. Both just changed.
+    resetPatrolSimulation();
     const described = describeTemporal(temporal);
     replayBadge.hidden = !historical;
     replayBadge.innerHTML = historical
@@ -777,6 +1104,164 @@ export function installTmcWorkspace({
   let analyzedId = null;
   /** Which of the three questions the panel is showing. */
   let activeTab = 'overview';
+
+  /**
+   * The patrol simulation's state, kept entirely separate from `assessed`.
+   *
+   * Nothing here feeds the risk engine, the location-history analysis or the Operational Impact
+   * level. A simulated vehicle must never move a number that was derived from real recorded data,
+   * so the two never meet: this state is read by the Response tab and the map, and by nothing else.
+   */
+  let patrolVisible = false;
+  let selectedPatrolId = null;
+  let patrolDispatch = null;      // the simulated scenario, once an operator runs one
+  let patrolComparison = null;    // the two dispatch delays, once asked for
+  let patrolRanking = null;       // the eligible patrols side by side, once asked for
+  /** 'summary' or 'plan'. The plan replaces the summary rather than extending the scroll. */
+  let responseView = 'summary';
+  /** Mitigation shows three by default; the rest are one click, not one scroll. */
+  let attentionExpanded = false;
+  /** The hypothetical warning, off until an operator asks for it. */
+  let warningScenarioOpen = false;
+  let simulatedQueueVisible = false;
+  /** The guided walk, open only when asked for. */
+  let exploreOpen = false;
+  /**
+   * What the map is emphasising inside the Response lens.
+   *
+   * NOT a tab and not a new mode: the Response tab shows several overlays at once, and this says
+   * which of them is the subject. Everything else is drawn dimmer rather than hidden, so the
+   * spatial relationship survives while one thing leads.
+   */
+  let responseFocus = RESPONSE_FOCUS.INCIDENT;
+  /** Minutes after the incident the queue scenario is showing. Never the wall clock. */
+  let scenarioMinutes = WARNING_ASSUMPTIONS.warningActivationDelayMinutes;
+  /**
+   * The scenario clock, local to this workspace.
+   *
+   * Deliberately NOT the Cesium global clock: that drives every other layer in the application,
+   * and a queue playback must not move vessels, the highway animation or Street View. A local
+   * interval owns the elapsed minutes and nothing else reads it.
+   */
+  let playbackTimer = null;
+
+  function stopPlayback() {
+    if (playbackTimer !== null) { window.clearInterval(playbackTimer); playbackTimer = null; }
+  }
+
+  /** One scenario minute per tick. Bounded by the model's own duration, then it stops itself. */
+  function startPlayback(entry) {
+    if (!QUEUE_PLAYBACK_ENABLED) return;
+    stopPlayback();
+    playbackTimer = window.setInterval(() => {
+      if (!active || !simulatedQueueVisible) { stopPlayback(); renderPanel(); return; }
+      scenarioMinutes += 1;
+      if (scenarioMinutes >= WARNING_ASSUMPTIONS.incidentDurationMinutes) {
+        scenarioMinutes = WARNING_ASSUMPTIONS.incidentDurationMinutes;
+        stopPlayback();
+      }
+      // Only the queue overlay and its own readout change — nothing else is redrawn.
+      drawUpstream(entry, { chrome: false });
+      updatePlaybackReadout(entry);
+    }, 700);
+  }
+
+  /**
+   * Update the playback numbers in place.
+   *
+   * A full renderPanel() on every tick would rebuild the whole Response tab, lose scroll position
+   * and re-attach every handler forty-five times. Only the three values that change are written.
+   */
+  function updatePlaybackReadout(entry) {
+    const queue = queueGeometryFor(entry);
+    // The map bar first: it is the one the operator is looking at while this runs.
+    const mpAt = mapPlayback.querySelector('[data-mp-at]');
+    const mpSlider = mapPlayback.querySelector('[data-mp-slider]');
+    const mpExtent = mapPlayback.querySelector('[data-mp-extent]');
+    const mpPlay = mapPlayback.querySelector('[data-mp-play]');
+    const mpNote = mapPlayback.querySelector('[data-mp-note]');
+    if (mpAt) mpAt.textContent = `Incident + ${scenarioMinutes} min`;
+    if (mpSlider) mpSlider.value = String(scenarioMinutes);
+    if (mpPlay) mpPlay.textContent = playbackTimer === null ? '▶ Play' : '❚❚ Pause';
+    if (mpExtent) mpExtent.textContent = queue?.resolved ? `${(queue.renderedMeters / 1000).toFixed(2)} km` : '—';
+    if (mpNote && queue?.resolved) {
+      mpNote.textContent = queue.clipped
+        ? `Modelled ${(queue.modelledMeters / 1000).toFixed(2)} km · clipped to mapped extent`
+        : `Tail ${queue.tail.upstreamKm} km upstream`;
+    }
+    const at = panel.querySelector('[data-playback-at]');
+    const extent = panel.querySelector('[data-playback-extent]');
+    const tail = panel.querySelector('[data-playback-tail]');
+    const slider = panel.querySelector('[data-playback-slider]');
+    const play = panel.querySelector('[data-action="queue-play"]');
+    if (at) at.textContent = `Incident + ${scenarioMinutes} min`;
+    if (slider) slider.value = String(scenarioMinutes);
+    if (play) play.textContent = playbackTimer === null ? 'Play' : 'Pause';
+    if (extent) {
+      extent.textContent = queue?.resolved
+        ? `${(queue.renderedMeters / 1000).toFixed(2)} km${queue.clipped
+          ? ` (modelled ${(queue.modelledMeters / 1000).toFixed(2)} km)` : ''}`
+        : '—';
+    }
+    if (tail) tail.textContent = queue?.resolved ? `${queue.tail.upstreamKm} km upstream` : '—';
+  }
+  let patrolLayer = null;
+  let upstreamLayer = null;
+  const patrolProvider = createSimulatedPatrolProvider({ centerline });
+
+  /** Everything simulated, forgotten. Called whenever the thing it described stops being current. */
+  /** Everything the Response map put on screen, taken down together. */
+  function hideResponseMapChrome() {
+    mapToolbar.hidden = true;
+    mapPlayback.hidden = true;
+  }
+
+  function resetPatrolSimulation() {
+    patrolVisible = false;
+    selectedPatrolId = null;
+    patrolDispatch = null;
+    patrolComparison = null;
+    patrolRanking = null;
+    responseView = 'summary';
+    attentionExpanded = false;
+    warningScenarioOpen = false;
+    simulatedQueueVisible = false;
+    exploreOpen = false;
+    responseFocus = RESPONSE_FOCUS.INCIDENT;
+    scenarioMinutes = WARNING_ASSUMPTIONS.warningActivationDelayMinutes;
+    stopPlayback();
+    hideResponseMapChrome();
+    closePatrolCard();
+    patrolLayer?.clear();
+    upstreamLayer?.clear();
+  }
+
+  /**
+   * The patrol scenario for the incident under investigation.
+   *
+   * Historical only, by design: the simulation is anchored to a past incident's own timestamp, and
+   * there is no claim to make about where a patrol is right now. Returns null in Live mode so every
+   * consumer degrades to "not offered" rather than to a wrong answer.
+   */
+  function patrolScenarioFor(entry) {
+    if (!PATROL_CONFIG.simulationEnabled || !entry) return null;
+    if (!isHistorical(temporal) || !centerline?.length) return null;
+    return cached(`patrol:${entry.incident.id}`, () => buildPatrolScenario(entry));
+  }
+
+  function buildPatrolScenario(entry) {
+    const anchorMs = incidentAnchor(entry.incident);
+    if (!Number.isFinite(anchorMs)) return null;
+    const incident = {
+      id: entry.incident.id,
+      longitude: entry.incident.longitude,
+      latitude: entry.incident.latitude,
+      carriageway: entry.incident.carriageway,
+      anchorMs,
+    };
+    const dispatch = patrolProvider.getDispatchOptions(incident, anchorMs, { centerline });
+    return { incident, anchorMs, ...dispatch };
+  }
   let confidenceOpen = false;
   let provenanceOpen = false;
   let evidenceOpen = false;
@@ -1029,13 +1514,53 @@ export function installTmcWorkspace({
     }, 1_000);
   }
 
-  function refresh() {
+  /**
+   * Everything an assessment is derived from, as one comparable string.
+   *
+   * The live feed polls, and each poll called refresh() → draw(), which begins by removing every
+   * entity in the TMC data source and rebuilding it. On a historical date the events cannot have
+   * changed at all, so that was a full teardown of the incident pins, section labels, context
+   * markers and upstream arrows for no reason — which is what the operator saw as flickering.
+   *
+   * The signature covers every input assessCorridor reads, so a real change still redraws: the
+   * moment, the analysed incident, the register, the weather that has arrived, and each event's
+   * identity and the fields the map draws from.
+   */
+  function assessmentSignature(events, registerCount) {
+    return JSON.stringify([
+      temporal.mode, temporal.date, temporal.timestamp,
+      analyzedId, registerCount, Object.keys(weatherSeen).length,
+      // The corridor's own geometry and its resources load after the first assessment, and the
+      // map needs rebuilding when they land — otherwise an early refresh would freeze a view
+      // drawn before the sections existed.
+      sections().length, resourceList(cameras).length, resourceList(signs).length,
+      (events ?? []).map(event => [
+        String(event.id), event.type ?? null, event.severity ?? null,
+        event.liveOps?.sectionId ?? null, event.liveOps?.carriageway ?? null,
+        event.liveOps?.laneImpact?.blockedLanes ?? null,
+        event.longitude ?? null, event.latitude ?? null,
+        event.reportedAtMs ?? null, event.clearedAtMs ?? null,
+      ]),
+    ]);
+  }
+  let lastAssessmentSignature = null;
+
+  /**
+   * @param {{force?: boolean}} options  `force` rebuilds even when nothing changed — used on the
+   *   way into the screen, where there is nothing on the map yet to preserve.
+   */
+  function refresh({ force = false } = {}) {
     if (!active) return;
     const register = registerRecords();
     registerSeen = register?.length ?? 0;
     // Nothing yet: assess on what is here, and come back when the register lands.
     if (!registerSeen) watchForRegister(); else stopRegisterWatch();
-    assessed = assessCorridor(assessableEvents(), {
+    const events = assessableEvents();
+    const signature = assessmentSignature(events, registerSeen);
+    // Same inputs, same output: leave the map and the panel exactly as they are.
+    if (!force && signature === lastAssessmentSignature) return;
+    lastAssessmentSignature = signature;
+    assessed = assessCorridor(events, {
       weatherByIncident: weatherSeen,
       historicalCrashes: register,
       analyzeLocationFor: analyzedId,
@@ -1048,6 +1573,7 @@ export function installTmcWorkspace({
     // A selected incident that has cleared stops being selected rather than lingering as a panel
     // about something no longer on the road.
     if (selectedId && !assessed.assessments.some(entry => entry.incident.id === selectedId)) selectedId = null;
+    clearAssessmentCache();
     renderStrip();
     renderRail();
     renderPanel();
@@ -1466,66 +1992,434 @@ export function installTmcWorkspace({
   }
 
   /** "What should I monitor or consider doing?" */
+  /** Minutes as an operator reads them, or a dash. Never a number when the route is unresolved. */
+  const etaText = option => (option.eligible && Number.isFinite(option.travelSeconds)
+    ? `${Math.max(1, Math.round(option.travelSeconds / 60))} min`
+    : null);
+
+  const clockOf = ms => timeLabel(ms);
+
+  /**
+   * The patrol simulation, inside Response.
+   *
+   * Compact on purpose: the Response tab already carries the roadway picture, the monitoring
+   * resources and the ranked attention list, and a second dashboard would bury all three. This is
+   * a count, a list, and the two things an operator can do with it.
+   */
+  /**
+   * The Response tab, rebuilt around the decision rather than the data.
+   *
+   * It used to render five sections, of which the patrol block alone emitted six rows, four
+   * buttons, a timeline and a comparison — an operator reached "which patrol can go" only after
+   * scrolling past the roadway grid and the monitoring resources. The roadway grid duplicated the
+   * header and the Overview tab, and the monitoring block duplicated what Upstream Protection now
+   * states properly, so both are gone rather than merely moved.
+   *
+   * What is left is four compact answers and one primary action. Everything else is behind
+   * progressive disclosure, and nothing was deleted — the detail view holds all of it.
+   */
+  function patrolSummary(entry) {
+    const scenario = patrolScenarioFor(entry);
+    if (!scenario) {
+      return isHistorical(temporal) ? '' : `
+        <section class="tmc-block tmc-patrol">
+          <h3>Patrol response <em class="tmc-sim-badge">${SIMULATION_BADGE}</em></h3>
+          <p class="tmc-weather-note">Offered on a historical date only — the scenario is anchored to a past
+            incident's own timestamp, and nothing here claims where a patrol is now.</p>
+        </section>`;
+    }
+    const { availability, eligible, suggested, options } = scenario;
+    const best = suggested ?? (eligible.length === 1 ? eligible[0] : null);
+    const unavailable = availability.total - eligible.length;
+
+    // No candidate: say which obstacle stopped it, not a generic nothing-found.
+    const body = best
+      ? `<div class="tmc-weather-grid">
+           <div><span>Suggested eligible patrol</span><strong>${escape(best.patrol.id)}</strong></div>
+           <div><span>Estimated travel</span><strong>${escape(etaText(best))}</strong></div>
+         </div>
+         <p class="tmc-patrol-counts">${eligible.length} eligible · ${unavailable} unavailable</p>`
+      : `<p class="tmc-patrol-none">No eligible simulated patrol</p>
+         <p class="tmc-patrol-why">${escape(primaryBlocker(scenario))}</p>
+         <p class="tmc-patrol-counts">${eligible.length} eligible · ${unavailable} unavailable</p>`;
+
+    return `
+      <section class="tmc-block tmc-patrol" id="tmc-patrol">
+        <h3>Patrol response <em class="tmc-sim-badge">${SIMULATION_BADGE}</em></h3>
+        ${body}
+        <div class="tmc-patrol-actions">
+          <button type="button" class="tmc-action is-primary" data-action="patrol-plan">View response plan</button>
+          ${eligible.length > 1 ? '<button type="button" class="tmc-action" data-action="patrol-compare-open">Compare patrols</button>' : ''}
+        </div>
+        <p class="tmc-patrol-disclaimer">${SIMULATION_DISCLAIMER}</p>
+      </section>`;
+  }
+
+  /**
+   * The single reason worth showing when nothing is eligible.
+   *
+   * The options all carry their own reason, but listing six of them is what made the old tab
+   * unreadable. One cause usually dominates, so the most common one is reported and the rest stay
+   * in the detail view.
+   */
+  function primaryBlocker(scenario) {
+    const reasons = scenario.options.filter(option => !option.eligible).map(option => option.ineligibleReason);
+    if (!reasons.length) return 'No simulated patrols in this scenario.';
+    const counts = new Map();
+    for (const reason of reasons) counts.set(reason, (counts.get(reason) ?? 0) + 1);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  }
+
+  /**
+   * The response plan: everything the summary deliberately left out.
+   *
+   * An inline expanding section rather than an overlay, because the map is the thing an operator
+   * is reading alongside it and a modal would cover the corridor this is all about.
+   */
+  function responsePlanView(entry) {
+    const scenario = patrolScenarioFor(entry);
+    if (!scenario) return '';
+    const { eligible, options } = scenario;
+    const ineligible = options.filter(option => !option.eligible);
+
+    const row = option => `<li class="tmc-patrol-row${option.patrol.id === selectedPatrolId ? ' is-selected' : ''}">
+      <button type="button" data-action="patrol-select" data-patrol="${escape(option.patrol.id)}"
+        aria-pressed="${option.patrol.id === selectedPatrolId}">
+        <span class="tmc-patrol-dot" style="--patrol-tone:${PATROL_STATUS_COLORS[option.patrol.status]}" aria-hidden="true"></span>
+        <span class="tmc-patrol-body">
+          <strong>${escape(option.patrol.id)}</strong>
+          <span>${escape(PATROL_STATUS_LABELS[option.patrol.status] ?? option.patrol.status)}${
+            option.eligible ? ` · ETA ${escape(etaText(option))} · ${escape(ROUTE_CONFIDENCE_LABELS[option.route.confidence])}` : ''}</span>
+          ${option.eligible ? '' : `<span class="tmc-patrol-why">${escape(option.ineligibleReason ?? 'Not eligible')}</span>`}
+        </span>
+      </button></li>`;
+
+    return `
+      <section class="tmc-block tmc-plan" id="tmc-response-plan">
+        <div class="tmc-plan-head">
+          <button type="button" class="tmc-action" data-action="patrol-summary">← Back to response summary</button>
+          <h3>Response plan <em class="tmc-sim-badge">${SIMULATION_BADGE}</em></h3>
+        </div>
+
+        ${eligible.length
+          ? `<h4>Eligible</h4><ul class="tmc-patrol-list">${eligible.map(row).join('')}</ul>`
+          : `<p class="tmc-patrol-why">${escape(primaryBlocker(scenario))}</p>`}
+
+        ${ineligible.length ? `<details class="tmc-fold tmc-unavailable">
+          <summary><h4>Show unavailable patrols</h4><span>${ineligible.length}</span></summary>
+          <ul class="tmc-patrol-list">${ineligible.map(row).join('')}</ul>
+        </details>` : ''}
+
+        <div class="tmc-patrol-actions">
+          <button type="button" class="tmc-action" data-action="patrol-show" aria-pressed="${patrolVisible}">
+            ${patrolVisible ? 'Hide on map' : 'Show on map'}</button>
+          ${eligible.length > 1 ? '<button type="button" class="tmc-action" data-action="patrol-compare">Compare patrols</button>' : ''}
+          ${eligible.length >= 1 ? '<button type="button" class="tmc-action" data-action="patrol-scenarios">Compare dispatch scenarios</button>' : ''}
+          ${selectedPatrolId && eligible.some(option => option.patrol.id === selectedPatrolId)
+            ? '<button type="button" class="tmc-action is-primary" data-action="patrol-dispatch">Simulate dispatch</button>' : ''}
+          ${patrolDispatch || patrolComparison || patrolRanking || selectedPatrolId
+            ? '<button type="button" class="tmc-action" data-action="patrol-reset">Clear scenario</button>' : ''}
+        </div>
+
+        ${patrolRanking ? patrolRankingBlock() : ''}
+        ${patrolComparison ? patrolComparisonBlock() : ''}
+        ${patrolDispatch ? patrolTimeline() : ''}
+
+        <p class="tmc-weather-note">Travel times assume ${PATROL_CONFIG.simulatedPatrolSpeedKmh} km/h along the
+          corridor centerline. There is no ramp or interchange topology in the published data, so every route is
+          approximate and a patrol that cannot be reached along its own carriageway is reported as unroutable
+          rather than estimated.</p>
+      </section>`;
+  }
+
+  /** The eligible patrols, every column the choice actually turns on. */
+  function patrolRankingBlock() {
+    const rows = patrolRanking ?? [];
+    if (rows.length < 2) return '';
+    return `
+      <div class="tmc-patrol-compare">
+        <h4>Eligible patrols compared <em class="tmc-sim-badge">${SIMULATION_BADGE}</em></h4>
+        <table class="tmc-patrol-table">
+          <thead><tr><th>Patrol</th><th>Status</th><th>Distance</th><th>Travel</th><th>Route</th></tr></thead>
+          <tbody>${rows.map((option, index) => `<tr${index === 0 ? ' class="is-best"' : ''}>
+            <td>${escape(option.patrol.id)}</td>
+            <td>${escape(PATROL_STATUS_LABELS[option.patrol.status])}</td>
+            <td>${(option.route.distanceMeters / 1000).toFixed(1)} km</td>
+            <td>${Math.max(1, Math.round(option.travelSeconds / 60))} min</td>
+            <td>${escape(ROUTE_CONFIDENCE_LABELS[option.route.confidence])}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+        <p class="tmc-weather-note">Service areas: ${escape(rows.map(o => `${o.patrol.id} — ${o.patrol.serviceArea}`).join(' · '))}.
+          Ranked by estimated travel time along the corridor centerline. A simulated candidate, not an ACS
+          dispatch recommendation.</p>
+      </div>`;
+  }
+
+  /** The simulated response timeline. The incident's own row is marked real; nothing else is. */
+  function patrolTimeline() {
+    const scenario = patrolDispatch;
+    if (!scenario) return '';
+    if (!scenario.resolved) {
+      return `<div class="tmc-patrol-timeline"><p class="tmc-patrol-why">${escape(scenario.reason)}</p></div>`;
+    }
+    return `
+      <div class="tmc-patrol-timeline">
+        <h4>Simulated response timeline <em class="tmc-sim-badge">${SIMULATION_BADGE}</em></h4>
+        <ol>${scenario.events.map(event => `<li data-kind="${event.kind}">
+          <span class="tmc-patrol-at">${escape(clockOf(event.at))}</span>
+          <span class="tmc-patrol-what">
+            <strong>${escape(event.label)}</strong>
+            <em>${event.kind === 'REAL' ? 'Real recorded time' : 'Simulated'}</em>
+            ${event.detail ? `<span>${escape(event.detail)}</span>` : ''}
+          </span></li>`).join('')}</ol>
+        <p class="tmc-weather-note">Exposure from the recorded incident time to simulated arrival:
+          ${scenario.exposureMinutes} min. Clearance depends on tow and debris removal, which are not modelled.</p>
+      </div>`;
+  }
+
+  /** Two dispatch delays, one changed assumption, and the arithmetic between them. */
+  function patrolComparisonBlock() {
+    const c = patrolComparison;
+    if (!c?.resolved) return `<p class="tmc-patrol-why">${escape(c?.reason ?? 'No route to compare')}</p>`;
+    return `
+      <div class="tmc-patrol-compare">
+        <h4>Dispatch scenarios <em class="tmc-sim-badge">${SIMULATION_BADGE}</em></h4>
+        <div class="tmc-weather-grid">
+          <div><span>Scenario A dispatch</span><strong>${c.dispatchMinutesA} min</strong></div>
+          <div><span>Scenario B dispatch</span><strong>${c.dispatchMinutesB} min</strong></div>
+          <div><span>Arrival earlier by</span><strong>${c.arrivalEarlierByMinutes} min</strong></div>
+          <div><span>Exposure reduced by</span><strong>${c.exposureReducedByMinutes} min</strong></div>
+        </div>
+        <p class="tmc-weather-note">${escape(c.caveat)}</p>
+      </div>`;
+  }
+
+  /**
+   * Upstream protection: can the approach be seen, and can it be warned?
+   *
+   * Four answers and two actions. The statuses are the whole content — "queue unavailable" is as
+   * important an operational fact as a queue length would be, and the section exists to make the
+   * difference between "nothing there" and "cannot tell" impossible to miss.
+   */
+  function upstreamProtectionSection(entry) {
+    const assessment = upstreamProtectionFor(entry);
+    if (!assessment) return '';
+    const state = (status, text) => `<strong data-obs="${status}">${escape(text)}</strong>`;
+    const approach = assessment.upstreamResolution.resolved
+      ? state(OBSERVATION.CONFIRMED, `${CARRIAGEWAY_SHORT[assessment.carriageway] ?? 'Resolved'} · resolved`)
+      : state(OBSERVATION.UNKNOWN, assessment.upstreamResolution.reason ?? 'Unresolved');
+
+    return `
+      <section class="tmc-block tmc-upstream" id="tmc-upstream">
+        <h3>Upstream protection</h3>
+        <div class="tmc-weather-grid">
+          <div><span>Approach</span>${approach}</div>
+          <div><span>Traffic</span>${state(assessment.trafficObservationStatus, assessment.traffic.detail)}</div>
+          <div><span>Queue</span>${state(assessment.queueObservationStatus, 'Unavailable — not published')}</div>
+          <div><span>Nearest upstream DMS</span>${assessment.nearestDms
+            ? state(OBSERVATION.CONFIRMED, `${assessment.nearestDms.id} · ${assessment.nearestDms.upstreamMiles} mi`)
+            : state(OBSERVATION.NOT_OBSERVED, 'None resolved')}</div>
+          <div><span>Warning status</span>${state(assessment.warningActivationStatus, 'Unknown')}</div>
+          <div><span>Data coverage</span><strong>${assessment.dataConfidence.label}
+            <em>${assessment.dataConfidence.known}/${assessment.dataConfidence.total}</em></strong></div>
+        </div>
+        <div class="tmc-patrol-actions">
+          <button type="button" class="tmc-action is-primary" data-action="explore-exposure"
+            aria-pressed="${exploreOpen}">Explore secondary-collision exposure</button>
+          <button type="button" class="tmc-action" data-action="inspect-upstream"
+            ${assessment.upstreamResolution.resolved ? '' : 'disabled'}>Inspect upstream</button>
+          <button type="button" class="tmc-action" data-action="warning-scenario"
+            aria-pressed="${warningScenarioOpen}">Explore warning scenario</button>
+        </div>
+        ${exploreOpen ? exploreSteps(entry, assessment) : ''}
+        ${assessment.upstreamResolution.resolved ? '' : `<p class="tmc-patrol-why">Inspect upstream is unavailable:
+          ${escape(assessment.upstreamResolution.reason ?? 'the approach could not be resolved')}.</p>`}
+        ${warningScenarioOpen ? warningScenarioBlock(entry, assessment) : ''}
+      </section>`;
+  }
+
+  /**
+   * A guided walk through what the map can already show.
+   *
+   * Not a new model and not a wizard: each step is one of the existing focus states, listed in the
+   * order the question is actually asked — where is it, what is approaching, what can warn it,
+   * what would a queue look like, who could respond. A step whose data is missing says so instead
+   * of offering a broken view, and the simulated queue is never switched on for the operator.
+   */
+  function exploreSteps(entry, assessment) {
+    const patrol = patrolScenarioFor(entry);
+    const steps = [
+      { focus: RESPONSE_FOCUS.INCIDENT, label: 'Locate the incident',
+        detail: `${entry.incident.id} · ${escape(clockOf(incidentAnchor(entry.incident)))}`, ok: true },
+      { focus: RESPONSE_FOCUS.UPSTREAM, label: 'Find the approaching traffic',
+        detail: assessment.upstreamResolution.resolved
+          ? `${assessment.upstreamSections.length} upstream section(s) resolved`
+          : assessment.upstreamResolution.reason,
+        ok: assessment.upstreamResolution.resolved },
+      { focus: RESPONSE_FOCUS.WARNING, label: 'See what could warn it',
+        detail: assessment.nearestDms
+          ? `${assessment.nearestDms.id} · ${assessment.nearestDms.upstreamMiles} mi upstream · activation unknown`
+          : 'No upstream sign resolved',
+        ok: Boolean(assessment.nearestDms || assessment.nearestCamera) },
+      { focus: RESPONSE_FOCUS.QUEUE, label: 'Picture the queue',
+        detail: assessment.upstreamResolution.resolved
+          ? 'Hypothetical — no queue observations are published'
+          : 'Needs a resolved approach',
+        ok: assessment.upstreamResolution.resolved },
+      { focus: RESPONSE_FOCUS.PATROLS, label: 'See who could respond',
+        detail: patrol
+          ? `${patrol.eligible.length} eligible of ${patrol.availability.total} simulated patrols`
+          : 'Patrol simulation unavailable',
+        ok: Boolean(patrol) },
+    ];
+    return `
+      <ol class="tmc-explore">${steps.map((step, index) => `<li${step.ok ? '' : ' data-blocked="true"'}>
+        <span class="tmc-mit-n">${index + 1}</span>
+        <button type="button" data-focus-step="${step.focus}" ${step.ok ? '' : 'disabled'}>
+          <strong>${escape(step.label)}</strong>
+          <span>${escape(String(step.detail ?? ''))}</span>
+        </button></li>`).join('')}</ol>
+      <p class="tmc-weather-note">Each step moves the map. Nothing is enabled for you: the simulated
+        queue appears only when you choose that step, and no step claims a queue actually formed.</p>`;
+  }
+
+  /** The hypothetical warning, kept visibly apart from everything measured above it. */
+  function warningScenarioBlock(entry, assessment) {
+    const scenario = warningScenarioFor(entry, assessment);
+    if (!scenario?.resolved) {
+      return `<p class="tmc-patrol-why">${escape(scenario?.reason ?? 'No scenario available')}</p>`;
+    }
+    const a = scenario.scenarioA;
+    const b = scenario.scenarioB;
+    const reach = value => (value === null ? 'Cannot say — no upstream sign' : value ? 'Yes' : 'No');
+    return `
+      <div class="tmc-warning-scenario">
+        <h4>Warning scenario <em class="tmc-sim-badge">${SIMULATION_BADGE}</em></h4>
+        <p class="tmc-patrol-disclaimer">Hypothetical. The connected feed publishes no queue observations and no
+          DMS activation records, so both the queue and the activation times below are assumptions.</p>
+        <table class="tmc-patrol-table">
+          <thead><tr><th>Scenario</th><th>Activated</th><th>Queue then</th><th>Reaches tail</th></tr></thead>
+          <tbody>
+            <tr><td>A</td><td>${a.delayMinutes} min</td><td>${a.simulatedQueueMiles} mi</td><td>${escape(reach(a.reachesQueueTail))}</td></tr>
+            <tr class="is-best"><td>B</td><td>${b.delayMinutes} min</td><td>${b.simulatedQueueMiles} mi</td><td>${escape(reach(b.reachesQueueTail))}</td></tr>
+          </tbody>
+        </table>
+        <p class="tmc-patrol-counts">${scenario.earlierByMinutes} min earlier warning.
+          The queue model is identical in both — only the activation moment differs.</p>
+        <p class="tmc-patrol-why">Effect on actual collisions: not estimated.</p>
+        ${assessment.upstreamResolution.resolved
+          ? `<div class="tmc-patrol-actions">
+               <button type="button" class="tmc-action" data-action="queue-show" aria-pressed="${simulatedQueueVisible}">
+                 ${simulatedQueueVisible ? 'Hide simulated queue' : 'Show simulated queue'}</button>
+             </div>
+             ${simulatedQueueVisible ? queuePlayback(entry) : ''}`
+          // No direction means no queue can be placed anywhere honest, so the control is not
+          // offered at all rather than offered and then refusing.
+          : `<p class="tmc-patrol-why">No simulated queue can be placed —
+               ${escape(assessment.upstreamResolution.reason ?? 'the upstream approach is unresolved')}.
+               A queue needs a direction to run back along.</p>`}
+        <details class="tmc-fold"><summary><h4>Assumptions</h4><span>${Object.keys(scenario.assumptions).length}</span></summary>
+          <div class="tmc-weather-grid">${Object.entries(scenario.assumptions).map(([key, value]) =>
+            `<div><span>${escape(WARNING_ASSUMPTION_LABELS[key] ?? key)}</span><strong>${value}</strong></div>`).join('')}</div>
+        </details>
+        <p class="tmc-weather-note">${escape(scenario.caveat)}</p>
+      </div>`;
+  }
+
+  /**
+   * The queue playback controller.
+   *
+   * Scenario time, not incident time: the slider moves elapsed minutes AFTER the historical
+   * incident, and the incident's own recorded timestamp never changes. Both are shown so the
+   * difference is on screen rather than implied.
+   */
+  function queuePlayback(entry) {
+    if (!QUEUE_PLAYBACK_ENABLED) return '';
+    const queue = queueGeometryFor(entry);
+    const maximum = WARNING_ASSUMPTIONS.incidentDurationMinutes;
+    const extent = queue?.resolved
+      ? `${(queue.renderedMeters / 1000).toFixed(2)} km${queue.clipped
+        ? ` (modelled ${(queue.modelledMeters / 1000).toFixed(2)} km)` : ''}`
+      : '—';
+    return `
+      <div class="tmc-playback">
+        <div class="tmc-playback-head">
+          <strong data-playback-at>Incident + ${scenarioMinutes} min</strong>
+          <span>${escape(clockOf(incidentAnchor(entry.incident)))} recorded · scenario time is simulated</span>
+        </div>
+        <div class="tmc-patrol-actions">
+          <button type="button" class="tmc-action" data-action="queue-play">${playbackTimer === null ? 'Play' : 'Pause'}</button>
+          <button type="button" class="tmc-action" data-action="queue-reset">Reset</button>
+        </div>
+        <input type="range" class="tmc-playback-slider" data-playback-slider
+          min="0" max="${maximum}" step="1" value="${scenarioMinutes}"
+          aria-label="Simulated minutes after the incident">
+        <div class="tmc-playback-scale"><span>0 min</span><span>${maximum} min</span></div>
+        <div class="tmc-weather-grid">
+          <div><span>Queue extent</span><strong data-playback-extent>${escape(extent)}</strong></div>
+          <div><span>Queue tail</span><strong data-playback-tail>${queue?.resolved
+            ? `${queue.tail.upstreamKm} km upstream` : '—'}</strong></div>
+        </div>
+        ${queue?.clipNotice ? `<p class="tmc-patrol-why">${escape(queue.clipNotice)}</p>` : ''}
+        ${queue?.resolved ? `<p class="tmc-weather-note">${escape(queue.approximation)}</p>` : ''}
+      </div>`;
+  }
+
+  /** Incident → dispatch → arrival, at a glance. The milestones live in the response plan. */
+  function compactTimeline(entry) {
+    const anchorMs = incidentAnchor(entry.incident);
+    if (!Number.isFinite(anchorMs)) return '';
+    const steps = [{ label: 'Incident', at: anchorMs, kind: 'REAL' }];
+    if (patrolDispatch?.resolved) {
+      steps.push({ label: 'Dispatch', at: patrolDispatch.events.find(e => e.id === 'dispatched').at, kind: 'SIMULATED' });
+      steps.push({ label: 'Arrival', at: patrolDispatch.arrivalMs, kind: 'SIMULATED' });
+    }
+    return `
+      <section class="tmc-block">
+        <h3>Response timeline</h3>
+        <ol class="tmc-steps">${steps.map(step => `<li data-kind="${step.kind}">
+          <span class="tmc-step-at">${escape(clockOf(step.at))}</span>
+          <span class="tmc-step-label">${escape(step.label)}</span>
+          <em>${step.kind === 'REAL' ? 'Recorded' : 'Simulated'}</em></li>`).join('')}</ol>
+        ${patrolDispatch?.resolved
+          ? '<p class="tmc-weather-note">Milestones and assumptions are in the response plan.</p>'
+          : '<p class="tmc-weather-note">Simulate a dispatch in the response plan to see the full timeline.</p>'}
+      </section>`;
+  }
+
   function responseTab(entry) {
-    const { incident, risk, upstream, upstreamCongestion, impactLevel, resources, mitigation } = entry;
-    const lane = risk.factors.find(f => f.type === 'LANE_CLOSURE');
-    const resourceBlock = (title, kind, found) => `<div class="tmc-resource">
-      <span class="tmc-resource-title">${title}</span>
-      ${found
-        ? `<span class="tmc-resource-id">${escape(found.id)}</span>
-           <span class="tmc-resource-distance">${escape(upstreamLabel(found))}</span>
-           <button type="button" class="tmc-action" data-action="${kind}">View ${escape(found.id)}</button>`
-        : `<span class="tmc-resource-none">No upstream ${kind === 'camera' ? 'camera' : 'sign'} resolved for this incident</span>`}
-    </div>`;
+    const { risk } = entry;
     const gaps = [...risk.unknownFactors.map(f => `${f.label} — ${f.detail ?? 'unknown'}`),
       ...risk.unavailableFactors.map(f => `${f.label} — ${f.reason.toLowerCase()}`)];
+    const attention = entry.attention ?? [];
+    // Top three by default. The rest are one click away rather than a scroll away.
+    const shown = attentionExpanded ? attention : attention.slice(0, 3);
+
+    // The plan replaces the summary rather than sitting under it: this is a view, not a section.
+    if (responseView === 'plan') return responsePlanView(entry);
+
     return `
-      <section class="tmc-block" id="tmc-traffic">
-        <h3>Traffic / roadway</h3>
-        <div class="tmc-weather-grid">
-          <div><span>Lane closure</span><strong>${escape(incident.lanes?.stated ? 'Recorded' : 'Not stated by the source')}</strong></div>
-          <div><span>Lanes blocked</span><strong>${escape(Number.isFinite(incident.lanes?.blockedLanes)
-            ? String(incident.lanes.blockedLanes) : (lane?.detail?.includes('not published') ? 'Not published' : 'Not stated'))}</strong></div>
-          <div><span>Carriageway</span><strong>${escape(CARRIAGEWAY_SHORT[incident.carriageway] ?? 'Unresolved')}</strong></div>
-          <div><span>Upstream traffic</span><strong>${upstream.status === UPSTREAM_STATUS.RESOLVED
-            ? (upstreamCongestion.length ? `${upstreamCongestion.length} congestion upstream` : 'None reported')
-            : `Unknown — ${escape(String(upstream.reason ?? 'upstream unresolved').toLowerCase())}`}</strong></div>
-          <div><span>Operational Impact</span><strong>${escape(impactLevel ?? 'Unknown — section not resolved')}</strong></div>
-        </div>
-      </section>
+      ${patrolSummary(entry)}
+      ${upstreamProtectionSection(entry)}
+      ${compactTimeline(entry)}
 
       <section class="tmc-block">
-        <h3>Monitoring &amp; warning</h3>
-        ${resourceBlock('Camera', 'camera', resources.camera)}
-        ${resourceBlock('DMS', 'sign', resources.sign)}
-        <p class="tmc-weather-note">Nearest upstream by distance. The feed does not publish sign messages, so this
-          cannot confirm a warning is in place for this incident.</p>
-      </section>
-
-      <section class="tmc-block">
-        <h3>Recommended attention</h3>
-        <ol class="tmc-mitigation">${(entry.attention ?? []).map((item, i) => `<li>
+        <h3>Mitigation priorities</h3>
+        <ol class="tmc-mitigation">${shown.map((item, i) => `<li>
           <span class="tmc-mit-n">${i + 1}</span>
           <span class="tmc-mit-body">
             <strong>${escape(item.action)}<em class="tmc-priority" data-priority="${item.priority}">${item.priority}</em></strong>
             <span>${escape(item.reason)}</span>
             ${item.gap ? '<span class="tmc-mit-gap">Data gap — this is what to establish, not an action already available.</span>' : ''}
           </span></li>`).join('')}</ol>
-        <p class="tmc-weather-note">Suggestions for an operator, ranked by how directly the evidence bears on the road now.
+        ${attention.length > 3 ? `<button type="button" class="tmc-action" data-action="attention-toggle">
+          ${attentionExpanded ? 'Show top three' : `View all ${attention.length} recommendations`}</button>` : ''}
+        <p class="tmc-weather-note">Ranked by how directly the evidence bears on the road now.
           Nothing here is carried out automatically.</p>
       </section>
 
-      ${timelineBlock(entry)}
-
-      ${entry.opportunity ? `<section class="tmc-block tmc-opportunity">
-        <h3>${escape(entry.opportunity.headline)}</h3>
-        <p class="tmc-insight-text">${escape(entry.opportunity.summary)}</p>
-        <ul class="tmc-factors">${entry.opportunity.evidence.map(line => `<li class="is-present">· ${escape(line)}</li>`).join('')}</ul>
-        <p class="tmc-weather-note">${entry.opportunity.limitations.map(escape).join(' ')}</p>
-      </section>` : ''}
-
       <details class="tmc-block tmc-fold tmc-gaps">
-        <summary><h3>Data gaps</h3><span>${gaps.length}</span></summary>
+        <summary><h3>Data gaps</h3><span>${gaps.length} unavailable</span></summary>
         <ul class="tmc-factors tmc-factors--unavailable">
           ${gaps.map(line => `<li>⚠ ${escape(line)}</li>`).join('')}
         </ul>
@@ -1592,6 +2486,21 @@ export function installTmcWorkspace({
       };
     }
 
+    // Scrubbing moves scenario time only; the incident's own timestamp is untouched.
+    const slider = panel.querySelector('[data-playback-slider]');
+    if (slider) {
+      slider.oninput = () => {
+        stopPlayback();
+        scenarioMinutes = Number(slider.value);
+        drawUpstream(entry, { chrome: false });
+        updatePlaybackReadout(entry);
+      };
+    }
+
+    for (const button of panel.querySelectorAll('[data-focus-step]')) {
+      button.onclick = () => chooseFocus(button.dataset.focusStep, entry);
+    }
+
     for (const button of panel.querySelectorAll('[data-action]')) {
       button.onclick = () => {
         const what = button.getAttribute('data-action');
@@ -1617,9 +2526,392 @@ export function installTmcWorkspace({
         if (what === 'camera' && entry.resources.camera) { rememberView(); flyTo(entry.resources.camera.resource, 900); renderPanel(); return; }
         if (what === 'sign' && entry.resources.sign) { rememberView(); flyTo(entry.resources.sign.resource, 900); renderPanel(); return; }
         if (what === 'to-incident') { restoreView(entry); return; }
+        if (what === 'patrol-show') { togglePatrols(entry); return; }
+        if (what === 'patrol-plan') { responseView = 'plan'; patrolVisible = true; renderPanel(); drawPatrols(entry); return; }
+        // Back to the summary keeps the scenario: an operator returning must not have to rebuild it.
+        if (what === 'patrol-summary') { responseView = 'summary'; renderPanel(); return; }
+        if (what === 'patrol-compare-open') { responseView = 'plan'; comparePatrols(entry); return; }
+        if (what === 'attention-toggle') { attentionExpanded = !attentionExpanded; renderPanel(); return; }
+        if (what === 'explore-exposure') { exploreOpen = !exploreOpen; renderPanel(); return; }
+        if (what === 'inspect-upstream') { inspectUpstream(entry); return; }
+        if (what === 'warning-scenario') {
+          warningScenarioOpen = !warningScenarioOpen;
+          if (!warningScenarioOpen) { simulatedQueueVisible = false; }
+          renderPanel(); drawUpstream(entry); return;
+        }
+        if (what === 'queue-show') {
+          simulatedQueueVisible = !simulatedQueueVisible;
+          if (!simulatedQueueVisible) stopPlayback();
+          renderPanel();
+          setResponseFocus(simulatedQueueVisible ? RESPONSE_FOCUS.QUEUE : RESPONSE_FOCUS.INCIDENT, entry);
+          return;
+        }
+        if (what === 'queue-play') {
+          if (playbackTimer === null) startPlayback(entry); else stopPlayback();
+          updatePlaybackReadout(entry); return;
+        }
+        if (what === 'queue-reset') {
+          stopPlayback();
+          scenarioMinutes = 0;
+          drawUpstream(entry, { chrome: false }); updatePlaybackReadout(entry); return;
+        }
+        if (what === 'patrol-select') { selectPatrol(entry, button.dataset.patrol); return; }
+        if (what === 'patrol-dispatch') { simulateDispatch(entry); return; }
+        if (what === 'patrol-compare') { comparePatrols(entry); return; }
+        if (what === 'patrol-scenarios') { compareDispatchDelays(entry); return; }
+        if (what === 'patrol-reset') { resetPatrolSimulation(); renderPanel(); drawPatrols(entry); return; }
+        if (what === 'patrol-route' && selectedPatrolId) { focusPatrolRoute(entry); return; }
         if (what === 'section') frameInvestigation(entry, 'overview');
       };
     }
+  }
+
+  /**
+   * The upstream protection assessment for the incident under investigation.
+   *
+   * Computed here rather than in tmcService so it stays out of the assessment object the risk
+   * engine reads — an operational assessment must not be able to reach the score by accident.
+   */
+  /**
+   * The assessments, computed once per incident rather than per caller.
+   *
+   * These were being rebuilt on every call, and the map toolbar alone asks for them five times —
+   * once per button — while `positionPatrolCard` asks on every camera movement. A patrol scenario
+   * is a full fleet simulation plus six route computations, so a pan was running that dozens of
+   * times a second. The cache is cleared whenever the thing it describes changes.
+   */
+  const assessmentCache = new Map();
+  const clearAssessmentCache = () => assessmentCache.clear();
+  function cached(key, build) {
+    if (assessmentCache.has(key)) return assessmentCache.get(key);
+    const value = build();
+    assessmentCache.set(key, value);
+    return value;
+  }
+
+  function upstreamProtectionFor(entry) {
+    if (!entry) return null;
+    return cached(`upstream:${entry.incident.id}`, () => buildUpstreamProtection(entry));
+  }
+
+  function buildUpstreamProtection(entry) {
+    return assessUpstreamProtection(entry.incident, {
+      sections: sections(),
+      centerline,
+      cameras: resourceList(cameras),
+      signs: resourceList(signs),
+      upstream: entry.upstream,
+      upstreamCongestion: entry.upstreamCongestion,
+      anchorMs: incidentAnchor(entry.incident),
+    });
+  }
+
+  /**
+   * The simulated queue's geometry at the scenario time.
+   *
+   * One computation, read by both the panel and the map, so the number an operator reads and the
+   * band they see can never disagree — which they did before this existed: a queue running off the
+   * end of the corridor was silently clipped to the geometry while the panel kept claiming the
+   * full modelled length.
+   */
+  /**
+   * The incident's own carriageway as one continuous path, in the direction traffic travels.
+   *
+   * Both carriageways are published west-to-east, so eastbound sections chain as they are and
+   * westbound sections have to be reversed — both the order of the sections and the vertices
+   * inside each one. Sorting by the corridor's own `travelOrder` puts them in the order traffic
+   * passes them, which is what makes "backwards from the incident" mean upstream.
+   */
+  function carriagewayPathFor(incident) {
+    const carriageway = incident?.carriageway;
+    if (carriageway !== CARRIAGEWAYS.EB_GENERAL && carriageway !== CARRIAGEWAYS.WB_GENERAL) return [];
+    const mine = sections().filter(section => section.carriageway === carriageway
+      && Number.isFinite(Number(section.travelOrder)));
+    if (!mine.length) return [];
+    const reversed = carriageway === CARRIAGEWAYS.WB_GENERAL;
+    const out = [];
+    for (const section of [...mine].sort((a, b) => Number(a.travelOrder) - Number(b.travelOrder))) {
+      const positions = sectionPositions(section.segmentId);
+      if (!positions?.length) continue;
+      const points = positions.map(position => {
+        const carto = Cartographic.fromCartesian(position);
+        return { lon: CesiumMath.toDegrees(carto.longitude), lat: CesiumMath.toDegrees(carto.latitude) };
+      });
+      out.push(...(reversed ? points.reverse() : points));
+    }
+    return out;
+  }
+
+  function queueGeometryFor(entry, assessment = upstreamProtectionFor(entry), atMinutes = scenarioMinutes) {
+    if (!entry || !assessment?.upstreamResolution.resolved) return null;
+    return simulatedQueueGeometry({
+      incident: entry.incident,
+      centerline,
+      // Measured: the shared centerline sits ~143 m from the westbound roadway and ~38 m from the
+      // eastbound one, so a westbound queue drawn on it lands off the road. The incident's own
+      // carriageway sections are published, so the queue uses those.
+      carriagewayPath: cached(`lane:${entry.incident.id}`, () => carriagewayPathFor(entry.incident)),
+      modelledMeters: simulatedQueueMetersAt(atMinutes),
+      upstreamResolved: true,
+      elapsedMinutes: atMinutes,
+    });
+  }
+
+  /** The hypothetical warning comparison, against whatever sign was actually resolved. */
+  function warningScenarioFor(entry, assessment = upstreamProtectionFor(entry)) {
+    if (!entry || !assessment) return null;
+    return compareWarningScenarios({
+      anchorMs: incidentAnchor(entry.incident),
+      dmsUpstreamMeters: assessment.nearestDms?.upstreamMeters ?? null,
+      dmsId: assessment.nearestDms?.id ?? null,
+    });
+  }
+
+  /** The option for the currently selected patrol, or null. */
+  function selectedPatrolOption(entry) {
+    const scenario = patrolScenarioFor(entry);
+    return scenario?.options.find(option => option.patrol.id === selectedPatrolId) ?? null;
+  }
+
+  function togglePatrols(entry) {
+    patrolVisible = !patrolVisible;
+    if (!patrolVisible) {
+      selectedPatrolId = null; patrolDispatch = null; patrolComparison = null; patrolRanking = null;
+      closePatrolCard();
+    }
+    renderPanel();
+    drawPatrols(entry);
+  }
+
+  /**
+   * Choose a simulated patrol.
+   *
+   * The incident under investigation is untouched — selecting a patrol is a question about the
+   * response, not a new investigation — so neither `selectedId` nor the assessment moves.
+   */
+  function selectPatrol(entry, patrolId) {
+    if (!patrolId) return;
+    const same = selectedPatrolId === patrolId;
+    selectedPatrolId = same ? null : patrolId;
+    // A scenario belongs to the patrol it was run for.
+    patrolDispatch = null;
+    patrolComparison = null;
+    if (!same) patrolVisible = true; else closePatrolCard();
+    renderPanel();
+    if (selectedPatrolId) {
+      // Framed on selection, not only on a focus change: choosing a patrol is the moment the
+      // operator wants to see where it is relative to the incident, and the fleet is spread over
+      // twenty kilometres of corridor — at incident zoom none of them is on screen.
+      setResponseFocus(RESPONSE_FOCUS.PATROLS, entry, { frame: false });
+      frameResponseFocus(entry);
+      openPatrolCard(entry);
+    } else { drawPatrols(entry); }
+  }
+
+  function simulateDispatch(entry) {
+    const option = selectedPatrolOption(entry);
+    const scenario = patrolScenarioFor(entry);
+    if (!option || !scenario) return;
+    // Local arithmetic over stated assumptions. Nothing is sent anywhere.
+    patrolDispatch = buildResponseScenario({ incident: scenario.incident, option });
+    renderPanel();
+    drawPatrols(entry);
+    openPatrolCard(entry);
+  }
+
+  /**
+   * Rank the eligible patrols side by side.
+   *
+   * A different question from the dispatch-delay comparison below: this one asks WHICH patrol,
+   * that one asks HOW SOON. Conflating them meant an incident with a single eligible patrol — the
+   * common case once same-carriageway and upstream are both required — offered no comparison at
+   * all, when the dispatch-delay one applies perfectly well to one patrol.
+   */
+  function comparePatrols(entry) {
+    const scenario = patrolScenarioFor(entry);
+    if (!scenario || scenario.eligible.length < 2) return;
+    patrolVisible = true;
+    patrolRanking = scenario.eligible;
+    renderPanel();
+    drawPatrols(entry);
+  }
+
+  /** The same patrol, dispatched at two different delays. Available with one candidate. */
+  function compareDispatchDelays(entry) {
+    const scenario = patrolScenarioFor(entry);
+    if (!scenario) return;
+    const option = selectedPatrolOption(entry) ?? scenario.suggested ?? scenario.eligible[0];
+    if (!option) return;
+    selectedPatrolId = option.patrol.id;
+    patrolVisible = true;
+    patrolComparison = compareDispatchScenarios({ incident: scenario.incident, option });
+    renderPanel();
+    drawPatrols(entry);
+  }
+
+  function focusPatrolRoute(entry) {
+    const option = selectedPatrolOption(entry);
+    if (!option?.route?.resolved) return;
+    rememberView();
+    patrolVisible = true;
+    drawPatrols(entry);
+    // Frame the midpoint of the route so both ends are in view.
+    const path = option.route.path;
+    const mid = path[Math.floor(path.length / 2)];
+    if (mid) flyTo({ longitude: mid.lon, latitude: mid.lat }, Math.max(1400, option.route.distanceMeters));
+  }
+
+  /**
+   * Frame the resolved upstream approach, without losing the incident.
+   *
+   * Refuses when the approach is unresolved rather than flying somewhere plausible: moving the map
+   * to "roughly upstream" is the same error as drawing a queue with no direction.
+   */
+  /**
+   * Change what the map emphasises, and frame it ONCE.
+   *
+   * Framing belongs here rather than in the draw, because the draw runs on every playback tick and
+   * a camera that re-framed forty-five times would make the scenario unwatchable. Manual pan, zoom,
+   * rotate and tilt survive, because nothing moves the camera again until the focus changes.
+   */
+  function setResponseFocus(next, entry, { frame = true } = {}) {
+    const changed = responseFocus !== next;
+    responseFocus = next;
+    drawUpstream(entry);
+    drawPatrols(entry);
+    if (changed && frame) frameResponseFocus(entry);
+  }
+
+  /** A safe view for each focus, always keeping the incident in frame. */
+  function frameResponseFocus(entry) {
+    if (!entry || !viewer) return;
+    const incident = { longitude: entry.incident.longitude, latitude: entry.incident.latitude };
+    if (responseFocus === RESPONSE_FOCUS.WARNING) {
+      // The signs and cameras are the subject here, and they sit close to the incident — framing
+      // on the queue midpoint pushed them to the edge and made this state look like Queue focus.
+      const assessment = upstreamProtectionFor(entry);
+      const resource = assessment?.nearestDms ?? assessment?.nearestCamera;
+      if (resource) {
+        flyTo({
+          longitude: (incident.longitude + resource.longitude) / 2,
+          latitude: (incident.latitude + resource.latitude) / 2,
+        }, Math.max(1200, resource.upstreamMeters * 2.2), { biasForPanel: true });
+        return;
+      }
+    }
+    if (responseFocus === RESPONSE_FOCUS.QUEUE) {
+      /**
+       * Framed for the FULL scenario, not the current minute.
+       *
+       * Framing the queue as it stands meant playback grew the tail straight out of the view, and
+       * re-framing on every tick is exactly what the spec forbids. Taking the extent the queue
+       * will reach by the end of the scenario means one fly, and the tail stays on screen for the
+       * whole of it.
+       */
+      const full = queueGeometryFor(entry, upstreamProtectionFor(entry), WARNING_ASSUMPTIONS.incidentDurationMinutes);
+      const queue = full?.resolved ? full : queueGeometryFor(entry);
+      if (queue?.resolved) {
+        flyTo({
+          longitude: (incident.longitude + queue.tail.longitude) / 2,
+          latitude: (incident.latitude + queue.tail.latitude) / 2,
+        }, Math.max(1800, queue.renderedMeters * 1.4), { biasForPanel: true });
+        return;
+      }
+    }
+    if (responseFocus === RESPONSE_FOCUS.PATROLS || responseFocus === RESPONSE_FOCUS.RESPONSE_SCENARIO) {
+      const option = selectedPatrolOption(entry);
+      if (option?.route?.resolved) {
+        const mid = option.route.path[Math.floor(option.route.path.length / 2)];
+        if (mid) {
+          flyTo({ longitude: mid.lon, latitude: mid.lat },
+            Math.max(1600, option.route.distanceMeters * 1.4), { biasForPanel: true });
+          return;
+        }
+      }
+    }
+    if (responseFocus === RESPONSE_FOCUS.UPSTREAM) {
+      const paths = upstreamSectionPaths(upstreamProtectionFor(entry));
+      // Derived from the span, not a fixed height: the resolved approach can be a few hundred
+      // metres or several kilometres, and a constant 3,200 m framed the longer ones off screen —
+      // the blue line was drawn correctly and simply not in view.
+      const far = paths.at(-1)?.at(-1);
+      if (far) {
+        const spanM = metresBetween(incident.longitude, incident.latitude, far.lon, far.lat);
+        flyTo({ longitude: (incident.longitude + far.lon) / 2, latitude: (incident.latitude + far.lat) / 2 },
+          Math.max(1800, spanM * 1.25), { biasForPanel: true });
+        return;
+      }
+    }
+    flyTo(incident, 1400, { biasForPanel: true });
+  }
+
+  function inspectUpstream(entry) {
+    const assessment = upstreamProtectionFor(entry);
+    if (!assessment?.upstreamResolution.resolved) return false;
+    rememberView();
+    setResponseFocus(RESPONSE_FOCUS.UPSTREAM, entry, { frame: false });
+    frameResponseFocus(entry);
+    return true;
+  }
+
+  /** The resolved upstream sections' real geometry, from the corridor's own segment layer. */
+  function upstreamSectionPaths(assessment) {
+    const out = [];
+    for (const section of assessment?.upstreamSections ?? []) {
+      const positions = sectionPositions(section.segmentId);
+      if (!positions?.length) continue;
+      out.push(positions.map(position => {
+        const carto = Cartographic.fromCartesian(position);
+        return { lon: CesiumMath.toDegrees(carto.longitude), lat: CesiumMath.toDegrees(carto.latitude) };
+      }));
+    }
+    return out;
+  }
+
+  /** The upstream overlay: the approach, and the hypothetical queue only when asked for. */
+  function drawUpstream(entry) {
+    if (!viewer) return;
+    if (!upstreamLayer) upstreamLayer = createUpstreamProtectionMapLayer(viewer);
+    const assessment = entry && activeTab === 'response' ? upstreamProtectionFor(entry) : null;
+    if (!assessment?.upstreamResolution.resolved) { upstreamLayer.clear(); return; }
+
+    // The queue is drawn ONLY when the operator enabled the scenario, and only as far as the
+    // published geometry actually reaches — the geometry module reports the clip rather than
+    // letting the map quietly disagree with the panel.
+    const queue = simulatedQueueVisible && warningScenarioOpen ? queueGeometryFor(entry, assessment) : null;
+
+    upstreamLayer.render({
+      sectionPaths: upstreamSectionPaths(assessment),
+      queuePath: queue?.resolved ? queue.path : null,
+      tail: queue?.resolved ? queue.tail : null,
+      queueSimulated: Boolean(queue?.resolved),
+      // Queue focus leads with the queue; Warning focus leads with the approach and its signs, so
+      // the two states do not look alike. Both still show everything — only the weight changes.
+      emphasis: responseFocus === RESPONSE_FOCUS.QUEUE ? 'queue'
+        : (responseFocus === RESPONSE_FOCUS.UPSTREAM || responseFocus === RESPONSE_FOCUS.WARNING
+          ? 'upstream' : null),
+    });
+    // The chip names what is simulated, so it is stale the moment an overlay is toggled.
+    renderMapChip(entry);
+    renderMapToolbar(entry);
+    renderMapPlayback(entry);
+  }
+
+  /** Draw, or remove, the simulated fleet. The one place the map learns about patrols. */
+  function drawPatrols(entry) {
+    if (!viewer) return;
+    if (!patrolLayer) patrolLayer = createPatrolMapLayer(viewer);
+    const scenario = entry && patrolVisible ? patrolScenarioFor(entry) : null;
+    if (!scenario) { patrolLayer.clear(); renderMapChip(entry); return; }
+    const option = selectedPatrolOption(entry);
+    patrolLayer.render({
+      patrols: scenario.options.map(o => o.patrol),
+      selectedPatrolId,
+      route: option?.route ?? null,
+      incident: scenario.incident,
+    });
+    renderMapChip(entry);
+    renderMapToolbar(entry);
   }
 
   /** Show one of the three questions. The header and the map filter stay as they are. */
@@ -1627,7 +2919,20 @@ export function installTmcWorkspace({
     if (!TABS.some(tab => tab.id === id)) return;
     const changed = activeTab !== id;
     activeTab = id;
+    // The fleet belongs to the Response question. Leaving it takes the vehicles off the map but
+    // keeps the scenario, so coming back does not make the operator set it up again.
+    if (id !== 'response') {
+      // Overview and History are different questions. The queue scenario stops and its controls
+      // go with it, rather than a playback bar hovering over a map that is no longer showing it.
+      stopPlayback();
+      closePatrolCard();
+      patrolLayer?.clear();
+      upstreamLayer?.clear();
+      mapToolbar.hidden = true;
+      mapPlayback.hidden = true;
+    }
     renderPanel();
+    if (id === 'response') { if (patrolVisible) drawPatrols(selected()); drawUpstream(selected()); }
     // The lens changes what is drawn; the camera only moves when the new lens needs geometry the
     // current view does not hold. Switching tabs should feel like changing lens, not reloading.
     if (changed) draw();
@@ -1830,10 +3135,33 @@ export function installTmcWorkspace({
 
   /** Fly without taking the camera over: no trackedEntity, so pan, zoom and rotate keep working. */
   const FLY_PITCH_DEG = -35;
-  function flyTo(place, height) {
+  /**
+   * How far east to aim so the subject lands in the VISIBLE map, not under the panel.
+   *
+   * Measured defect: framing the midpoint of the incident and the queue tail put the tail at
+   * screen x=1572 on a 1680-wide canvas, behind the 400 px Response panel. The camera was correct
+   * and the geometry was correct; the operator simply could not see it.
+   *
+   * The panel covers the right of the canvas, so the usable centre is left of the canvas centre.
+   * Aiming further east slides the subject west into that usable area. The ground width visible at
+   * height h with this pitch is about 2h, which is what converts a pixel bias into metres.
+   */
+  function panelBiasDegrees(height, latitude) {
+    const canvas = viewer?.scene?.canvas;
+    const panelWidth = panel && !panel.hidden ? panel.getBoundingClientRect().width : 0;
+    if (!canvas?.clientWidth || !panelWidth) return 0;
+    // Half the panel, because centring in the visible area means moving by half its width.
+    const biasFraction = (panelWidth / canvas.clientWidth) / 2;
+    const groundWidthM = 2 * height;
+    const metres = biasFraction * groundWidthM;
+    return metres / (111_320 * Math.cos(latitude * Math.PI / 180));
+  }
+
+  function flyTo(place, height, { biasForPanel = false } = {}) {
     if (!viewer || !Number.isFinite(place?.longitude) || !Number.isFinite(place?.latitude)) return;
+    const longitude = place.longitude + (biasForPanel ? panelBiasDegrees(height, place.latitude) : 0);
     // Framed, not centred on the eye: see cameraFraming for why flying AT a point hides it.
-    const eye = framedDestination(place.longitude, place.latitude, height, FLY_PITCH_DEG);
+    const eye = framedDestination(longitude, place.latitude, height, FLY_PITCH_DEG);
     viewer.camera.flyTo({
       destination: Cartesian3.fromDegrees(eye.longitude, eye.latitude, eye.height),
       orientation: { heading: 0, pitch: CesiumMath.toRadians(FLY_PITCH_DEG), roll: 0 },
@@ -1861,6 +3189,7 @@ export function installTmcWorkspace({
       focusedComponent = null;
       investigationView = null;
       closeResourceCard();
+      resetPatrolSimulation();
       openPlace = null;
       openEvent = null;
       scrollByTab.clear();
@@ -1870,6 +3199,18 @@ export function installTmcWorkspace({
       railCollapsed = Boolean(id);
     }
     selectedId = id;
+    clearAssessmentCache();
+    /**
+     * An open investigation owns the corridor's colour.
+     *
+     * TMC already clears the road layers on the way in, but an operator who turns one back on in
+     * Map Explorer kept it on through a selection — and the layer's own colouring then competed
+     * with the affected section, the upstream approach, the simulated queue and the patrol route,
+     * which are the things the investigation is drawing. Selecting an incident puts the corridor
+     * back to the TMC baseline so those read clearly. Leaving TMC restores whatever the operator
+     * had before they arrived.
+     */
+    if (id) void setCorridorRoads(false);
     if (!id) {
       // Back: the camera the operator had before they opened anything.
       if (cameraBefore && viewer) { viewer.camera.flyTo({ ...cameraBefore, duration: 1.2 }); cameraBefore = null; }
@@ -1940,6 +3281,7 @@ export function installTmcWorkspace({
     drawContextEvents(entry, lens);
     drawIncidentPins(entry, lens);
     renderMapChip(entry);
+    renderMapToolbar(entry);
     layoutLabels();
     viewer.scene?.requestRender?.();
   }
@@ -2187,7 +3529,24 @@ export function installTmcWorkspace({
   function layoutLabels() {
     if (!viewer?.scene || !declutter.length) return;
     const time = viewer.clock.currentTime;
+    /**
+     * The map's own overlays are obstacles too.
+     *
+     * The incident callout was being pushed up-left by the declutter and landing underneath the
+     * Response map toolbar, so the thing the whole screen is about ended up behind a control. The
+     * toolbar and the legend reserve their boxes before any label chooses a spot.
+     */
     const boxes = [];
+    const canvas = viewer.scene.canvas.getBoundingClientRect();
+    for (const overlay of [mapToolbar, mapChipEl, mapPlayback]) {
+      if (!overlay || overlay.hidden) continue;
+      const rect = overlay.getBoundingClientRect();
+      if (!rect.width) continue;
+      boxes.push({
+        x1: rect.left - canvas.left - 8, x2: rect.right - canvas.left + 8,
+        y1: rect.top - canvas.top - 8, y2: rect.bottom - canvas.top + 8,
+      });
+    }
     const ordered = [...declutter].sort((a, b) => a.priority - b.priority);
     for (const item of ordered) {
       const position = item.entity.position?.getValue?.(time);
@@ -2232,6 +3591,7 @@ export function installTmcWorkspace({
       badge.billboard.pixelOffset = new Cartesian2(dx, on.y + dy);
     }
     positionResourceCard();
+    positionPatrolCard();
     viewer.scene.requestRender?.();
   }
 
@@ -2705,6 +4065,9 @@ export function installTmcWorkspace({
       if (place) { openPlace = place; renderMapChip(selected()); return; }
       const event = pickedId ? contextByEntity.get(pickedId) : null;
       if (event) { selectContextEvent(event); return; }
+      // A simulated patrol: select it, leave the incident alone.
+      const patrolId = pickedId ? patrolLayer?.patrolAt(pickedId) : null;
+      if (patrolId) { selectPatrol(selected(), patrolId); return; }
       const resource = pickedId ? resourceByEntity.get(pickedId) : null;
       // Opens beside the camera and leaves the incident panel exactly as it was: looking through a
       // camera is not a new investigation.
@@ -2744,6 +4107,93 @@ export function installTmcWorkspace({
      * Nothing here changes an assessment — they move the camera and the display filter only.
      */
     showTab(id) { if (!selectedId) return false; showTab(id); return true; },
+
+    /**
+     * The patrol scenario the screen is showing, for Ask the Twin to describe.
+     *
+     * A getter over the live computation rather than a stored copy, so the chat can never describe
+     * a fleet the map is no longer drawing.
+     */
+    get patrolScenario() { return patrolScenarioFor(selected()); },
+
+    /** The upstream assessment and the warning scenario the screen is showing. */
+    get upstreamProtection() { return upstreamProtectionFor(selected()); },
+    get warningScenario() { return warningScenarioFor(selected()); },
+
+    /** Frame the resolved approach, or refuse when it is not resolved. */
+    inspectUpstream() {
+      const entry = selected();
+      if (!entry) return false;
+      showTab('response');
+      return inspectUpstream(entry);
+    },
+    /** Open the hypothetical warning scenario. Never enables the queue overlay on its own. */
+    showWarningScenario() {
+      const entry = selected();
+      if (!upstreamProtectionFor(entry)) return false;
+      showTab('response');
+      warningScenarioOpen = true;
+      renderPanel();
+      drawUpstream(entry);
+      return true;
+    },
+
+    /**
+     * The patrol actions Ask the Twin may drive.
+     *
+     * Each one validates against the scenario the workspace holds and returns false rather than
+     * improvising — asking to select a patrol that is not in this scenario moves nothing, and the
+     * chat says so instead of pretending.
+     */
+    showPatrols() {
+      const entry = selected();
+      if (!patrolScenarioFor(entry)) return false;
+      patrolVisible = true;
+      showTab('response');
+      drawPatrols(entry);
+      return true;
+    },
+    selectPatrol(patrolId) {
+      const entry = selected();
+      const scenario = patrolScenarioFor(entry);
+      if (!scenario?.options.some(option => option.patrol.id === patrolId)) return false;
+      patrolVisible = true;
+      showTab('response');
+      selectPatrol(entry, patrolId);
+      return true;
+    },
+    comparePatrols() {
+      const entry = selected();
+      const scenario = patrolScenarioFor(entry);
+      if (!scenario || scenario.eligible.length === 0) return false;
+      showTab('response');
+      // Two eligible patrols is a choice between them; one is a choice about when to send it.
+      if (scenario.eligible.length > 1) comparePatrols(entry);
+      compareDispatchDelays(entry);
+      return true;
+    },
+    simulateDispatch(patrolId) {
+      const entry = selected();
+      const scenario = patrolScenarioFor(entry);
+      const option = scenario?.eligible.find(o => o.patrol.id === (patrolId ?? selectedPatrolId));
+      if (!option) return false;
+      showTab('response');
+      selectedPatrolId = option.patrol.id;
+      patrolVisible = true;
+      simulateDispatch(entry);
+      return true;
+    },
+    showPatrolRoute(patrolId) {
+      const entry = selected();
+      const scenario = patrolScenarioFor(entry);
+      const option = scenario?.eligible.find(o => o.patrol.id === (patrolId ?? selectedPatrolId));
+      if (!option) return false;
+      showTab('response');
+      selectedPatrolId = option.patrol.id;
+      patrolVisible = true;
+      focusPatrolRoute(entry);
+      return true;
+    },
     showHistoryOnMap() {
       const entry = selected();
       if (!entry?.locationHistory?.available || !entry.locationHistory.totals.crashes) return false;
@@ -2812,13 +4262,16 @@ export function installTmcWorkspace({
       // incident is on. Restored on the way out.
       void setCorridorRoads(false);
       void loadRoadIndex();
-      refresh();
+      refresh({ force: true });
       strip.measure();
     },
     deactivate() {
       if (!active) return;
       closeResourceCard();
+      resetPatrolSimulation();
       miniHost.hidden = true;
+      mapToolbar.hidden = true;
+      mapPlayback.hidden = true;
       corridorStatus?.setSuppressed?.(false, 'tmc');
       void setCorridorRoads(true);
       document.body.dataset.tmcInvestigating = 'false';
@@ -2839,6 +4292,12 @@ export function installTmcWorkspace({
     },
     destroy() {
       corridorStatus?.setSuppressed?.(false, 'tmc');
+      stopPlayback();
+      resetPatrolSimulation();
+      patrolLayer?.destroy();
+      patrolLayer = null;
+      upstreamLayer?.destroy();
+      upstreamLayer = null;
       stopRegisterWatch();
       stopSnapshot();
       stopUpdates();

@@ -585,7 +585,14 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     if (!intent) return false;
     const assessed = tmc.assessment;
     const selected = assessed?.assessments?.find(entry => entry.incident.id === tmc.selectedIncidentId) ?? null;
-    const answer = answerTmcQuestion(intent, assessed, { selected });
+    // The patrol scenario comes from the workspace, already computed — the chat never builds one,
+    // so an answer can only ever describe the same simulation the screen is showing.
+    const answer = answerTmcQuestion(intent, assessed, {
+      selected,
+      patrol: tmc.patrolScenario ?? null,
+      upstreamProtection: tmc.upstreamProtection ?? null,
+      warning: tmc.warningScenario ?? null,
+    });
     if (!answer) return false;
     addMsg('assistant', answer.answer);
     offerTmcActions(answer.actions);
@@ -625,6 +632,15 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
         case TWIN_ACTIONS.CLEAR_HISTORY_FILTER: return tmc.clearHistoryFilter();
         case TWIN_ACTIONS.FOCUS_AFFECTED_SECTION: return tmc.focusAffectedSection();
         case TWIN_ACTIONS.FOCUS_RESOURCE: return tmc.focusResource(action.resourceType);
+        // Patrol actions. Each one refuses rather than improvises: the workspace validates the
+        // patrol id against the scenario it actually holds.
+        case TWIN_ACTIONS.SHOW_PATROLS: return tmc.showPatrols();
+        case TWIN_ACTIONS.SELECT_PATROL: return tmc.selectPatrol(action.patrolId);
+        case TWIN_ACTIONS.COMPARE_PATROLS: return tmc.comparePatrols();
+        case TWIN_ACTIONS.SIMULATE_DISPATCH: return tmc.simulateDispatch(action.patrolId);
+        case TWIN_ACTIONS.SHOW_PATROL_ROUTE: return tmc.showPatrolRoute(action.patrolId);
+        case TWIN_ACTIONS.INSPECT_UPSTREAM: return tmc.inspectUpstream();
+        case TWIN_ACTIONS.SHOW_WARNING_SCENARIO: return tmc.showWarningScenario();
         case TWIN_ACTIONS.SELECT_INCIDENT:
           if (action.incidentId) { tmc.selectIncident(action.incidentId); return true; }
           return false;

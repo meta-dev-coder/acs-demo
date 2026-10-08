@@ -1039,6 +1039,9 @@ body:has(.layers:not(.collapsed)) .safety-trend { left: calc(var(--app-nav-w) + 
 /* Safety keeps its Crash Hotspots control, while the KPI cards and source badge stay out of view. */
 .safety-workspace .ws-kpi-cards,
 .safety-workspace .ws-source { display: none; }
+/* Maintenance data and cloud sync continue in the background; their status pills do not occupy
+   the KPI row. Loading and error states remain visible on the KPI cards themselves. */
+.maintenance-workspace .ws-source { display: none; }
 /* The cards are the part that scrolls when the strip runs out of room; the source pills stay put. */
 .ws-kpi-cards { display: flex; align-items: stretch; gap: 8px; min-width: 0;
   overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
@@ -1558,3 +1561,198 @@ body[data-section="tmc"][data-tmc-investigating="true"] .ask-twin-btn { right: 4
 .tmc-replay-tag { font-weight: 600; color: #ee9148; letter-spacing: .04em; text-transform: uppercase; font-size: 10.5px; }
 .tmc-panel-when { margin: 2px 0 0; font-size: 11px; color: #ee9148; }
 .tmc-when[data-loading="true"] { opacity: .6; }
+
+/* ---- Patrol response simulation -------------------------------------------------------------
+   Everything simulated carries the same amber badge, in the panel, on the card and on the map, so
+   the distinction is one visual idea rather than a sentence the reader has to find. */
+.tmc-sim-badge {
+  display: inline-block; margin-left: 6px; padding: 1px 5px; border-radius: 3px;
+  background: rgba(245, 181, 27, 0.16); border: 1px solid rgba(245, 181, 27, 0.5);
+  color: #F5B51B; font-size: 9px; font-weight: 700; font-style: normal; letter-spacing: .07em;
+  text-transform: uppercase; vertical-align: middle;
+}
+.tmc-patrol-disclaimer {
+  margin: 0 0 8px; padding: 6px 8px; border-left: 2px solid rgba(245, 181, 27, 0.6);
+  background: rgba(245, 181, 27, 0.07); color: var(--ui-text-dim); font-size: 10.5px; line-height: 1.45;
+}
+.tmc-patrol-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 4px; }
+.tmc-patrol-row button {
+  width: 100%; display: flex; align-items: flex-start; gap: 8px; text-align: left;
+  padding: 6px 8px; border: 1px solid transparent; border-radius: 7px;
+  background: var(--ui-surface-raised); color: var(--ui-text); font: inherit; cursor: pointer;
+}
+.tmc-patrol-row button:hover { border-color: var(--ui-border); }
+.tmc-patrol-row button[aria-pressed="true"] { border-color: #F5B51B; background: rgba(245, 181, 27, 0.1); }
+/* The status dot repeats what the row says in words; it never carries the meaning alone. */
+.tmc-patrol-dot {
+  flex: none; width: 9px; height: 9px; margin-top: 4px; border-radius: 2px;
+  background: var(--patrol-tone, #8b95a3);
+}
+.tmc-patrol-body { display: grid; gap: 1px; font-size: 11px; }
+.tmc-patrol-body strong { font-size: 11.5px; font-weight: 600; }
+.tmc-patrol-body span { color: var(--ui-text-dim); }
+.tmc-patrol-best {
+  margin-left: 6px; color: #14b8a6; font-size: 9.5px; font-weight: 700; font-style: normal;
+  letter-spacing: .04em; text-transform: uppercase;
+}
+.tmc-patrol-why { margin: 6px 0 0; color: #e5bc57; font-size: 10.5px; line-height: 1.45; }
+.tmc-patrol-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+.tmc-patrol-timeline, .tmc-patrol-compare {
+  margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--ui-border);
+}
+.tmc-patrol-timeline h4, .tmc-patrol-compare h4 { margin: 0 0 6px; font-size: 11.5px; font-weight: 600; }
+.tmc-patrol-timeline ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.tmc-patrol-timeline li { display: grid; grid-template-columns: 46px 1fr; gap: 8px; font-size: 11px; }
+/* A real recorded time and a simulated one must never look alike. */
+.tmc-patrol-timeline li[data-kind="REAL"] .tmc-patrol-at { color: #55d6ba; font-weight: 700; }
+.tmc-patrol-timeline li[data-kind="SIMULATED"] .tmc-patrol-at { color: #F5B51B; }
+.tmc-patrol-at { font-variant-numeric: tabular-nums; font-size: 11px; }
+.tmc-patrol-what { display: grid; gap: 1px; }
+.tmc-patrol-what strong { font-size: 11px; font-weight: 600; }
+.tmc-patrol-what em {
+  font-size: 9px; font-style: normal; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ui-text-dim);
+}
+.tmc-patrol-timeline li[data-kind="REAL"] .tmc-patrol-what em { color: #55d6ba; }
+.tmc-patrol-what span { color: var(--ui-text-dim); font-size: 10.5px; }
+/* The patrol card sits above the camera card: it is the thing just clicked. */
+.tmc-patrol-card { z-index: 15; }
+.tmc-patrol-table { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 10.5px; }
+.tmc-patrol-table th {
+  text-align: left; padding: 3px 6px 4px; font-size: 9px; font-weight: 600; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--ui-text-dim); border-bottom: 1px solid var(--ui-border);
+}
+.tmc-patrol-table td { padding: 4px 6px; border-bottom: 1px solid var(--ui-border); }
+.tmc-patrol-table tr.is-best td { color: #14b8a6; font-weight: 600; }
+
+/* ---- Response tab, rebuilt around the decision ---------------------------------------------- */
+.tmc-action.is-primary {
+  background: rgba(59, 130, 246, 0.16); border-color: rgba(59, 130, 246, 0.55); color: #cfe0ff;
+  font-weight: 600;
+}
+.tmc-action.is-primary:hover { background: rgba(59, 130, 246, 0.26); }
+.tmc-action[disabled] { opacity: .45; cursor: not-allowed; }
+.tmc-patrol-counts { margin: 6px 0 0; color: var(--ui-text-dim); font-size: 10.5px; }
+.tmc-patrol-none { margin: 4px 0 2px; font-size: 12px; font-weight: 600; color: #e5bc57; }
+.tmc-plan-head { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.tmc-plan-head h3 { margin: 0; }
+.tmc-plan h4, .tmc-unavailable h4 { margin: 10px 0 4px; font-size: 11px; font-weight: 600; }
+.tmc-fold.tmc-unavailable summary { cursor: pointer; display: flex; align-items: center; gap: 8px; }
+.tmc-fold.tmc-unavailable summary h4 { margin: 0; }
+.tmc-fold.tmc-unavailable summary span { color: var(--ui-text-dim); font-size: 10.5px; }
+
+/* The observation states. Each one reads differently at a glance, because "not observed",
+   "unknown" and "unavailable" are three different operational answers. */
+.tmc-upstream [data-obs="CONFIRMED"] { color: #55d6ba; }
+.tmc-upstream [data-obs="NOT_OBSERVED"] { color: var(--ui-text); }
+.tmc-upstream [data-obs="UNKNOWN"] { color: #e5bc57; }
+.tmc-upstream [data-obs="UNAVAILABLE"] { color: var(--ui-text-dim); font-style: italic; }
+.tmc-upstream [data-obs] em { font-style: normal; font-size: 10px; color: var(--ui-text-dim); margin-left: 4px; }
+
+.tmc-warning-scenario { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--ui-border); }
+.tmc-warning-scenario h4 { margin: 0 0 6px; font-size: 11.5px; font-weight: 600; }
+
+/* The compact timeline: three steps, recorded distinguished from simulated. */
+.tmc-steps { list-style: none; margin: 4px 0 0; padding: 0; display: flex; gap: 6px; flex-wrap: wrap; }
+.tmc-steps li {
+  flex: 1 1 auto; min-width: 84px; display: grid; gap: 1px; padding: 6px 8px;
+  border-radius: 7px; background: var(--ui-surface-raised); border-left: 3px solid var(--ui-border);
+}
+.tmc-steps li[data-kind="REAL"] { border-left-color: #55d6ba; }
+.tmc-steps li[data-kind="SIMULATED"] { border-left-color: #F5B51B; }
+.tmc-step-at { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tmc-step-label { font-size: 11px; }
+.tmc-steps em {
+  font-size: 9px; font-style: normal; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ui-text-dim);
+}
+.tmc-steps li[data-kind="REAL"] em { color: #55d6ba; }
+
+/* ---- Queue scenario playback ---------------------------------------------------------------- */
+.tmc-playback { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--ui-border); }
+.tmc-playback-head { display: grid; gap: 1px; margin-bottom: 6px; }
+.tmc-playback-head strong { font-size: 12.5px; color: #F5B51B; font-variant-numeric: tabular-nums; }
+.tmc-playback-head span { font-size: 10px; color: var(--ui-text-dim); }
+.tmc-playback-slider { width: 100%; margin: 8px 0 2px; accent-color: #F5B51B; }
+.tmc-playback-scale {
+  display: flex; justify-content: space-between; font-size: 9.5px; color: var(--ui-text-dim);
+  margin-bottom: 6px;
+}
+
+/* ---- Response map toolbar -------------------------------------------------------------------
+   The focus states existed in code but nothing on screen offered them. This is the control
+   surface: compact, over the map, left column — clear of the KPI strip above, the mini-map below
+   and the Response panel to the right. */
+.tmc-map-toolbar {
+  /* In the control bar beside Mode and Date, not floating over the map: focus is a control, and
+     it was reading as a second legend sitting under the one it duplicates. */
+  display: inline-flex; align-items: center; gap: 8px;
+  margin-left: 4px; padding-left: 12px; border-left: 1px solid var(--ui-border);
+}
+.tmc-map-toolbar[hidden] { display: none; }
+.tmc-map-toolbar-kicker {
+  font-size: 9.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--ui-text-dim);
+  white-space: nowrap;
+}
+.tmc-map-toolbar-row { display: flex; flex-wrap: wrap; gap: 4px; }
+/* The control bar can wrap on a narrow window rather than pushing the map focus off screen. */
+.tmc-when { flex-wrap: wrap; row-gap: 6px; }
+.tmc-focus-btn {
+  display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px 4px 6px;
+  border: 1px solid var(--ui-border); border-radius: 999px;
+  background: var(--ui-surface); color: var(--ui-text-dim);
+  font: 600 10.5px/1 inherit; font-family: inherit; cursor: pointer; white-space: nowrap;
+}
+.tmc-focus-btn:hover:not([disabled]) { color: var(--ui-text); border-color: #6ea8ff; }
+.tmc-focus-btn.is-active {
+  background: rgba(59, 130, 246, 0.2); border-color: #6ea8ff; color: #dbeafe;
+}
+/* Unavailable rather than hidden: the operator learns the capability exists and why it is not
+   offered here, which the tooltip states. */
+.tmc-focus-btn[disabled] { opacity: .4; cursor: not-allowed; }
+.tmc-focus-icon { display: inline-flex; width: 13px; height: 13px; }
+.tmc-focus-icon svg { width: 100%; height: 100%; fill: currentColor; }
+/* The legend is back to its own place: the toolbar has moved into the control bar above it. */
+.tmc-map-chip { top: 160px; }
+
+/* ---- Queue playback, on the map ------------------------------------------------------------
+   Above the corridor slider and left of Ask the Twin, so it drives the animation without
+   covering the Cesium navigation controls or the mini-map. */
+.tmc-map-playback {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: 86px; z-index: 14;
+  width: min(540px, 52vw); padding: 8px 12px 7px;
+  border: 1px solid var(--ui-border); border-radius: 10px;
+  background: var(--ui-surface-solid); box-shadow: 0 10px 30px var(--ui-shadow-color);
+  pointer-events: auto;
+}
+.tmc-map-playback[hidden] { display: none; }
+.tmc-mp-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.tmc-mp-kicker { font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ui-text-dim); }
+.tmc-mp-at { font-size: 12.5px; font-weight: 700; color: #F5B51B; font-variant-numeric: tabular-nums; }
+.tmc-mp-row { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+.tmc-mp-row .tmc-action { padding: 3px 9px; font-size: 11px; white-space: nowrap; }
+.tmc-mp-slider { flex: 1; accent-color: #F5B51B; }
+.tmc-mp-extent {
+  min-width: 62px; text-align: right; font-size: 12px; font-weight: 600;
+  font-variant-numeric: tabular-nums; color: var(--ui-text);
+}
+.tmc-mp-foot {
+  display: flex; justify-content: space-between; gap: 8px; margin-top: 2px;
+  font-size: 9.5px; color: var(--ui-text-dim);
+}
+
+/* ---- Guided exploration ---------------------------------------------------------------------- */
+.tmc-explore { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 3px; }
+.tmc-explore li { display: grid; grid-template-columns: 18px 1fr; gap: 7px; align-items: start; }
+.tmc-explore button {
+  display: grid; gap: 1px; width: 100%; text-align: left; padding: 5px 8px;
+  border: 1px solid transparent; border-radius: 7px; background: var(--ui-surface-raised);
+  color: var(--ui-text); font: inherit; cursor: pointer;
+}
+.tmc-explore button:hover:not([disabled]) { border-color: #6ea8ff; }
+.tmc-explore button strong { font-size: 11.5px; font-weight: 600; }
+.tmc-explore button span { font-size: 10.5px; color: var(--ui-text-dim); }
+/* A blocked step still shows, with the reason: the operator learns the capability and the gap. */
+.tmc-explore li[data-blocked] button { opacity: .55; cursor: not-allowed; }
+.tmc-explore li[data-blocked] button span { color: #e5bc57; }

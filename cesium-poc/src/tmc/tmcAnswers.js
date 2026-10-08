@@ -128,6 +128,34 @@ const has = (question, ...words) => {
 export function parseTmcQuestion(question) {
   const text = String(question ?? '').toLowerCase().trim();
   if (!text) return null;
+  // Upstream protection. Before the patrol block, because "compare patrol and warning response"
+  // mentions both and the warning is the part the patrol answers cannot speak to.
+  if (/\bwarning\b|\bdms\b/.test(text)) {
+    if (has(text, 'what if') || has(text, 'earlier') || has(text, 'sooner')) return 'WARNING_EARLIER';
+    if (has(text, 'compare') && /patrol|ranger/.test(text)) return 'PATROL_AND_WARNING';
+    if (has(text, 'active') || has(text, 'activated') || has(text, 'status')) return 'WARNING_STATUS';
+    if (has(text, 'which') || has(text, 'upstream') || has(text, 'show')) return 'UPSTREAM_DMS';
+    return 'WARNING_STATUS';
+  }
+  if (has(text, 'queue') || (has(text, 'traffic') && /forming|building|slowing|backing/.test(text))) return 'QUEUE_STATUS';
+  if (has(text, 'protect') && /traffic|approach|queue|driver/.test(text)) return 'PROTECT_APPROACH';
+  if (has(text, 'show') && has(text, 'upstream')) return 'UPSTREAM_APPROACH';
+  if (has(text, 'upstream approach')) return 'UPSTREAM_APPROACH';
+  // Patrol simulation. Matched FIRST: several of these also contain 'show', 'compare' or
+  // 'fastest', which the general matchers below would otherwise claim.
+  if (/patrol|road ranger|roadranger|ranger/.test(text)) {
+    if (has(text, 'what data') || has(text, 'need from acs') || has(text, 'make this real')) return 'PATROL_REAL_DATA';
+    if (has(text, 'route')) return 'PATROL_ROUTE';
+    if (has(text, 'compare') || has(text, 'response times')) return 'PATROL_COMPARE';
+    if (has(text, 'fastest') || has(text, 'quickest') || has(text, 'soonest') || has(text, 'reach')) return 'PATROL_FASTEST';
+    if (has(text, 'show') || has(text, 'map') || has(text, 'where')) return 'PATROL_SHOW';
+    return 'PATROL_AVAILABLE';
+  }
+  // "What data do we need to make this real?" is about the simulation, not about the incident's
+  // own missing fields, so it must not fall through to the general data-gaps answer.
+  if (has(text, 'make this real') || has(text, 'make it real') || has(text, 'need from acs')) return 'PATROL_REAL_DATA';
+  if (has(text, 'dispatch') && (has(text, 'earlier') || has(text, 'sooner') || /\bminutes? earlier\b/.test(text))) return 'PATROL_EARLIER';
+  if (has(text, 'what if') && has(text, 'dispatch')) return 'PATROL_EARLIER';
   if (has(text, 'highest') && (text.includes('secondary') || text.includes('risk'))) return 'HIGHEST_RISK';
   if (has(text, 'reduce') && text.includes('risk')) return 'MITIGATION';
   if (text.includes('mitigat')) return 'MITIGATION';
@@ -176,7 +204,9 @@ const unavailableLines = risk => risk.unavailableFactors.map(f => `• ${f.label
  *
  * @returns {{answer: string, actions: object[], incidentId: string|null}|null}
  */
-export function answerTmcQuestion(intent, assessed, { selected = null } = {}) {
+export function answerTmcQuestion(intent, assessed, {
+  selected = null, patrol = null, upstreamProtection = null, warning = null,
+} = {}) {
   if (!intent) return null;
   const historical = assessed?.historical === true || assessed?.when?.mode === TEMPORAL_MODES.HISTORICAL;
   const when = assessed?.when?.label ?? null;
@@ -528,9 +558,261 @@ export function answerTmcQuestion(intent, assessed, { selected = null } = {}) {
           : `${incident.id} has been active for ${incident.activeMinutes} minutes, on ${place(incident)}.`,
         actions: buildActions(entry, resources),
       };
+    /**
+     * The patrol questions.
+     *
+     * Every one of these opens by saying the data is simulated. That is not decoration: an answer
+     * in a chat window is the easiest place in the whole application for a simulated number to be
+     * mistaken for an operational one, because it arrives as prose with no badge beside it.
+     */
+    case 'PATROL_AVAILABLE':
+    case 'PATROL_SHOW':
+    case 'PATROL_FASTEST':
+    case 'PATROL_COMPARE':
+    case 'PATROL_ROUTE':
+    case 'PATROL_EARLIER':
+      return patrolAnswer(intent, incident, patrol);
+
+    case 'UPSTREAM_APPROACH':
+    case 'QUEUE_STATUS':
+    case 'UPSTREAM_DMS':
+    case 'WARNING_STATUS':
+    case 'PROTECT_APPROACH':
+    case 'WARNING_EARLIER':
+    case 'PATROL_AND_WARNING':
+      // "Which DMS is upstream" is answerable from the incident's own resolved resources even
+      // when the fuller assessment was not supplied, so it degrades to that rather than refusing.
+      if (!upstreamProtection && intent === 'UPSTREAM_DMS') {
+        return {
+          incidentId: incident.id,
+          answer: resources.sign
+            ? `Nearest upstream sign for ${incident.id} is ${resources.sign.id}, ${upstreamLabel(resources.sign)}.`
+              + '\n\nThe feed publishes no sign messages or activation times, so warning status is UNKNOWN — '
+              + 'the sign being upstream is not evidence that it warned about this incident.'
+            : `No upstream sign resolved for ${incident.id}${upstream.status === UPSTREAM_STATUS.RESOLVED
+              ? ' within range.' : ` — ${String(upstream.reason).toLowerCase()}.`}`,
+          actions: buildActions(entry, resources),
+        };
+      }
+      return upstreamAnswer(intent, incident, upstreamProtection, warning, patrol);
+
+    case 'PATROL_REAL_DATA':
+      return {
+        incidentId: incident.id,
+        actions: [],
+        answer: 'To replace the simulation with real patrol data, ACS would need to provide: patrol and '
+          + 'vehicle identifiers, position with a timestamp (AVL), availability or duty status, the incident '
+          + 'a patrol is assigned to, and the dispatch, arrival, departure and clearance times for each '
+          + 'response. Road network topology — ramp and interchange connectivity — would also let travel '
+          + 'times be routed properly instead of estimated along the mainline centerline. Those field names '
+          + 'are what an integration would need, not a confirmed SunGuide payload.',
+      };
     default:
       return null;
   }
+}
+
+/**
+ * The upstream protection answers.
+ *
+ * Every one of them distinguishes four things that a chat answer makes it very easy to blur:
+ * what was OBSERVED, what is SIMULATED, what is UNKNOWN because we could not look, and what is
+ * UNAVAILABLE because the source does not publish it at all. The model never supplies a traffic
+ * condition — these answers are built from the deterministic assessment the screen is showing.
+ */
+function upstreamAnswer(intent, incident, assessment, warning, patrol) {
+  if (!assessment) {
+    return { incidentId: incident.id, actions: [],
+      answer: `No upstream assessment is available for ${incident.id}. Open the incident on a historical `
+        + 'date to assess its approach.' };
+  }
+  const resolved = assessment.upstreamResolution.resolved;
+  const inspect = resolved
+    ? [{ id: 'inspect-upstream', type: TWIN_ACTIONS.INSPECT_UPSTREAM, label: 'Inspect upstream', incidentId: incident.id }]
+    : [];
+  const scenarioAction = { id: 'warning-scenario', type: TWIN_ACTIONS.SHOW_WARNING_SCENARIO,
+    label: 'Explore warning scenario', incidentId: incident.id };
+
+  if (intent === 'UPSTREAM_APPROACH') {
+    return { incidentId: incident.id, actions: inspect,
+      answer: resolved
+        ? `The upstream approach for ${incident.id} is resolved from the corridor's own travel order: `
+          + `${assessment.upstreamSections.length} section(s) upstream on the `
+          + `${assessment.carriageway.replace('_', ' ').toLowerCase()} carriageway. OBSERVED, from road geometry.`
+        : `The upstream approach for ${incident.id} is UNKNOWN — ${assessment.upstreamResolution.reason}. `
+          + 'Nothing upstream can be assessed until the direction is established, and the twin will not '
+          + 'guess a direction or snap to the nearest section.' };
+  }
+
+  if (intent === 'QUEUE_STATUS') {
+    return { incidentId: incident.id, actions: resolved ? [...inspect, scenarioAction] : [],
+      answer: `Queue extent is UNAVAILABLE — the connected feed publishes no queue length, traffic `
+        + `conditions, delay or recovery estimate (${assessment.queue.missingFields.map(f => f.field).join(', ')}). `
+        + `What can be said is traffic: ${assessment.traffic.detail} `
+        + `(${assessment.trafficObservationStatus}). A hypothetical queue can be explored as an explicitly `
+        + 'SIMULATED scenario, but nothing observed supports a queue length for this incident.' };
+  }
+
+  if (intent === 'UPSTREAM_DMS') {
+    return { incidentId: incident.id, actions: inspect,
+      answer: assessment.nearestDms
+        ? `${assessment.nearestDms.id} is ${assessment.nearestDms.upstreamMiles} mi upstream on the same `
+          + 'carriageway — OBSERVED, from the published sign locations. Whether it displayed anything is a '
+          + 'separate question: no message content or activation time is published, so warning status is UNKNOWN.'
+        : (resolved
+          ? 'No message sign resolved upstream of this incident on its carriageway.'
+          : `No upstream sign can be resolved — ${assessment.upstreamResolution.reason}.`) };
+  }
+
+  if (intent === 'WARNING_STATUS') {
+    return { incidentId: incident.id, actions: resolved ? [scenarioAction, ...inspect] : [],
+      answer: `Warning activation is UNKNOWN for ${incident.id}. ${assessment.warningActivation.detail}. `
+        + 'A sign being nearby is not evidence that a warning was shown — the fields that would settle it are '
+        + `${assessment.warningActivation.missingFields.map(f => f.field).join(' and ')}, neither of which the `
+        + 'feed publishes.' };
+  }
+
+  if (intent === 'PROTECT_APPROACH') {
+    const lines = assessment.recommendedAttention
+      .map((item, i) => `${i + 1}. ${item.action} (${item.priority})${item.gap ? ' — data gap' : ''}: ${item.reason}`);
+    return { incidentId: incident.id, actions: resolved ? [...inspect, scenarioAction] : [],
+      answer: `What the connected data supports for protecting approaching traffic:\n${lines.join('\n')}\n\n`
+        + `Data coverage for this assessment is ${assessment.dataConfidence.label} `
+        + `(${assessment.dataConfidence.known} of ${assessment.dataConfidence.total} established). Items marked `
+        + 'as a data gap say what to establish, not an action already available.' };
+  }
+
+  if (intent === 'WARNING_EARLIER') {
+    if (!warning?.resolved) {
+      return { incidentId: incident.id, actions: [],
+        answer: `A warning scenario cannot be built for ${incident.id} — ${warning?.reason ?? 'no incident timestamp'}.` };
+    }
+    const a = warning.scenarioA; const b = warning.scenarioB;
+    const reach = value => (value === null ? 'cannot be said — no upstream sign was resolved' : value ? 'yes' : 'no');
+    return { incidentId: incident.id, actions: [scenarioAction],
+      answer: `SIMULATED scenario. Activating ${warning.earlierByMinutes} minutes earlier (${a.delayMinutes} → `
+        + `${b.delayMinutes} min) does NOT shorten the queue — the queue model is identical in both scenarios. `
+        + `What changes is how far it had grown when the sign lit up: ${a.simulatedQueueMiles} mi at `
+        + `${a.delayMinutes} min versus ${b.simulatedQueueMiles} mi at ${b.delayMinutes} min. Whether the sign `
+        + `is upstream of the tail — A: ${reach(a.reachesQueueTail)}, B: ${reach(b.reachesQueueTail)}. `
+        + 'Both the queue and the activation times are assumptions: no queue observations and no DMS activation '
+        + 'records are published. Effect on actual collisions: not estimated.' };
+  }
+
+  // PATROL_AND_WARNING
+  const best = patrol?.suggested ?? patrol?.eligible?.[0] ?? null;
+  return { incidentId: incident.id, actions: resolved ? [...inspect, scenarioAction] : [],
+    answer: 'Patrol response and upstream warning are independent, and the twin keeps them that way — a patrol '
+      + 'does not operate a sign, and a dispatch does not activate one.\n\n'
+      + `PATROL (SIMULATED): ${best
+        ? `${best.patrol.id} could reach the scene in about ${Math.max(1, Math.round(best.travelSeconds / 60))} min.`
+        : 'no eligible simulated patrol for this incident.'}\n`
+      + `WARNING (UNKNOWN): ${assessment.nearestDms
+        ? `${assessment.nearestDms.id} is ${assessment.nearestDms.upstreamMiles} mi upstream, but activation cannot be confirmed.`
+        : 'no upstream sign resolved.'}\n`
+      + `QUEUE (UNAVAILABLE): not published, so neither response can be measured against the queue it would meet.` };
+}
+
+/** The patrol answers, each stating up front that the fleet is simulated. */
+function patrolAnswer(intent, incident, patrol) {
+  const SIM = 'Patrol data is SIMULATED — illustrative Road Ranger positions, not actual FDOT or ACS dispatch data.';
+  if (!patrol) {
+    return {
+      incidentId: incident.id, actions: [],
+      answer: `${SIM}\n\nNo patrol scenario is available for ${incident.id}. The simulation runs on a `
+        + 'historical date with an incident open, because it is anchored to that incident\'s own timestamp.',
+    };
+  }
+  const { availability, eligible, suggested, options } = patrol;
+  const mins = option => Math.max(1, Math.round(option.travelSeconds / 60));
+  const show = { id: 'show-patrols', type: TWIN_ACTIONS.SHOW_PATROLS, label: 'Show simulated patrols', incidentId: incident.id };
+
+  if (intent === 'PATROL_AVAILABLE' || intent === 'PATROL_SHOW') {
+    const lines = options.map(option => `• ${option.patrol.id} — ${option.patrol.statusLabel}`
+      + (option.eligible ? ` · estimated travel ${mins(option)} min` : ` · ${option.ineligibleReason}`));
+    return {
+      incidentId: incident.id,
+      actions: [show],
+      answer: `${SIM}\n\nThe scenario holds ${availability.total} simulated patrols: ${availability.available} `
+        + `available, ${availability.busy} busy, ${availability.outOfService} out of service. `
+        + `${eligible.length} can be routed to ${incident.id}.\n${lines.join('\n')}`,
+    };
+  }
+
+  if (intent === 'PATROL_FASTEST') {
+    if (!suggested) {
+      return {
+        incidentId: incident.id, actions: eligible.length ? [show] : [],
+        answer: `${SIM}\n\n` + (eligible.length === 0
+          ? `No simulated patrol can be routed to ${incident.id}. ${options[0]?.ineligibleReason ?? ''}`
+          : 'More than one simulated patrol shares the fastest estimated travel time, so no single candidate '
+            + 'is suggested — ranking them would be a coin flip presented as a recommendation.'),
+      };
+    }
+    return {
+      incidentId: incident.id,
+      actions: [show,
+        { id: 'select-patrol', type: TWIN_ACTIONS.SELECT_PATROL, patrolId: suggested.patrol.id,
+          label: `Select ${suggested.patrol.id}`, incidentId: incident.id },
+        { id: 'patrol-route', type: TWIN_ACTIONS.SHOW_PATROL_ROUTE, patrolId: suggested.patrol.id,
+          label: 'Show simulated route', incidentId: incident.id }],
+      answer: `${SIM}\n\n${suggested.patrol.id} is the fastest eligible simulated patrol: about `
+        + `${mins(suggested)} minutes, over ${(suggested.route.distanceMeters / 1000).toFixed(1)} km along the `
+        + 'corridor centerline. Route confidence is approximate — the published data has no ramp or '
+        + 'interchange topology, so this follows the mainline. It is a simulated candidate, not an ACS '
+        + 'dispatch recommendation.',
+    };
+  }
+
+  if (intent === 'PATROL_ROUTE') {
+    const option = suggested ?? eligible[0];
+    if (!option) {
+      return { incidentId: incident.id, actions: [],
+        answer: `${SIM}\n\nNo simulated route can be drawn for ${incident.id}. `
+          + `${options[0]?.ineligibleReason ?? 'Road connectivity is unresolved.'}` };
+    }
+    return {
+      incidentId: incident.id,
+      actions: [show, { id: 'patrol-route', type: TWIN_ACTIONS.SHOW_PATROL_ROUTE, patrolId: option.patrol.id,
+        label: `Show ${option.patrol.id} route`, incidentId: incident.id }],
+      answer: `${SIM}\n\nThe simulated route for ${option.patrol.id} follows the I-595 mainline centerline for `
+        + `${(option.route.distanceMeters / 1000).toFixed(1)} km on the same carriageway as the incident. It is `
+        + 'not a routed driving path: no ramp or interchange connectivity is published, so the line follows the '
+        + 'corridor rather than turning off it.',
+    };
+  }
+
+  if (intent === 'PATROL_COMPARE') {
+    if (eligible.length < 2) {
+      return { incidentId: incident.id, actions: eligible.length ? [show] : [],
+        answer: `${SIM}\n\nThere ${eligible.length === 1 ? 'is only one eligible simulated patrol' : 'are no eligible simulated patrols'} `
+          + `for ${incident.id}, so there is nothing to compare.` };
+    }
+    const lines = eligible.map(option => `• ${option.patrol.id} — ${mins(option)} min · `
+      + `${(option.route.distanceMeters / 1000).toFixed(1)} km · approximate`);
+    return {
+      incidentId: incident.id,
+      actions: [show, { id: 'compare', type: TWIN_ACTIONS.COMPARE_PATROLS, label: 'Compare patrols', incidentId: incident.id }],
+      answer: `${SIM}\n\nEligible simulated patrols for ${incident.id}, fastest first:\n${lines.join('\n')}\n`
+        + 'All travel times assume the stated cruise speed along the corridor centerline.',
+    };
+  }
+
+  // PATROL_EARLIER
+  const option = suggested ?? eligible[0];
+  if (!option) {
+    return { incidentId: incident.id, actions: [],
+      answer: `${SIM}\n\nNo simulated patrol can reach ${incident.id}, so an earlier dispatch cannot be modelled.` };
+  }
+  return {
+    incidentId: incident.id,
+    actions: [show, { id: 'compare', type: TWIN_ACTIONS.COMPARE_PATROLS, label: 'Compare dispatch scenarios', incidentId: incident.id }],
+    answer: `${SIM}\n\nDispatching ${option.patrol.id} earlier moves the simulated arrival earlier by the same `
+      + 'number of minutes, and shortens the window between the recorded incident time and arrival by that much. '
+      + 'It does not change the travel time or the on-scene work, which are held constant, and clearance still '
+      + 'depends on tow and debris removal, which are not modelled. This is a scenario comparison under stated '
+      + 'assumptions, not a predicted reduction in crashes or delay.',
+  };
 }
 
 /** The synchronised map actions an answer offers. Only ones that have somewhere to go. */
@@ -546,6 +828,13 @@ export const TWIN_ACTIONS = Object.freeze({
   FOCUS_AFFECTED_SECTION: 'FOCUS_AFFECTED_SECTION',
   FOCUS_RESOURCE: 'FOCUS_RESOURCE',
   SHOW_HISTORY: 'SHOW_HISTORY',
+  SHOW_PATROLS: 'SHOW_PATROLS',
+  SELECT_PATROL: 'SELECT_PATROL',
+  COMPARE_PATROLS: 'COMPARE_PATROLS',
+  SIMULATE_DISPATCH: 'SIMULATE_DISPATCH',
+  SHOW_PATROL_ROUTE: 'SHOW_PATROL_ROUTE',
+  INSPECT_UPSTREAM: 'INSPECT_UPSTREAM',
+  SHOW_WARNING_SCENARIO: 'SHOW_WARNING_SCENARIO',
   FILTER_HISTORY: 'FILTER_HISTORY',
   CLEAR_HISTORY_FILTER: 'CLEAR_HISTORY_FILTER',
 });

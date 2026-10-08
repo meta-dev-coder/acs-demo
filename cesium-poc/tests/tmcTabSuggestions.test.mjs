@@ -32,7 +32,10 @@ test('each tab asks about what is on that tab', () => {
   // Response asks what to do and what with.
   assert.ok(intents('response').includes('MITIGATION'));
   assert.ok(intents('response').includes('UPSTREAM_CAMERAS'));
-  assert.ok(intents('response').includes('UPSTREAM_SIGNS'));
+  // "Which DMS are upstream?" now resolves to UPSTREAM_DMS, which answers the same question but
+  // separates where the sign IS from whether it warned — the feed publishes no activation record,
+  // and the older intent could not say so as plainly.
+  assert.ok(intents('response').includes('UPSTREAM_DMS'));
   assert.ok(!intents('response').includes('LOCATION_CRASH_TYPES'));
 });
 
