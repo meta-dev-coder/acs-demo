@@ -4,6 +4,9 @@
  */
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import { createServer } from 'node:http';
 import {
@@ -222,21 +225,56 @@ describe('askTwin: EC2 wiring', () => {
     assert.equal(createDemoAsk({ env: { ASK_TWIN_ANTHROPIC_SECRET_NAME: '  ' }, logger: quiet }), null);
   });
 
-  test('createDemoAsk reads the key through the aws CLI on the first question and uses the DataConnect events', async () => {
+  test('createDemoAsk runs the orchestrator: key from the aws CLI on the first question, DataConnect events through a lookup', async () => {
     const { spawnImpl, calls } = fakeSpawn(`{"api_key":"${KEY}"}\n`);
+    const dir = mkdtempSync(join(tmpdir(), 'demo-ask-'));
+    const sent = [];
+    // The SDK talks to `fetch`: answer with real Responses — first a lookup, then the answer.
+    const replies = [
+      { content: [{ type: 'tool_use', id: 'tu1', name: 'list_live_events', input: {} }], stop_reason: 'tool_use', usage: {} },
+      { content: [{ type: 'text', text: JSON.stringify({ answer: 'One incident.', basis: [{ claim: 'one incident', refs: ['R1'] }] }) }], stop_reason: 'end_turn', usage: {} },
+    ];
+    const fetchImpl = async (url, init) => {
+      sent.push({ url: String(url), headers: new Headers(init.headers), body: JSON.parse(init.body) });
+      const reply = replies.shift();
+      return new Response(JSON.stringify({ id: 'msg_1', type: 'message', role: 'assistant', model: 'm-1', ...reply }), { status: 200, headers: { 'content-type': 'application/json' } });
+    };
+    try {
+      const handler = createDemoAsk({
+        env: { ASK_TWIN_ANTHROPIC_SECRET_NAME: 'i595/anthropic-key', LIVE_DC_AWS_REGION: 'us-east-1', ASK_TWIN_MODEL: 'm-1', ASK_TWIN_STORE: join(dir, 'twin.sqlite') },
+        // The DataConnect events payload names its source (liveEventsFromDc.mjs DC_SOURCE).
+        liveEvents: { dataConnectEvents: async () => ({ ...EVENTS, source: 'DataConnect' }) }, logger: quiet, spawnImpl, fetchImpl,
+      });
+      assert.equal(calls.length, 0, 'nothing read at startup');
+      const srv = await serve(handler);
+      try {
+        const response = await srv.ask({ question: 'Any incidents right now?' });
+        assert.equal(response.status, 200);
+        const answer = await response.json();
+        assert.equal(answer.confidence, 'high');
+        assert.deepEqual(answer.sources, ['DataConnect · Live Events']);
+        assert.deepEqual(calls[0].args.slice(0, 4), ['secretsmanager', 'get-secret-value', '--secret-id', 'i595/anthropic-key']);
+        assert.ok(calls[0].args.includes('us-east-1'));
+        assert.equal(sent[0].headers.get('x-api-key'), KEY);
+        assert.equal(sent[0].body.model, 'm-1');
+        assert.ok(sent[0].body.tools.some(t => t.name === 'explain_incident'), 'the insight tools are offered');
+        assert.doesNotMatch(JSON.stringify(sent[0].body.system), /FL511-INCIDENT-1/, 'live events reach the model through a lookup, not the system prompt');
+        assert.match(JSON.stringify(sent[1].body.messages.at(-1)), /FL511-INCIDENT-1/);
+      } finally { await srv.close(); }
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test('ASK_TWIN_ENGINE=legacy keeps the earlier handler, with the live events in its prompt', async () => {
+    const { spawnImpl } = fakeSpawn(`{"api_key":"${KEY}"}\n`);
     const { fetchImpl, calls: sent } = fakeAnthropic([]);
     const handler = createDemoAsk({
-      env: { ASK_TWIN_ANTHROPIC_SECRET_NAME: 'i595/anthropic-key', LIVE_DC_AWS_REGION: 'us-east-1', ASK_TWIN_MODEL: 'm-1' },
+      env: { ASK_TWIN_ANTHROPIC_SECRET_NAME: 'i595/anthropic-key', ASK_TWIN_MODEL: 'm-1', ASK_TWIN_ENGINE: 'legacy' },
       liveEvents: { dataConnectEvents: async () => EVENTS }, logger: quiet, spawnImpl, fetchImpl,
     });
-    assert.equal(calls.length, 0, 'nothing read at startup');
     const srv = await serve(handler);
     try {
       assert.equal((await srv.ask({ question: 'hi' })).status, 200);
-      assert.deepEqual(calls[0].args.slice(0, 4), ['secretsmanager', 'get-secret-value', '--secret-id', 'i595/anthropic-key']);
-      assert.ok(calls[0].args.includes('us-east-1'));
       assert.equal(sent[0].init.headers['x-api-key'], KEY);
-      assert.equal(sent[0].body.model, 'm-1');
       assert.match(sent[0].body.system, /FL511-INCIDENT-1/);
     } finally { await srv.close(); }
   });

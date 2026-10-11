@@ -44,11 +44,28 @@ ignore the screen block, so a recording replays wherever the camera is.
 
 Nothing here writes to DataConnect.
 
+## What is built
+
+- **Panel** (`src/askTheTwin.js`, `askTwinDock.js`, `askTwinActivity.js`):
+  - docked on the right, resizable, with a reading mode;
+  - a live activity log per answer, showing the context sent, each model round with its tokens, each lookup
+    with its ref, and the checks;
+  - cited claims, stated gaps and the confidence reason;
+  - context chips, a demo persona and settings;
+  - auto-run with suppression rules, and Restore view;
+  - an Accept/Reject card for playbook recommendations, plus a disabled "Send to dispatch · planned" button.
+- **Insight tools** (`insights.mjs`), run first when `prefetch.mjs` recognises the intent:
+  - `explain_incident` and `rank_incidents`, using the TMC risk model;
+  - `crash_hotspots`, with crashes placed on FDOT sections;
+  - `weather_risk_forecast`, with a baseline and playbook rule P-WX-1.
+- **The same service on EC2** (`askService.mjs`, wired in `demoServer.mjs`) on Node 22.5+, with a legacy fallback.
+
 ## Not done yet (see the spec's build order)
 
-- The EC2 demo host still uses `server/liveDc/askTwin.mjs`. Moving it onto this orchestrator, as a
-  separate `live-dc-ask.service`, comes next.
-- The store is built from the committed snapshot. A read-only DataConnect pull and the live-table
-  feed from the EC2 sync are still to come.
-- `explain_incident` (the insight tool that runs before the model), answer blocks, auto-run rules and
-  the docked panel are later steps.
+- **EC2:** the separate `live-dc-ask.service`, HTTPS through CloudFront, and a real deployment.
+- **Store:** a read-only DataConnect pull and a live-table feed from the EC2 sync. The store is built from the
+  committed snapshot today.
+- **Historical replay** in `explain_incident`. Today it reports a gap and points to the TMC screen.
+- **Real sign-in.** Personas only steer emphasis.
+- **The full Twin UI API registry** (commands, flows, Cmd-K). Answer actions still use the existing fly and show
+  helpers.

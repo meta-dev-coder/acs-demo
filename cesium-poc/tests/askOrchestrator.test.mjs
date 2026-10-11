@@ -197,6 +197,23 @@ describe('ask orchestrator', () => {
     } finally { cleanup(); }
   });
 
+  test('a demo persona travels in the screen, picks its playbook, and an unknown one is dropped', () => {
+    assert.equal(sanitizeEnvelope({ question: 'q', screen: { persona: 'safety_engineer' } }).screen.persona, 'safety_engineer');
+    assert.equal(sanitizeEnvelope({ question: 'q', screen: { persona: 'admin' } }).screen.persona, undefined);
+    assert.match(systemPrompt({ persona: 'safety_engineer' }), /PERSONA \(demo\): safety engineer/);
+    assert.doesNotMatch(systemPrompt({}), /PERSONA \(demo\)/);
+  });
+
+  test('the system prompt can follow the envelope (one cached prompt per persona)', async () => {
+    const { tools, cleanup } = fixtureTools();
+    try {
+      const provider = scripted([reply({ answer: 'ok' })]);
+      await createOrchestrator({ provider, tools, logger: quiet, system: env => `SYS:${env.screen.persona ?? 'none'}` })
+        .run(envelope('q', { screen: { persona: 'tmc_operator' } }), () => {});
+      assert.equal(provider.requests[0].system, 'SYS:tmc_operator');
+    } finally { cleanup(); }
+  });
+
   test('the store summary goes in the cached system prompt, so no round is spent describing the store', () => {
     const system = systemPrompt({ classes: [{ className: 'Florida I595 Incidents', rowCount: 178, asOf: '2026-10-01T00:00:00Z', fields: ['weather', 'Segment'] }] });
     assert.match(system, /TWIN STORE[\s\S]*Florida I595 Incidents \(178 records, loaded 2026-10-01\): weather, Segment/);

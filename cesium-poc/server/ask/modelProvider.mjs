@@ -23,12 +23,13 @@ export class ProviderError extends Error {
 }
 
 /**
- * @param {{apiKey?: string, getApiKey?: () => Promise<string>, model: string, effort?: string|null, client?: object}} options
+ * @param {{apiKey?: string, getApiKey?: () => Promise<string>, model: string, effort?: string|null, client?: object, fetchImpl?: typeof fetch}} options
  *   `getApiKey` reads the key on the first question (e.g. from Secrets Manager) and again after the
  *   key is rejected; `client` injects a fake in tests.
  */
-export function createAnthropicProvider({ apiKey, getApiKey = null, model, effort = null, client = null }) {
-  let sdk = client ?? (apiKey ? new Anthropic({ apiKey, maxRetries: 0 }) : null);
+export function createAnthropicProvider({ apiKey, getApiKey = null, model, effort = null, client = null, fetchImpl = null }) {
+  const sdkOptions = key => ({ apiKey: key, maxRetries: 0, ...(fetchImpl ? { fetch: fetchImpl } : {}) });
+  let sdk = client ?? (apiKey ? new Anthropic(sdkOptions(apiKey)) : null);
   let pending = null;
   const sdkFor = async () => {
     if (sdk) return sdk;
@@ -36,7 +37,7 @@ export function createAnthropicProvider({ apiKey, getApiKey = null, model, effor
     pending ??= Promise.resolve().then(getApiKey).finally(() => { pending = null; });
     let key;
     try { key = await pending; } catch (error) { throw new ProviderError(`The Anthropic key could not be read: ${String(error?.message ?? error).slice(0, 200)}`); }
-    sdk = new Anthropic({ apiKey: key, maxRetries: 0 });
+    sdk = new Anthropic(sdkOptions(key));
     return sdk;
   };
   return {

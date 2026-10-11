@@ -160,6 +160,7 @@ function contextSummary(envelope) {
   const { screen = {} } = envelope;
   return {
     workspace: screen.workspace ?? null,
+    persona: screen.persona ?? null,
     selection: screen.selection ?? null,
     temporal: screen.temporal ?? null,
     hasView: Boolean(screen.view),
@@ -170,7 +171,7 @@ function contextSummary(envelope) {
 
 /**
  * @param {{provider: {name: string, complete: Function}, tools: {definitions: object[], run: Function},
- *   system?: string, limits?: Partial<typeof DEFAULT_LIMITS>, logger?: Console, now?: () => number,
+ *   system?: string|((envelope: object) => string), limits?: Partial<typeof DEFAULT_LIMITS>, logger?: Console, now?: () => number,
  *   retryDelayMs?: () => number, prefetch?: (envelope: object) => {name: string, input: object, why: string}[]}} options
  *   `prefetch` names lookups to run before the model is asked — the insight that answers the
  *   question's obvious part — so its results stream at once and save the model a round.
@@ -239,6 +240,7 @@ export function createOrchestrator({ provider, tools, system = systemPrompt(), l
         prefetched = `TWIN DATA ALREADY LOOKED UP FOR THIS QUESTION (cite by ref):\n${done.map(d => d.text).join('\n\n')}\n\n`;
       }
       const messages = [...envelope.history, { role: 'user', content: `${screenBlock(envelope.screen)}${prefetched}${envelope.question}` }];
+      const turnSystem = typeof system === 'function' ? system(envelope) : system;
 
       let text = '';
       for (let round = 1; round <= maxRounds; round++) {
@@ -249,7 +251,7 @@ export function createOrchestrator({ provider, tools, system = systemPrompt(), l
         emit({ type: 'StepStarted', round, last });
         const t0 = now();
         const response = await complete({
-          system, messages, tools: tools.definitions, toolChoice: last ? { type: 'none' } : null, maxTokens,
+          system: turnSystem, messages, tools: tools.definitions, toolChoice: last ? { type: 'none' } : null, maxTokens,
           signal: AbortSignal.any([signal ?? new AbortController().signal, AbortSignal.timeout(remaining)]),
         });
         addUsage(usage, response.usage);

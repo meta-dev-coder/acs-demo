@@ -10,7 +10,8 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, w
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildLiveDcBundle, OPS_FILES, RUNTIME_DATA_FILES, WEB_BUILD_ENV, webBuildEnv } from '../tools/build-live-dc-bundle.mjs';
+import { buildLiveDcBundle, OPS_FILES, RUNTIME_DATA_FILES, SNAPSHOT_SUBDIR, WEB_BUILD_ENV, webBuildEnv } from '../tools/build-live-dc-bundle.mjs';
+import { SNAPSHOT_CLASSES } from '../server/ask/twinStore.mjs';
 import { createDcStandin } from '../server/liveDc/standin.mjs';
 import { loadI595Network } from '../server/i595Network.mjs';
 import { LIVE_CLASS } from '../server/liveDc/classes.mjs';
@@ -62,7 +63,8 @@ describe('EC2 bundle', () => {
   test('dist holds one ESM file, the ops files, the corridor data the process reads and the data dictionary', () => {
     assert.deepEqual(readdirSync(join(dir, 'dist')).sort(), ['data', 'env.example', 'install.sh', 'live-dc-sync.mjs', 'live-dc.service', 'livedc.sh']);
     assert.deepEqual([...OPS_FILES].sort(), ['env.example', 'install.sh', 'live-dc.service', 'livedc.sh']);
-    assert.deepEqual(readdirSync(join(dir, 'dist', 'data')).sort(), [...RUNTIME_DATA_FILES, 'data-dictionary.json'].sort());
+    assert.deepEqual(readdirSync(join(dir, 'dist', 'data')).sort(), [...RUNTIME_DATA_FILES, 'data-dictionary.json', SNAPSHOT_SUBDIR].sort());
+    assert.deepEqual(readdirSync(join(dir, 'dist', 'data', SNAPSHOT_SUBDIR)).sort(), SNAPSHOT_CLASSES.map(c => c.file).sort());
     assert.deepEqual([...RUNTIME_DATA_FILES].sort(), [
       'express-way.geojson', 'i595_bridges.geojson', 'i595_corridor_cameras.geojson', 'i595_corridor_traffic_signals.geojson',
       'i595_express_gantries.geojson', 'i595_fdot_traffic_segments.geojson', 'i595_mainline_eb.geojson',
@@ -72,7 +74,9 @@ describe('EC2 bundle', () => {
     assert.equal(dictionary.dataConnect.live.length + dictionary.dataConnect.historical.length, 15);
     assert.equal(dictionary.corridorLayers.length, 6);
     const bundle = readFileSync(join(dir, 'dist', 'live-dc-sync.mjs'), 'utf8');
-    const specifiers = [...bundle.matchAll(/(?:^|[;\s])(?:import|export)\s[^;'"]*?from\s*["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)/gm)]
+    // Block comments are left out: bundled libraries keep JSDoc examples that mention import paths.
+    const code = bundle.replace(/\/\*[\s\S]*?\*\//g, '');
+    const specifiers = [...code.matchAll(/(?:^|[;\s])(?:import|export)\s[^;'"]*?from\s*["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)/gm)]
       .map(m => m[1] ?? m[2]);
     assert.ok(specifiers.length > 0);
     for (const specifier of specifiers) assert.match(specifier, /^node:/, `non-builtin import ${specifier}`);

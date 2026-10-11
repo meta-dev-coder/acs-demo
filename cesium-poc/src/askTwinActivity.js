@@ -11,6 +11,7 @@
 import { TOOL_LABELS } from './askTwinStream.js';
 
 const WORKSPACE_LABELS = Object.freeze({ traffic: 'Traffic', safety: 'Safety', maintenance: 'Maintenance', liveOps: 'Live Ops', tmc: 'TMC' });
+export const PERSONA_LABELS = Object.freeze({ tmc_operator: 'TMC operator', maintenance_manager: 'Maintenance manager', safety_engineer: 'Safety engineer' });
 const fmtMs = ms => (ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms)} ms`);
 const fmtInt = n => Number(n || 0).toLocaleString('en-US');
 
@@ -40,6 +41,7 @@ export function activityEntry(event) {
   switch (event.type) {
     case 'ContextUsed': {
       const parts = [];
+      if (event.persona) parts.push(`demo persona ${PERSONA_LABELS[event.persona] ?? event.persona}`);
       if (event.workspace) parts.push(`${WORKSPACE_LABELS[event.workspace] ?? event.workspace} screen`);
       if (event.selection) parts.push(`${event.selection.type} ${event.selection.id}`);
       if (event.temporal?.mode) parts.push(event.temporal.mode.toLowerCase() + (event.temporal.date ? ` ${event.temporal.date}` : ''));

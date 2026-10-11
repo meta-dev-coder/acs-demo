@@ -699,6 +699,9 @@ body.ask-twin-docked { position: relative; width: calc(100% - var(--ask-twin-doc
 .ask-twin-settings { display: flex; flex-direction: column; gap: 6px; padding: 10px 18px; border-bottom: 1px solid var(--ui-border-soft); font-size: 12px; color: var(--ui-text-secondary); }
 .ask-twin-settings[hidden] { display: none; }
 .ask-twin-settings label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.ask-twin-persona-select { margin-left: auto; background: var(--ui-surface); color: var(--ui-text); border: 1px solid var(--ui-border); border-radius: 6px; padding: 3px 6px; font: inherit; }
+.ask-twin-persona-note { margin: 0; font-size: 10.5px; color: var(--ui-text-muted); }
+.ask-twin-rec-commit:disabled { opacity: .55; cursor: not-allowed; }
 
 /* One section per remote turn: activity log, then the answer under it */
 .ask-twin-turn { display: flex; flex-direction: column; gap: 8px; }

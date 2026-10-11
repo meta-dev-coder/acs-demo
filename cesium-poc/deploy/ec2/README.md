@@ -151,19 +151,34 @@ example, secret access denied) is logged and retried every 30 s.
 
 With `ASK_TWIN_ANTHROPIC_SECRET_NAME=i595/anthropic-key` in `/etc/live-dc/env`, `POST /api/i595/ask` (behind the
 password) answers with Claude (`ASK_TWIN_MODEL`, default `claude-sonnet-5`). Unset, it answers 503 and only the
-built-in answers work. The model can call read-only tools (`server/liveDc/askTools.mjs`): the data dictionary, live
-events, a live event's chain, filtered reads of any live or historical DataConnect class, the corridor layers and the
-current weather. The release ships `data/data-dictionary.json`, built from the code's own config plus
-`config/askTwin/dataGuide.json` (a class or layer without an entry there fails the build). The key is read on the
-first question through the instance role and never logged. The logs show `ask-the-twin: on` at start and the tools
-used for each answer.
+built-in answers work. The key is read on the first question through the instance role and never logged.
+
+**Which engine runs.** On Node 22.5+ (it needs `node:sqlite`) the host runs the orchestrator in `server/ask/`, the
+same service `npm run dev` runs locally:
+- the twin store is SQLite, built at startup from the bundled snapshot (`data/dataconnect-data/`) into the state
+  directory (`/var/lib/live-dc/twin.sqlite`, or `ASK_TWIN_STORE`);
+- insight tools run before the model (TMC incident risk, crash hotspots, rain-risk forecast);
+- answers carry cited claims, stated gaps and a server-computed confidence;
+- event streams are sent when the page asks for them;
+- rate limits are per session.
+
+On an older Node, or with `ASK_TWIN_ENGINE=legacy`, the earlier handler (`server/liveDc/askTwin.mjs`) answers
+instead. The start-up log says which one runs: `live-dc ask-the-twin: orchestrator (…)` or `… legacy handler (…)`.
+Each answered question also logs one `ask_turn` JSON line with rounds, timings, tokens and lookups.
 
 To turn it on for an existing install, add these lines once to `/etc/live-dc/env`, then `sudo /opt/live-dc/livedc.sh restart`:
 
 ```text
 ASK_TWIN_ANTHROPIC_SECRET_NAME=i595/anthropic-key
 ASK_TWIN_MODEL=claude-sonnet-5
+# ASK_TWIN_EFFORT=low        # low | medium | high; empty = the model's default
+# ASK_TWIN_ENGINE=legacy     # force the earlier handler
 ```
+
+Not done yet on EC2 (see the design spec's build order):
+- Ask the Twin still runs inside the sync process. The separate `live-dc-ask.service` is not written yet.
+- HTTPS through CloudFront is not set up.
+- This release has not been deployed or tried on the instance.
 
 ## 7. Shutdown / uninstall
 

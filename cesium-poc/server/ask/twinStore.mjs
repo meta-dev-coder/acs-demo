@@ -13,8 +13,24 @@
  * table is exactly the failure this exists to prevent.
  */
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+
+/**
+ * node:sqlite, loaded on first use rather than imported. The EC2 bundle runs on any Node >= 20.12 and
+ * node:sqlite needs 22.5: a static import would stop the whole live sync from starting there, where a
+ * lazy load lets the host check `sqliteAvailable()` and fall back.
+ */
+let sqlite;
+const DatabaseSync = function DatabaseSync(...args) {
+  sqlite ??= createRequire(import.meta.url)('node:sqlite');
+  return new sqlite.DatabaseSync(...args);
+};
+
+/** Whether this Node has node:sqlite (22.5+). */
+export function sqliteAvailable() {
+  try { sqlite ??= createRequire(import.meta.url)('node:sqlite'); return true; } catch { return false; }
+}
 
 /** Classes the repository snapshot (public/dataconnect-data) carries, and how to index each. */
 export const SNAPSHOT_CLASSES = Object.freeze([

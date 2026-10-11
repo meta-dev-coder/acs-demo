@@ -34,6 +34,16 @@ const OUTPUT = `OUTPUT: raw JSON only — no markdown, no code fences, no preamb
 BASIS RULES: one entry per factual claim. "refs" lists the lookup refs that establish the claim. A claim from general corridor knowledge (not a lookup) has "refs": [].
 ACTION RULES: an action's coordinates and entity_id must be ones a lookup returned in this turn (find_corridor_features for places and cameras, list_live_events for events, a record's coordinates). If no lookup returned a location, use type "none".`;
 
+/**
+ * What each demo persona cares about. Wording only steers emphasis and the order of the answer; the
+ * tools, the data and the rules are the same for everyone.
+ */
+export const PERSONA_PLAYBOOKS = Object.freeze({
+  tmc_operator: 'PERSONA (demo): TMC operator on shift. Lead with what needs action now: active incidents, their secondary-incident risk and rank, upstream congestion, the nearest upstream camera, and the mitigation the twin recommends. Keep answers short and operational.',
+  maintenance_manager: 'PERSONA (demo): maintenance manager. Lead with assets, open tickets and work orders, inspection results and recurring failures; tie live events to the assets and records they touch. Prefer counts and ids over narrative.',
+  safety_engineer: 'PERSONA (demo): safety engineer. Lead with crash history: hotspots by section, wet versus dry weather, lane-closure hours and injury crashes, and what the record cannot show (exposure, speed). Be explicit about baselines.',
+});
+
 /** A compact, stable description of what the store holds, for the cached system prompt. */
 export function storeSummary(classes) {
   if (!classes?.length) return 'TWIN STORE: not built yet — record lookups will report a gap.';
@@ -41,9 +51,12 @@ export function storeSummary(classes) {
   return `TWIN STORE (record classes for query_records / count_records; field names exactly as listed):\n${lines.join('\n')}`;
 }
 
-/** @param {{classes?: object[]}} [options]  the store's classes, from `store.classes()` */
-export function systemPrompt({ classes = null } = {}) {
-  return [ZONE_A, classes ? storeSummary(classes) : '', RULES, OUTPUT].filter(Boolean).join('\n\n');
+/**
+ * @param {{classes?: object[], persona?: string|null}} [options]  the store's classes (from
+ *   `store.classes()`) and the demo persona; each persona's prompt is cached on its own
+ */
+export function systemPrompt({ classes = null, persona = null } = {}) {
+  return [ZONE_A, classes ? storeSummary(classes) : '', RULES, PERSONA_PLAYBOOKS[persona] ?? '', OUTPUT].filter(Boolean).join('\n\n');
 }
 
 export const SYSTEM_PROMPT = systemPrompt();

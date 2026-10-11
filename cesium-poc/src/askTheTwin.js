@@ -4,7 +4,7 @@ import { framedDestination } from './cameraFraming.js';
 import { answerTmcQuestion, parseTmcQuestion, tmcSuggestionsForTab, TWIN_ACTIONS, TMC_HISTORICAL_INCIDENT_SUGGESTIONS, TMC_HISTORICAL_SUGGESTIONS, TMC_INCIDENT_SUGGESTIONS, TMC_SUGGESTIONS } from './tmc/tmcAnswers.js';
 import { ASK_THE_TWIN_EVENT } from './askTheTwinBridge.js';
 import { AskError, askRemote } from './askTwinStream.js';
-import { createActivityLog } from './askTwinActivity.js';
+import { createActivityLog, PERSONA_LABELS } from './askTwinActivity.js';
 import { createDock } from './askTwinDock.js';
 import { eventPlace, isBareSegmentRequest, MAX_REMOTE_OFFSET_M, parseFlyRequest, parseRoadRequest, parseSegmentFollowUp, parseSegmentRequests, parseTourCommand, parseTypeBrowse, resolveFlyTarget, searchAssets, segmentPoint, typeHints } from './assetExplorer/assetSearch.js';
 import { corridorPositionOf } from './assetExplorer/corridorPosition.js';
@@ -28,6 +28,16 @@ const SUGGESTIONS = [
   'Fly to bridge 860384',
 ];
 
+
+/** Starter questions per demo persona, shown outside the TMC screen and with no area drawn. */
+const PERSONA_SUGGESTIONS = Object.freeze({
+  tmc_operator: ['Which incident is riskiest right now?', 'Any closures on I-595 right now, and which camera is closest?', 'Rain is coming this afternoon — where should we pre-position patrols?'],
+  maintenance_manager: ['How many work orders are still open, by asset type?', 'Which assets have the most tickets?', 'Which ITS inspections failed most recently?'],
+  safety_engineer: ['Where are the crash hotspots in wet weather?', 'How many incidents involved injuries, by segment?', 'Rain is forecast — which sections are most at risk?'],
+});
+const PERSONA_KEY = 'askTwin.persona.v1';
+const readPersona = () => { try { const v = localStorage.getItem(PERSONA_KEY); return v in PERSONA_LABELS ? v : null; } catch { return null; } };
+const writePersona = value => { try { if (value) localStorage.setItem(PERSONA_KEY, value); else localStorage.removeItem(PERSONA_KEY); } catch { /* blocked storage: per-session only */ } };
 
 /** Older services name their sources with keys; the orchestrator sends readable labels as they are. */
 const SOURCE_LABELS = Object.freeze({ live_events: 'FL511 live data', static_knowledge: 'Corridor knowledge', dataconnect: 'DataConnect', corridor_layers: 'Corridor layers', weather: 'Weather' });
@@ -114,6 +124,15 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     <div class="ask-twin-settings" hidden>
       <label><input type="checkbox" data-setting="autoRunMap"/> Move the map automatically for high-confidence answers</label>
       <label><input type="checkbox" data-setting="keepActivityOpen"/> Keep each answer's activity log open</label>
+      <label class="ask-twin-persona">Demo persona
+        <select class="ask-twin-persona-select">
+          <option value="">General</option>
+          <option value="tmc_operator">TMC operator</option>
+          <option value="maintenance_manager">Maintenance manager</option>
+          <option value="safety_engineer">Safety engineer</option>
+        </select>
+      </label>
+      <p class="ask-twin-persona-note">A persona changes the emphasis and starter questions only. Everyone gets the same read-only data until sign-in exists.</p>
     </div>
     <div class="ask-twin-body">
       <div class="ask-twin-area-bar">
@@ -172,7 +191,7 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
       }
       return historical ? TMC_HISTORICAL_SUGGESTIONS : TMC_SUGGESTIONS;
     }
-    return SUGGESTIONS;
+    return PERSONA_SUGGESTIONS[persona] ?? SUGGESTIONS;
   }
 
   function renderSuggestions() {
@@ -198,6 +217,10 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     settingsEl.hidden = !settingsEl.hidden;
     settingsBtn.setAttribute('aria-expanded', String(!settingsEl.hidden));
   };
+  let persona = readPersona();
+  const personaSelect = settingsEl.querySelector('.ask-twin-persona-select');
+  personaSelect.value = persona ?? '';
+  personaSelect.onchange = () => { persona = personaSelect.value || null; writePersona(persona); renderSuggestions(); renderContext(); };
   expandBtn.onclick = () => {
     dock.setExpanded(!dock.expanded);
     expandBtn.setAttribute('aria-pressed', String(dock.expanded));
@@ -315,6 +338,15 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
           b.onclick = () => decide(verdict);
           buttons.appendChild(b);
         }
+        // The planned workflow step: the twin would draft the request for a person to confirm
+        // (i595-workflows). Shown so the next step is visible; there is no write path in the POC.
+        const commit = document.createElement('button');
+        commit.type = 'button';
+        commit.className = 'ask-twin-fly-btn ask-twin-rec-commit';
+        commit.disabled = true;
+        commit.textContent = 'Send to dispatch · planned';
+        commit.title = 'Automated workflows (i595-workflows) are planned after the POC: the twin drafts, a person confirms, the server writes.';
+        buttons.appendChild(commit);
         if (rec.location?.lon != null) {
           const go = document.createElement('button');
           go.type = 'button';
@@ -968,7 +1000,7 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
 
   /** What the operator is looking at, as ids: the service treats it as context, never as authority. */
   function screenSnapshot() {
-    const screen = { workspace: document.body.dataset.section || null };
+    const screen = { workspace: document.body.dataset.section || null, ...(persona ? { persona } : {}) };
     if (tmc && screen.workspace === 'tmc') {
       if (tmc.temporal?.mode) screen.temporal = { mode: tmc.temporal.mode, ...(tmc.temporal.date ? { date: String(tmc.temporal.date) } : {}) };
       const id = tmc.selectedIncidentId ? String(tmc.selectedIncidentId) : null;
@@ -988,6 +1020,7 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     if (tmc?.selectedIncidentId && String(tmc.selectedIncidentId) !== omittedSelection) omittedSelection = null;
     const screen = screenSnapshot();
     const chips = [];
+    if (persona) chips.push({ text: `Persona: ${PERSONA_LABELS[persona]}` });
     if (screen.workspace) chips.push({ text: `${WORKSPACE_LABELS[screen.workspace] ?? screen.workspace} screen` });
     if (screen.temporal?.mode) chips.push({ text: screen.temporal.mode === 'HISTORICAL' ? `Historical ${screen.temporal.date ?? ''}`.trim() : 'Live' });
     if (screen.selection) chips.push({ text: `Incident ${screen.selection.id}`, remove: () => { omittedSelection = screen.selection.id; renderContext(); } });

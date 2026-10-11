@@ -19,15 +19,8 @@ import { fileURLToPath } from 'node:url';
 import { apiKeyFromSecret, DEFAULT_ASK_MODEL } from '../liveDc/askTwin.mjs';
 import { readSecretString } from '../liveDc/awsSecret.mjs';
 import { fetchEventWeather } from '../liveDc/eventWeather.mjs';
-import { createAskHttpHandler } from './httpAdapter.mjs';
 import { createAnthropicProvider, createRecordingProvider, createReplayProvider } from './modelProvider.mjs';
-import { createOrchestrator } from './orchestrator.mjs';
-import { systemPrompt } from './prompt.mjs';
-import { createTools } from './tools.mjs';
-import { createInsights } from './insights.mjs';
-import { planPrefetch } from './prefetch.mjs';
-import CENTERLINE from '../../config/corridorCenterline.json' with { type: 'json' };
-import { buildStoreFromSnapshot, openTwinStore } from './twinStore.mjs';
+import { createAskService } from './askService.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const DEFAULT_STORE_PATH = join(ROOT, '.twin-store', 'twin.sqlite');
@@ -74,21 +67,11 @@ export function createLocalAsk({ env = process.env, getLiveEvents = null, logger
   }
 
   const storePath = String(env.ASK_TWIN_STORE ?? '').trim() || DEFAULT_STORE_PATH;
-  if (!existsSync(storePath)) {
-    const { classes } = buildStoreFromSnapshot({ snapshotDir: SNAPSHOT_DIR, outPath: storePath });
-    logger.log?.(`ask-the-twin: built the twin store from the snapshot (${classes.reduce((n, c) => n + c.rowCount, 0)} records) at ${storePath}`);
-  }
-  const store = openTwinStore(storePath);
-  const readLayer = file => { const path = join(LAYER_DIR, file); return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null; };
-  const tools = createTools({
-    store,
-    getLiveEvents,
-    readLayer,
+  const service = createAskService({
+    provider, storePath, snapshotDir: SNAPSHOT_DIR, getLiveEvents, logger,
+    readLayer: file => { const path = join(LAYER_DIR, file); return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null; },
     fetchWeather: point => fetchEventWeather(point),
-    insights: createInsights({ store, getLiveEvents, readLayer, centerline: CENTERLINE }),
   });
-  // The store's classes go into the cached system prompt, so the model does not spend a round asking.
-  const orchestrator = createOrchestrator({ provider, tools, logger, prefetch: planPrefetch, system: systemPrompt({ classes: store.classes() }) });
   logger.log?.(`ask-the-twin (local): ${label}, store ${storePath}`);
-  return { label, ...createAskHttpHandler({ orchestrator }) };
+  return { label, ...service };
 }

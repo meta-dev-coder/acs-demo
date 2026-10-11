@@ -19,6 +19,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 import { ASK_LAYER_FILES, DICTIONARY_FILE, buildDataDictionary } from '../server/liveDc/dataDictionary.mjs';
+import { SNAPSHOT_CLASSES } from '../server/ask/twinStore.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const EC2_DIR = join(ROOT, 'deploy', 'ec2');
@@ -31,6 +32,8 @@ export const RUNTIME_DATA_FILES = Object.freeze([...new Set([
   'i595_ramps_connectors_classified.geojson', 'i595_fdot_traffic_segments.geojson', 'i595_corridor_cameras.geojson',
   ...ASK_LAYER_FILES,
 ])]);
+/** Where the bundle carries the DataConnect snapshot, under data/. */
+export const SNAPSHOT_SUBDIR = 'dataconnect-data';
 export const OPS_FILES = Object.freeze(['install.sh', 'livedc.sh', 'live-dc.service', 'env.example']);
 
 export const WEB_BUILD_ENV = Object.freeze({
@@ -128,6 +131,9 @@ export async function buildLiveDcBundle({ outDir = DEFAULT_OUT_DIR, web = 'build
     banner: { js: BANNER }, legalComments: 'none', logLevel: 'warning',
   });
   for (const name of RUNTIME_DATA_FILES) copyFileSync(join(ROOT, 'public', 'data', name), join(outDir, 'data', name));
+  // The snapshot Ask the Twin builds its store from at startup (server/ask/twinStore.mjs).
+  mkdirSync(join(outDir, 'data', SNAPSHOT_SUBDIR), { recursive: true });
+  for (const { file } of SNAPSHOT_CLASSES) copyFileSync(join(ROOT, 'public', SNAPSHOT_SUBDIR, file), join(outDir, 'data', SNAPSHOT_SUBDIR, file));
   // The data dictionary Ask the Twin reasons with, built from the code's own config and these layers.
   const dictionary = buildDataDictionary({ readLayer: name => JSON.parse(readFileSync(join(outDir, 'data', name), 'utf8')) });
   writeFileSync(join(outDir, 'data', DICTIONARY_FILE), `${JSON.stringify(dictionary, null, 2)}\n`);
@@ -135,7 +141,7 @@ export async function buildLiveDcBundle({ outDir = DEFAULT_OUT_DIR, web = 'build
   if (web === 'build') await buildLiveDcWeb({ outDir: join(outDir, 'web'), envFiles, logger });
   else if (web) cpSync(web.from, join(outDir, 'web'), { recursive: true });
   const bytes = statSync(outfile).size;
-  logger.log?.(`live-dc bundle: ${outfile} (${Math.round(bytes / 1024)} KiB) + ${RUNTIME_DATA_FILES.length} data files + ${DICTIONARY_FILE}`
+  logger.log?.(`live-dc bundle: ${outfile} (${Math.round(bytes / 1024)} KiB) + ${RUNTIME_DATA_FILES.length} data files + ${DICTIONARY_FILE} + ${SNAPSHOT_CLASSES.length} snapshot files`
     + `${web ? ' + web/' : ' (no web/)'} + ops files`);
   return { outfile, bytes, dataFiles: [...RUNTIME_DATA_FILES, DICTIONARY_FILE], web: Boolean(web) };
 }

@@ -1,6 +1,6 @@
 # Ask the Twin — reference architecture (Phase 2 "Why" layer) — design
 
-**Date:** 2026-10-11 · **Status:** v2, approved for implementation (2026-10-11). Progress: build step 1 local layer done (`cesium-poc/server/ask/`, see its README) · **Scope:** architecture
+**Date:** 2026-10-11 · **Status:** v2, approved for implementation (2026-10-11). Progress: POC steps 1 (local + EC2 code path), 2 (snapshot store), 3, 5, 6 and 7 are implemented on `askthetwin`; step 4 is partial (actions use the existing helpers, not the Twin UI API registry). See `cesium-poc/server/ask/README.md`.
 only; implementation gated on a separate go-ahead. · **Branch:** `askthetwin`
 
 ## Why now

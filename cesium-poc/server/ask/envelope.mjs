@@ -8,6 +8,11 @@
  * short labelled block. Badges, numbers and confidence bind only to this turn's own tool results.
  */
 export const MAX_QUESTION = 512;
+/**
+ * Demo personas. A persona picks the playbook and the starter questions; it never grants tools or
+ * data — every session gets the same read-only tool set until real sign-in exists.
+ */
+export const PERSONAS = Object.freeze(['tmc_operator', 'maintenance_manager', 'safety_engineer']);
 export const MAX_HISTORY_TURNS = 6;
 export const MAX_HISTORY_CHARS = 6_000;
 const MAX_TURN_CHARS = 1_500;
@@ -50,6 +55,7 @@ function sanitizeScreen(screen, spatialContext) {
   const out = {};
   const workspace = text(screen.workspace, 32);
   if (workspace) out.workspace = workspace;
+  if (PERSONAS.includes(screen.persona)) out.persona = screen.persona;
   const mode = text(screen.temporal?.mode, 16);
   if (mode) out.temporal = { mode, ...(text(screen.temporal?.date, 32) ? { date: text(screen.temporal.date, 32) } : {}) };
   const selectionId = text(screen.selection?.id, MAX_ID);
