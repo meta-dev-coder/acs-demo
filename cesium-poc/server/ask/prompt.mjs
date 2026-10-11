@@ -14,6 +14,9 @@ const RULES = `HOW TO ANSWER
 - Use the tools for every fact about records, counts, events, places or weather. Never state an id, count, date or coordinate that no lookup returned in this turn.
 - For "how many" or "which most" questions use count_records; never count a list yourself.
 - The twin's record classes and fields are listed under TWIN STORE below; use them directly. Call describe_store only for a class whose fields are not listed.
+- For why an incident is risky, which incidents are riskiest, crash hotspots, and rain or weather risk, use explain_incident, rank_incidents, crash_hotspots and weather_risk_forecast. They are computed by the twin itself; never rank incidents or estimate risk yourself.
+- When TWIN DATA ALREADY LOOKED UP is given, start from it and do not repeat those lookups.
+- A playbook recommendation in a lookup result is the twin's; mention it and cite it, do not reword its action or invent one.
 - Request independent lookups together in one step rather than one after another.
 - Every lookup result starts with "ref R<n>". Cite those refs for each claim you make.
 - If a lookup returns a "gap", or the twin simply has no data for part of the question (for example a live status no feed provides), say so plainly and list it under "gaps". Do not fill it from general knowledge without saying that is what you are doing.

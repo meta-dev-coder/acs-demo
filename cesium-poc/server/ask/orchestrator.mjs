@@ -115,6 +115,9 @@ export function finalizeAnswer(rawText, calls) {
   const byRef = new Map(calls.map(call => [call.ref, call]));
   const cited = [...new Set(claims.flatMap(claim => claim.refs))].filter(ref => byRef.get(ref)?.evidence);
   const sources = [...new Set(cited.map(ref => byRef.get(ref).source).filter(Boolean))];
+  // Playbook recommendations are attached from the cited insight results, word for word: the model
+  // may explain a recommendation but never writes one.
+  const recommendations = cited.map(ref => byRef.get(ref).output?.recommendation).filter(Boolean);
   const followUps = Array.isArray(parsed.follow_ups)
     ? parsed.follow_ups.filter(q => typeof q === 'string' && q.trim()).slice(0, 3).map(q => q.trim().slice(0, 120)) : [];
   return {
@@ -126,6 +129,7 @@ export function finalizeAnswer(rawText, calls) {
     sources: sources.length ? sources : ['Corridor knowledge'],
     basis: claims.map(claim => ({ ...claim, sources: [...new Set(claim.refs.map(ref => byRef.get(ref)?.source).filter(Boolean))] })),
     gaps,
+    recommendations,
     follow_ups: followUps,
     cited,
     uncited: calls.filter(call => call.evidence && !cited.includes(call.ref)).map(call => call.ref),

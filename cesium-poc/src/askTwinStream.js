@@ -73,6 +73,10 @@ export const TOOL_LABELS = Object.freeze({
   list_live_events: 'Reading live FL511 events',
   find_corridor_features: 'Searching corridor layers',
   get_weather: 'Checking the weather',
+  explain_incident: 'Assessing the incident with the TMC risk model',
+  rank_incidents: 'Ranking active incidents by risk',
+  crash_hotspots: 'Ranking crash hotspots',
+  weather_risk_forecast: 'Checking rain forecast against crash history',
 });
 
 /** One line of the activity trace for a finished tool call. */

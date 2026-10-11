@@ -290,6 +290,42 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
         }
         wrap.appendChild(list);
       }
+      // A playbook recommendation is the twin's, attached by the server from the lookup that made it.
+      // Accepting or rejecting it is recorded here only: the POC writes nothing anywhere.
+      for (const rec of meta.recommendations ?? []) {
+        const card = document.createElement('div');
+        card.className = 'ask-twin-recommendation';
+        card.innerHTML = '<div class="ask-twin-rec-head"></div><p class="ask-twin-rec-action"></p><p class="ask-twin-rec-basis"></p><div class="ask-twin-rec-buttons"></div>';
+        card.querySelector('.ask-twin-rec-head').textContent = `Playbook ${rec.rule} · ${rec.title}`;
+        card.querySelector('.ask-twin-rec-action').textContent = rec.action;
+        card.querySelector('.ask-twin-rec-basis').textContent = rec.basis;
+        const buttons = card.querySelector('.ask-twin-rec-buttons');
+        const decide = verdict => {
+          buttons.replaceChildren();
+          const done = document.createElement('span');
+          done.className = 'ask-twin-rec-decided';
+          done.textContent = `${verdict} by you — in the POC this decision is not sent anywhere.`;
+          buttons.appendChild(done);
+        };
+        for (const [label, verdict] of [['Accept', 'Accepted'], ['Reject', 'Rejected']]) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'ask-twin-fly-btn';
+          b.textContent = label;
+          b.onclick = () => decide(verdict);
+          buttons.appendChild(b);
+        }
+        if (rec.location?.lon != null) {
+          const go = document.createElement('button');
+          go.type = 'button';
+          go.className = 'ask-twin-fly-btn';
+          go.textContent = 'Show on map';
+          go.onclick = () => flyTo(rec.location, go);
+          buttons.appendChild(go);
+        }
+        wrap.appendChild(card);
+      }
+
       if (meta.gaps?.length) {
         const gaps = document.createElement('div');
         gaps.className = 'ask-twin-gaps';

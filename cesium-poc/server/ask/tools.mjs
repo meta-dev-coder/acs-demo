@@ -86,9 +86,11 @@ const compactEvent = e => ({
 
 /**
  * @param {{store: ReturnType<import('./twinStore.mjs').openTwinStore>, getLiveEvents?: () => Promise<object|null>,
- *   readLayer?: (file: string) => object|null, fetchWeather?: (point: {latitude: number, longitude: number}) => Promise<object|null>}} deps
+ *   readLayer?: (file: string) => object|null, fetchWeather?: (point: {latitude: number, longitude: number}) => Promise<object|null>,
+ *   insights?: {definitions: object[], handlers: object}|null}} deps
+ *   `insights` adds the computed tools (insights.mjs) beside the read tools.
  */
-export function createTools({ store, getLiveEvents = null, readLayer = null, fetchWeather = null }) {
+export function createTools({ store, getLiveEvents = null, readLayer = null, fetchWeather = null, insights = null }) {
   // The corridor-layer search is shared with the EC2 tools, not copied.
   const layerTools = createAskTools({ dictionary: { dataConnect: { live: [], historical: [] } }, readLayer });
   const sourceOf = className => store.classes().find(c => c.className.toLowerCase() === String(className ?? '').toLowerCase());
@@ -144,11 +146,14 @@ export function createTools({ store, getLiveEvents = null, readLayer = null, fet
     },
   };
 
+  if (insights) Object.assign(handlers, insights.handlers);
+  const definitions = insights ? [...TOOL_DEFINITIONS, ...insights.definitions] : TOOL_DEFINITIONS;
+
   return {
-    definitions: TOOL_DEFINITIONS,
+    definitions,
     /**
      * Run one tool. Never throws: bad input becomes `{error}` the model can correct.
-     * @returns {Promise<{text: string, output: object, source: string|null}>}
+     * @returns {Promise<{text: string, output: object, source: string|null, summary?: string}>}
      */
     async run(name, input) {
       const handler = Object.hasOwn(handlers, name) ? handlers[name] : null;

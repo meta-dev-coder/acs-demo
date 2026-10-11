@@ -38,6 +38,8 @@ export const SNAPSHOT_CLASSES = Object.freeze([
 
 export const OPERATORS = Object.freeze(['equals', 'contains']);
 export const MAX_LIMIT = 50;
+/** Upper bound for `rows()`: an insight that needs more should aggregate in SQL instead. */
+export const MAX_ROWS = 50_000;
 const MAX_GROUPS = 25;
 const DAY_MS = 86_400_000;
 
@@ -229,6 +231,20 @@ export function openTwinStore(path, { now = Date.now, staleAfterMs = 0 } = {}) {
       const groups = db.prepare(`SELECT CAST(json_extract(json, ?) AS TEXT) AS value, count(*) AS count FROM records WHERE ${sql}
         GROUP BY value ORDER BY count DESC, value LIMIT ?`).all(`$."${groupBy}"`, ...params, limitOf(limit, MAX_GROUPS));
       return { className: entry.class, asOf: entry.as_of, totalCount, groupBy, groups: groups.map(row => ({ value: row.value, count: row.count })) };
+    },
+
+    /**
+     * Every record of a class, up to `limit`, for insight tools that aggregate in code. A gap when the
+     * class is not loaded; `truncated` when the class holds more than the limit.
+     * @returns {{className, asOf, records: object[], truncated: boolean} | {gap}}
+     */
+    rows(className, { limit = MAX_ROWS } = {}) {
+      const checked = check(className);
+      if (checked.gap) return checked;
+      const { entry } = checked;
+      const rows = db.prepare('SELECT key, json FROM records WHERE class = ? ORDER BY at DESC, key LIMIT ?').all(entry.class, limit + 1);
+      return { className: entry.class, asOf: entry.as_of, truncated: rows.length > limit,
+        records: rows.slice(0, limit).map(row => ({ key: row.key, ...JSON.parse(row.json) })) };
     },
 
     close: () => db?.close(),

@@ -720,6 +720,12 @@ body.ask-twin-docked { position: relative; width: calc(100% - var(--ask-twin-doc
 .ask-twin-refs { margin-left: 6px; font-size: 10.5px; color: var(--ui-accent-strong); }
 .ask-twin-refs.is-uncited { color: #fbbf24; }
 .ask-twin-gaps { font-size: 11.5px; color: #fbbf24; }
+.ask-twin-recommendation { border: 1px solid var(--ui-accent-line); border-radius: 10px; padding: 10px 12px; background: var(--ui-surface); display: flex; flex-direction: column; gap: 4px; }
+.ask-twin-rec-head { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ui-accent-strong); }
+.ask-twin-rec-action { margin: 0; font-size: 13px; color: var(--ui-text); }
+.ask-twin-rec-basis { margin: 0; font-size: 11px; color: var(--ui-text-muted); }
+.ask-twin-rec-buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.ask-twin-rec-decided { font-size: 11px; color: var(--ui-text-secondary); }
 .ask-twin-autorun-note { margin: 0; font-size: 11px; color: var(--ui-text-muted); }
 
 /* Context chips: what the next question is about */
