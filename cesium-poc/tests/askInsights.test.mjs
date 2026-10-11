@@ -158,3 +158,23 @@ describe('prefetch plans the obvious insight first', () => {
     for (const p of places.places) assert.ok(text.includes(p.text.toLowerCase()), `${p.name}: '${p.text}' not in ${places.layer}`);
   });
 });
+
+describe('explain_incident for a recorded incident', () => {
+  test('a register id is explained from the record and its section history, labelled as not the live model', () => withInsights([
+    crash('INC-200014', eb(4), 'Light Rain', { incident_type: 'Vehicle vs barrier', lane_closure_y_n: 'Yes', recommended_next_action: 'Inspect barrier' }),
+    crash('INC-2', eb(4), 'Clear'), crash('INC-3', eb(8), 'Rain'), crash('INC-4', null, 'Clear'),
+  ], {}, async h => {
+    const out = await h.explain_incident({ incident_id: 'INC-200014' });
+    assert.equal(out.source, 'Twin insight · crash register (recorded incident)');
+    assert.equal(out.output.incident.type, 'Vehicle vs barrier');
+    assert.equal(out.output.incident.section, eb(4).sectionLabel);
+    assert.equal(out.output.section.crashes, 2);
+    assert.equal(out.output.section.rankOnCorridor, 1);
+    assert.match(out.output.basis, /Not the live TMC risk model/);
+    assert.equal(out.output.incident.recommendedNextAction, 'Inspect barrier');
+    // Historical mode explains the record too.
+    assert.equal((await h.explain_incident({ incident_id: 'INC-200014', temporal: { mode: 'HISTORICAL', date: '2024-05-01' } })).output.incident.id, 'INC-200014');
+    // A record with no position says why its section history is missing.
+    assert.match((await h.explain_incident({ incident_id: 'INC-4' })).output.gaps[0], /no position/);
+  }));
+});

@@ -578,3 +578,31 @@ describe('give-ups and unverified figures', () => {
     assert.equal(answer.confidence, 'medium');
   });
 });
+
+describe('answer blocks and evidence', () => {
+  test('blocks and evidence come only from cited lookups, with figures copied from their output', async () => {
+    const { buildAnswerExtras } = await import('../server/ask/answerBlocks.mjs');
+    const calls = [
+      { ref: 'R1', name: 'count_records', evidence: true, source: 'DataConnect · Florida I595 Incidents', output: { className: 'Florida I595 Incidents', totalCount: 178, groupBy: 'weather', groups: [{ value: 'Clear', count: 120 }, { value: 'Light Rain', count: 30 }] } },
+      { ref: 'R2', name: 'list_live_events', evidence: true, source: 'Live', summary: '2 events', output: { total: 2, events: [{ id: 'FL511-1', type: 'CLOSURE', near: 'SR-7', lon: -80.2, lat: 26.08 }, { id: 'FL511-2', type: 'INCIDENT', near: null }] } },
+      { ref: 'R3', name: 'count_records', evidence: true, source: 'x', output: { className: 'Uncited', totalCount: 5 } },
+    ];
+    const { blocks, evidence } = buildAnswerExtras(calls, ['R1', 'R2']);
+    assert.deepEqual(blocks.map(b => [b.type, b.ref]), [['kpi', 'R1'], ['bars', 'R1'], ['kpi', 'R2'], ['table', 'R2']]);
+    assert.equal(blocks[0].value, 178);
+    assert.deepEqual(blocks[1].items, [{ label: 'Clear', value: 120 }, { label: 'Light Rain', value: 30 }]);
+    assert.deepEqual(blocks[3].rowLocations, [{ lon: -80.2, lat: 26.08 }, null]);
+    assert.equal(evidence.R3, undefined, 'an uncited lookup has no evidence chip');
+    assert.equal(evidence.R2.total, 2);
+    assert.deepEqual(evidence.R2.records[0], { id: 'FL511-1', label: 'CLOSURE', lon: -80.2, lat: 26.08, fields: { type: 'CLOSURE', near: 'SR-7' } });
+    assert.equal(evidence.R2.summary, '2 events');
+  });
+
+  test('a finished answer carries blocks and evidence for what it cites', () => {
+    const calls = [{ ref: 'R1', name: 'count_records', evidence: true, status: 'ok', source: 'DC', output: { className: 'Florida I595 Incidents', totalCount: 30 } }];
+    const answer = finalizeAnswer(JSON.stringify({ answer: '30 incidents in light rain.', basis: [{ claim: '30 incidents in light rain.', refs: ['R1'] }], gaps: [] }), calls);
+    assert.equal(answer.blocks[0].value, 30);
+    assert.ok(answer.evidence.R1);
+    assert.equal(finalizeAnswer(JSON.stringify({ answer: 'x', basis: [], gaps: [] }), calls).blocks, undefined);
+  });
+});

@@ -19,6 +19,7 @@ import { randomUUID } from 'node:crypto';
 import { parseModelReply } from '../liveDc/askTwin.mjs';
 import { screenBlock } from './envelope.mjs';
 import { ProviderError } from './modelProvider.mjs';
+import { buildAnswerExtras } from './answerBlocks.mjs';
 import { ANSWER_SCHEMA, systemPrompt } from './prompt.mjs';
 
 export const DEFAULT_LIMITS = Object.freeze({ maxRounds: 3, toolTimeoutMs: 8_000, runTimeoutMs: 45_000, maxTokens: 2_000 });
@@ -181,6 +182,7 @@ export function finalizeAnswer(rawText, calls) {
   // Playbook recommendations are attached from the cited insight results, word for word: the model
   // may explain a recommendation but never writes one.
   const recommendations = cited.map(ref => byRef.get(ref).output?.recommendation).filter(Boolean);
+  const { blocks, evidence } = buildAnswerExtras(calls, cited);
   const followUps = Array.isArray(parsed.follow_ups)
     ? parsed.follow_ups.filter(q => typeof q === 'string' && q.trim()).slice(0, 3).map(q => q.trim().slice(0, 120)) : [];
   return {
@@ -196,6 +198,8 @@ export function finalizeAnswer(rawText, calls) {
     follow_ups: followUps,
     ...(inferred.length ? { basis_inferred: true } : {}),
     ...(unverified.length ? { unverified } : {}),
+    ...(blocks.length ? { blocks } : {}),
+    ...(Object.keys(evidence).length ? { evidence } : {}),
     cited,
     uncited: calls.filter(call => call.evidence && !cited.includes(call.ref)).map(call => call.ref),
   };
@@ -242,7 +246,7 @@ function contextSummary(envelope) {
  *   question's obvious part — so its results stream at once and save the model a round.
  */
 export function createOrchestrator({ provider, tools, system = systemPrompt(), limits = {}, logger = console, now = Date.now,
-  retryDelayMs = () => 400 + Math.floor(Math.random() * 400), prefetch = () => [] }) {
+  retryDelayMs = () => 400 + Math.floor(Math.random() * 400), prefetch = () => [], spend = null }) {
   const { maxRounds, toolTimeoutMs, runTimeoutMs, maxTokens } = { ...DEFAULT_LIMITS, ...limits };
 
   async function complete(request) {
@@ -272,6 +276,13 @@ export function createOrchestrator({ provider, tools, system = systemPrompt(), l
     const usage = {};
     let rounds = 0;
     emit({ type: 'RunStarted', runId });
+    // The daily budget (spendGuard.mjs) is checked before any model call; over it, the turn ends at once.
+    const overBudget = spend?.blocked?.();
+    if (overBudget) {
+      emit({ type: 'RunError', runId, message: overBudget, retryable: false });
+      log({ runId, ok: false, rounds: 0, ms: now() - started, usage, calls, error: 'daily limit' });
+      return null;
+    }
     emit({ type: 'ContextUsed', ...contextSummary(envelope) });
 
     /** Run one lookup with a deadline; record it, emit start and end, return its labelled result text. */
@@ -287,6 +298,7 @@ export function createOrchestrator({ provider, tools, system = systemPrompt(), l
       call.evidence = !result.timedOut && isEvidence(name, result.output);
       call.ms = now() - t0;
       call.output = result.output;
+      call.summary = result.summary ?? null;
       emit({ type: 'ToolCallEnd', id, ref, name, input: call.input, status: call.status, source: call.source, ms: call.ms, origin,
         ...(result.summary ? { summary: result.summary } : {}),
         ...(call.status === 'ok' ? {} : { detail: result.output?.gap?.detail ?? result.output?.error ?? null }) });
@@ -427,6 +439,7 @@ export function createOrchestrator({ provider, tools, system = systemPrompt(), l
 
   /** One JSON line per turn: what the latency budget and the cost guardrails are measured from. */
   function log({ runId, ok, rounds, ms, usage, calls, error = null }) {
+    if (rounds) spend?.record?.(usage);
     logger.log?.(JSON.stringify({
       event: 'ask_turn', runId, ok, provider: provider.name, rounds, ms, usage,
       tools: calls.map(({ ref, name, status, ms: toolMs, source, origin }) => ({ ref, name, status, ms: toolMs, source, origin })), ...(error ? { error } : {}),

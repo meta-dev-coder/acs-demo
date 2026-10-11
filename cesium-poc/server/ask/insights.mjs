@@ -109,15 +109,57 @@ export function createInsights({ store, getLiveEvents = null, readLayer = () => 
   const historicalGap = temporal => (temporal?.mode === 'HISTORICAL'
     ? { gap: { type: 'not_ready', detail: `Historical replay (${temporal.date ?? 'a past date'}) is assessed on the TMC screen only for now; the twin's server assesses live incidents.` } } : null);
 
+  /**
+   * A recorded incident explained from the register: what happened, where, and how its FDOT section
+   * compares with the corridor. The live TMC risk model needs live lane and upstream state, which a
+   * past record does not carry, so this says plainly that it is a different, record-based view.
+   * @returns {{output: object, source: string, summary: string} | null}  null when the id is not recorded
+   */
+  function explainRecorded(incidentId) {
+    const result = store.rows('Florida I595 Incidents');
+    if (result.gap) return null;
+    const id = String(incidentId ?? '').trim();
+    const record = result.records.find(r => r.key === id || String(r.incident_id ?? r.keyInSource ?? '') === id);
+    if (!record) return null;
+    const { sections: s } = corridor();
+    const point = crashPoint(record);
+    const section = point && s.length ? nearestSection(point, s) : null;
+    const all = result.records;
+    const { groups } = section ? groupBySection(all, s) : { groups: new Map() };
+    const here = section ? groups.get(section.sectionLabel) : null;
+    const wetShare = all.filter(r => WET.test(r.weather ?? '')).length / (all.length || 1);
+    const ranked = [...groups.values()].sort((a, b) => b.crashes - a.crashes);
+    const near = point ? all.filter(r => r !== record && crashPoint(r) && haversineMeters(point.lon, point.lat, crashPoint(r).lon, crashPoint(r).lat) <= 800).length : null;
+    const pick = (...names) => { for (const n of names) if (record[n] !== undefined && record[n] !== null && record[n] !== '') return record[n]; return null; };
+    const output = {
+      asOf: result.asOf, basis: 'Recorded incident and its section history (crash register). Not the live TMC risk model, which needs live lane and upstream state.',
+      incident: { id: record.key, date: pick('incident_date', '_at'), type: pick('incident_type'), weather: pick('weather'), lanesClosed: pick('lane_closure_y_n'),
+        closureHours: pick('lane_closure_duration_hours'), injuries: pick('injuries_y_n'), fatalities: pick('fatalities'), rootCause: pick('root_cause_category', 'root_cause'),
+        recommendedNextAction: pick('recommended_next_action'), section: section?.sectionLabel ?? null, lon: point ? round(point.lon) : null, lat: point ? round(point.lat) : null },
+      section: here ? { crashes: here.crashes, wetCrashes: here.wet, laneClosureHours: round(here.closureHours, 1), injuryCrashes: here.injuries,
+        rankOnCorridor: ranked.findIndex(g => g.segment === here.segment) + 1, of: ranked.length,
+        wetShare: round(here.wet / here.crashes, 2), corridorWetShare: round(wetShare, 2) } : null,
+      incidentsWithin800m: near,
+      gaps: [
+        ...(section ? [] : ['This record has no position on an FDOT section, so its section history is not shown.']),
+        'Traffic volume and speed at the time are not in the twin.',
+      ],
+    };
+    return { output, source: 'Twin insight · crash register (recorded incident)',
+      summary: here ? `${record.key} · ${section.sectionLabel}: ${here.crashes} crashes on record (rank ${output.section.rankOnCorridor} of ${ranked.length})` : `${record.key} · recorded incident` };
+  }
+
   const handlers = {
     async explain_incident({ incident_id, temporal } = {}) {
-      const past = historicalGap(temporal);
-      if (past) return { output: past, source: null };
+      // A past date, or an id from the crash register, is explained from the record.
+      const recorded = explainRecorded(incident_id);
+      if (temporal?.mode === 'HISTORICAL') return recorded ?? { output: historicalGap(temporal), source: null };
       const live = await assessLive();
-      if (live.gap) return { output: live, source: null };
+      if (live.gap) return recorded ?? { output: live, source: null };
       const { ranked } = live.assessed;
       const at = ranked.findIndex(entry => String(entry.incident.id) === String(incident_id));
       if (at === -1) {
+        if (recorded) return recorded;
         return { output: { gap: { type: 'not_ready', detail: `Incident ${incident_id} is not among the ${ranked.length} active incident(s) in the live feed now — it may have cleared, or the screen and the twin hold different snapshots.` } }, source: null };
       }
       const out = compactAssessment(ranked[at], at + 1, ranked.length);
@@ -276,7 +318,7 @@ export function groupBySection(rows, sections) {
 export const INSIGHT_DEFINITIONS = Object.freeze([
   {
     name: 'explain_incident',
-    description: 'Why an active incident has the secondary-incident risk it has: score, rank among active incidents, the factors driving it, upstream sections and congestion, recommended mitigation, nearest upstream camera, and what could not be evaluated. Computed by the TMC risk model the screen uses.',
+    description: 'Why an active incident has the secondary-incident risk it has: score, rank among active incidents, the factors driving it, upstream sections and congestion, recommended mitigation, nearest upstream camera, and what could not be evaluated. Computed by the TMC risk model the screen uses. For a recorded (past) incident id such as INC-200014, or in historical mode, it explains the record and its section\'s crash history instead.',
     input_schema: { type: 'object', required: ['incident_id'], properties: { incident_id: { type: 'string' },
       temporal: { type: 'object', properties: { mode: { type: 'string' }, date: { type: 'string' } } } } },
   },

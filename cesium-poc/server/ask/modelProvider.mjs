@@ -124,3 +124,27 @@ export function createRecordingProvider(inner, { path }) {
     },
   };
 }
+
+/**
+ * The primary model, and a second one when the primary is overloaded or unreachable (529, 5xx,
+ * connection errors). A refusal, a bad request or a rejected key is not retried on another model.
+ * The fallback has its own prompt cache, so its first answers are slower and cost more.
+ */
+export function createFallbackProvider(primary, fallback, { logger = console } = {}) {
+  return {
+    name: `${primary.name} → ${fallback.name}`,
+    model: primary.model,
+    async complete(request) {
+      try {
+        return await primary.complete(request);
+      } catch (error) {
+        // A rate limit (429) is usually account-wide, so another model would not help.
+        const unavailable = error instanceof ProviderError && error.retryable && (error.status === null || error.status === 529 || error.status >= 500);
+        if (!unavailable || request.signal?.aborted) throw error;
+        logger.warn?.(`ask-the-twin: ${primary.model} unavailable (${error.message}); answering with ${fallback.model}`);
+        const response = await fallback.complete(request);
+        return { ...response, served_by: fallback.model };
+      }
+    },
+  };
+}

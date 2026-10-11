@@ -23,7 +23,7 @@ import { resolve } from 'node:path';
 export const DEFAULT_PORT = 8787;
 
 /** The status document: enough to tell which model, which data, and how fresh. */
-export function statusOf({ label, store = null, refresher = null, now = Date.now }) {
+export function statusOf({ label, store = null, refresher = null, spend = null, now = Date.now }) {
   const classes = store ? store.classes().map(c => ({ className: c.className, origin: originOfSource(c.source), rowCount: c.rowCount, asOf: c.asOf })) : [];
   return {
     ok: Boolean(store),
@@ -32,6 +32,7 @@ export function statusOf({ label, store = null, refresher = null, now = Date.now
     store: { classes, live: classes.filter(c => c.origin === 'live').length, historical: classes.filter(c => c.origin === 'historical').length,
       snapshot: classes.filter(c => c.origin === 'snapshot').length },
     refresh: refresher ? { ...refresher.status } : { off: true },
+    usage: spend?.status?.() ?? null,
   };
 }
 

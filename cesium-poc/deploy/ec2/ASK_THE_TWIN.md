@@ -81,6 +81,8 @@ DC_BASE_URL=…  DC_CLIENT_ID=…      # historical classes (+ `npm run dc:login
 | `ASK_TWIN_SERVICE_URL=http://127.0.0.1:8787 npm run dev` | The map on :5188, with `/api/i595/ask` proxied to the service above (the same path EC2 will use) | Open `http://localhost:5188/?demo=i595` → Ask the Twin. The dev terminal says `proxied to …`. |
 | `npm run dev` (no `ASK_TWIN_SERVICE_URL`) | The map with the same service mounted in-process (the quickest loop) | the terminal prints `ask-the-twin (local): <model>, store …, refreshing from DataConnect (live + historical)` |
 
+Model settings: `ASK_TWIN_FALLBACK_MODEL` (a second model for overloads), `ASK_TWIN_DAILY_TOKENS` (daily budget, counted
+beside the store in `ask-spend.json`; `/api/i595/ask/status` shows `usage`).
 Refresh settings: `ASK_TWIN_REFRESH=off` (snapshot only), `ASK_TWIN_LIVE_REFRESH_MIN=5`,
 `ASK_TWIN_HISTORICAL_REFRESH_H=24`, `ASK_TWIN_STORE=<path>`, `ASK_TWIN_PORT=8787`, `ASK_TWIN_EFFORT=low`.
 
@@ -144,9 +146,12 @@ browser ──HTTP(S)──▶ live-dc (:8095, password gate, web + read APIs) �
 - `live-dc-ask.service` runs `tools/ask-serve.mjs`: the same `User=livedc` and hardening as `live-dc`,
   `MemoryMax=768M`, `CPUQuota=50%`, `ReadWritePaths=/var/lib/live-dc`, listening on 127.0.0.1 only.
   A model or refresh problem can then never take down the DataConnect writer, and it restarts on its own.
-- `live-dc` forwards `/api/i595/ask` to it, after its session check.
-  **Not built yet:** the proxy in `demoServer.mjs`, the unit file, and `install.sh`/`livedc.sh` handling two
-  units. Each is small, but they are untested on the host, so they wait until phase 1 is verified.
+- `live-dc` forwards `/api/i595/ask` to it, after its session check, when `ASK_TWIN_SERVICE_URL=http://127.0.0.1:8787`
+  is set (`server/ask/askProxy.mjs`). **Built, not deployed:** the release carries `live-dc-ask.mjs` and
+  `live-dc-ask.service`; `install.sh` installs the unit without enabling it; `livedc.sh` restarts, updates,
+  rolls back and reports both units once `live-dc-ask` is enabled (`livedc.sh ask-logs` for its journal).
+  To switch: `sudo systemctl enable --now live-dc-ask`, set `ASK_TWIN_SERVICE_URL` in the env, `livedc.sh restart`.
+  To switch back: remove `ASK_TWIN_SERVICE_URL`, `systemctl disable --now live-dc-ask`, `livedc.sh restart`.
 - **HTTPS (optional, for `/demo/` on GitHub Pages).** The page is HTTPS and cannot call `http://…:8095`.
   Add a CloudFront custom origin `ec2-34-237-187-140.compute-1.amazonaws.com:8095` with path
   `/api/i595/ask*`, caching disabled, all methods, origin read timeout 60 s, and response streaming on.
@@ -211,7 +216,7 @@ That is acceptable for a demo-grade shared secret, but it is not a vault. To rot
 host (`new,old`), change the parameter, `cdk deploy` (the parameter is read again on every deploy), then
 remove `old` from the host.
 
-**Host contract (not implemented; for the engineer who adds it)**
+**Host contract (implemented in `server/liveDc/edgeGate.mjs` and `demoHost.mjs`; `/api/i595/ask/status` is not exposed at the edge)**
 
 1. **Header:** `x-ask-edge-key`. Accepted keys come from the host env, e.g.
    `ASK_TWIN_EDGE_KEYS=<key>[,<previous key>]` in `/etc/live-dc/env`. (Reading SSM from the host instead
@@ -301,6 +306,9 @@ Each AWS or host command below is yours to run. Read-only checks come first.
    ASK_TWIN_EFFORT=low
    # ASK_TWIN_STORE=/var/lib/live-dc/twin.sqlite      (default: $HOME/twin.sqlite = the state dir)
    # ASK_TWIN_LIVE_REFRESH_MIN=5   ASK_TWIN_HISTORICAL_REFRESH_H=24   ASK_TWIN_REFRESH=on
+   # ASK_TWIN_FALLBACK_MODEL=<model>                   (answers when the primary is overloaded or 5xx)
+   # ASK_TWIN_DAILY_TOKENS=2000000                     (daily budget; usage in /var/lib/live-dc/ask-spend.json)
+   # ASK_TWIN_EDGE_KEYS=<key>                          (only with the CloudFront edge path, section 5.1)
    # ASK_TWIN_ENGINE=legacy                            (emergency switch back to the old handler)
    ```
    `LIVE_DC_READ_BASE_URL` and `DC_BASE_URL` are already set there; the read clients take the service client

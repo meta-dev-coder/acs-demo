@@ -22,7 +22,7 @@ import { apiKeyFromSecret, DEFAULT_ASK_MODEL } from '../liveDc/askTwin.mjs';
 import { readSecretString } from '../liveDc/awsSecret.mjs';
 import { fetchEventWeather } from '../liveDc/eventWeather.mjs';
 import { createAnthropicProvider, createRecordingProvider, createReplayProvider } from './modelProvider.mjs';
-import { createAskService } from './askService.mjs';
+import { createAskService, spendFromEnv, withFallbackFromEnv } from './askService.mjs';
 import { configuredClients, refreshFromEnv } from './storeRefresh.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -47,10 +47,12 @@ export function providerFromEnv(env, { readSecret = readSecretString } = {}) {
   // The same secret the EC2 host reads (JSON {"api_key"}), through the AWS CLI and your own AWS
   // credentials, on the first question — never at startup, never logged.
   const region = String(env.LIVE_DC_AWS_REGION ?? '').trim() || undefined;
-  const live = apiKey ? createAnthropicProvider({ apiKey, model, effort })
-    : createAnthropicProvider({ model, effort, getApiKey: async () => apiKeyFromSecret(await readSecret(secretName, { region, policyHint: 'your AWS credentials need secretsmanager:GetSecretValue on it' }), secretName) });
+  const getApiKey = async () => apiKeyFromSecret(await readSecret(secretName, { region, policyHint: 'your AWS credentials need secretsmanager:GetSecretValue on it' }), secretName);
+  const make = m => (apiKey ? createAnthropicProvider({ apiKey, model: m, effort }) : createAnthropicProvider({ model: m, effort, getApiKey }));
+  const live = withFallbackFromEnv(env, make(model), make);
   const record = String(env.ASK_TWIN_RECORD ?? '').trim();
-  const via = `${effort ? `, effort ${effort}` : ''}${apiKey ? '' : ` (key from secret ${secretName})`}`;
+  const fallback = String(env.ASK_TWIN_FALLBACK_MODEL ?? '').trim();
+  const via = `${effort ? `, effort ${effort}` : ''}${fallback && fallback !== model ? `, fallback ${fallback}` : ''}${apiKey ? '' : ` (key from secret ${secretName})`}`;
   return record ? { provider: createRecordingProvider(live, { path: record }), label: `${model}${via}, recording to ${record}` } : { provider: live, label: `${model}${via}` };
 }
 
@@ -81,7 +83,7 @@ export function createLocalAsk({ env = process.env, getLiveEvents = null, logger
     ...(clientKey ? { clientKey } : {}), ...(limiter ? { limiter } : {}),
     readLayer: file => { const path = join(layerDir, file); return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null; },
     fetchWeather: point => fetchEventWeather(point),
-    ...clients, refresh: refreshFromEnv(env),
+    ...clients, refresh: refreshFromEnv(env), spend: spendFromEnv(env, storePath, logger),
   });
   const refreshing = service.refresher ? `, refreshing from DataConnect (${[clients.liveDc && 'live', clients.historical && 'historical'].filter(Boolean).join(' + ')})` : ', snapshot only';
   logger.log?.(`ask-the-twin (local): ${label}, store ${storePath}${refreshing}`);
