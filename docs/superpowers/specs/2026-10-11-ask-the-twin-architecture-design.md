@@ -47,7 +47,15 @@ can extend.
    experimental `node:sqlite` API changes.
 7. **Twin UI API.** One registry of state providers, commands, events and flows. The human UI and Ask the
    Twin both go through it. It uses a contract plus a registry, not class inheritance.
-8. **View-tier actions auto-run** as an answer streams. A setting in the chat panel can switch this off.
+8. **View-tier actions auto-run** as an answer streams, under these rules:
+   - **Per-category setting** in the panel header: camera/highlight, layer toggles, filters.
+   - **Fixed limits no setting can change:** state-tier actions ask unless opted in, and write-tier actions
+     always ask.
+   - **Every auto-run passes the client registry's checks** (e.g. the corridor-distance limit), because FL511
+     and DataConnect text reaching the model is untrusted.
+   - **Low-confidence answers never auto-run.** Confidence is computed by the server from evidence count and
+     freshness, never self-reported by the model.
+   - **The view is saved before a turn's actions run**, and each turn has **Restore view**.
 9. **Ask the Twin is a docked, resizable panel on the right side of the whole application**, not a
    floating widget.
 
@@ -213,6 +221,84 @@ map layer with a legend, cleared on the next question. Hovering an evidence row 
 feature. Trust signals: source chips, an "as of" time, and "computed by the twin" vs. "interpretation"
 labels.
 
+## Industry research (2026-10-11): what changed
+
+Five research angles (twin vendors, transport operations, copilot platforms, structured-data grounding,
+copilot UX); full findings are in the workflow output. Each item below is adopted into the POC.
+
+**Confirmed precedents**
+
+- **Cesium's own `cesiumjs-ai-starter-app`.** Same stack, same split (agent on the server, view tools
+  streamed to and run in the browser). Cesium deprecated its earlier "browser as MCP server" design.
+- **Bentley Copilot on Bentley MCP servers.** Marketing-level evidence.
+- **FDOT SunGuide response plans.** The system drafts, the operator edits and presses Activate. That is
+  our propose/commit model, in vocabulary District 4 operators already use.
+- **USDOT Dallas US-75 ICM.** Pre-approved rule-based plans that the operator accepts or rejects.
+- **Microsoft Fabric data agent.** Read-only, capped results, runs with the user's credentials.
+- **dbt / Snowflake / Databricks.** Semantic layers and verified queries beat raw text-to-SQL on numeric
+  accuracy, and fail in a way you can see.
+
+**Panel and trust**
+
+- Each turn records a view checkpoint and has **Restore view**.
+- Activity-trace rows have states: started, running, awaiting-confirmation, done, error, denied/undone.
+  Each row says whether it auto-ran, was clicked, or was skipped. A row expands to show its exact inputs and
+  a result digest, and the trace can be copied as JSON.
+- Stream event names follow **AG-UI** (RunStarted, ToolCallStart/Args/End/Result, …) instead of a home-made
+  set.
+- **Evidence renders first; interpretation is visually subordinate.** The "Twin-computed" badge appears only
+  when a block came directly from a named insight tool with its parameters shown. Those parameters can be
+  edited, which re-runs the tool without the model. Everything else is labelled "Interpretation".
+- Evidence chips open the source record or map feature, with the time window and filters of that answer.
+  The verdict carries inline reference chips. Evidence rows have a "wrong data" feedback action.
+- There is a **New conversation** control, because stale history skews answers.
+
+**Grounding and tools**
+
+- Evidence rows come back from tools as `search_result` blocks with stable sources
+  (`tool:get_live_chain#ticket/…`), and API citations map to `evidence.ref`. Numbers in `kpis` and `trend`
+  are resolved on the server from stored tool results.
+- **Fail typed, never guess.** A question outside the curated metrics returns a typed error rendered as
+  `gaps`. A question type that keeps missing becomes a new derived table, not a prompt tweak.
+- Tool contract:
+  - readable labels next to ids;
+  - `response_format: concise|detailed`;
+  - default row caps with a "narrow by segment/time" hint;
+  - `describe_data` returns only the slice of the dictionary that is relevant.
+- **Spatial questions only go through corridor-native parameters:** milepost range, carriageway, segment id,
+  screen bbox, radius. The model never sees R-tree or spatial SQL.
+- The optional SQL tool takes a **structured input**: `{view, measures[], dimensions[], filters[],
+  time_range, bbox?}`. Free SQL stays off.
+- Tools check deictic ids ("this incident") against `screen.selection`. The envelope may be absent (bridge
+  calls, flows).
+- Each capability folder has **`verified-questions.json`**: canonical question, the tool call that answers
+  it, `verified_by` / `verified_at`, and an onboarding flag. It drives the starter chips, the few-shot
+  examples in the playbook, and the numeric eval golden set (scored by exact match against the twin store).
+- MCP tools carry `readOnlyHint` and other annotations. These are informative only; authority stays with the
+  server-side role checks.
+
+**Insights and the scenario**
+
+- **Recommendations come from pre-approved playbooks** in `i595-insights`. The tool names the rule it used,
+  and the UI shows Accept / Reject (including "stand down"). The model explains the choice and never writes
+  the plan.
+- **The forecasting scenario uses inputs available at detection:** location, lanes blocked, upstream speed,
+  weather, time of day. It does not need severity or crash type, which FL511 often leaves blank. It shows
+  the recommendation next to a **do-nothing baseline**, with its time window and contributing factors.
+- Tier rationale for ACS:
+  - information gathering is automated (view actions);
+  - decision selection is computed by the twin (the model never ranks);
+  - action implementation is confirmed by a person (writes).
+
+**Deferred:**
+- aligning `actions[]` names with `@cesium-ai/tools` and sharing schemas between browser and server;
+- explicit ontology relationships in `dataGuide.json` for graph-style traversal;
+- MCP Apps `ui://` views for external hosts;
+- SOP/TIM documents as retrievable citations;
+- shift-handover and bulletin generation;
+- an admin-owned supervised/autonomous setting per workflow, with proposals as records in a review queue;
+- no arbitrary code execution, ever.
+
 ## Planned (out of POC scope): `i595-workflows`
 
 Robert's "automated workflows", shown as the next step after the POC. It is the third MCP server, and the
@@ -252,8 +338,11 @@ confirmation card with a disabled "Commit (not in POC)" button. It's tangible in
 
 1. Will ACS open the GitHub Pages URL or the EC2-served URL? This decides same-origin cookie auth vs.
    token + CORS.
-2. ~~Does Bentley have or plan iTwin/DataConnect MCP servers?~~ **Answered: not currently.** `i595-data` is
-   our own server.
+2. ~~Does Bentley have or plan iTwin/DataConnect MCP servers?~~ **No iTwin or DataConnect MCP server is
+   confirmed**, so `i595-data` is our own server. Research correction: Bentley *does* ship MCP servers
+   (STAAD.Pro, MicroStation, with a portfolio rollout announced; an iTwin IoT MCP server is listed but
+   unconfirmed), and Bentley Copilot uses them as its interface to applications. Our MCP-shaped servers
+   follow the same pattern and can later sit beside Bentley's, or be called by Bentley Copilot.
 3. ~~How much of `src/tmc/*` is pure?~~ **Answered (2026-10-11): almost all of it.** Of the 27 modules only
    three touch Cesium or the DOM: `tmcWorkspace.js` (the 4,300-line screen), `patrolMapLayer.js` and
    `upstreamProtectionMapLayer.js` (map drawing). `tmcMapMarkers.js` is drawing too. Everything else,
