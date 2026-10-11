@@ -1,6 +1,6 @@
 # Ask the Twin — reference architecture (Phase 2 "Why" layer) — design
 
-**Date:** 2026-10-11 · **Status:** draft (brainstorming with user; not yet approved) · **Scope:** architecture
+**Date:** 2026-10-11 · **Status:** draft v2: research and adversarial review applied; awaiting user approval · **Scope:** architecture
 only; implementation gated on a separate go-ahead. · **Branch:** `askthetwin`
 
 ## Why now
@@ -32,15 +32,19 @@ can extend.
    - a decision on same-origin vs cross-origin access (open question 1).
 2. **The core is independent of the host.** One pure core with thin host adapters. The existing
    `createAskHandler` dependency injection is the starting point; `demoHost.mjs` becomes the EC2 adapter.
-3. **An MCP-shaped modular monolith.** Domain logic is written as MCP servers using MCP tool shapes and the
+3. **An MCP-shaped modular monolith** (POC: plain JS modules with MCP-shaped tool definitions; the MCP SDK
+   and transport come after the POC). Domain logic is written as MCP servers using MCP tool shapes and the
    official SDK, but **run in-process** with the orchestrator over the in-memory transport. Moving a server to
    its own deployment, or to Bentley hosting, then means changing the transport, not the code.
 4. **The UI exposes no tools.** The browser sends *context in* (a screen snapshot) and receives
    *actions out* (`answer.actions[]`, checked against a client action registry before running). Business
    logic moves out of the browser into `i595-insights`. Pure modules such as `src/tmc/*` are shared by the
    browser and the server, never duplicated.
-5. **The role comes from identity checked on the server, never from the browser.** Screen context is useful
-   but untrusted.
+5. **The role comes from identity checked on the server, never from the browser.** Screen context and the
+   browser-held history are useful but untrusted. **POC:** the host has one shared password and its token
+   carries no subject, so a persona is a *demo playbook and presentation hint* chosen in a switcher. It never
+   grants tool authority, and every session gets the same read-only tool set. Real identity (subject + role
+   in the signed token, a server-side session list for revocation) is a prerequisite for `i595-workflows`.
 6. **Twin store: SQLite** through Node's built-in `node:sqlite`, so no dependency to install. It is
    verified on Node 22 with R-tree (spatial bounding boxes) and FTS5 (keyword search). Vectors are deferred
    (`sqlite-vec` later, only for free text and documents). `better-sqlite3` is the fallback if the
@@ -53,9 +57,21 @@ can extend.
      always ask.
    - **Every auto-run passes the client registry's checks** (e.g. the corridor-distance limit), because FL511
      and DataConnect text reaching the model is untrusted.
-   - **Low-confidence answers never auto-run.** Confidence is computed by the server from evidence count and
-     freshness, never self-reported by the model.
-   - **The view is saved before a turn's actions run**, and each turn has **Restore view**.
+   - **Confidence is computed by the server** only from structured fields of this turn's tool results:
+     distinct evidence refs cited by answer blocks (not rows returned), freshness measured against
+     `clockFor(temporal)` (so historical replay is not penalised), and agreement with the screen's inputs
+     signature. History and free text never count. Low confidence never auto-runs.
+   - **Only insight-tool actions auto-run mid-stream** (they carry their own evidence and `as_of`).
+     Model-proposed actions wait for the final confidence.
+   - **Action targets must be ids or coordinates returned by a tool in this turn.** No exemption based on
+     `sources`.
+   - **Auto-run is suppressed** (the action becomes a "Fly there" chip) if, since the turn started, the user
+     moved the camera or changed the selection, a TMC incident is under investigation, or the target no
+     longer exists.
+   - Actions that **reduce what is visible** (hide layer, narrowing filter, close panel) are state tier.
+   - **Restore view** saves workspace, temporal mode, selection, filters, layers and camera from the state
+     providers. It is offered for the latest turn only if the user ran no command since; older turns offer
+     "go to this answer's view".
 9. **Ask the Twin is a docked, resizable panel on the right side of the whole application**, not a
    floating widget.
 
@@ -77,6 +93,13 @@ can extend.
 
 ### Request envelope (browser → orchestrator)
 
+History is untrusted. The client sends prior turns as user and assistant text only, and the server caps it
+at N turns and M bytes. The server drops any tool blocks and `proposal_id` in it. Badges, KPIs, trend values
+and confidence bind only to this turn's server-side tool results. Deictics ("this one") are resolved once on
+the server at turn start and echoed in the answer header ("About FL511-876564"). With no envelope, a deictic
+question returns a typed gap. Evidence refs carry `as_of`, and a chip whose record has changed shows
+"changed since".
+
 `{ question, history, screen: { workspace, temporal, view: {bbox, zoom}, selection: {type, id}, area, panels: {…} } }`.
 The browser keeps the conversation history. Each active panel contributes a small snapshot through a
 registered context provider: ids, counts and the selection, never raw data. The model fetches details
@@ -91,6 +114,10 @@ through tools ("push a summary, let the model pull the rest").
 4. Messages: history, then this turn's screen context and question (after the cache breakpoint).
 
 ### Answer contract
+
+A `RunError` event after the first byte marks the turn incomplete, keeps the evidence already streamed, and
+offers Restore view and Retry. On 429/529 the server retries once with jitter, then falls back to a
+configured model or to the insight-only answer.
 
 Streams progress events (tool started/finished, with its source silo), then the final answer:
 headline, "why" points each tagged with a source declared by a tool (not written by the model), a
@@ -126,10 +153,23 @@ DataConnect stays the system of record. A **sync job** keeps a local SQLite read
 does not load everything at startup.
 
 - **Historical classes:** full refresh nightly or on demand, using the writer's existing paging `readAll`.
-- **Live classes:** written by the live sync loop in the same cycle it writes DataConnect. No read-back.
+- **Live classes:** written by the EC2 live sync, the **only** DataConnect writer (the poller Lambda's schedule
+  is retired along with `AskTheTwinFn`). SQLite holds **curated state only**: read-back plus confirmed
+  overlay (`curatedKeys`), never unconfirmed upserts.
+- **`store_meta`** table: `{table, as_of, cycle_id, row_count, status: loading|ready|stale|failed}`. Every tool
+  returns a typed `not_ready` or `stale` gap instead of answering from an empty or old table. On an empty
+  store, a historical refresh runs at startup, and `/healthz` reports store age.
+- Refreshes load into staging tables and swap in one transaction. Derived tables are computed only from
+  committed inputs and are stamped with `as_of`.
+- WAL mode, one writer connection (the sync process); Ask opens the file read-only on the same host.
+- The sync also caches current and forecast Open-Meteo weather per corridor section each cycle, so no tool
+  calls a live upstream on the answer path.
 - **Derived tables** are recomputed each cycle: crashes per segment × month × weather, asset risk, closure
-  lane-hours, and the latest `assessCorridor` result. Insight tools read these in milliseconds, and the
-  screen and the chat read the same numbers.
+  lane-hours. The TMC assessment is **not** read from a table cached for a whole cycle, because the screen's
+  assessment depends on the viewer (temporal mode, weather fetched for the selection, a 60 s poll). The
+  browser sends the input ids, temporal value and weather it assessed. The server runs `assessCorridor` per
+  request from stored events and returns the inputs signature, and a mismatch renders a "screen and twin
+  differ" gap.
 - **Spatial:** an R-tree over the bounding box of each record, plus milepost columns for corridor-linear
   queries.
 - **Text:** FTS5 over `root_cause`, issue summaries, inspection notes and FL511 descriptions.
@@ -156,8 +196,8 @@ operation.
 2. **Commands.** `twin.command({ id, title, tier, input (JSON schema), available(ctx), run })`. `run` returns
    an `undo`. There are three tiers:
    - `view` (fly, highlight, pulse, open panel, show/hide layer): auto-runs, can be undone.
-   - `state` (select, filter, switch workspace, draw area, run a *simulation*): runs and is announced as a
-     chip, can be undone.
+   - `state` (select, filter, narrow/hide, switch workspace, draw area, run a *simulation*): offered as
+     one-click buttons (today's behaviour), never auto-run in the POC, can be undone.
    - `write`: never runs in the browser. It shows a confirmation card with a preview. Confirming sends the
      `proposal_id` to `i595-workflows` (see Planned).
 3. **Events.** `selectionChanged`, `viewChanged`, `workspaceChanged`, `layerChanged`. These update context
@@ -177,7 +217,9 @@ Cmd-K command palette, e2e tests that drive commands, and a session timeline.
 ## Ask the Twin panel (UI)
 
 - **Docked on the right of the whole application**, full height, part of the layout (the map resizes; the
-  panel does not cover it). It replaces the floating draggable widget.
+  panel does not cover it). It replaces the floating draggable widget. In TMC with an incident open, it
+  shares the right column with the TMC panel as a tab, or defaults to the collapsed rail. The resize handle
+  keeps at least 50% of the width for the map. Layout is verified at 1366 and 1440 px.
 - **Resizable** with a drag handle, from a narrow chat width up to about half the screen. There is also an
   **expand** control for a reading mode where the panel takes most of the screen with the map as a strip,
   and **collapse** to a rail button. Width and mode are remembered per user (localStorage, per-viewer
@@ -196,11 +238,19 @@ Cmd-K command palette, e2e tests that drive commands, and a session timeline.
 ## Performance budget
 
 Something visible in under 300 ms. First useful content (a headline or the map moving) in under 3 s. A
-typical full answer in under 10 s. The levers, in order:
+typical full answer in under 10 s. All are measured as p50/p95 per route against the golden question set.
+The levers, in order:
+
+0. **The insight tool runs before the model.** For a question with a selection or a recognised intent, the
+   orchestrator calls `explain_incident` / `assessCorridor` before the first model round. Its verdict, KPIs
+   and view actions stream within about 500 ms, and the model then writes the interpretation. `RunStarted`
+   is sent before any upstream I/O, with no per-request live-events prefetch. Interactive routes are capped
+   at 2 model rounds.
 
 1. Fewer model rounds through large insight tools (`explain_incident` returns the whole bundle).
 2. Tools read SQLite and derived tables, not DataConnect.
-3. Stream progress, text and actions (view actions run as soon as they are decided).
+3. Stream progress, text and actions (insight-tool view actions run as soon as they are decided; others at
+   the end of the answer).
 4. Prompt caching on tools, system and persona playbook.
 5. Prefetch the context bundle when an incident is selected.
 6. The local fast path for plain commands.
@@ -224,7 +274,8 @@ labels.
 ## Industry research (2026-10-11): what changed
 
 Five research angles (twin vendors, transport operations, copilot platforms, structured-data grounding,
-copilot UX); full findings are in the workflow output. Each item below is adopted into the POC.
+copilot UX); full findings are in the workflow output. Items are adopted in the order given in "POC build
+order"; items listed there under "After the POC" are not needed for the demo.
 
 **Confirmed precedents**
 
@@ -246,7 +297,9 @@ copilot UX); full findings are in the workflow output. Each item below is adopte
   a result digest, and the trace can be copied as JSON.
 - Stream event names follow **AG-UI** (RunStarted, ToolCallStart/Args/End/Result, …) instead of a home-made
   set.
-- **Evidence renders first; interpretation is visually subordinate.** The "Twin-computed" badge appears only
+- **Rendering order:** the verdict with inline reference chips and the recommended action, KPIs next to
+  it, then evidence rows labelled Twin-computed or Interpretation. The trace is collapsed unless it is
+  running or has an error. **Interpretation is visually subordinate.** The "Twin-computed" badge appears only
   when a block came directly from a named insight tool with its parameters shown. Those parameters can be
   edited, which re-runs the tool without the model. Everything else is labelled "Interpretation".
 - Evidence chips open the source record or map feature, with the time window and filters of that answer.
@@ -282,9 +335,15 @@ copilot UX); full findings are in the workflow output. Each item below is adopte
 - **Recommendations come from pre-approved playbooks** in `i595-insights`. The tool names the rule it used,
   and the UI shows Accept / Reject (including "stand down"). The model explains the choice and never writes
   the plan.
-- **The forecasting scenario uses inputs available at detection:** location, lanes blocked, upstream speed,
-  weather, time of day. It does not need severity or crash type, which FL511 often leaves blank. It shows
-  the recommendation next to a **do-nothing baseline**, with its time window and contributing factors.
+- **The single forecasting scenario: weather-driven crash risk for the next 6 h, with patrol
+  pre-positioning.**
+  - Inputs: historical crash register × weather per segment, month and time of day; the Open-Meteo
+    forecast; live events.
+  - **Upstream speed is declared as a gap.** There is no traffic-condition feed on this corridor, and the
+    TMC replay is explicitly not a forecast.
+  - **Baseline:** the historical crash rate per segment × time-of-day bucket × weather bucket, so the
+    "Twin-computed" label is honest.
+  - Severity and crash type, which FL511 often leaves blank, are not required.
 - Tier rationale for ACS:
   - information gathering is automated (view actions);
   - decision selection is computed by the twin (the model never ranks);
@@ -317,6 +376,10 @@ model output alone.
   - open or close a live ticket;
   - schedule an inspection after an event clears;
   - bundle at-risk assets into a planned lane-closure window.
+- **Prerequisites:** real identity (see Decision 5). Proposals are stored on the server as
+  `{id, subject, role, payload_hash, source_versions, expiry}`, and commit sends only the id. The writer
+  consumes an authenticated queue and re-checks role, the SDNA class allowlist and record versions. The
+  internet-facing Ask process never holds write credentials.
 - **Role-gated.** The verified role decides which `propose_*` tools are offered and who may commit.
   The server checks this again at commit time.
 - **Write boundaries carried over from the live pipeline.** Writes go only to the `SDNA Florida I595 Live *`
@@ -333,6 +396,69 @@ model output alone.
 
 What the POC shows of this: the architecture slot, plus one *read-only* `propose_*` example rendered as a
 confirmation card with a disabled "Commit (not in POC)" button. It's tangible in the demo, with no write path.
+
+## Operational guardrails
+
+- **The HTTPS path is a CloudFront custom origin to EC2:8095.** The origin uses HTTP; the security group is
+  limited to CloudFront's origin-facing prefix list. The `/api/i595/ask` behaviour uses CachingDisabled, no
+  compression and OriginReadTimeout 60.
+- Streaming sends a heartbeat or progress event at least every 10 s. Each tool has a deadline of about 8 s,
+  and the whole run about 45 s.
+- **`live-dc-ask.service`** is a separate unit with these settings:
+  - ReadWritePaths on the store directory;
+  - its own MemoryMax and CPUQuota, sized against measured free RAM;
+  - a shared session-signing key from Secrets Manager;
+  - a **separate read-only DataConnect identity**, since only the sync/writer holds write credentials.
+- At startup it warms the key, live class ids, layers and the prompt cache, and reports readiness in
+  `/healthz`.
+- **Rate limits:** the client IP is trusted only from `CloudFront-Viewer-Address`, and only with the origin
+  secret header. Ask limits are keyed on the session id.
+- **Cost:** per-session and global daily token budgets from API `usage`. When exceeded, the route falls back
+  to the insight-only path. The Anthropic workspace has a spend limit. The model call and tools are aborted
+  when the request closes.
+- **Telemetry:** one JSON log line per turn: route, model, rounds, input/output/cache tokens, TTFB,
+  first-content time, total time, and per-tool ms and status. An alarm fires on the daily token total.
+
+## POC build order
+
+1. **One streaming EC2 backend.**
+   - Retire `AskTheTwinFn`, the poller schedule and `VITE_ASK_THE_TWIN_API`.
+   - Split out `live-dc-ask.service`; add the CloudFront origin with heartbeat, deadlines, telemetry and the
+     token budget.
+
+   *Exit:* the Pages build streams `RunStarted` in under 300 ms and a log line appears per turn.
+2. **Curated SQLite read model with `store_meta`.**
+   - The EC2 sync is the only writer; historical data loads with an atomic swap; weather is cached per
+     section.
+   - No R-tree, FTS5 or MCP SDK yet.
+
+   *Exit:* tools return typed `not_ready` / `stale` gaps on an empty or old store.
+3. **`explain_incident` insight tool.**
+   - Imports `assessCorridor` and the live chain; confidence is computed by the server.
+   - It runs before the first model round, with a cap of 2 rounds.
+
+   *Exit:* headline under 3 s at p50, in live and replay.
+4. **Map `actions[]` onto the existing `TWIN_ACTIONS` via `runTmcAction`.**
+   - Use the explicit tier table and the auto-run suppression rules, plus full-state Restore view.
+
+   *Exit:* an e2e run where the operator pans mid-stream and the camera does not move.
+5. **Hotspot navigation** from the derived crash table, with corridor-native parameters.
+
+   *Exit:* "fly to the worst wet-weather segment" lands correctly, with evidence stamped with `as_of`.
+6. **The forecasting scenario,** with its baseline and a playbook rule offering Accept/Reject.
+
+   *Exit:* the scripted demo question renders verdict, KPIs, baseline and factors, all Twin-computed.
+7. **Panel and persona polish.**
+   - The docked panel shares the right column with TMC; verdict-first rendering; history capped.
+   - Demo-persona switcher; one read-only `propose_*` card with a disabled Commit button.
+
+   *Exit:* the full demo script runs at 1366 and 1440 px.
+8. **After the POC:**
+   - Twin UI API registry and flows, Cmd-K, AG-UI naming;
+   - MCP SDK and transport, capability glob discovery;
+   - verified-questions eval harness, editable tool parameters;
+   - FTS5 / R-tree and the structured SQL tool;
+   - turn store, real identity, the workflows write path.
 
 ## Open questions
 
