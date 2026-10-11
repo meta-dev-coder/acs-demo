@@ -11,7 +11,9 @@
  * Neither set → /api/i595/ask answers 503 saying what to set; the built-in answers still work.
  *
  * Data: the SQLite twin store at ASK_TWIN_STORE (default .twin-store/twin.sqlite), built from the
- * committed snapshot on first use when missing. Nothing here writes to DataConnect.
+ * committed snapshot on first use when missing, then refreshed from DataConnect (SDNA live classes and
+ * historical classes) when the dev server has DataConnect credentials; ASK_TWIN_REFRESH=off keeps
+ * the snapshot. Nothing here writes to DataConnect.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -21,6 +23,7 @@ import { readSecretString } from '../liveDc/awsSecret.mjs';
 import { fetchEventWeather } from '../liveDc/eventWeather.mjs';
 import { createAnthropicProvider, createRecordingProvider, createReplayProvider } from './modelProvider.mjs';
 import { createAskService } from './askService.mjs';
+import { configuredClients, refreshFromEnv } from './storeRefresh.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const DEFAULT_STORE_PATH = join(ROOT, '.twin-store', 'twin.sqlite');
@@ -52,10 +55,11 @@ export function providerFromEnv(env, { readSecret = readSecretString } = {}) {
 }
 
 /**
- * @param {{env?: object, getLiveEvents?: () => Promise<object|null>, logger?: Console}} [options]
+ * @param {{env?: object, getLiveEvents?: () => Promise<object|null>, logger?: Console, liveDc?: object|null,
+ *   historical?: object|null}} [options]  liveDc/historical: the dev server's DataConnect read clients
  * @returns {{middleware: Function, handle: Function, label: string}}
  */
-export function createLocalAsk({ env = process.env, getLiveEvents = null, logger = console } = {}) {
+export function createLocalAsk({ env = process.env, getLiveEvents = null, logger = console, liveDc = null, historical = null } = {}) {
   const { provider, label } = providerFromEnv(env);
   if (!provider) {
     const handle = (req, res) => {
@@ -67,11 +71,14 @@ export function createLocalAsk({ env = process.env, getLiveEvents = null, logger
   }
 
   const storePath = String(env.ASK_TWIN_STORE ?? '').trim() || DEFAULT_STORE_PATH;
+  const clients = configuredClients({ liveDc, historical });
   const service = createAskService({
     provider, storePath, snapshotDir: SNAPSHOT_DIR, getLiveEvents, logger,
     readLayer: file => { const path = join(LAYER_DIR, file); return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null; },
     fetchWeather: point => fetchEventWeather(point),
+    ...clients, refresh: refreshFromEnv(env),
   });
-  logger.log?.(`ask-the-twin (local): ${label}, store ${storePath}`);
+  const refreshing = service.refresher ? `, refreshing from DataConnect (${[clients.liveDc && 'live', clients.historical && 'historical'].filter(Boolean).join(' + ')})` : ', snapshot only';
+  logger.log?.(`ask-the-twin (local): ${label}, store ${storePath}${refreshing}`);
   return { label, ...service };
 }

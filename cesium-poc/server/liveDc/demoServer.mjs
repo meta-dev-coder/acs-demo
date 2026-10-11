@@ -11,6 +11,7 @@ import { parseCookies, parsePasswordHash } from './demoAuth.mjs';
 import { createDemoHost, SESSION_COOKIE } from './demoHost.mjs';
 import { apiKeyFromSecret, createAskHandler, createAskLimiter, DEFAULT_ASK_MODEL } from './askTwin.mjs';
 import { createAskService } from '../ask/askService.mjs';
+import { configuredClients, refreshFromEnv } from '../ask/storeRefresh.mjs';
 import { createAnthropicProvider } from '../ask/modelProvider.mjs';
 import { sqliteAvailable } from '../ask/twinStore.mjs';
 import { readSecretString } from './awsSecret.mjs';
@@ -39,7 +40,7 @@ export function loadDemoHttpConfig(env = process.env) {
  *
  * On a Node with node:sqlite (22.5+) this is the orchestrator in server/ask/ — the same service
  * `npm run dev` runs: the twin store (built at startup from the bundled snapshot into the state
- * directory), insight tools, cited answers and the event stream. On an older Node the earlier
+ * directory, then refreshed from DataConnect), insight tools, cited answers and the event stream. On an older Node the earlier
  * handler (askTwin.mjs) answers instead, and the log says which one is running.
  */
 export function createDemoAsk({
@@ -64,6 +65,9 @@ export function createDemoAsk({
       storePath: String(env.ASK_TWIN_STORE ?? '').trim() || join(String(env.HOME ?? '').trim() || '/var/lib/live-dc', 'twin.sqlite'),
       snapshotDir: dataDir ? join(dataDir, 'dataconnect-data') : DEFAULT_SNAPSHOT_DIR,
       readLayer, getLiveEvents, fetchWeather, logger, ...(fetchImpl ? { fetchImpl } : {}),
+      // The store is refreshed from DataConnect (SDNA live classes every few minutes, historical
+      // daily) through the same read clients the map uses; read-only, never a second writer.
+      ...configuredClients({ liveDc, historical }), refresh: refreshFromEnv(env),
       // Behind the password gate every caller has a session; limit per session, not per proxy address.
       clientKey: req => parseCookies(req.headers?.cookie)[SESSION_COOKIE] || req.socket?.remoteAddress || 'unknown',
       limiter: createAskLimiter({ limit: 120 }),

@@ -12,13 +12,18 @@ step 1 of that spec, done locally first.
 | `tools.mjs` | Read-only tools: `describe_store`, `query_records`, `count_records`, `list_live_events`, `find_corridor_features`, `get_weather`. Each returns its source; a missing or stale table is a typed gap, never an empty list. |
 | `twinStore.mjs` | The SQLite read model (`node:sqlite`) with `store_meta`, atomic rebuilds and read-only opening. |
 | `httpAdapter.mjs` | `POST /api/i595/ask`: Server-Sent Events for `Accept: text/event-stream` (with heartbeats), otherwise one JSON answer. A client disconnect aborts the run. |
-| `localAsk.mjs` | Environment wiring for `npm run dev` (mounted by `vite.config.js`). |
+| `localAsk.mjs` | Environment wiring for `npm run dev` (mounted by `vite.config.js`) and `npm run ask:serve`. |
+| `dataConnectPull.mjs` | Read-only pull of every SDNA live class and every historical class, compacted into the store (`npm run twin:store:dc`). |
+| `storeRefresh.mjs` | Keeps the store current: live classes every 5 min, historical daily, atomic swap and reopen; a failed refresh keeps the last good store. |
 
 ## Run it locally
 
 ```bash
 npm install
 npm run twin:store          # optional: the dev route builds the store on first use anyway
+npm run twin:store:dc       # optional: the store from DataConnect (SDNA live + historical), read-only
+npm run ask:serve           # optional: the service as its own process on 127.0.0.1:8787 (what EC2 will run);
+                            #   then ASK_TWIN_SERVICE_URL=http://127.0.0.1:8787 npm run dev
 # .env.local, one of:
 #   ASK_TWIN_ANTHROPIC_SECRET_NAME=i595/anthropic-key   (key from AWS Secrets Manager, as on EC2;
 #                                                        needs the aws CLI and an AWS login first)
@@ -62,9 +67,8 @@ Nothing here writes to DataConnect.
 
 ## Not done yet (see the spec's build order)
 
-- **EC2:** the separate `live-dc-ask.service`, HTTPS through CloudFront, and a real deployment.
-- **Store:** a read-only DataConnect pull and a live-table feed from the EC2 sync. The store is built from the
-  committed snapshot today.
+- **EC2:** nothing is deployed. The plan, the packages and the local verification steps are in
+  `deploy/ec2/ASK_THE_TWIN.md`. The phase 2 proxy and unit are not built yet.
 - **Historical replay** in `explain_incident`. Today it reports a gap and points to the TMC screen.
 - **Real sign-in.** Personas only steer emphasis.
 - **The full Twin UI API registry** (commands, flows, Cmd-K). Answer actions still use the existing fly and show

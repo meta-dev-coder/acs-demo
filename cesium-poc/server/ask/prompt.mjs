@@ -7,6 +7,7 @@
  * spends a whole round asking what data exists before it asks for the data.
  */
 import { ZONE_A } from '../liveDc/askTwin.mjs';
+import { originOf } from './twinStore.mjs';
 
 const MAX_FIELDS = 30;
 
@@ -47,8 +48,9 @@ export const PERSONA_PLAYBOOKS = Object.freeze({
 /** A compact, stable description of what the store holds, for the cached system prompt. */
 export function storeSummary(classes) {
   if (!classes?.length) return 'TWIN STORE: not built yet — record lookups will report a gap.';
-  const lines = classes.map(c => `- ${c.className} (${c.rowCount} records, loaded ${String(c.asOf).slice(0, 10)}): ${c.fields.slice(0, MAX_FIELDS).join(', ')}${c.fields.length > MAX_FIELDS ? ', …' : ''}`);
-  return `TWIN STORE (record classes for query_records / count_records; field names exactly as listed):\n${lines.join('\n')}`;
+  const label = { live: 'LIVE, SDNA (FL511 sync)', historical: 'historical, DataConnect', snapshot: 'historical, snapshot', other: 'other' };
+  const lines = classes.map(c => `- ${c.className} [${label[originOf(c.source)]}] (${c.rowCount} records, loaded ${String(c.asOf).slice(0, 16)}): ${c.fields.slice(0, MAX_FIELDS).join(', ')}${c.fields.length > MAX_FIELDS ? ', …' : ''}`);
+  return `TWIN STORE (record classes for query_records / count_records; field names exactly as listed). LIVE classes are the current FL511 chain (Events → Tickets → Tasks → Work Orders → Inspections → Asset Status), linked by event id; historical classes are the customer's records — say which one an answer uses:\n${lines.join('\n')}`;
 }
 
 /**

@@ -12,7 +12,7 @@
 import DATA_GUIDE from '../../config/askTwin/dataGuide.json' with { type: 'json' };
 import { createAskTools, fitResult } from '../liveDc/askTools.mjs';
 import { ASK_LAYER_FILES } from '../liveDc/dataDictionary.mjs';
-import { MAX_LIMIT, OPERATORS } from './twinStore.mjs';
+import { MAX_LIMIT, OPERATORS, originOf } from './twinStore.mjs';
 
 const MAX_STRING = 300;
 const EVENT_TYPES = ['INCIDENT', 'CLOSURE', 'CONSTRUCTION', 'CONGESTION', 'DISABLED'];
@@ -77,7 +77,7 @@ export const TOOL_DEFINITIONS = Object.freeze([
 
 const clip = value => (typeof value === 'string' && value.length > MAX_STRING ? `${value.slice(0, MAX_STRING)}…` : value);
 const limitOf = (value, max, fallback = 10) => Math.min(max, Math.max(1, Number.parseInt(value ?? fallback, 10) || fallback));
-const classSource = result => `DataConnect · ${result.className}${result.source?.startsWith('snapshot:') ? ' (snapshot)' : ''}`;
+const classSource = result => `DataConnect · ${result.className}${originOf(result.source) === 'snapshot' ? ' (snapshot)' : ''}`;
 
 const compactEvent = e => ({
   id: e.id, type: e.type, title: clip(e.title), description: clip(e.description),
@@ -100,12 +100,12 @@ export function createTools({ store, getLiveEvents = null, readLayer = null, fet
       const classes = store.classes();
       if (!classes.length) return { output: { gap: { type: 'not_ready', detail: 'The twin store has not been built yet.' } }, source: null };
       if (!class_name) {
-        return { output: { classes: classes.map(({ className, rowCount, asOf }) => ({ className, rowCount, asOf })) }, source: 'Twin store' };
+        return { output: { classes: classes.map(({ className, rowCount, asOf, source }) => ({ className, origin: originOf(source), rowCount, asOf })) }, source: 'Twin store' };
       }
       const entry = sourceOf(class_name);
       if (!entry) return { output: { gap: { type: 'not_ready', className: class_name, detail: `Unknown class. Classes: ${classes.map(c => c.className).join(', ')}.` } }, source: null };
       const guide = DATA_GUIDE.dataConnectClasses[entry.className] ?? {};
-      return { output: { ...entry, purpose: guide.purpose ?? null, notes: guide.notes ?? null }, source: classSource(entry) };
+      return { output: { ...entry, origin: originOf(entry.source), purpose: guide.purpose ?? null, notes: guide.notes ?? null }, source: classSource(entry) };
     },
 
     query_records({ class_name, filters = [], fields, limit } = {}) {

@@ -98,7 +98,9 @@ describe('twin store: read', () => {
 });
 
 test('twin-store CLI: a source is required and --out overrides the env default', () => {
-  assert.throws(() => parseArgs([], {}), /--from-snapshot/);
+  assert.throws(() => parseArgs([], {}), /--from-snapshot or --from-dataconnect/);
+  assert.deepEqual(parseArgs(['--from-dataconnect', '--no-snapshot-fallback'], {}).snapshotFallback, false);
+  assert.equal(parseArgs(['--from-dataconnect'], {}).source, 'dataconnect');
   assert.equal(parseArgs(['--from-snapshot'], { ASK_TWIN_STORE: '/x/y.sqlite' }).out, '/x/y.sqlite');
   assert.equal(parseArgs(['--from-snapshot', '--out', '/tmp/a.sqlite'], {}).out, '/tmp/a.sqlite');
   assert.throws(() => parseArgs(['--from-snapshot', '--bogus'], {}), /unknown argument/);

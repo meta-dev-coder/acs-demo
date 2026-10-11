@@ -149,6 +149,10 @@ example, secret access denied) is logged and retried every 30 s.
 
 ## Ask the Twin (free-form questions)
 
+The local-first verification steps and the EC2 migration plan for the new orchestrator are in
+[`ASK_THE_TWIN.md`](ASK_THE_TWIN.md). None of it is deployed yet.
+
+
 With `ASK_TWIN_ANTHROPIC_SECRET_NAME=i595/anthropic-key` in `/etc/live-dc/env`, `POST /api/i595/ask` (behind the
 password) answers with Claude (`ASK_TWIN_MODEL`, default `claude-sonnet-5`). Unset, it answers 503 and only the
 built-in answers work. The key is read on the first question through the instance role and never logged.

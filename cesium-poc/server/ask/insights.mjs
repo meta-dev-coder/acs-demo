@@ -16,6 +16,7 @@ import { CARRIAGEWAYS } from '../../src/liveOps/carriagewayModel.js';
 import { assessCorridor } from '../../src/tmc/tmcService.js';
 import { liveContext } from '../../src/tmc/temporalContext.js';
 import { haversineMeters } from '../geo.mjs';
+import { originOf } from './twinStore.mjs';
 
 /** A crash further than this from every FDOT section is not placed on one. */
 export const PLACE_WITHIN_M = 400;
@@ -152,7 +153,7 @@ export function createInsights({ store, getLiveEvents = null, readLayer = () => 
         output: { asOf: result.asOf, weather, totalCrashes: wanted.length, hotspots: rows.map(r => ({ section: r.segment, crashes: r.crashes,
           wetCrashes: r.wet, laneClosureHours: round(r.closureHours, 1), injuryCrashes: r.injuries, lon: r.lon, lat: r.lat })),
           ...(unplaced ? { gaps: [`${unplaced} of ${wanted.length} crashes have no position within ${PLACE_WITHIN_M} m of an FDOT section and are not ranked.`] } : {}) },
-        source: 'Twin insight · crash register (DataConnect snapshot)',
+        source: `Twin insight · crash register (${registerOrigin(store)})`,
         summary: rows.length ? `${rows[0].segment}: ${rows[0].crashes} crashes` : 'no crashes recorded',
       };
     },
@@ -191,7 +192,7 @@ export function createInsights({ store, getLiveEvents = null, readLayer = () => 
           ruleNotFired: fires ? null : `${PLAYBOOK_WX1.id} needs ≥ ${PLAYBOOK_WX1.rainProbability}% rain${forecast ? ` (forecast peak ${peak}%)` : ''} and a segment with ≥ ${PLAYBOOK_WX1.minWetCrashes} wet crashes.`,
           gaps,
         },
-        source: `Twin insight · crash register (snapshot) + Open-Meteo forecast`,
+        source: `Twin insight · crash register (${registerOrigin(store)}) + Open-Meteo forecast`,
         summary: forecast ? `rain peak ${peak}% · ${fires ? `${PLAYBOOK_WX1.id} recommends a patrol at ${top.section}` : 'no playbook action'}` : 'forecast unavailable',
       };
     },
@@ -215,15 +216,22 @@ export function createInsights({ store, getLiveEvents = null, readLayer = () => 
   return { definitions: INSIGHT_DEFINITIONS, handlers };
 }
 
+/** Where the crash register came from, for the source line: DataConnect once refreshed, else the snapshot. */
+function registerOrigin(store) {
+  const entry = store.classes().find(c => c.className === 'Florida I595 Incidents');
+  return originOf(entry?.source) === 'historical' ? 'DataConnect' : 'DataConnect snapshot';
+}
+
 /** Every incident in the register; an empty list when the register is not loaded. */
 function allIncidents(store) {
   const result = store.rows('Florida I595 Incidents');
   return result.gap ? [] : result.records;
 }
 
+/** A record's position: the store's indexed columns (any source), else the snapshot's own fields. */
 const crashPoint = r => {
-  const lon = Number(r['x_coordinate (from asset)']), lat = Number(r['y_coordinate (from asset)']);
-  return Number.isFinite(lon) && Number.isFinite(lat) && lon && lat ? { lon, lat } : null;
+  const lon = Number(r._lon ?? r['x_coordinate (from asset)']), lat = Number(r._lat ?? r['y_coordinate (from asset)']);
+  return r._lon !== null && Number.isFinite(lon) && Number.isFinite(lat) && lon && lat ? { lon, lat } : null;
 };
 
 /**

@@ -81,15 +81,20 @@ const finite = value => (Number.isFinite(Number(value)) && value !== null && val
  * Write a fresh store to `outPath`, replacing any previous one in a single rename so a reader never
  * sees a half-built file.
  *
- * @param {{outPath: string, classes: {spec: object, rows: object[], source: string}[], asOf?: string}} input
- * @returns {{outPath: string, classes: {className: string, rowCount: number, skipped: number}[]}}
+ * `keep` copies classes verbatim from an existing store file (rows, field names, and their own load
+ * time and source), so a live-only refresh every few minutes does not re-page the historical classes.
+ *
+ * @param {{outPath: string, classes: {spec: object, rows: object[], source: string}[], asOf?: string,
+ *   keep?: {path: string, classNames: string[]}|null}} input
+ * @returns {{outPath: string, classes: {className: string, rowCount: number, skipped: number}[], kept: string[]}}
  */
-export function writeTwinStore({ outPath, classes, asOf = new Date().toISOString() }) {
+export function writeTwinStore({ outPath, classes, asOf = new Date().toISOString(), keep = null }) {
   mkdirSync(dirname(outPath), { recursive: true });
   const temp = `${outPath}.building-${process.pid}`;
   rmSync(temp, { force: true });
   const db = new DatabaseSync(temp);
   const report = [];
+  let kept = [];
   try {
     db.exec(SCHEMA);
     const insert = db.prepare('INSERT INTO records (class, key, segment, lon, lat, at, json) VALUES (?, ?, ?, ?, ?, ?, ?)');
@@ -121,7 +126,19 @@ export function writeTwinStore({ outPath, classes, asOf = new Date().toISOString
       meta.run(spec.className, asOf, source, rowCount, 'ready');
       report.push({ className: spec.className, rowCount, skipped, duplicates });
     }
+    if (keep?.path && existsSync(keep.path) && keep.classNames?.length) {
+      const fresh = new Set(classes.map(c => c.spec.className.toLowerCase()));
+      db.prepare('ATTACH DATABASE ? AS prev').run(keep.path);
+      for (const { class: name } of db.prepare('SELECT class FROM prev.store_meta').all()) {
+        if (fresh.has(name.toLowerCase()) || !keep.classNames.some(k => k.toLowerCase() === name.toLowerCase())) continue;
+        for (const table of ['records', 'columns', 'store_meta']) db.prepare(`INSERT INTO main.${table} SELECT * FROM prev.${table} WHERE class = ?`).run(name);
+        kept.push(name);
+      }
+    }
     db.exec('COMMIT');
+    if (keep?.path && existsSync(keep.path) && keep.classNames?.length) db.exec('DETACH DATABASE prev');
+    // A freshly built file has no free pages, but VACUUM also repacks the indexes: the smallest file to ship.
+    db.exec('VACUUM');
   } catch (error) {
     db.close();
     rmSync(temp, { force: true });
@@ -129,17 +146,32 @@ export function writeTwinStore({ outPath, classes, asOf = new Date().toISOString
   }
   db.close();
   renameSync(temp, outPath);
-  return { outPath, classes: report };
+  return { outPath, classes: report, kept };
 }
 
-/** Build the store from the JSON snapshot committed under public/dataconnect-data. */
-export function buildStoreFromSnapshot({ snapshotDir, outPath, asOf }) {
-  const classes = SNAPSHOT_CLASSES.map(spec => {
+/** The committed snapshot's classes, ready for writeTwinStore. */
+export function snapshotClasses(snapshotDir) {
+  return SNAPSHOT_CLASSES.map(spec => {
     const rows = JSON.parse(readFileSync(join(snapshotDir, spec.file), 'utf8'));
     if (!Array.isArray(rows)) throw new Error(`${spec.file} is not a JSON array`);
     return { spec, rows, source: `snapshot:${spec.file}` };
   });
-  return writeTwinStore({ outPath, classes, asOf });
+}
+
+/** Build the store from the JSON snapshot committed under public/dataconnect-data. */
+export function buildStoreFromSnapshot({ snapshotDir, outPath, asOf }) {
+  return writeTwinStore({ outPath, classes: snapshotClasses(snapshotDir), asOf });
+}
+
+/**
+ * Where a class's rows came from, from its store_meta source: 'live' (an SDNA live class from
+ * DataConnect), 'historical' (a customer class from DataConnect) or 'snapshot' (the committed JSON).
+ */
+export function originOf(source) {
+  const s = String(source ?? '');
+  if (s === 'dataconnect:live') return 'live';
+  if (s === 'dataconnect:historical') return 'historical';
+  return s.startsWith('snapshot:') ? 'snapshot' : 'other';
 }
 
 const gap = (type, className, detail) => ({ gap: { type, className, detail } });
@@ -258,9 +290,11 @@ export function openTwinStore(path, { now = Date.now, staleAfterMs = 0 } = {}) {
       const checked = check(className);
       if (checked.gap) return checked;
       const { entry } = checked;
-      const rows = db.prepare('SELECT key, json FROM records WHERE class = ? ORDER BY at DESC, key LIMIT ?').all(entry.class, limit + 1);
+      const rows = db.prepare('SELECT key, lon, lat, segment, at, json FROM records WHERE class = ? ORDER BY at DESC, key LIMIT ?').all(entry.class, limit + 1);
+      // The indexed columns ride along as _lon/_lat/_segment/_at, so an insight reads a position the
+      // same way whether the record came from DataConnect or from the snapshot.
       return { className: entry.class, asOf: entry.as_of, truncated: rows.length > limit,
-        records: rows.slice(0, limit).map(row => ({ key: row.key, ...JSON.parse(row.json) })) };
+        records: rows.slice(0, limit).map(row => ({ key: row.key, ...JSON.parse(row.json), _lon: row.lon, _lat: row.lat, _segment: row.segment, _at: row.at })) };
     },
 
     close: () => db?.close(),

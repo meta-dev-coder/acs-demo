@@ -216,7 +216,7 @@ describe('ask orchestrator', () => {
 
   test('the store summary goes in the cached system prompt, so no round is spent describing the store', () => {
     const system = systemPrompt({ classes: [{ className: 'Florida I595 Incidents', rowCount: 178, asOf: '2026-10-01T00:00:00Z', fields: ['weather', 'Segment'] }] });
-    assert.match(system, /TWIN STORE[\s\S]*Florida I595 Incidents \(178 records, loaded 2026-10-01\): weather, Segment/);
+    assert.match(system, /TWIN STORE[\s\S]*Florida I595 Incidents \[other\] \(178 records, loaded 2026-10-01T00:00\): weather, Segment/);
     assert.match(storeSummary([]), /not built yet/);
     assert.doesNotMatch(SYSTEM_PROMPT, /TWIN STORE \(record classes/);
   });
