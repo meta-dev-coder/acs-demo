@@ -23,3 +23,6 @@ public/models/i595/*.glb
 # EC2 live-dc bundle (npm run live-dc:bundle)
 deploy/ec2/dist/
 deploy/ec2/releases/
+
+# Ask the Twin local store (npm run twin:store) and recorded model responses
+.twin-store/

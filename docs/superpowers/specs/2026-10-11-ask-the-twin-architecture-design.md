@@ -1,6 +1,6 @@
 # Ask the Twin — reference architecture (Phase 2 "Why" layer) — design
 
-**Date:** 2026-10-11 · **Status:** draft v2: research and adversarial review applied; awaiting user approval · **Scope:** architecture
+**Date:** 2026-10-11 · **Status:** v2, approved for implementation (2026-10-11). Progress: build step 1 local layer done (`cesium-poc/server/ask/`, see its README) · **Scope:** architecture
 only; implementation gated on a separate go-ahead. · **Branch:** `askthetwin`
 
 ## Why now

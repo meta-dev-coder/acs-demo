@@ -18,17 +18,34 @@ const cesiumBuildRootPath = join(dirname(createRequire(import.meta.url).resolve(
 // FL511 is never called from the browser. Mounting the live-events API inside the dev server keeps
 // it same-origin for `npm start` and the e2e suite without a second process; deployments that serve
 // the map statically run the identical handler from server/index.mjs instead.
-const liveEventsApi = liveDc => {
-  const api = createLiveEventsApi({ liveDc });
-  return {
-    name: "i595-live-events-api",
-    configureServer(server) {
-      server.middlewares.use(api.middleware);
-      server.httpServer?.on("close", () => { void api.stop(); });
-    },
-    configurePreviewServer(server) { server.middlewares.use(api.middleware); },
-  };
-};
+const liveEventsApi = api => ({
+  name: "i595-live-events-api",
+  configureServer(server) {
+    server.middlewares.use(api.middleware);
+    server.httpServer?.on("close", () => { void api.stop(); });
+  },
+  configurePreviewServer(server) { server.middlewares.use(api.middleware); },
+});
+
+// Ask the Twin, same-origin and streaming, with the orchestrator the EC2 service runs. Dev only: the
+// key comes from ANTHROPIC_API_KEY in .env.local (or ASK_TWIN_REPLAY for recorded answers), never a
+// VITE_ variable, so it cannot reach the browser bundle. Imported lazily: a build never loads it, and
+// a Node without node:sqlite (< 22.5) still runs the map, with a note instead of the route.
+const askApi = liveEvents => ({
+  name: "i595-ask-the-twin-api",
+  async configureServer(server) {
+    try {
+      const { createLocalAsk } = await import("./server/ask/localAsk.mjs");
+      const ask = createLocalAsk({
+        // The events the map shows: the DataConnect Live Events class when configured, else FL511 direct.
+        getLiveEvents: async () => (await liveEvents.dataConnectEvents().catch(() => null)) ?? liveEvents.fl511Events().catch(() => null),
+      });
+      server.middlewares.use(ask.middleware);
+    } catch (error) {
+      console.warn(`ask-the-twin (local): not mounted (${error.message}). It needs Node >= 22.5 for node:sqlite.`);
+    }
+  },
+});
 
 // FL511 message sign markers and details stay same-origin.
 const messageSignsApi = () => {
@@ -67,6 +84,7 @@ const snapshotApi = () => {
 
 // One read proxy serves both /api/live-dc/* and ?source=dataconnect, as in server/index.mjs.
 const liveDc = createLiveDcReadApi();
+const liveEvents = createLiveEventsApi({ liveDc });
 
 // vite-plugin-cesium wires up CESIUM_BASE_URL + static asset copying for us.
 export default defineConfig({
@@ -80,7 +98,7 @@ export default defineConfig({
   // automatic runtime is enough for it — no fast-refresh plugin, so the rest of the app's plain
   // HMR is untouched.
   esbuild: { jsx: 'automatic' },
-  plugins: [cesium({ cesiumBuildRootPath, cesiumBuildPath: join(cesiumBuildRootPath, "Cesium") }), liveEventsApi(liveDc), snapshotApi(), messageSignsApi(), dataConnectApi(), liveDcReadApi(liveDc)],
+  plugins: [cesium({ cesiumBuildRootPath, cesiumBuildPath: join(cesiumBuildRootPath, "Cesium") }), liveEventsApi(liveEvents), askApi(liveEvents), snapshotApi(), messageSignsApi(), dataConnectApi(), liveDcReadApi(liveDc)],
   // Port 5188 (not the default 5180) keeps this NTTA worktree isolated from a sibling session's
   // dev server sharing localhost. Disable auto-open under headless e2e.
   server: { port: 5188, open: false, strictPort: true },

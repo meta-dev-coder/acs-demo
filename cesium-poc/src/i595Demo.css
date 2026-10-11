@@ -589,6 +589,12 @@ body:has(.street-view[data-state="active"]) :is(.ramp-details, .road-details, .s
 .ask-twin-confidence--medium { background: #2e2408; color: #fbbf24; border: 1px solid #fbbf2433; }
 .ask-twin-confidence--low    { background: #2e0f0f; color: #f87171; border: 1px solid #f8717133; }
 
+/* Activity trace: what ran to produce an answer, one line until opened */
+.ask-twin-trace { font-size: 10.5px; color: var(--ui-text-muted); max-width: 92%; }
+.ask-twin-trace summary { cursor: pointer; list-style: revert; }
+.ask-twin-trace ul { margin: 4px 0 0; padding-left: 16px; line-height: 1.5; }
+.ask-twin-followups { display: flex; flex-wrap: wrap; gap: 5px; max-width: 92%; }
+
 /* Fly-to button */
 .ask-twin-fly-btn { display: inline-flex; align-items: center; gap: 5px; background: #0a2535; border: 1px solid var(--ui-accent-line); border-radius: 8px; color: var(--ui-accent-strong); font-size: 11px; padding: 4px 10px; cursor: pointer; transition: background 0.12s; }
 .ask-twin-fly-btn:hover:not(:disabled) { background: #0f3a4e; border-color: var(--ui-accent-line); }

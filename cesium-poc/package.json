@@ -19,9 +19,11 @@
     "live-dc:sync": "node tools/live-dc-sync.mjs",
     "live-dc:bundle": "node tools/build-live-dc-bundle.mjs",
     "live-dc:release": "node tools/release-live-dc.mjs",
-    "live-dc:classes": "node tools/live-dc-classes.mjs"
+    "live-dc:classes": "node tools/live-dc-classes.mjs",
+    "twin:store": "node --no-warnings tools/twin-store.mjs --from-snapshot"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
     "@arcgis/core": "^5.1.9",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",

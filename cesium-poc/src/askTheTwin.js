@@ -4,6 +4,7 @@ import { eventLayersToShow } from './safety/answerLayers.js';
 import { framedDestination } from './cameraFraming.js';
 import { answerTmcQuestion, parseTmcQuestion, tmcSuggestionsForTab, TWIN_ACTIONS, TMC_HISTORICAL_INCIDENT_SUGGESTIONS, TMC_HISTORICAL_SUGGESTIONS, TMC_INCIDENT_SUGGESTIONS, TMC_SUGGESTIONS } from './tmc/tmcAnswers.js';
 import { ASK_THE_TWIN_EVENT } from './askTheTwinBridge.js';
+import { AskError, askRemote, TOOL_LABELS, traceLine } from './askTwinStream.js';
 import { eventPlace, isBareSegmentRequest, MAX_REMOTE_OFFSET_M, parseFlyRequest, parseRoadRequest, parseSegmentFollowUp, parseSegmentRequests, parseTourCommand, parseTypeBrowse, resolveFlyTarget, searchAssets, segmentPoint, typeHints } from './assetExplorer/assetSearch.js';
 import { corridorPositionOf } from './assetExplorer/corridorPosition.js';
 import { assetTypeConfig } from './assetExplorer/assetTypes.js';
@@ -13,8 +14,10 @@ import { buildSpatialContext } from './spatial/spatialQuery.js';
 import { AREA_SUGGESTIONS, answerAreaQuestion, areaIndicatorText, areaSummaryLines, parseAreaQuestion } from './spatial/areaAnswers.js';
 import { geometryIntersectsBounds } from './spatial/areaGeometry.js';
 
+// `npm run dev` serves the orchestrator itself (server/ask/localAsk.mjs), so a dev build asks it
+// same-origin; a build without VITE_ASK_THE_TWIN_API keeps the deployed service.
 const ASK_URL = (import.meta.env?.VITE_ASK_THE_TWIN_API ?? '').replace(/\/$/, '')
-  || 'https://d3syo4sqvwi009.cloudfront.net/api/i595/ask';
+  || (import.meta.env?.DEV ? '/api/i595/ask' : 'https://d3syo4sqvwi009.cloudfront.net/api/i595/ask');
 
 const SUGGESTIONS = [
   'Any incidents on I-595 right now?',
@@ -24,11 +27,20 @@ const SUGGESTIONS = [
   'Fly to bridge 860384',
 ];
 
+// Shown only by a service that does not stream its progress; a streaming one says what it is doing.
 const STEPS = [
-  { label: 'Reading live events from DynamoDB…', ms: 0 },
+  { label: 'Reading live events…', ms: 0 },
   { label: 'Asking Claude about I-595…', ms: 900 },
   { label: 'Processing response…', ms: 2400 },
 ];
+
+/** Older services name their sources with keys; the orchestrator sends readable labels as they are. */
+const SOURCE_LABELS = Object.freeze({ live_events: 'FL511 live data', static_knowledge: 'Corridor knowledge', dataconnect: 'DataConnect', corridor_layers: 'Corridor layers', weather: 'Weather' });
+const sourceLabel = source => SOURCE_LABELS[source] ?? source;
+/** Coordinates from the live feed are real even just past the corridor's ends; see submit(). */
+const isLiveSource = source => source === 'live_events' || /live events/i.test(String(source));
+/** Remote turns sent back as plain-text history so "and westbound?" can follow the last answer. */
+const MAX_HISTORY_TURNS = 6;
 
 // Find cameras within radiusM metres of lon/lat, sorted by distance
 function nearbyCameras(cameraControls, lon, lat, radiusM = 800) {
@@ -215,9 +227,7 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
       if (meta.sources?.length) {
         const src = document.createElement('span');
         src.className = 'ask-twin-sources';
-        src.textContent = '📡 ' + meta.sources.map(s =>
-          s === 'live_events' ? 'FL511 live data' : 'Corridor knowledge'
-        ).join(' + ');
+        src.textContent = '📡 ' + [...new Set(meta.sources.map(sourceLabel))].join(' + ');
         row.appendChild(src);
       }
 
@@ -225,9 +235,23 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
       const conf = document.createElement('span');
       conf.className = `ask-twin-confidence ask-twin-confidence--${meta.confidence}`;
       conf.textContent = meta.confidence;
+      // The server says why it is (or is not) sure: how many lookups backed the answer, and any gaps.
+      if (meta.confidence_reason) conf.title = meta.confidence_reason;
       row.appendChild(conf);
 
       wrap.appendChild(row);
+
+      // What ran in the background to produce this answer, collapsed to one line.
+      if (meta.trace?.length) {
+        const trace = document.createElement('details');
+        trace.className = 'ask-twin-trace';
+        const summary = document.createElement('summary');
+        summary.textContent = `${meta.trace.length} lookup${meta.trace.length === 1 ? '' : 's'}${meta.elapsedMs ? ` · ${(meta.elapsedMs / 1000).toFixed(1)} s` : ''}`;
+        const list = document.createElement('ul');
+        for (const line of meta.trace) { const li = document.createElement('li'); li.textContent = line; list.appendChild(li); }
+        trace.append(summary, list);
+        wrap.appendChild(trace);
+      }
 
       // Action button
       const actionType = meta.action?.type;
@@ -245,6 +269,20 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
           if (shown.length) addMsg('assistant', `Switched on ${shown.join(' and ')} so you can see them on the map.`);
         };
         wrap.appendChild(flyBtn);
+      }
+
+      if (meta.follow_ups?.length) {
+        const chips = document.createElement('div');
+        chips.className = 'ask-twin-followups';
+        for (const text of meta.follow_ups) {
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'ask-twin-chip';
+          chip.textContent = text;
+          chip.onclick = () => { input.value = text; submit(); };
+          chips.appendChild(chip);
+        }
+        wrap.appendChild(chips);
       }
     }
 
@@ -845,8 +883,31 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     const timers = STEPS.map(({ label, ms }) =>
       setTimeout(() => { stepLabel.textContent = label; }, ms)
     );
+    const clear = () => timers.forEach(clearTimeout);
 
-    return { el: wrap, clear: () => timers.forEach(clearTimeout) };
+    // A streaming service reports what it is actually doing; the timed labels give way to it.
+    return { el: wrap, clear, setLabel: text => { clear(); stepLabel.textContent = text; scrollBottom(); } };
+  }
+
+  // ── Request envelope ──────────────────────────────────────────────────
+  /** Plain-text remote turns, oldest first; local answers are not part of the model's conversation. */
+  const conversation = [];
+  function remember(role, text) {
+    if (!text) return;
+    conversation.push({ role, text: String(text) });
+    while (conversation.length > MAX_HISTORY_TURNS * 2) conversation.shift();
+  }
+
+  /** What the operator is looking at, as ids: the service treats it as context, never as authority. */
+  function screenSnapshot() {
+    const screen = { workspace: document.body.dataset.section || null };
+    if (tmc && screen.workspace === 'tmc') {
+      if (tmc.temporal?.mode) screen.temporal = { mode: tmc.temporal.mode, ...(tmc.temporal.date ? { date: String(tmc.temporal.date) } : {}) };
+      if (tmc.selectedIncidentId) screen.selection = { type: 'incident', id: String(tmc.selectedIncidentId) };
+    }
+    const rect = viewer.camera.computeViewRectangle?.();
+    if (rect) screen.view = { bbox: [rect.west, rect.south, rect.east, rect.north].map(r => Number(CesiumMath.toDegrees(r).toFixed(5))) };
+    return screen;
   }
 
   // ── Submit ────────────────────────────────────────────────────────────
@@ -867,51 +928,62 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     }
     if (answered) { release(); return; }
     const thinking = addThinking();
+    const trace = [];
+    const started = Date.now();
     try {
-      const res = await fetch(ASK_URL, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        // The structured context rides along for the free-form questions this does not answer
-        // locally. A service that does not know the field ignores it; one that does gets the
-        // resolved geometry rather than a rectangle to reason about.
-        body: JSON.stringify({ question, ...(activeSpatialContext ? { spatialContext: activeSpatialContext } : {}) }),
+      // The structured context rides along for the free-form questions this does not answer
+      // locally: the screen as ids, the drawn area as the context already resolved for it, and the
+      // last remote turns as plain text.
+      const data = await askRemote(ASK_URL, {
+        question,
+        history: conversation.slice(),
+        screen: screenSnapshot(),
+        ...(activeSpatialContext ? { spatialContext: activeSpatialContext } : {}),
+      }, {
+        onEvent: event => {
+          if (event.type === 'StepStarted') thinking.setLabel(event.round === 1 ? 'Reading the question…' : 'Putting the answer together…');
+          if (event.type === 'ToolCallStart') thinking.setLabel(`${TOOL_LABELS[event.name] ?? event.name}…`);
+          if (event.type === 'ToolCallEnd') trace.push(traceLine(event));
+        },
       });
-      const data = await res.json();
       thinking.clear();
       thinking.el.remove();
-      if (!res.ok) {
-        addMsg('assistant', data.error ?? 'Something went wrong — please try again.');
-      } else {
-        // The remote service can guess coordinates from general knowledge. A location nowhere near
-        // I-595 is reported, not flown to: it once sent "the end of segment one" to a spot 5 km off
-        // the corridor.
-        const coords = data.action?.coordinates;
-        const offsetM = coords && centerline.length ? corridorPositionOf(Number(coords.lon), Number(coords.lat), centerline).offsetM : null;
-        // Coordinates from the live FL511 feed are real, even just past the corridor's ends; only
-        // locations from general knowledge are guesses to check.
-        const fromLiveFeed = (data.sources ?? []).includes('live_events');
-        if (!fromLiveFeed && Number.isFinite(offsetM) && offsetM > MAX_REMOTE_OFFSET_M) {
-          addMsg('assistant', data.answer, { ...data, action: { type: 'none' } });
-          addMsg('assistant', `The location in that answer (${Number(coords.lat).toFixed(5)}, ${Number(coords.lon).toFixed(5)}) is ${(offsetM / 1000).toFixed(1)} km from I-595, so the map was not moved.`);
-          offerFromMap(question);
-          return;
-        }
-        addMsg('assistant', data.answer, data);
+      remember('user', question);
+      remember('assistant', data.answer);
+      const meta = { ...data, trace, elapsedMs: Date.now() - started };
+      // The remote service can guess coordinates from general knowledge. A location nowhere near
+      // I-595 is reported, not flown to: it once sent "the end of segment one" to a spot 5 km off
+      // the corridor.
+      const coords = data.action?.coordinates;
+      const offsetM = coords && centerline.length ? corridorPositionOf(Number(coords.lon), Number(coords.lat), centerline).offsetM : null;
+      // Coordinates from the live FL511 feed are real, even just past the corridor's ends; only
+      // locations from general knowledge are guesses to check.
+      const fromLiveFeed = (data.sources ?? []).some(isLiveSource);
+      if (!fromLiveFeed && Number.isFinite(offsetM) && offsetM > MAX_REMOTE_OFFSET_M) {
+        addMsg('assistant', data.answer, { ...meta, action: { type: 'none' } });
+        addMsg('assistant', `The location in that answer (${Number(coords.lat).toFixed(5)}, ${Number(coords.lon).toFixed(5)}) is ${(offsetM / 1000).toFixed(1)} km from I-595, so the map was not moved.`);
         offerFromMap(question);
-        // auto-act on high confidence responses with coordinates
-        if (data.confidence === 'high' && data.action?.coordinates) {
-          if (data.action.type === 'open_camera') openNearestCameras(data.action.coordinates);
-          else {
-            const shown = await showEventLayersFor(data.action.coordinates);
-            flyTo(data.action.coordinates);
-            if (shown.length) addMsg('assistant', `Switched on ${shown.join(' and ')} so you can see them on the map.`);
-          }
+        return;
+      }
+      addMsg('assistant', data.answer, meta);
+      // The service checks that a map action points at something a lookup returned, and says so
+      // when it dropped one rather than leaving the operator wondering why nothing moved.
+      if (data.action_note) addMsg('assistant', data.action_note);
+      offerFromMap(question);
+      // auto-act on high confidence responses with coordinates (the orchestrator computes the
+      // confidence from its own lookups; the older service reports the model's)
+      if (data.confidence === 'high' && data.action?.coordinates) {
+        if (data.action.type === 'open_camera') openNearestCameras(data.action.coordinates);
+        else {
+          const shown = await showEventLayersFor(data.action.coordinates);
+          flyTo(data.action.coordinates);
+          if (shown.length) addMsg('assistant', `Switched on ${shown.join(' and ')} so you can see them on the map.`);
         }
       }
-    } catch {
+    } catch (error) {
       thinking.clear();
       thinking.el.remove();
-      addMsg('assistant', 'Could not reach the twin. Check your connection.');
+      addMsg('assistant', error instanceof AskError ? error.message : 'Could not reach the twin. Check your connection.');
     } finally {
       release();
     }

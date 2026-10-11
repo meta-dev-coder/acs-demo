@@ -15,7 +15,7 @@ const MAX_EVENTS = 10;
 const MAX_TOOL_ROUNDS = 6;
 const MAX_TOKENS = 1500;
 
-const ZONE_A = `You are a knowledgeable assistant for the I-595 Digital Twin, a visualization of the I-595 Corridor in Broward County, Florida.
+export const ZONE_A = `You are a knowledgeable assistant for the I-595 Digital Twin, a visualization of the I-595 Corridor in Broward County, Florida.
 
 CORRIDOR OVERVIEW:
 - I-595 runs east-west through Broward County, connecting I-75 (west) to US-1/Port Everglades (east)
