@@ -421,7 +421,8 @@ confirmation card with a disabled "Commit (not in POC)" button. It's tangible in
 
 ## POC build order
 
-1. **One streaming EC2 backend.**
+1. **One streaming EC2 backend,** developed locally first (see "Local development and testing": dev host
+   adapter, replay model adapter, snapshot store).
    - Retire `AskTheTwinFn`, the poller schedule and `VITE_ASK_THE_TWIN_API`.
    - Split out `live-dc-ask.service`; add the CloudFront origin with heartbeat, deadlines, telemetry and the
      token budget.
@@ -459,6 +460,33 @@ confirmation card with a disabled "Commit (not in POC)" button. It's tangible in
    - verified-questions eval harness, editable tool parameters;
    - FTS5 / R-tree and the structured SQL tool;
    - turn store, real identity, the workflows write path.
+
+## Local development and testing
+
+Everything below runs on a laptop. **Nothing local ever writes to DataConnect**, because EC2 is the single
+writer.
+
+1. **Offline (no keys, no network).** The model provider adapter has a **replay mode**: recorded Claude
+   responses keyed by request, so the tool loop, answer blocks, confidence, envelope sanitising and auto-run
+   rules are tested with `node --test`, deterministically and for free. The store builder has a
+   **`--from-snapshot`** mode that builds the SQLite file from `public/dataconnect-data/*.json`, plus a
+   fixture live feed (the existing `--feed <fixture.json>` pattern).
+2. **`npm run dev` with the real model.** Vite mounts the same ask handler through a dev host adapter, so
+   `/api/i595/ask` is same-origin and streams, as on EC2. The key comes from `ANTHROPIC_API_KEY` in
+   `.env.local` (no `VITE_` prefix, so it never reaches the bundle). The store comes from the snapshot or
+   from a **read-only DataConnect pull** using your own `npm run dc:login` token. The store builder has no
+   write code path.
+3. **The production shape locally.** Run the release bundle from `deploy/ec2/dist` as the two services do on
+   EC2: a sync process in **read-only / no-write mode** (feeds the store from DataConnect read-back or a
+   fixture), and the ask process with the password gate and the built web app. Check the stream with
+   `curl -N`: `RunStarted` first, a heartbeat at least every 10 s, a `RunError` when an upstream is killed.
+4. **E2E smoke and evals.** Playwright smoke scripts against localhost:5188 cover the demo questions, the
+   case where a pan mid-stream stops auto-run, and Restore view. A golden-question eval runs against the
+   real model under a token budget and reports p50/p95 timings from the per-turn log lines.
+
+Not reproducible locally: CloudFront behaviour (verify on a staging behaviour before switching the demo
+URL) and the EC2 memory/CPU limits (approximate with `systemd-run --scope -p MemoryMax=…` or a container
+with the same limits).
 
 ## Open questions
 
