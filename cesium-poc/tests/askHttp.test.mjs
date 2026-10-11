@@ -155,7 +155,10 @@ describe('local ask configuration', () => {
     try {
       const recordings = join(dir, 'rec.json');
       const storePath = join(dir, 'twin.sqlite');
-      const { TOOL_DEFINITIONS } = await import('../server/ask/tools.mjs');
+      // The local route offers the read tools and the insight tools; the recording keys include both.
+      const { TOOL_DEFINITIONS: READ_TOOLS } = await import('../server/ask/tools.mjs');
+      const { INSIGHT_DEFINITIONS } = await import('../server/ask/insights.mjs');
+      const TOOL_DEFINITIONS = [...READ_TOOLS, ...INSIGHT_DEFINITIONS];
       const question = { role: 'user', content: 'How many incidents are in the snapshot?' };
       const call = { content: [{ type: 'tool_use', id: 'tu1', name: 'count_records', input: { class_name: 'Florida I595 Incidents' } }], stop_reason: 'tool_use', usage: {} };
       const first = { messages: [question], tools: TOOL_DEFINITIONS };
