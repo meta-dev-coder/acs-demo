@@ -73,6 +73,10 @@ describe('activity line and timeline', () => {
     assert.deepEqual([tool.title, tool.detail, tool.warning], ['Reading live FL511 events', 'R1 · DataConnect · Live Events · 581 ms', undefined]);
     const gap = activityStep({ type: 'ToolCallEnd', id: 'b', ref: 'R2', name: 'count_records', status: 'gap', ms: 4, detail: 'Unknown class.' });
     assert.equal(gap.warning, 'No data: Unknown class.');
+    // The input stays on the finished step, so a failed lookup shows what it asked for.
+    const near = activityStep({ type: 'ToolCallEnd', id: 'd', ref: 'R3', name: 'records_near', status: 'gap', ms: 25,
+      input: { class_name: 'Incidents', place: { layer: 'x', text: 'Turnpike' }, radius_m: 800 }, detail: "Unknown class 'Incidents'." });
+    assert.equal(near.detail, 'R3 · Incidents · within 800 m of "Turnpike" · 25 ms');
   });
 
   test('a call to a tool the twin does not have reads as skipped, not as an error', () => {

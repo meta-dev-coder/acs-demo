@@ -201,7 +201,7 @@ export function openTwinStore(path, { now = Date.now, staleAfterMs = 0 } = {}) {
     const entry = meta.get(String(className ?? '').trim().toLowerCase());
     if (!entry) {
       const known = [...meta.values()].map(row => row.class);
-      return gap('not_ready', className, known.length ? `Unknown class. Loaded classes: ${known.join(', ')}.` : 'The twin store has not been built yet.');
+      return gap('not_ready', className, known.length ? `Unknown class '${String(className ?? '')}'. Loaded classes: ${known.join(', ')}.` : 'The twin store has not been built yet.');
     }
     if (entry.status !== 'ready') return gap('not_ready', entry.class, `Status is ${entry.status}.`);
     if (staleAfterMs > 0 && now() - Date.parse(entry.as_of) > staleAfterMs) {

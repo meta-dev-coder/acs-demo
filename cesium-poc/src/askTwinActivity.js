@@ -181,7 +181,8 @@ export function activityStep(event) {
         return { key: `tool-${event.id}`, kind: 'tool', status: 'skipped', title: 'Skipped an invalid lookup',
           detail: `${event.ref} · Claude asked for '${event.name}', which is not a lookup the twin has` };
       }
-      const detail = [event.ref, event.source, fmtMs(event.ms), event.summary].filter(Boolean).join(' · ');
+      // What was asked stays visible after the result: "Unknown class" means nothing without the class.
+      const detail = [event.ref, describeInput(event.name, event.input) || null, event.source, fmtMs(event.ms), event.summary].filter(Boolean).join(' · ');
       const step = { key: `tool-${event.id}`, kind: 'tool', status: event.status, title: toolTitle(event.name), detail };
       if (event.status !== 'ok') step.warning = `${PROBLEM_WORDS[event.status] ?? event.status}${event.detail ? `: ${event.detail}` : ''}`;
       return step;

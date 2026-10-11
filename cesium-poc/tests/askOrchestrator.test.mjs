@@ -432,15 +432,30 @@ describe('incomplete answers', () => {
     } finally { cleanup(); }
   });
 
-  test('the round before the last tells the model to reply with the JSON', async () => {
+  test('the round before the last tells the model to reply with the JSON, inside the tool result (no text block after results)', async () => {
     const { tools, cleanup } = fixtureTools();
     try {
       const provider = scripted([toolUse(['t1', 'list_live_events', {}]), toolUse(['t2', 'list_live_events', {}]), reply({ answer: 'ok', basis: [] })]);
       await createOrchestrator({ provider, tools, logger: quiet, system: 's' }).run(envelope('q'), () => {});
       const lastUser = provider.requests[2].messages.at(-1).content;
-      assert.equal(lastUser.at(-1).type, 'text');
-      assert.match(lastUser.at(-1).text, /JSON object only/);
-      assert.ok(!provider.requests[1].messages.at(-1).content.some(b => b.type === 'text'), 'not before round 2');
+      assert.ok(lastUser.every(b => b.type === 'tool_result'), 'only tool results in the turn');
+      assert.match(lastUser.at(-1).content, /No more lookups are possible/);
+      assert.doesNotMatch(provider.requests[1].messages.at(-1).content.at(-1).content, /No more lookups/, 'not before round 2');
+    } finally { cleanup(); }
+  });
+
+  test('an empty final answer is asked for once more, and fails visibly if still empty', async () => {
+    const empty = { content: [], stop_reason: 'end_turn', usage: { output_tokens: 1 } };
+    const { tools, cleanup } = fixtureTools();
+    try {
+      const provider = scripted([toolUse(['t1', 'list_live_events', {}]), empty, reply({ answer: 'One closure at SR-7.', basis: [{ claim: 'One closure at SR-7.', refs: ['R1'] }] })]);
+      const answer = await createOrchestrator({ provider, tools, logger: quiet, system: 's' }).run(envelope('closures?'), () => {});
+      assert.equal(answer.answer, 'One closure at SR-7.');
+      assert.match(provider.requests[2].messages.at(-1).content, /Please continue/);
+      const twice = scripted([empty, empty]);
+      const { events, emit } = collect();
+      assert.equal(await createOrchestrator({ provider: twice, tools, logger: quiet, system: 's' }).run(envelope('q'), emit), null);
+      assert.match(events.find(e => e.type === 'RunError').message, /empty answer/);
     } finally { cleanup(); }
   });
 

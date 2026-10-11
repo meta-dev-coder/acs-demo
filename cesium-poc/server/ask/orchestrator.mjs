@@ -25,6 +25,8 @@ export const DEFAULT_LIMITS = Object.freeze({ maxRounds: 3, toolTimeoutMs: 8_000
 const COORD_TOLERANCE = 1e-4;
 const ACTION_TYPES = new Set(['fly_to', 'open_camera', 'show_event']);
 const MAX_NOTE = 400;
+const FINAL_NOTE = '(No more lookups are possible after this. Reply with the JSON object.)';
+const CONTINUE = 'Please continue: reply with the JSON object for your answer.';
 
 export class RunError extends Error {
   constructor(message, { retryable = false } = {}) { super(message); this.retryable = retryable; }
@@ -244,7 +246,7 @@ export function createOrchestrator({ provider, tools, system = systemPrompt(), l
       call.evidence = !result.timedOut && isEvidence(name, result.output);
       call.ms = now() - t0;
       call.output = result.output;
-      emit({ type: 'ToolCallEnd', id, ref, name, status: call.status, source: call.source, ms: call.ms, origin,
+      emit({ type: 'ToolCallEnd', id, ref, name, input: call.input, status: call.status, source: call.source, ms: call.ms, origin,
         ...(result.summary ? { summary: result.summary } : {}),
         ...(call.status === 'ok' ? {} : { detail: result.output?.gap?.detail ?? result.output?.error ?? null }) });
       return { call, text: `ref ${ref}\n${result.text}` };
@@ -289,6 +291,21 @@ export function createOrchestrator({ provider, tools, system = systemPrompt(), l
         const unknownOnly = uses.length > 0 && uses.every(use => !known.has(use.name)) && roundText.trim();
         if (last || response.stop_reason !== 'tool_use' || !uses.length || unknownOnly) {
           text = roundText;
+          // An empty final turn is recovered once with an explicit continuation request; resending the
+          // same request would most likely end empty again.
+          if (!text.trim() && response.stop_reason === 'end_turn' && deadline - now() > 2_000) {
+            emit({ type: 'ModelNote', round, text: 'The answer came back empty; asking once more.' });
+            const t1 = now();
+            const retry = await complete({
+              system: turnSystem, messages: [...messages, { role: 'user', content: CONTINUE }], tools: tools.definitions, toolChoice: { type: 'none' }, maxTokens,
+              signal: AbortSignal.any([signal ?? new AbortController().signal, AbortSignal.timeout(deadline - now())]),
+            });
+            addUsage(usage, retry.usage);
+            emit({ type: 'ModelRound', round, ms: now() - t1, stop: retry.stop_reason ?? null, toolCalls: 0, usage: usageOf(retry.usage) });
+            if (retry.stop_reason === 'refusal') throw new RunError('The assistant declined to answer this question.');
+            text = (Array.isArray(retry.content) ? retry.content : []).filter(block => block?.type === 'text').map(block => block.text).join('\n');
+          }
+          if (!text.trim()) throw new RunError('The assistant returned an empty answer. Please ask again.', { retryable: true });
           break;
         }
         // What the model says between lookups is its own account of its plan; it is shown, not trusted.
@@ -301,8 +318,13 @@ export function createOrchestrator({ provider, tools, system = systemPrompt(), l
         }));
         // Every result of one round goes back in a single user turn. Before the last round the model is
         // told it cannot look anything else up, so it writes the JSON instead of prose or another call.
-        const finalNudge = round + 1 === maxRounds ? [{ type: 'text', text: 'No more lookups are possible. Reply now with the JSON object only.' }] : [];
-        messages.push({ role: 'user', content: [...results, ...finalNudge] });
+        // The note rides inside the last tool result: a separate text block after tool results taught
+        // the model to end its turn empty (seen: a 1-token final round and a blank answer).
+        if (round + 1 === maxRounds && results.length) {
+          const lastResult = results[results.length - 1];
+          lastResult.content = `${lastResult.content}\n\n${FINAL_NOTE}`;
+        }
+        messages.push({ role: 'user', content: results });
       }
       const answer = finalizeAnswer(text, calls);
       emit({ type: 'Checks', confidence: answer.confidence, reason: answer.confidence_reason, cited: answer.cited,
