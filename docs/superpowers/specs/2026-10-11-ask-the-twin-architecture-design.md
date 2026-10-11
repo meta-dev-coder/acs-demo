@@ -41,6 +41,15 @@ can extend.
    browser and the server, never duplicated.
 5. **The role comes from identity checked on the server, never from the browser.** Screen context is useful
    but untrusted.
+6. **Twin store: SQLite** through Node's built-in `node:sqlite`, so no dependency to install. It is
+   verified on Node 22 with R-tree (spatial bounding boxes) and FTS5 (keyword search). Vectors are deferred
+   (`sqlite-vec` later, only for free text and documents). `better-sqlite3` is the fallback if the
+   experimental `node:sqlite` API changes.
+7. **Twin UI API.** One registry of state providers, commands, events and flows. The human UI and Ask the
+   Twin both go through it. It uses a contract plus a registry, not class inheritance.
+8. **View-tier actions auto-run** as an answer streams. A setting in the chat panel can switch this off.
+9. **Ask the Twin is a docked, resizable panel on the right side of the whole application**, not a
+   floating widget.
 
 ## Architecture
 
@@ -102,6 +111,107 @@ Existing hardcoded versions this generalizes:
 | DataConnect → iTwin APIs / other database | connector inside `i595-data` | tools, prompts |
 | Anthropic API → Bedrock / Microsoft Foundry | model provider adapter | prompts, tools, loop |
 | Reuse from Claude Desktop / Bentley agents | deploy an MCP server remotely (Messages API MCP connector, beta `mcp-client-2025-11-20`) | tool definitions |
+
+## Twin store (SQLite)
+
+DataConnect stays the system of record. A **sync job** keeps a local SQLite read model up to date. The app
+does not load everything at startup.
+
+- **Historical classes:** full refresh nightly or on demand, using the writer's existing paging `readAll`.
+- **Live classes:** written by the live sync loop in the same cycle it writes DataConnect. No read-back.
+- **Derived tables** are recomputed each cycle: crashes per segment × month × weather, asset risk, closure
+  lane-hours, and the latest `assessCorridor` result. Insight tools read these in milliseconds, and the
+  screen and the chat read the same numbers.
+- **Spatial:** an R-tree over the bounding box of each record, plus milepost columns for corridor-linear
+  queries.
+- **Text:** FTS5 over `root_cause`, issue summaries, inspection notes and FL511 descriptions.
+- Tools use a `TwinStore` interface, so moving to Postgres + PostGIS (+ pgvector) at I-595 scale does not
+  touch tools or prompts.
+- Today's volume: about 9.6k historical rows (~7 MB). At 100× growth SQLite is still comfortable.
+- **Open:** does DataConnect offer a modified-since filter or change feed? The code shows only
+  `equals` / `contains`, sort and paging.
+
+Model access to data comes in three tiers:
+1. **Insight tools** (computed bundles, the default).
+2. **Search tools** (FTS5 now, similarity later), always combined with SQL filters.
+3. **Optional:** a guarded read-only SQL tool over curated views, with row and time limits, that shows its
+   query in the answer.
+
+## Twin UI API (`src/twin/`)
+
+The twin's equivalent of Jira's REST API for Rovo: every capability of the UI is a registered, typed
+operation.
+
+1. **State providers.** `twin.provide(id, { describe, get })`. `describe()` returns a small snapshot (ids,
+   selection, filters, temporal mode) that goes into the request envelope. `get(id)` returns details on
+   demand.
+2. **Commands.** `twin.command({ id, title, tier, input (JSON schema), available(ctx), run })`. `run` returns
+   an `undo`. There are three tiers:
+   - `view` (fly, highlight, pulse, open panel, show/hide layer): auto-runs, can be undone.
+   - `state` (select, filter, switch workspace, draw area, run a *simulation*): runs and is announced as a
+     chip, can be undone.
+   - `write`: never runs in the browser. It shows a confirmation card with a preview. Confirming sends the
+     `proposal_id` to `i595-workflows` (see Planned).
+3. **Events.** `selectionChanged`, `viewChanged`, `workspaceChanged`, `layerChanged`. These update context
+   chips, suggestions and follow-up resolution ("this one").
+4. **Flows.** Ordered command steps with narration, played by a flow runner (Next / Pause / Stop, undo
+   the whole flow). They can be predefined (demo), composed by the model (each step validated), or later
+   saved by the user.
+
+The registry exports its command schemas to the server. That list is the complete set of actions Claude may
+return. `available(ctx)` gates by role and screen for buttons and AI alike. The same registry also gives a
+Cmd-K command palette, e2e tests that drive commands, and a session timeline.
+
+**Migration:** wrap existing methods (`layerStore`, `assetExplorer`, `segments`, the `tmc` methods behind
+`TWIN_ACTIONS`) as commands, then replace `runTmcAction`'s switch and the hand-written fly/show code in
+`askTheTwin.js` with `twin.run(action)`.
+
+## Ask the Twin panel (UI)
+
+- **Docked on the right of the whole application**, full height, part of the layout (the map resizes; the
+  panel does not cover it). It replaces the floating draggable widget.
+- **Resizable** with a drag handle, from a narrow chat width up to about half the screen. There is also an
+  **expand** control for a reading mode where the panel takes most of the screen with the map as a strip,
+  and **collapse** to a rail button. Width and mode are remembered per user (localStorage, per-viewer
+  convenience only).
+- **A document, not a bubble list.** It scrolls freely and each turn is a section: question, live activity,
+  answer blocks. Earlier turns stay readable and linked to the map (clicking a past answer's entity flies
+  there again).
+- **Background activity is visible.** While an answer runs, the turn shows a live trace: tools started and
+  finished, each with its source silo and duration, and actions run on the map. It collapses to one summary
+  line ("5 sources · 3.2 s · 2 map actions") when done and can be expanded.
+- **Context chips** above the input (`Incident FL511-876564 · Live · TMC operator`). They can be removed,
+  and clicking a map feature adds one.
+- **Settings in the panel header:** auto-run view actions (on by default), show the activity trace
+  expanded/collapsed, and later the persona switcher if identity is not ready.
+
+## Performance budget
+
+Something visible in under 300 ms. First useful content (a headline or the map moving) in under 3 s. A
+typical full answer in under 10 s. The levers, in order:
+
+1. Fewer model rounds through large insight tools (`explain_incident` returns the whole bundle).
+2. Tools read SQLite and derived tables, not DataConnect.
+3. Stream progress, text and actions (view actions run as soon as they are decided).
+4. Prompt caching on tools, system and persona playbook.
+5. Prefetch the context bundle when an incident is selected.
+6. The local fast path for plain commands.
+7. Effort tuned per route, measured.
+
+## Answer blocks
+
+The model picks blocks from a fixed set and points them at tool results. It never types the numbers
+shown in charts.
+
+Block types:
+- `verdict`, `kpis`, `evidence` (claim + ref + source), `trend`, `compare`, `ranked_list`, `timeline`;
+- `actions` (command ids from the registry);
+- `gaps` (data that is not available).
+
+Rendering order is short-answer first: verdict, then KPIs, then evidence on demand. Each answer adds its own
+map layer with a legend, cleared on the next question. Hovering an evidence row pulses the matching
+feature. Trust signals: source chips, an "as of" time, and "computed by the twin" vs. "interpretation"
+labels.
 
 ## Planned (out of POC scope): `i595-workflows`
 
