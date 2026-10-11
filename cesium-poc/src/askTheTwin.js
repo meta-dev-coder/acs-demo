@@ -14,6 +14,9 @@ import { createRectangleSelection } from './spatial/rectangleSelection.js';
 import { buildSpatialContext } from './spatial/spatialQuery.js';
 import { AREA_SUGGESTIONS, answerAreaQuestion, areaIndicatorText, areaSummaryLines, parseAreaQuestion } from './spatial/areaAnswers.js';
 import { geometryIntersectsBounds } from './spatial/areaGeometry.js';
+import { createTwinUiApi, logLine } from './twinUiApi.js';
+import { renderBlocks } from './askTwinBlocks.js';
+import { createEvidenceChips } from './askTwinEvidence.js';
 
 // `npm run dev` serves the orchestrator itself (server/ask/localAsk.mjs), so a dev build asks it
 // same-origin; a build without VITE_ASK_THE_TWIN_API keeps the deployed service.
@@ -268,6 +271,21 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     bubble.textContent = text;
     wrap.appendChild(bubble);
 
+    // A remote answer's refs become evidence chips, in its text as well as its claims list, and its
+    // blocks (built by the server from cited lookups) sit straight under the text they support.
+    const evidence = meta ? createEvidenceChips(meta, {
+      onLocate: (coordinates, { label, button }) => locate(coordinates, label, button, wrap),
+    }) : null;
+    if (evidence && evidence.known.size) {
+      bubble.replaceChildren(evidence.textWithChips(text));
+      bubble.dataset.evidenceHost = '';
+    }
+    const blocks = meta ? renderBlocks(meta, {
+      onLocate: (coordinates, { label, button }) => locate(coordinates, label, button, wrap),
+      refChip: evidence.chip,
+    }) : null;
+    if (blocks) wrap.appendChild(blocks);
+
     if (meta) {
       const row = document.createElement('div');
       row.className = 'ask-twin-meta';
@@ -302,12 +320,16 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
       if (meta.basis?.length) {
         const list = document.createElement('ul');
         list.className = 'ask-twin-basis';
+        list.dataset.evidenceHost = '';
         for (const item of meta.basis) {
           const li = document.createElement('li');
           li.textContent = item.claim;
           const refs = document.createElement('span');
-          refs.className = `ask-twin-refs${item.refs.length ? '' : ' is-uncited'}`;
-          refs.textContent = item.refs.length ? `${item.refs.join(', ')}${item.sources?.length ? ` · ${item.sources.join(', ')}` : ''}` : 'general knowledge';
+          refs.className = `ask-twin-refs${item.refs?.length ? '' : ' is-uncited'}`;
+          if (item.refs?.length) {
+            refs.appendChild(evidence.chipsFor(item.refs));
+            if (item.sources?.length) refs.appendChild(document.createTextNode(` · ${item.sources.join(', ')}`));
+          } else refs.textContent = 'general knowledge';
           li.appendChild(refs);
           list.appendChild(li);
         }
@@ -330,12 +352,18 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
           done.textContent = `${verdict} by you — in the POC this decision is not sent anywhere.`;
           buttons.appendChild(done);
         };
+        // A decision is a change, not a view: it goes through the registry's confirm step, so one
+        // stray click on a busy screen never records an operator's verdict.
         for (const [label, verdict] of [['Accept', 'Accepted'], ['Reject', 'Rejected']]) {
           const b = document.createElement('button');
           b.type = 'button';
           b.className = 'ask-twin-fly-btn';
           b.textContent = label;
-          b.onclick = () => decide(verdict);
+          b.onclick = async () => {
+            const outcome = await act('recommendation_decision', { rule: rec.rule, title: rec.title, verdict },
+              { source: 'recommendation', anchor: b, container: card, confirmNote: 'Recorded in this panel only — in the POC the decision is not sent anywhere.' });
+            if (outcome.status === 'ran') decide(verdict);
+          };
           buttons.appendChild(b);
         }
         // The planned workflow step: the twin would draft the request for a person to confirm
@@ -352,7 +380,8 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
           go.type = 'button';
           go.className = 'ask-twin-fly-btn';
           go.textContent = 'Show on map';
-          go.onclick = () => flyTo(rec.location, go);
+          go.onclick = () => act('fly_to', { coordinates: rec.location, label: `playbook ${rec.rule}`, showLayers: false },
+            { source: 'recommendation', button: go, container: card });
           buttons.appendChild(go);
         }
         wrap.appendChild(card);
@@ -372,14 +401,8 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
         const flyBtn = document.createElement('button');
         flyBtn.className = 'ask-twin-fly-btn';
         flyBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg> ${isCamera ? 'Show cameras on map' : 'Show on map'}`;
-        flyBtn.onclick = async () => {
-          if (isCamera) { openNearestCameras(meta.action.coordinates, flyBtn); return; }
-          // Switch the layers on BEFORE the camera moves, so the markers are already drawn when it
-          // arrives rather than appearing a beat later on a corridor that looked empty.
-          const shown = await showEventLayersFor(meta.action.coordinates);
-          flyTo(meta.action.coordinates, flyBtn);
-          if (shown.labels.length) addMsg('assistant', `Switched on ${shown.labels.join(' and ')} so you can see them on the map.`, null, container);
-        };
+        flyBtn.onclick = () => act(answerActionName(actionType), answerActionParams(meta.action),
+          { source: 'answer', button: flyBtn, container });
         actionRow(wrap).appendChild(flyBtn);
       }
 
@@ -428,6 +451,148 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     nearby.slice(0, 5).forEach(({ entity }) => { entity.show = true; });
     cameraControls.selectCamera(nearby[0].id);
     flyTo({ lon, lat }, flyBtn, 1000);
+  }
+
+  // ── Twin UI actions (twinUiApi.js) ────────────────────────────────────
+  // Every map move and decision an answer can make goes through one registry, so there is one list
+  // of what the twin can do to the screen, one place that asks before a change, and one log of what
+  // ran. Auto-run's rules (setting, confidence, operator busy) still sit in front of it, in autoRun.
+  const ui = createTwinUiApi({ confirm: confirmInline, debug: Boolean(import.meta.env?.DEV) });
+  const where = c => `${Number(c?.lat).toFixed(5)}, ${Number(c?.lon).toFixed(5)}`;
+
+  /**
+   * Fly to a place, switching on the event layers that draw what is there first.
+   *
+   * Switching layers on is part of the view action, not a separate change to confirm: it is what
+   * makes the destination readable (see showEventLayersFor) and Restore view switches them off again.
+   */
+  async function flyToAnswer(params, ctx) {
+    // Switch the layers on BEFORE the camera moves, so the markers are already drawn when it
+    // arrives rather than appearing a beat later on a corridor that looked empty.
+    const shown = params.showLayers === false ? { ids: [], labels: [] } : await showEventLayersFor(params.coordinates);
+    flyTo(params.coordinates, ctx.button ?? null, params.alt);
+    if (shown.labels.length && ctx.container) addMsg('assistant', `Switched on ${shown.labels.join(' and ')} so you can see them on the map.`, null, ctx.container);
+    return { layersOn: shown.ids };
+  }
+  ui.register('fly_to', {
+    kind: 'view', label: 'Show on map', run: flyToAnswer,
+    describe: p => (p.label ? `Fly to ${p.label}` : p.entity_id ? `Fly to ${p.entity_id}` : `Show on map · ${where(p.coordinates)}`),
+  });
+  ui.register('show_event', {
+    kind: 'view', label: 'Show event on map', run: flyToAnswer,
+    describe: p => (p.entity_id ? `Show event ${p.entity_id}` : `Show event on map · ${where(p.coordinates)}`),
+  });
+  ui.register('open_camera', {
+    kind: 'view', label: 'Show cameras on map',
+    run: (p, ctx) => { openNearestCameras(p.coordinates, ctx.button ?? null); return { layersOn: [] }; },
+    describe: p => (p.entity_id ? `Fly to camera ${p.entity_id}` : `Show cameras near ${where(p.coordinates)}`),
+  });
+  ui.register('restore_view', {
+    kind: 'view', label: 'Restore view',
+    async run({ checkpoint }) {
+      for (const id of checkpoint.layersOn) await layerStore?.setVisible?.(id, false);
+      programmaticMove = true;
+      viewer.camera.flyTo({ ...checkpoint, duration: 1.2, complete: () => { programmaticMove = false; }, cancel: () => { programmaticMove = false; } });
+      return true;
+    },
+  });
+  ui.register('tmc_action', { kind: 'view', label: 'TMC action', run: ({ action }) => runTmcActionNow(action), describe: p => p.action?.label });
+  // A playbook verdict, kept in this panel only: the POC writes nothing anywhere.
+  const decisions = new Map();
+  ui.register('recommendation_decision', {
+    kind: 'change', label: 'Record a playbook decision',
+    run: ({ rule, verdict }) => { decisions.set(rule, verdict); return verdict; },
+    describe: p => `${p.verdict === 'Accepted' ? 'Accept' : 'Reject'} playbook ${p.rule}${p.title ? ` · ${p.title}` : ''}`,
+  });
+  if (layerStore?.setVisible) {
+    ui.register('set_layer_visible', {
+      kind: 'change', label: 'Switch a map layer',
+      run: async ({ id, visible }) => { await layerStore.setVisible(id, Boolean(visible)); return true; },
+      describe: p => `${p.visible ? 'Show' : 'Hide'} ${layerStore.get?.(p.id)?.label ?? p.id}`,
+    });
+  }
+  if (import.meta.env?.DEV) window.__twinUi = ui;
+
+  /** The reply contract's action types; anything else that carries coordinates was always a fly. */
+  const answerActionName = type => (['fly_to', 'show_event', 'open_camera'].includes(type) ? type : 'fly_to');
+  const answerActionParams = action => ({ coordinates: action.coordinates, ...(action.entity_id ? { entity_id: String(action.entity_id) } : {}) });
+
+  /**
+   * Run a registered action and say what ran under the message it came from. One line per message,
+   * replaced by the latest: a table of ten flyable rows must not leave ten lines behind.
+   */
+  async function act(name, params, { container, ...options } = {}) {
+    const outcome = await ui.run(name, params, { ...options, container });
+    if (container && outcome.status !== 'cancelled') {
+      let line = container.querySelector(':scope > .ask-twin-ran');
+      if (!line) { line = document.createElement('p'); line.className = 'ask-twin-ran'; line.setAttribute('role', 'status'); }
+      line.textContent = logLine(outcome.entry);
+      line.classList.toggle('is-problem', outcome.status !== 'ran');
+      container.appendChild(line);
+      scrollBottom();
+    }
+    return outcome;
+  }
+
+  /** A record or table row's position, from the evidence drawer or a block. */
+  async function locate(coordinates, label, button, message) {
+    // The "Ran:" line goes in the block or drawer that was clicked, next to the row, not at the
+    // bottom of a long answer.
+    const container = button?.closest('.ask-twin-block, .ask-twin-evidence') ?? message;
+    const outcome = await act('fly_to', { coordinates, label, showLayers: false }, { source: 'evidence', container });
+    if (outcome.status === 'ran') button?.classList.add('is-flown');
+  }
+
+  /**
+   * The confirm step for a change action: a small prompt under the button that asked, with the action
+   * in words. Only one is open at a time; opening another cancels the first, and Escape cancels.
+   */
+  let pendingConfirm = null;
+  function confirmInline({ label, anchor, container, confirmNote }) {
+    pendingConfirm?.(false);
+    return new Promise(resolve => {
+      const box = document.createElement('div');
+      box.className = 'ask-twin-confirm';
+      box.setAttribute('role', 'group');
+      box.setAttribute('aria-label', `Confirm: ${label}`);
+      const text = document.createElement('p');
+      text.className = 'ask-twin-confirm-text';
+      text.textContent = `${label}?`;
+      box.appendChild(text);
+      if (confirmNote) {
+        const note = document.createElement('p');
+        note.className = 'ask-twin-confirm-note';
+        note.textContent = confirmNote;
+        box.appendChild(note);
+      }
+      const row = document.createElement('div');
+      row.className = 'ask-twin-confirm-buttons';
+      const yes = document.createElement('button');
+      yes.type = 'button';
+      yes.className = 'ask-twin-fly-btn ask-twin-confirm-yes';
+      yes.textContent = 'Confirm';
+      const no = document.createElement('button');
+      no.type = 'button';
+      no.className = 'ask-twin-fly-btn';
+      no.textContent = 'Cancel';
+      row.append(yes, no);
+      box.appendChild(row);
+      const finish = ok => {
+        if (pendingConfirm !== finish) return;
+        pendingConfirm = null;
+        box.remove();
+        if (!ok && anchor?.isConnected) anchor.focus();
+        resolve(ok);
+      };
+      pendingConfirm = finish;
+      yes.onclick = () => finish(true);
+      no.onclick = () => finish(false);
+      box.addEventListener('keydown', event => { if (event.key === 'Escape') { event.stopPropagation(); finish(false); } });
+      const host = anchor?.closest('.ask-twin-rec-buttons, .ask-twin-action-row');
+      if (host) host.insertAdjacentElement('afterend', box); else (container ?? messages).appendChild(box);
+      yes.focus();
+      scrollBottom();
+    });
   }
 
   // ── Fly to a map asset, answered locally ──────────────────────────────
@@ -798,7 +963,7 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
       button.type = 'button';
       button.className = 'ask-twin-fly-btn';
       button.textContent = action.label;
-      button.onclick = () => runTmcAction(action, button);
+      button.onclick = () => runTmcAction(action, button, wrap);
       wrap.appendChild(button);
     }
     messages.appendChild(wrap);
@@ -812,9 +977,19 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
    * against the workspace before anything moves. A refusal is reported on the button rather than
    * silently ignored, so an operator never clicks and wonders whether it worked.
    */
-  function runTmcAction(action, button) {
+  async function runTmcAction(action, button, container) {
     if (!tmc) return;
-    const done = (() => {
+    const { status } = await act('tmc_action', { action }, { source: 'tmc', button, container });
+    if (status === 'refused') {
+      button.disabled = true;
+      button.textContent = `${action.label} — not available`;
+    }
+  }
+
+  /** The workspace call behind one TMC action; false when the workspace refused it. */
+  function runTmcActionNow(action) {
+    if (!tmc) return false;
+    return (() => {
       switch (action.type) {
         case TWIN_ACTIONS.SHOW_HISTORY: return tmc.showHistoryOnMap();
         case TWIN_ACTIONS.FILTER_HISTORY: return tmc.filterHistory(action.filterType, action.filterValue);
@@ -842,10 +1017,6 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
           return Boolean(action.incidentId || action.resource?.resource);
       }
     })();
-    if (done === false) {
-      button.disabled = true;
-      button.textContent = `${action.label} — not available`;
-    }
   }
 
   function offerFromMap(question) {
@@ -1185,9 +1356,7 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     button.textContent = '↩ Restore view';
     button.onclick = async () => {
       button.disabled = true;
-      for (const id of checkpoint.layersOn) await layerStore?.setVisible?.(id, false);
-      programmaticMove = true;
-      viewer.camera.flyTo({ ...checkpoint, duration: 1.2, complete: () => { programmaticMove = false; }, cancel: () => { programmaticMove = false; } });
+      await act('restore_view', { checkpoint }, { source: 'button', container: turn });
       button.textContent = '✓ View restored';
     };
     turn.appendChild(button);
@@ -1214,13 +1383,8 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
       return;
     }
     const checkpoint = viewCheckpoint();
-    if (action.type === 'open_camera') openNearestCameras(action.coordinates);
-    else {
-      const shown = await showEventLayersFor(action.coordinates);
-      checkpoint.layersOn = shown.ids;
-      flyTo(action.coordinates);
-      if (shown.labels.length) addMsg('assistant', `Switched on ${shown.labels.join(' and ')} so you can see them on the map.`, null, turn);
-    }
+    const outcome = await act(answerActionName(action.type), answerActionParams(action), { source: 'auto', container: turn });
+    checkpoint.layersOn = outcome.result?.layersOn ?? [];
     addRestore(turn, checkpoint);
   }
 
@@ -1265,8 +1429,11 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     newConversation,
     clearArea,
     ask,
+    /** The twin's UI action registry (twinUiApi.js): what it can do, and what it has done. */
+    twinUi: ui,
     destroy() {
       document.removeEventListener(ASK_THE_TWIN_EVENT, onAskEvent);
+      if (import.meta.env?.DEV && window.__twinUi === ui) delete window.__twinUi;
       selection.destroy(); dock.destroy(); btn.remove(); panel.remove();
     },
   };

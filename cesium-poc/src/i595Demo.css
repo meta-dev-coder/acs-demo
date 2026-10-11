@@ -841,6 +841,102 @@ body.ask-twin-docked { position: relative; width: calc(100% - var(--ask-twin-doc
 :root[data-theme="light"] .ask-twin-activity { --act-warn: #a16207; }
 :root[data-theme="light"] .ask-twin-gaps, :root[data-theme="light"] .ask-twin-refs.is-uncited { color: #92400e; }
 
+/* Answer blocks (askTwinBlocks.js): KPI tiles, tables, bars and trends the server built from cited
+   lookups. Quiet surfaces on the panel's own tokens, so they read in the dark and light themes alike
+   and never outshout the answer text above them. Numbers are tabular so columns line up. */
+.ask-twin-blocks { align-self: stretch; display: flex; flex-direction: column; gap: 8px; min-width: 0; font-variant-numeric: tabular-nums; }
+.ask-twin-block { margin: 0; min-width: 0; padding: 8px 10px; border: 1px solid var(--ui-border-soft); border-radius: 10px; background: var(--ui-surface-sunken); display: flex; flex-direction: column; gap: 6px; }
+.ask-twin-block-title { font-size: 11.5px; font-weight: 600; color: var(--ui-text-secondary); }
+.ask-twin-block-caption { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; font-size: 10px; color: var(--ui-text-muted); min-width: 0; }
+.ask-twin-block-source { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.ask-twin-block-ref { font-weight: 600; }
+.ask-twin-kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; }
+.ask-twin-kpi { gap: 2px; padding: 8px 10px 7px; }
+.ask-twin-kpi-value { font-size: 18px; font-weight: 650; line-height: 1.2; color: var(--ui-text); overflow-wrap: anywhere; }
+.ask-twin-kpi-label { font-size: 11px; color: var(--ui-text-secondary); line-height: 1.3; }
+.ask-twin-kpi-note { font-size: 10.5px; color: var(--ui-text-muted); line-height: 1.3; }
+.ask-twin-kpi .ask-twin-block-caption { margin-top: 3px; }
+/* Bars: label, track, value on one line; a long label is clipped with its full text in the tooltip. */
+.ask-twin-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.ask-twin-bar { display: grid; grid-template-columns: minmax(64px, 38%) 1fr auto; align-items: center; gap: 8px; font-size: 11.5px; }
+.ask-twin-bar-label { color: var(--ui-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ask-twin-bar-track { height: 8px; border-radius: 4px; background: var(--ui-hover); overflow: hidden; }
+.ask-twin-bar-fill { display: block; height: 100%; border-radius: 4px; background: var(--ui-accent-strong); opacity: .85; }
+.ask-twin-bar-value { color: var(--ui-text); text-align: right; min-width: 2.5em; }
+/* Trend: the polyline stretches to the block's width; min/max sit on the right, dates under it. */
+.ask-twin-trend { display: flex; align-items: stretch; gap: 6px; }
+.ask-twin-trend-plot { position: relative; flex: 1 1 auto; min-width: 0; height: 48px; }
+.ask-twin-trend-svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ask-twin-trend-line { fill: none; stroke: var(--ui-accent-strong); stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round; }
+.ask-twin-trend-dot { position: absolute; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: var(--ui-accent-strong); box-shadow: 0 0 0 2px var(--ui-surface-solid); }
+.ask-twin-trend-scale { display: flex; flex-direction: column; justify-content: space-between; font-size: 10px; color: var(--ui-text-muted); text-align: right; white-space: nowrap; }
+.ask-twin-trend-axis { display: flex; justify-content: space-between; gap: 8px; font-size: 10px; color: var(--ui-text-muted); }
+.ask-twin-trend-last { color: var(--ui-text-secondary); }
+/* Table: scrolls sideways inside its block on a narrow dock rather than widening the panel. */
+.ask-twin-table-scroll { overflow-x: auto; margin: 0 -2px; }
+.ask-twin-table { width: 100%; border-collapse: collapse; font-size: 11.5px; line-height: 1.35; }
+.ask-twin-table th { text-align: left; font-weight: 600; font-size: 10.5px; color: var(--ui-text-muted); padding: 3px 6px; border-bottom: 1px solid var(--ui-border); white-space: nowrap; }
+.ask-twin-table td { padding: 4px 6px; color: var(--ui-text); border-bottom: 1px solid var(--ui-border-soft); vertical-align: top; }
+.ask-twin-table tr:last-child td { border-bottom: 0; }
+.ask-twin-table .is-num { text-align: right; white-space: nowrap; }
+.ask-twin-table tr.is-locatable { cursor: pointer; }
+.ask-twin-table tr.is-locatable:hover td { background: var(--ui-hover); }
+.ask-twin-table-go-col { width: 1%; padding-left: 0; padding-right: 2px; }
+.ask-twin-table-go, .ask-twin-table-more, .ask-twin-evidence-go, .ask-twin-evidence-close { font: inherit; cursor: pointer; background: none; border: 1px solid transparent; color: var(--ui-accent-strong); border-radius: 6px; }
+.ask-twin-table-go { font-size: 13px; line-height: 1; padding: 1px 4px; }
+.ask-twin-table-go:hover, .ask-twin-table-go.is-flown { border-color: var(--ui-accent-line); background: var(--ui-accent-tint); }
+.ask-twin-table-more { align-self: flex-start; font-size: 11px; padding: 2px 4px; margin-top: 2px; }
+.ask-twin-table-more:hover { text-decoration: underline; }
+
+/* Evidence chips (askTwinEvidence.js): a ref as a small pill that opens the records behind it. */
+.ask-twin-ref-chips { display: inline-flex; flex-wrap: wrap; gap: 3px; vertical-align: baseline; }
+.ask-twin-ref-chip { display: inline-flex; align-items: center; font: inherit; font-size: 10px; font-weight: 650; line-height: 1; letter-spacing: .02em; padding: 2px 5px; border-radius: 5px;
+  border: 1px solid var(--ui-accent-line); background: var(--ui-accent-tint); color: var(--ui-accent-strong); cursor: pointer; vertical-align: 1px; }
+.ask-twin-ref-chip:hover, .ask-twin-ref-chip.is-open { background: var(--ui-accent-strong); color: var(--ui-accent-contrast); border-color: var(--ui-accent-strong); }
+.ask-twin-ref-chip.is-static { cursor: default; background: transparent; border-color: var(--ui-border); color: var(--ui-text-muted); }
+.ask-twin-ref-chip:focus-visible, .ask-twin-table-go:focus-visible, .ask-twin-table-more:focus-visible, .ask-twin-evidence-go:focus-visible, .ask-twin-evidence-close:focus-visible { outline: 2px solid var(--ui-accent-line); outline-offset: 1px; }
+.ask-twin-evidence { align-self: stretch; margin: 2px 0; padding: 8px 10px; border: 1px solid var(--ui-accent-line); border-left-width: 3px; border-radius: 8px; background: var(--ui-surface-raised); font-size: 11.5px; color: var(--ui-text-secondary); display: flex; flex-direction: column; gap: 6px; }
+.ask-twin-evidence:focus { outline: none; }
+.ask-twin-evidence-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ask-twin-evidence-ref { font-weight: 700; color: var(--ui-accent-strong); }
+.ask-twin-evidence-source { flex: 1 1 auto; min-width: 0; color: var(--ui-text-muted); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ask-twin-evidence-close { margin-left: auto; color: var(--ui-text-muted); padding: 1px 5px; }
+.ask-twin-evidence-close:hover { color: var(--ui-text); background: var(--ui-hover); }
+.ask-twin-evidence-summary, .ask-twin-evidence-empty, .ask-twin-evidence-more { margin: 0; }
+.ask-twin-evidence-more, .ask-twin-evidence-empty { color: var(--ui-text-muted); font-size: 10.5px; }
+.ask-twin-evidence-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ask-twin-evidence-record { padding-top: 6px; border-top: 1px solid var(--ui-border-soft); }
+.ask-twin-evidence-record:first-child { padding-top: 0; border-top: 0; }
+.ask-twin-evidence-record-head { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.ask-twin-evidence-id { font-weight: 600; color: var(--ui-text); font-variant-numeric: tabular-nums; }
+.ask-twin-evidence-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ask-twin-evidence-go { margin-left: auto; flex-shrink: 0; font-size: 10.5px; padding: 1px 7px; border-color: var(--ui-accent-line); border-radius: 999px; }
+.ask-twin-evidence-go:hover, .ask-twin-evidence-go.is-flown { background: var(--ui-accent-tint); }
+.ask-twin-evidence-fields { display: grid; grid-template-columns: max-content 1fr; gap: 1px 8px; margin: 3px 0 0; font-size: 10.5px; }
+.ask-twin-evidence-fields dt { color: var(--ui-text-muted); }
+.ask-twin-evidence-fields dd { margin: 0; color: var(--ui-text-secondary); overflow-wrap: anywhere; }
+
+/* Twin UI actions (twinUiApi.js): the confirm step for a change, and the line saying what ran. */
+.ask-twin-confirm { align-self: stretch; display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--ui-accent-line); border-radius: 8px; background: var(--ui-accent-tint); }
+.ask-twin-confirm-text { margin: 0; font-size: 12px; font-weight: 600; color: var(--ui-text); }
+.ask-twin-confirm-note { margin: 0; font-size: 10.5px; color: var(--ui-text-muted); }
+.ask-twin-confirm-buttons { display: flex; gap: 6px; margin-top: 2px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-confirm .ask-twin-fly-btn.ask-twin-confirm-yes, .ask-twin-panel.ask-twin-dock .ask-twin-confirm .ask-twin-fly-btn.ask-twin-confirm-yes:hover { background: var(--ui-accent-strong); border-color: var(--ui-accent-strong); color: var(--ui-accent-contrast); }
+.ask-twin-ran { margin: 0; font-size: 10.5px; color: var(--ui-text-muted); }
+.ask-twin-ran::before { content: '✓ '; color: var(--ui-status-live); }
+.ask-twin-ran.is-problem::before { content: '! '; color: var(--act-warn, #d9a441); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .ask-twin-evidence, .ask-twin-confirm { animation: ask-twin-reveal 160ms ease-out both; }
+  .ask-twin-bar-fill { animation: ask-twin-grow 380ms ease-out both; transform-origin: left center; }
+}
+@keyframes ask-twin-reveal { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+@keyframes ask-twin-grow { from { transform: scaleX(0); } to { transform: none; } }
+:root[data-theme="light"] .ask-twin-block { background: #fff; border-color: #dce6f5; }
+:root[data-theme="light"] .ask-twin-evidence { background: #fff; }
+:root[data-theme="light"] .ask-twin-trend-dot { box-shadow: 0 0 0 2px #fff; }
+:root[data-theme="light"] .ask-twin-bar-track { background: #eaf1ff; }
+
 /* Floating panels: the heading is the grab handle, and a dragged panel lifts above its neighbours. */
 .panel-drag-handle { cursor: grab; user-select: none; touch-action: none; }
 .panel-drag-handle:active { cursor: grabbing; }
