@@ -41,6 +41,10 @@ const askApi = liveEvents => ({
         getLiveEvents: async () => (await liveEvents.dataConnectEvents().catch(() => null)) ?? liveEvents.fl511Events().catch(() => null),
       });
       server.middlewares.use(ask.middleware);
+      // The browser only asks this route when VITE_ASK_THE_TWIN_API is unset; a leftover value in .env
+      // silently sends every question to the deployed service instead.
+      const remote = String(process.env.VITE_ASK_THE_TWIN_API ?? '').trim();
+      if (remote) console.warn(`ask-the-twin (local): VITE_ASK_THE_TWIN_API=${remote} is set, so the page asks that service, not this one. Remove it from .env to use the local orchestrator.`);
     } catch (error) {
       console.warn(`ask-the-twin (local): not mounted (${error.message}). It needs Node >= 22.5 for node:sqlite.`);
     }
