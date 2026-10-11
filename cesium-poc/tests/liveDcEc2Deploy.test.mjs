@@ -61,8 +61,8 @@ describe('EC2 bundle', () => {
   after(() => rmSync(dir, { recursive: true, force: true }));
 
   test('dist holds one ESM file, the ops files, the corridor data the process reads and the data dictionary', () => {
-    assert.deepEqual(readdirSync(join(dir, 'dist')).sort(), ['data', 'env.example', 'install.sh', 'live-dc-sync.mjs', 'live-dc.service', 'livedc.sh']);
-    assert.deepEqual([...OPS_FILES].sort(), ['env.example', 'install.sh', 'live-dc.service', 'livedc.sh']);
+    assert.deepEqual(readdirSync(join(dir, 'dist')).sort(), ['data', 'env.example', 'install.sh', 'live-dc-ask.mjs', 'live-dc-ask.service', 'live-dc-sync.mjs', 'live-dc.service', 'livedc.sh']);
+    assert.deepEqual([...OPS_FILES].sort(), ['env.example', 'install.sh', 'live-dc-ask.service', 'live-dc.service', 'livedc.sh']);
     assert.deepEqual(readdirSync(join(dir, 'dist', 'data')).sort(), [...RUNTIME_DATA_FILES, 'data-dictionary.json', SNAPSHOT_SUBDIR].sort());
     assert.deepEqual(readdirSync(join(dir, 'dist', 'data', SNAPSHOT_SUBDIR)).sort(), SNAPSHOT_CLASSES.map(c => c.file).sort());
     assert.deepEqual([...RUNTIME_DATA_FILES].sort(), [
@@ -81,6 +81,34 @@ describe('EC2 bundle', () => {
     assert.ok(specifiers.length > 0);
     for (const specifier of specifiers) assert.match(specifier, /^node:/, `non-builtin import ${specifier}`);
     assert.ok(!/with\s*\{\s*type:\s*["']json["']/.test(bundle), 'config JSON is inlined');
+  });
+
+  test('the bundled ask service starts from dist/ alone, builds its store from data/ and answers status', async () => {
+    const box = join(dir, 'askbox');
+    mkdirSync(box);
+    execFileSync('cp', ['-R', join(dir, 'dist'), join(box, 'dist')]);
+    const state = join(dir, 'askstate');
+    mkdirSync(state);
+    const port = 18000 + Math.floor(Math.random() * 1000);
+    // PATH without an aws CLI and no secret names: the service must still start (snapshot store, replay model).
+    const env = { PATH: '/usr/bin:/bin', HOME: state, ASK_TWIN_STORE: join(state, 'twin.sqlite'), ASK_TWIN_PORT: String(port),
+      ASK_TWIN_REPLAY: join(state, 'none.json'), ASK_TWIN_REFRESH: 'off' };
+    const child = spawn(process.execPath, [join(box, 'dist', 'live-dc-ask.mjs')], { cwd: box, env, stdio: ['ignore', 'pipe', 'pipe'] });
+    let output = '';
+    child.stdout.on('data', c => { output += c; });
+    child.stderr.on('data', c => { output += c; });
+    try {
+      let status = null;
+      for (let i = 0; i < 60 && !status; i++) {
+        await new Promise(r => setTimeout(r, 250));
+        status = await fetch(`http://127.0.0.1:${port}/api/i595/ask/status`).then(r => r.json()).catch(() => null);
+      }
+      assert.ok(status, `status answered (output: ${output.slice(0, 500)})`);
+      assert.equal(status.store.snapshot, SNAPSHOT_CLASSES.length);
+      assert.equal(status.refresh.off, true);
+    } finally {
+      child.kill('SIGTERM');
+    }
   });
 
   test('runs --once --feed from an empty directory with only dist/, service client via the aws CLI', async () => {

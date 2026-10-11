@@ -34,7 +34,9 @@ export const RUNTIME_DATA_FILES = Object.freeze([...new Set([
 ])]);
 /** Where the bundle carries the DataConnect snapshot, under data/. */
 export const SNAPSHOT_SUBDIR = 'dataconnect-data';
-export const OPS_FILES = Object.freeze(['install.sh', 'livedc.sh', 'live-dc.service', 'env.example']);
+export const OPS_FILES = Object.freeze(['install.sh', 'livedc.sh', 'live-dc.service', 'live-dc-ask.service', 'env.example']);
+/** The Ask the Twin service, bundled beside the sync for live-dc-ask.service (phase 2). */
+export const ASK_BUNDLE = 'live-dc-ask.mjs';
 
 export const WEB_BUILD_ENV = Object.freeze({
   VITE_DATA_SOURCE: 'dataconnect',
@@ -128,6 +130,11 @@ export async function buildLiveDcBundle({ outDir = DEFAULT_OUT_DIR, web = 'build
   await build({
     entryPoints: [join(ROOT, 'tools', 'live-dc-sync.mjs')],
     outfile, bundle: true, platform: 'node', target: 'node20', format: 'esm',
+    banner: { js: BANNER }, legalComments: 'none', logLevel: 'warning',
+  });
+  await build({
+    entryPoints: [join(ROOT, 'tools', 'ask-serve.mjs')],
+    outfile: join(outDir, ASK_BUNDLE), bundle: true, platform: 'node', target: 'node22', format: 'esm',
     banner: { js: BANNER }, legalComments: 'none', logLevel: 'warning',
   });
   for (const name of RUNTIME_DATA_FILES) copyFileSync(join(ROOT, 'public', 'data', name), join(outDir, 'data', name));

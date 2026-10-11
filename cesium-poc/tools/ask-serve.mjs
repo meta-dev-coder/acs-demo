@@ -66,7 +66,12 @@ async function main() {
   const { createDataConnectApi } = await import('../server/dataConnect.mjs');
   const { createLiveEventsApi } = await import('../server/api.mjs');
   const { createLocalAsk } = await import('../server/ask/localAsk.mjs');
+  const { applyServiceClientSecret } = await import('../server/liveDc/awsSecret.mjs');
+  const { createAskLimiter } = await import('../server/liveDc/askTwin.mjs');
 
+  // On EC2 the DataConnect read clients come from the service-client secret (as for live-dc);
+  // a no-op on a laptop, where .env.local has them.
+  await applyServiceClientSecret({ env: process.env });
   const liveDc = createLiveDcReadApi();
   const historical = createDataConnectApi();
   const liveEvents = createLiveEventsApi({ liveDc });
@@ -74,6 +79,10 @@ async function main() {
     // As in `npm run dev`: the DataConnect Live Events class when configured, else FL511 direct.
     getLiveEvents: async () => (await liveEvents.dataConnectEvents().catch(() => null)) ?? liveEvents.fl511Events().catch(() => null),
     liveDc, historical,
+    // Behind live-dc's gate the proxy names the session in x-ask-client; this process only listens on
+    // 127.0.0.1, so nothing else can set it.
+    clientKey: req => String(req.headers['x-ask-client'] ?? '').trim() || req.socket?.remoteAddress || 'unknown',
+    limiter: createAskLimiter({ limit: 120 }),
   });
   const port = Number(process.env.ASK_TWIN_PORT) || DEFAULT_PORT;
   const server = createAskServer({ ask });

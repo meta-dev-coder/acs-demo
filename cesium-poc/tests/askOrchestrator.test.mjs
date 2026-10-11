@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EnvelopeError, sanitizeEnvelope, screenBlock, MAX_HISTORY_TURNS } from '../server/ask/envelope.mjs';
 import { createAnthropicProvider, createRecordingProvider, createReplayProvider, ProviderError, requestKey } from '../server/ask/modelProvider.mjs';
-import { checkAction, claimsFromText, computeConfidence, createOrchestrator, finalizeAnswer } from '../server/ask/orchestrator.mjs';
+import { checkAction, claimsFromText, computeConfidence, createOrchestrator, finalizeAnswer, givesUp, unverifiedClaims } from '../server/ask/orchestrator.mjs';
 import { createTools } from '../server/ask/tools.mjs';
 import { openTwinStore, writeTwinStore } from '../server/ask/twinStore.mjs';
 import { storeSummary, SYSTEM_PROMPT, systemPrompt } from '../server/ask/prompt.mjs';
@@ -422,12 +422,16 @@ describe('incomplete answers', () => {
       const provider = scripted([
         toolUse(['t1', 'list_live_events', {}]),
         { content: [{ type: 'text', text: 'One closure at SR-7 (R1).' }, { type: 'tool_use', id: 't2', name: 'none', input: {} }], stop_reason: 'tool_use', usage: {} },
+        reply({ answer: 'One closure at SR-7.', basis: [{ claim: 'One closure at SR-7.', refs: ['R1'] }] }),
       ]);
       const orchestrator = createOrchestrator({ provider, tools: tools, logger: quiet, system: 's' });
       const { events, emit } = collect();
       const answer = await orchestrator.run(envelope('closures at the turnpike?'), emit);
-      assert.equal(provider.requests.length, 2);
-      assert.equal(answer.answer, 'One closure at SR-7 (R1).');
+      // No third lookup round: the prose answer is only restated in the checked format.
+      assert.equal(provider.requests.length, 3);
+      assert.ok(provider.requests[2].format, 'the restatement uses the reply schema');
+      assert.equal(answer.answer, 'One closure at SR-7.');
+      assert.equal(answer.confidence, 'high');
       assert.ok(!events.some(e => e.type === 'ToolCallStart' && e.name === 'none'));
     } finally { cleanup(); }
   });
@@ -480,5 +484,97 @@ describe('incomplete answers', () => {
   test('the prompt points place questions at records_near and says action is not a tool', () => {
     assert.match(SYSTEM_PROMPT, /records_near with place/);
     assert.match(SYSTEM_PROMPT, /no tool named "none"/);
+  });
+});
+
+describe('structured final answer', () => {
+  test('the last round asks for the reply schema; earlier rounds do not', async () => {
+    const { tools, cleanup } = fixtureTools();
+    try {
+      const provider = scripted([toolUse(['a', 'list_live_events', {}]), toolUse(['b', 'list_live_events', {}]), reply({ answer: 'ok', basis: [] })]);
+      await createOrchestrator({ provider, tools, logger: quiet, system: 's' }).run(envelope('q'), () => {});
+      assert.equal(provider.requests[0].format, undefined);
+      assert.equal(provider.requests[2].format.required.join(), 'answer,basis,gaps,action,follow_ups');
+    } finally { cleanup(); }
+  });
+
+  test('a prose answer in an early round is restated in the schema, so its citations are checked, not inferred', async () => {
+    const { tools, cleanup } = fixtureTools();
+    try {
+      const provider = scripted([
+        toolUse(['a', 'list_live_events', {}]),
+        { content: [{ type: 'text', text: 'One closure at SR-7 (R1).' }], stop_reason: 'end_turn', usage: {} },
+        reply({ answer: 'One closure at SR-7.', basis: [{ claim: 'One closure at SR-7.', refs: ['R1'] }], gaps: [], action: { type: 'none', entity_id: null, coordinates: null }, follow_ups: [] }),
+      ]);
+      const answer = await createOrchestrator({ provider, tools, logger: quiet, system: 's' }).run(envelope('closures?'), () => {});
+      assert.equal(answer.basis_inferred, undefined);
+      assert.equal(answer.confidence, 'high');
+      const restate = provider.requests[2];
+      assert.equal(restate.messages.at(-2).role, 'assistant');
+      assert.match(restate.messages.at(-1).content, /Restate exactly that answer/);
+    } finally { cleanup(); }
+  });
+
+  test('if the restatement fails, the prose stands with inferred citations', async () => {
+    const { tools, cleanup } = fixtureTools();
+    try {
+      const provider = scripted([toolUse(['a', 'list_live_events', {}]), { content: [{ type: 'text', text: 'One closure at SR-7 (R1).' }], stop_reason: 'end_turn', usage: {} }, new Error('overloaded')]);
+      const answer = await createOrchestrator({ provider, tools, logger: quiet, system: 's' }).run(envelope('closures?'), () => {});
+      assert.equal(answer.basis_inferred, true);
+      assert.equal(answer.confidence, 'medium');
+    } finally { cleanup(); }
+  });
+
+  test('the provider sends the schema as output_config.format with the effort', async () => {
+    const { createAnthropicProvider } = await import('../server/ask/modelProvider.mjs');
+    const sent = [];
+    const client = { messages: { create: async body => { sent.push(body); return { content: [], stop_reason: 'end_turn', usage: {} }; } } };
+    const provider = createAnthropicProvider({ model: 'm', effort: 'low', client });
+    await provider.complete({ system: 's', messages: [], tools: [], maxTokens: 10, format: { type: 'object' } });
+    assert.deepEqual(sent[0].output_config, { effort: 'low', format: { type: 'json_schema', schema: { type: 'object' } } });
+    await provider.complete({ system: 's', messages: [], tools: [], maxTokens: 10 });
+    assert.deepEqual(sent[1].output_config, { effort: 'low' });
+  });
+});
+
+describe('give-ups and unverified figures', () => {
+  const json = obj => JSON.stringify({ gaps: [], action: { type: 'none', entity_id: null, coordinates: null }, follow_ups: [], ...obj });
+
+  test('a give-up resting on no lookup gets one more lookup round, then answers from it', async () => {
+    const { tools, cleanup } = fixtureTools();
+    try {
+      const provider = scripted([
+        { content: [{ type: 'text', text: json({ answer: 'I cannot isolate incidents at the Turnpike from this data.', basis: [] }) }], stop_reason: 'end_turn', usage: {} },
+        toolUse(['n', 'records_near', { class_name: 'Florida I595 Incidents', near: { lon: -80.2, lat: 26.08 }, radius_m: 1500 }]),
+        { content: [{ type: 'text', text: json({ answer: '2 incidents within 1500 m.', basis: [{ claim: '2 incidents within 1500 m.', refs: ['R1'] }] }) }], stop_reason: 'end_turn', usage: {} },
+      ]);
+      const { events, emit } = collect();
+      const answer = await createOrchestrator({ provider, tools, logger: quiet, system: 's' }).run(envelope('incidents at the turnpike?'), emit);
+      assert.equal(answer.answer, '2 incidents within 1500 m.');
+      assert.equal(answer.confidence, 'high');
+      assert.ok(events.some(e => e.type === 'ModelNote' && /gave up/.test(e.text)));
+      assert.match(provider.requests[1].messages.at(-1).content, /records_near/);
+      assert.equal(provider.requests[2].format?.type, 'object', 'the retry ends with the schema');
+    } finally { cleanup(); }
+  });
+
+  test('givesUp needs both give-up wording and no backing lookup', () => {
+    assert.equal(givesUp({ answer: 'The twin cannot tell.', confidence: 'low' }), true);
+    assert.equal(givesUp({ answer: 'The twin cannot tell express lane status, but 2 closures are active.', confidence: 'medium' }), false);
+    assert.equal(givesUp({ answer: 'I-595 is about 11 miles long.', confidence: 'low' }), false);
+  });
+
+  test('a general-knowledge claim stating a figure no lookup returned is flagged and caps confidence', () => {
+    const calls = [{ ref: 'R1', evidence: true, status: 'ok', source: 'Live', output: { events: [{ id: 'FL511-876564', lon: -80.168 }] } }];
+    const claims = [
+      { claim: 'Two closures near I-95 on I-595.', refs: [] },
+      { claim: 'Camera 5036 is at lon -80.2246.', refs: [] },
+      { claim: 'FL511-876564 is near -80.168.', refs: [] },
+    ];
+    assert.deepEqual(unverifiedClaims(claims, calls), ['Camera 5036 is at lon -80.2246.']);
+    const answer = finalizeAnswer(JSON.stringify({ answer: 'x', basis: [{ claim: 'Closure FL511-876564 is active.', refs: ['R1'] }, claims[1]], gaps: [] }), calls);
+    assert.deepEqual(answer.unverified, ['Camera 5036 is at lon -80.2246.']);
+    assert.match(answer.confidence_reason, /1 claim states figures no lookup returned/);
+    assert.equal(answer.confidence, 'medium');
   });
 });

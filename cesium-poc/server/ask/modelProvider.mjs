@@ -43,7 +43,7 @@ export function createAnthropicProvider({ apiKey, getApiKey = null, model, effor
   return {
     name: `anthropic:${model}`,
     model,
-    async complete({ system, messages, tools, toolChoice, maxTokens, signal }) {
+    async complete({ system, messages, tools, toolChoice, maxTokens, signal, format = null }) {
       const api = await sdkFor();
       try {
         const response = await api.messages.create({
@@ -54,8 +54,9 @@ export function createAnthropicProvider({ apiKey, getApiKey = null, model, effor
           system,
           messages,
           ...(tools?.length ? { tools, ...(toolChoice ? { tool_choice: toolChoice } : {}) } : {}),
-          // Chat lookups rarely need deep reasoning; a lower effort means fewer, faster rounds.
-          ...(effort ? { output_config: { effort } } : {}),
+          // Chat lookups rarely need deep reasoning; a lower effort means fewer, faster rounds. A format
+          // (the reply schema, on the final turn) makes the answer always parse.
+          ...(effort || format ? { output_config: { ...(effort ? { effort } : {}), ...(format ? { format: { type: 'json_schema', schema: format } } : {}) } } : {}),
         }, { signal });
         return { content: response.content, stop_reason: response.stop_reason, usage: response.usage ?? null };
       } catch (error) {

@@ -56,10 +56,12 @@ export function providerFromEnv(env, { readSecret = readSecretString } = {}) {
 
 /**
  * @param {{env?: object, getLiveEvents?: () => Promise<object|null>, logger?: Console, liveDc?: object|null,
- *   historical?: object|null}} [options]  liveDc/historical: the dev server's DataConnect read clients
+ *   historical?: object|null, clientKey?: Function, limiter?: object}} [options]  liveDc/historical: the
+ *   DataConnect read clients. LIVE_DC_DATA_DIR points the layers and the snapshot at a release bundle's
+ *   data/ (EC2) instead of the repository's public/.
  * @returns {{middleware: Function, handle: Function, label: string}}
  */
-export function createLocalAsk({ env = process.env, getLiveEvents = null, logger = console, liveDc = null, historical = null } = {}) {
+export function createLocalAsk({ env = process.env, getLiveEvents = null, logger = console, liveDc = null, historical = null, clientKey = null, limiter = null } = {}) {
   const { provider, label } = providerFromEnv(env);
   if (!provider) {
     const handle = (req, res) => {
@@ -71,10 +73,13 @@ export function createLocalAsk({ env = process.env, getLiveEvents = null, logger
   }
 
   const storePath = String(env.ASK_TWIN_STORE ?? '').trim() || DEFAULT_STORE_PATH;
+  const dataDir = String(env.LIVE_DC_DATA_DIR ?? '').trim();
+  const layerDir = dataDir || LAYER_DIR;
   const clients = configuredClients({ liveDc, historical });
   const service = createAskService({
-    provider, storePath, snapshotDir: SNAPSHOT_DIR, getLiveEvents, logger,
-    readLayer: file => { const path = join(LAYER_DIR, file); return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null; },
+    provider, storePath, snapshotDir: dataDir ? join(dataDir, 'dataconnect-data') : SNAPSHOT_DIR, getLiveEvents, logger,
+    ...(clientKey ? { clientKey } : {}), ...(limiter ? { limiter } : {}),
+    readLayer: file => { const path = join(layerDir, file); return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null; },
     fetchWeather: point => fetchEventWeather(point),
     ...clients, refresh: refreshFromEnv(env),
   });

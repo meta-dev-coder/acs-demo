@@ -64,3 +64,28 @@ export function systemPrompt({ classes = null, persona = null } = {}) {
 }
 
 export const SYSTEM_PROMPT = systemPrompt();
+
+/**
+ * The reply contract as a JSON schema, for structured outputs (output_config.format) on the final
+ * turn. With it the final answer always parses, so cited claims, gaps and the map action are never
+ * lost to a prose reply. Structured outputs take no numeric or length limits and need
+ * additionalProperties: false on every object, so limits stay in finalizeAnswer.
+ */
+export const ANSWER_SCHEMA = Object.freeze({
+  type: 'object', additionalProperties: false,
+  required: ['answer', 'basis', 'gaps', 'action', 'follow_ups'],
+  properties: {
+    answer: { type: 'string' },
+    basis: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['claim', 'refs'],
+      properties: { claim: { type: 'string' }, refs: { type: 'array', items: { type: 'string' } } } } },
+    gaps: { type: 'array', items: { type: 'string' } },
+    action: { type: 'object', additionalProperties: false, required: ['type', 'entity_id', 'coordinates'],
+      properties: {
+        type: { type: 'string', enum: ['fly_to', 'open_camera', 'show_event', 'none'] },
+        entity_id: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+        coordinates: { anyOf: [{ type: 'null' }, { type: 'object', additionalProperties: false, required: ['lon', 'lat'],
+          properties: { lon: { type: 'number' }, lat: { type: 'number' } } }] },
+      } },
+    follow_ups: { type: 'array', items: { type: 'string' } },
+  },
+});

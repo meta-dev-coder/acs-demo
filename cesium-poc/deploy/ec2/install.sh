@@ -82,6 +82,12 @@ chown root:"$SERVICE_USER" "$CONF_DIR/env"
 chmod 640 "$CONF_DIR/env"
 
 install -m 644 -o root -g root "$OPS/live-dc.service" "$UNIT"
+# Phase 2: Ask the Twin as its own unit. Installed but not enabled: enable it, and set
+# ASK_TWIN_SERVICE_URL=http://127.0.0.1:8787 in the env, only when moving Ask out of live-dc
+# (deploy/ec2/ASK_THE_TWIN.md, section 5).
+if [[ -f "$OPS/live-dc-ask.service" ]]; then
+  install -m 644 -o root -g root "$OPS/live-dc-ask.service" "${ASK_UNIT:-/etc/systemd/system/live-dc-ask.service}"
+fi
 systemctl daemon-reload
 systemctl enable live-dc.service
 

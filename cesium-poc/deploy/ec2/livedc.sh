@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Operates the live-dc service on the EC2 host (installed as /opt/live-dc/livedc.sh).
-#   livedc.sh start|stop|restart|status|logs
+#   livedc.sh start|stop|restart|status|logs   (live-dc, plus live-dc-ask when it is enabled)
+#   livedc.sh ask-logs                    journal of the separate Ask the Twin unit
 #   livedc.sh update [<version>|latest]   fetch from s3://$LIVE_DC_RELEASE_BUCKET/$LIVE_DC_RELEASE_PREFIX via the instance role
 #   livedc.sh rollback                    switch back to the previous installed release
 #   livedc.sh uninstall [-y]              stop, disable, remove the unit, /opt/live-dc and /etc/live-dc
@@ -11,6 +12,8 @@ CONF_DIR="${LIVE_DC_CONF_DIR:-/etc/live-dc}"
 UNIT_PATH="${LIVE_DC_UNIT_PATH:-/etc/systemd/system/live-dc.service}"
 STATE_DIR="${LIVE_DC_STATE_DIR:-/var/lib/live-dc}"
 SERVICE=live-dc
+ASK_SERVICE=live-dc-ask
+ASK_UNIT_PATH="${LIVE_DC_ASK_UNIT_PATH:-/etc/systemd/system/live-dc-ask.service}"
 SERVICE_USER=livedc
 KEEP=3
 VERSION_RE='^live-dc-[0-9]{8}T[0-9]{6}Z$'
@@ -49,12 +52,26 @@ switch_to() {
 }
 
 refresh_ops_files() {
-  local dir="$ROOT_DIR/releases/$1"
+  local dir="$ROOT_DIR/releases/$1" reload=""
   if [[ -f "$dir/livedc.sh" ]]; then install -m 755 "$dir/livedc.sh" "$ROOT_DIR/livedc.sh.new" && mv -f "$ROOT_DIR/livedc.sh.new" "$ROOT_DIR/livedc.sh"; fi
   if [[ -f "$dir/live-dc.service" ]] && ! cmp -s "$dir/live-dc.service" "$UNIT_PATH"; then
     install -m 644 "$dir/live-dc.service" "$UNIT_PATH"
-    systemctl daemon-reload
+    reload=1
   fi
+  if [[ -f "$dir/live-dc-ask.service" ]] && ! cmp -s "$dir/live-dc-ask.service" "$ASK_UNIT_PATH"; then
+    install -m 644 "$dir/live-dc-ask.service" "$ASK_UNIT_PATH"
+    reload=1
+  fi
+  if [[ -n "$reload" ]]; then systemctl daemon-reload; fi
+}
+
+# Whether the separate Ask the Twin unit is in use (enabled by the operator for phase 2).
+ask_enabled() { systemctl is-enabled "$ASK_SERVICE" >/dev/null 2>&1; }
+
+# Restart live-dc, and live-dc-ask when it is enabled, so both run the same release.
+restart_all() {
+  systemctl restart "$SERVICE"
+  if ask_enabled; then systemctl restart "$ASK_SERVICE"; fi
 }
 
 prune() {
@@ -101,7 +118,7 @@ cmd_update() {
   mv "$tmp/unpack" "$ROOT_DIR/releases/$version"
   switch_to "$version"
   refresh_ops_files "$version"
-  systemctl restart "$SERVICE"
+  restart_all
   prune
   echo "live-dc now at $version"
 }
@@ -114,7 +131,7 @@ cmd_rollback() {
   [[ -n "$previous" ]] || die "no release older than ${current:-<none>} to roll back to"
   switch_to "$previous"
   refresh_ops_files "$previous"
-  systemctl restart "$SERVICE"
+  restart_all
   echo "live-dc rolled back to $previous (was $current)"
 }
 
@@ -134,6 +151,16 @@ cmd_status() {
   else
     echo "healthz:  unreachable on 127.0.0.1:$port"
   fi
+  if ask_enabled; then
+    local ask_port ask_status
+    ask_port="$(conf_get ASK_TWIN_PORT)"
+    ask_port="${ask_port:-8787}"
+    echo "ask:      $(systemctl is-active "$ASK_SERVICE" 2>/dev/null || true) (enabled)"
+    ask_status="$(curl -fsS --max-time 5 "http://127.0.0.1:$ask_port/api/i595/ask/status" 2>/dev/null | tr -d '\n' | head -c 400 || true)"
+    echo "ask status: ${ask_status:-unreachable on 127.0.0.1:$ask_port}"
+  else
+    echo "ask:      in live-dc (live-dc-ask not enabled)"
+  fi
 }
 
 cmd_uninstall() {
@@ -144,6 +171,8 @@ cmd_uninstall() {
     [[ "$answer" =~ ^[Yy]$ ]] || die "aborted"
   fi
   systemctl disable --now "$SERVICE" || true
+  systemctl disable --now "$ASK_SERVICE" 2>/dev/null || true
+  rm -f "$ASK_UNIT_PATH"
   rm -f "$UNIT_PATH"
   systemctl daemon-reload || true
   rm -rf "$ROOT_DIR" "$CONF_DIR" "$STATE_DIR"
@@ -155,11 +184,12 @@ cmd_uninstall() {
 command="$1"
 shift
 case "$command" in
-  start) need_root; systemctl start "$SERVICE" ;;
-  stop) need_root; systemctl stop "$SERVICE" ;;
-  restart) need_root; systemctl restart "$SERVICE" ;;
+  start) need_root; systemctl start "$SERVICE"; if ask_enabled; then systemctl start "$ASK_SERVICE"; fi ;;
+  stop) need_root; systemctl stop "$SERVICE"; if ask_enabled; then systemctl stop "$ASK_SERVICE"; fi ;;
+  restart) need_root; restart_all ;;
   status) cmd_status ;;
   logs) journalctl -u "$SERVICE" -f ;;
+  ask-logs) journalctl -u "$ASK_SERVICE" -f ;;
   update) cmd_update "$@" ;;
   rollback) cmd_rollback ;;
   uninstall) cmd_uninstall "$@" ;;

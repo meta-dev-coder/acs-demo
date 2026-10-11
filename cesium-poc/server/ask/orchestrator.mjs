@@ -19,7 +19,7 @@ import { randomUUID } from 'node:crypto';
 import { parseModelReply } from '../liveDc/askTwin.mjs';
 import { screenBlock } from './envelope.mjs';
 import { ProviderError } from './modelProvider.mjs';
-import { systemPrompt } from './prompt.mjs';
+import { ANSWER_SCHEMA, systemPrompt } from './prompt.mjs';
 
 export const DEFAULT_LIMITS = Object.freeze({ maxRounds: 3, toolTimeoutMs: 8_000, runTimeoutMs: 45_000, maxTokens: 2_000 });
 const COORD_TOLERANCE = 1e-4;
@@ -27,6 +27,12 @@ const ACTION_TYPES = new Set(['fly_to', 'open_camera', 'show_event']);
 const MAX_NOTE = 400;
 const FINAL_NOTE = '(No more lookups are possible after this. Reply with the JSON object.)';
 const CONTINUE = 'Please continue: reply with the JSON object for your answer.';
+const GIVE_UP_MIN_MS = 15_000;
+const GIVE_UP = /\b(cannot|can't|can ?not|unable to|not able to|no (data|records?|information)|isn't (available|possible)|not available|does(n't| not) (have|include|contain|record))\b/i;
+const GIVE_UP_NOTE = 'Before concluding that the twin cannot answer, check whether a lookup can: records_near for a named place, count_records or query_records with filters, find_corridor_features to locate something. If none can, reply with the same JSON.';
+/** An answer that says the data cannot answer, without resting on any lookup. */
+export const givesUp = answer => GIVE_UP.test(answer.answer) && answer.confidence === 'low';
+const RESTATE = 'Restate exactly that answer as the JSON object, with each claim and the refs it rests on. Add nothing new.';
 
 export class RunError extends Error {
   constructor(message, { retryable = false } = {}) { super(message); this.retryable = retryable; }
@@ -106,6 +112,26 @@ function provenance(calls) {
   return { numbers, strings };
 }
 
+/**
+ * Figures and ids in claims that cite no lookup: a camera number, a coordinate, a count. A road name
+ * ("I-595", "SR-7") is corridor knowledge, not a figure. A figure no lookup returned this turn is
+ * flagged, so "camera 5036 at lon -80.2246 (general knowledge)" cannot pass as twin data.
+ */
+export function unverifiedClaims(claims, calls) {
+  const { numbers, strings } = provenance(calls);
+  const known = n => numbers.some(m => Math.abs(m - n) <= Math.max(1e-4, Math.abs(n) * 1e-6));
+  const flagged = [];
+  for (const claim of claims) {
+    if (claim.refs.length) continue;
+    const text = claim.claim.replace(/\b(I|SR|US|CR|Exit)[- ]?\d+[A-Z]?\b/gi, ' ');
+    const ids = text.match(/\b[A-Z]{2,}[-_]?\d{2,}[-\w]*\b/g) ?? [];
+    // An id's digits are part of the id, not a separate figure.
+    const figures = (text.replace(/\b[A-Z]{2,}[-_]?\d{2,}[-\w]*\b/g, ' ').match(/-?\d+\.\d+|\b\d{3,}\b/g) ?? []).map(Number);
+    if (ids.some(id => !strings.has(id)) || figures.some(n => !known(n))) flagged.push(claim.claim);
+  }
+  return flagged;
+}
+
 /** The model's action if a lookup this turn returned its target; otherwise none, with the reason. */
 export function checkAction(action, calls) {
   const none = { type: 'none', entity_id: null, coordinates: null };
@@ -122,6 +148,15 @@ export function checkAction(action, calls) {
   return { action: { type: action.type, entity_id: id, coordinates: { lon, lat } }, dropped: null };
 }
 
+/** Whether the model's text is the JSON reply contract (an answer string and a basis list). */
+export function isStructuredReply(text) {
+  const stripped = String(text ?? '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  try {
+    const parsed = JSON.parse(stripped);
+    return Boolean(parsed) && typeof parsed.answer === 'string' && Array.isArray(parsed.basis);
+  } catch { return false; }
+}
+
 /** The reply contract the client renders, with sources, confidence and action decided here. */
 export function finalizeAnswer(rawText, calls) {
   const parsed = parseModelReply(rawText);
@@ -134,6 +169,11 @@ export function finalizeAnswer(rawText, calls) {
   // Citations read from prose are weaker than a basis: never more than medium, and the reason says so.
   if (inferred.length) {
     confidence = { level: confidence.level === 'high' ? 'medium' : confidence.level, reason: `${confidence.reason} Citations were read from the answer text.` };
+  }
+  const unverified = unverifiedClaims(claims, calls);
+  if (unverified.length) {
+    confidence = { level: confidence.level === 'high' ? 'medium' : confidence.level,
+      reason: `${confidence.reason} ${plural(unverified.length, 'claim')} ${unverified.length === 1 ? 'states' : 'state'} figures no lookup returned.` };
   }
   const byRef = new Map(calls.map(call => [call.ref, call]));
   const cited = [...new Set(claims.flatMap(claim => claim.refs))].filter(ref => byRef.get(ref)?.evidence);
@@ -155,6 +195,7 @@ export function finalizeAnswer(rawText, calls) {
     recommendations,
     follow_ups: followUps,
     ...(inferred.length ? { basis_inferred: true } : {}),
+    ...(unverified.length ? { unverified } : {}),
     cited,
     uncited: calls.filter(call => call.evidence && !cited.includes(call.ref)).map(call => call.ref),
   };
@@ -267,68 +308,106 @@ export function createOrchestrator({ provider, tools, system = systemPrompt(), l
       const turnSystem = typeof system === 'function' ? system(envelope) : system;
 
       const known = new Set((tools.definitions ?? []).map(d => d.name));
-      let text = '';
-      for (let round = 1; round <= maxRounds; round++) {
-        const remaining = deadline - now();
-        if (remaining <= 1_000) throw new RunError('The assistant ran out of time before answering.', { retryable: true });
-        const last = round === maxRounds;
-        rounds = round;
-        emit({ type: 'StepStarted', round, last });
-        const t0 = now();
-        const response = await complete({
-          system: turnSystem, messages, tools: tools.definitions, toolChoice: last ? { type: 'none' } : null, maxTokens,
-          signal: AbortSignal.any([signal ?? new AbortController().signal, AbortSignal.timeout(remaining)]),
-        });
-        addUsage(usage, response.usage);
-        const content = Array.isArray(response.content) ? response.content : [];
-        const uses = content.filter(block => block?.type === 'tool_use');
-        emit({ type: 'ModelRound', round, ms: now() - t0, stop: response.stop_reason ?? null, toolCalls: uses.length, usage: usageOf(response.usage) });
-        if (response.stop_reason === 'refusal') throw new RunError('The assistant declined to answer this question.');
-        const roundText = content.filter(block => block?.type === 'text').map(block => block.text).join('\n');
-        // A model that "calls" a tool the twin does not have (seen: 'none', from action.type) after
-        // writing its answer is finishing, not looking something up. Spending a round on the error cost
-        // ~4 s, so the text it wrote is taken as the answer.
-        const unknownOnly = uses.length > 0 && uses.every(use => !known.has(use.name)) && roundText.trim();
-        if (last || response.stop_reason !== 'tool_use' || !uses.length || unknownOnly) {
-          text = roundText;
-          // An empty final turn is recovered once with an explicit continuation request; resending the
-          // same request would most likely end empty again.
-          if (!text.trim() && response.stop_reason === 'end_turn' && deadline - now() > 2_000) {
-            emit({ type: 'ModelNote', round, text: 'The answer came back empty; asking once more.' });
-            const t1 = now();
-            const retry = await complete({
-              system: turnSystem, messages: [...messages, { role: 'user', content: CONTINUE }], tools: tools.definitions, toolChoice: { type: 'none' }, maxTokens,
-              signal: AbortSignal.any([signal ?? new AbortController().signal, AbortSignal.timeout(deadline - now())]),
-            });
-            addUsage(usage, retry.usage);
-            emit({ type: 'ModelRound', round, ms: now() - t1, stop: retry.stop_reason ?? null, toolCalls: 0, usage: usageOf(retry.usage) });
-            if (retry.stop_reason === 'refusal') throw new RunError('The assistant declined to answer this question.');
-            text = (Array.isArray(retry.content) ? retry.content : []).filter(block => block?.type === 'text').map(block => block.text).join('\n');
+
+      /** Rounds `first`..`lastRound`: lookups until the model answers; the last of them cannot call tools. */
+      async function playRounds(first, lastRound) {
+        let text = '';
+        for (let round = first; round <= lastRound; round++) {
+          const remaining = deadline - now();
+          if (remaining <= 1_000) throw new RunError('The assistant ran out of time before answering.', { retryable: true });
+          const last = round === lastRound;
+          rounds = round;
+          emit({ type: 'StepStarted', round, last });
+          const t0 = now();
+          const response = await complete({
+            system: turnSystem, messages, tools: tools.definitions, toolChoice: last ? { type: 'none' } : null, maxTokens,
+            ...(last ? { format: ANSWER_SCHEMA } : {}),
+            signal: AbortSignal.any([signal ?? new AbortController().signal, AbortSignal.timeout(remaining)]),
+          });
+          addUsage(usage, response.usage);
+          const content = Array.isArray(response.content) ? response.content : [];
+          const uses = content.filter(block => block?.type === 'tool_use');
+          emit({ type: 'ModelRound', round, ms: now() - t0, stop: response.stop_reason ?? null, toolCalls: uses.length, usage: usageOf(response.usage) });
+          if (response.stop_reason === 'refusal') throw new RunError('The assistant declined to answer this question.');
+          const roundText = content.filter(block => block?.type === 'text').map(block => block.text).join('\n');
+          // A model that "calls" a tool the twin does not have (seen: 'none', from action.type) after
+          // writing its answer is finishing, not looking something up. Spending a round on the error cost
+          // ~4 s, so the text it wrote is taken as the answer.
+          const unknownOnly = uses.length > 0 && uses.every(use => !known.has(use.name)) && roundText.trim();
+          if (last || response.stop_reason !== 'tool_use' || !uses.length || unknownOnly) {
+            text = roundText;
+            // An empty final turn is recovered once with an explicit continuation request; resending the
+            // same request would most likely end empty again.
+            if (!text.trim() && response.stop_reason === 'end_turn' && deadline - now() > 2_000) {
+              emit({ type: 'ModelNote', round, text: 'The answer came back empty; asking once more.' });
+              const t1 = now();
+              const retry = await complete({
+                system: turnSystem, messages: [...messages, { role: 'user', content: CONTINUE }], tools: tools.definitions, toolChoice: { type: 'none' }, maxTokens,
+                format: ANSWER_SCHEMA,
+                signal: AbortSignal.any([signal ?? new AbortController().signal, AbortSignal.timeout(deadline - now())]),
+              });
+              addUsage(usage, retry.usage);
+              emit({ type: 'ModelRound', round, ms: now() - t1, stop: retry.stop_reason ?? null, toolCalls: 0, usage: usageOf(retry.usage) });
+              if (retry.stop_reason === 'refusal') throw new RunError('The assistant declined to answer this question.');
+              text = (Array.isArray(retry.content) ? retry.content : []).filter(block => block?.type === 'text').map(block => block.text).join('\n');
+            }
+            if (!text.trim()) throw new RunError('The assistant returned an empty answer. Please ask again.', { retryable: true });
+            // An earlier round can end in prose (no tools needed, or the model chose to stop). One short
+            // call restates that answer in the reply schema, so its claims and refs are checked rather
+            // than inferred from the text. If it fails, the prose stands with inferred citations.
+            if (!last && !isStructuredReply(text) && deadline - now() > 3_000) {
+              emit({ type: 'ModelNote', round, text: 'Restating the answer in the checked format.' });
+              const t2 = now();
+              try {
+                const restated = await complete({
+                  system: turnSystem, messages: [...messages, { role: 'assistant', content }, { role: 'user', content: RESTATE }],
+                  tools: tools.definitions, toolChoice: { type: 'none' }, maxTokens, format: ANSWER_SCHEMA,
+                  signal: AbortSignal.any([signal ?? new AbortController().signal, AbortSignal.timeout(deadline - now())]),
+                });
+                addUsage(usage, restated.usage);
+                emit({ type: 'ModelRound', round, ms: now() - t2, stop: restated.stop_reason ?? null, toolCalls: 0, usage: usageOf(restated.usage) });
+                const restatedText = (Array.isArray(restated.content) ? restated.content : []).filter(block => block?.type === 'text').map(block => block.text).join('\n');
+                if (isStructuredReply(restatedText)) text = restatedText;
+              } catch (error) {
+                if (signal?.aborted) throw error;
+              }
+            }
+            break;
           }
-          if (!text.trim()) throw new RunError('The assistant returned an empty answer. Please ask again.', { retryable: true });
-          break;
+          // What the model says between lookups is its own account of its plan; it is shown, not trusted.
+          const note = content.filter(block => block?.type === 'text').map(block => block.text).join(' ').replace(/\s+/g, ' ').trim();
+          if (note) emit({ type: 'ModelNote', round, text: note.slice(0, MAX_NOTE) });
+          messages.push({ role: 'assistant', content });
+          const results = await Promise.all(uses.map(async use => {
+            const { call, text: labelled } = await lookup(use.id, use.name, use.input, 'model');
+            return { type: 'tool_result', tool_use_id: use.id, content: labelled, ...(call.status === 'error' || call.status === 'timeout' ? { is_error: true } : {}) };
+          }));
+          // Every result of one round goes back in a single user turn. Before the last round the model is
+          // told it cannot look anything else up, so it writes the JSON instead of prose or another call.
+          // The note rides inside the last tool result: a separate text block after tool results taught
+          // the model to end its turn empty (seen: a 1-token final round and a blank answer).
+          if (round + 1 === lastRound && results.length) {
+            const lastResult = results[results.length - 1];
+            lastResult.content = `${lastResult.content}\n\n${FINAL_NOTE}`;
+          }
+          messages.push({ role: 'user', content: results });
         }
-        // What the model says between lookups is its own account of its plan; it is shown, not trusted.
-        const note = content.filter(block => block?.type === 'text').map(block => block.text).join(' ').replace(/\s+/g, ' ').trim();
-        if (note) emit({ type: 'ModelNote', round, text: note.slice(0, MAX_NOTE) });
-        messages.push({ role: 'assistant', content });
-        const results = await Promise.all(uses.map(async use => {
-          const { call, text: labelled } = await lookup(use.id, use.name, use.input, 'model');
-          return { type: 'tool_result', tool_use_id: use.id, content: labelled, ...(call.status === 'error' || call.status === 'timeout' ? { is_error: true } : {}) };
-        }));
-        // Every result of one round goes back in a single user turn. Before the last round the model is
-        // told it cannot look anything else up, so it writes the JSON instead of prose or another call.
-        // The note rides inside the last tool result: a separate text block after tool results taught
-        // the model to end its turn empty (seen: a 1-token final round and a blank answer).
-        if (round + 1 === maxRounds && results.length) {
-          const lastResult = results[results.length - 1];
-          lastResult.content = `${lastResult.content}\n\n${FINAL_NOTE}`;
-        }
-        messages.push({ role: 'user', content: results });
+        return text;
+      }
+
+      let text = await playRounds(1, maxRounds);
+      // A give-up ("the twin cannot isolate…") that rests on no lookup gets one more try, told what
+      // can answer such questions, while there is time. At most once per question.
+      const first = finalizeAnswer(text, calls);
+      if (givesUp(first) && deadline - now() > GIVE_UP_MIN_MS) {
+        emit({ type: 'ModelNote', round: rounds, text: 'The answer gave up without using the data; trying one more lookup.' });
+        messages.push({ role: 'assistant', content: [{ type: 'text', text }] }, { role: 'user', content: GIVE_UP_NOTE });
+        const retried = await playRounds(rounds + 1, rounds + 2).catch(error => { if (signal?.aborted) throw error; return null; });
+        if (retried) text = retried;
       }
       const answer = finalizeAnswer(text, calls);
       emit({ type: 'Checks', confidence: answer.confidence, reason: answer.confidence_reason, cited: answer.cited,
-        uncited: answer.uncited, gaps: answer.gaps, actionNote: answer.action_note ?? null });
+        uncited: answer.uncited, gaps: answer.gaps, actionNote: answer.action_note ?? null, ...(answer.unverified ? { unverified: answer.unverified } : {}) });
       emit({ type: 'AnswerReady', answer });
       emit({ type: 'RunFinished', runId, ms: now() - started, rounds, usage });
       log({ runId, ok: true, rounds, ms: now() - started, usage, calls });

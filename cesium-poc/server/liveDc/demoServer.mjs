@@ -10,6 +10,7 @@ import { createReadApiHandlers } from '../readApiHandlers.mjs';
 import { parseCookies, parsePasswordHash } from './demoAuth.mjs';
 import { createDemoHost, SESSION_COOKIE } from './demoHost.mjs';
 import { apiKeyFromSecret, createAskHandler, createAskLimiter, DEFAULT_ASK_MODEL } from './askTwin.mjs';
+import { createAskProxy } from '../ask/askProxy.mjs';
 import { createAskService } from '../ask/askService.mjs';
 import { configuredClients, refreshFromEnv } from '../ask/storeRefresh.mjs';
 import { createAnthropicProvider } from '../ask/modelProvider.mjs';
@@ -47,6 +48,14 @@ export function createDemoAsk({
   env = process.env, liveEvents, liveDc, historical, logger = console, spawnImpl, fetchImpl, dictionary, readLayer = defaultReadLayer(env),
   fetchWeather = point => fetchEventWeather(point),
 } = {}) {
+  // Phase 2: the ask service runs as its own unit (live-dc-ask.service); this process only forwards,
+  // after its own session check, so the writer never shares memory or CPU with a model turn.
+  const serviceUrl = String(env.ASK_TWIN_SERVICE_URL ?? '').trim();
+  if (serviceUrl) {
+    const proxy = createAskProxy({ target: serviceUrl, logger, clientKey: req => parseCookies(req.headers?.cookie)[SESSION_COOKIE] || req.socket?.remoteAddress || 'unknown' });
+    logger.log?.(`live-dc ask-the-twin: forwarded to ${proxy.target} (live-dc-ask.service)`);
+    return proxy;
+  }
   const name = String(env.ASK_TWIN_ANTHROPIC_SECRET_NAME ?? '').trim();
   if (!name) return null;
   const region = String(env.LIVE_DC_AWS_REGION ?? '').trim() || undefined;
@@ -120,7 +129,7 @@ export function createSyncStatus({ intervalSeconds, now = Date.now }) {
 export async function startDemoHttp({ env = process.env, httpConfig, service, network, dataDir, status, logger = console }) {
   const { handlers, liveEvents, liveDc, historical, stop } = createReadApiHandlers({ config: loadConfig(env), env, logger, dataDir, service, network, dataConnect: true });
   const ask = createDemoAsk({ env, liveEvents, liveDc, historical, logger });
-  logger.log?.(`live-dc ask-the-twin: ${ask ? `on (${String(env.ASK_TWIN_ANTHROPIC_SECRET_NAME).trim()})` : 'off (ASK_TWIN_ANTHROPIC_SECRET_NAME unset)'}`);
+  logger.log?.(`live-dc ask-the-twin: ${ask ? (ask.target ? `on, forwarded to ${ask.target}` : `on (${String(env.ASK_TWIN_ANTHROPIC_SECRET_NAME).trim()})`) : 'off (ASK_TWIN_ANTHROPIC_SECRET_NAME and ASK_TWIN_SERVICE_URL unset)'}`);
   const { server } = createDemoHost({ passwordHash: httpConfig.passwordHash, webDir: httpConfig.webDir, apiHandlers: handlers, ask, status, logger });
   await new Promise((resolve, reject) => {
     server.once('error', reject);

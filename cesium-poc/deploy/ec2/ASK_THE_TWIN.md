@@ -152,8 +152,132 @@ browser ──HTTP(S)──▶ live-dc (:8095, password gate, web + read APIs) �
   `/api/i595/ask*`, caching disabled, all methods, origin read timeout 60 s, and response streaming on.
   Point the Pages build's `VITE_ASK_THE_TWIN_API` at it. That needs a CDK change and an auth decision (the
   Pages site has no password), so it is a separate approval. Until then Pages keeps the Lambda.
+  The CDK side is now written behind context flags (off by default, not deployed); see section 5.1.
 - **Retire later:** `AskTheTwinFn` (and the old poller schedule, which must stay off while EC2 writes), once
   nothing points at it.
+
+### 5.1 HTTPS for GitHub Pages
+
+Status: **code only, not deployed.** `infra/lib/i595-stack.ts` (section 12b) can send `/api/i595/ask*` on
+CloudFront `d3syo4sqvwi009.cloudfront.net` (stack `I595StackV5`) to the EC2 host. With no context flags the
+synthesized template is byte-identical to today's (checked by diffing it before and after the change, and by
+`infra/test/askEc2Origin.test.ts`, run with `cd infra && npm test`). The host side below is **not built**:
+it is the contract for whoever adds it to `demoServer.mjs` / `server/ask`.
+
+**Flags** (`cdk deploy -c key=value`; a person runs `cdk diff` and `cdk deploy`, never Claude):
+
+| Context key | Default | Meaning |
+|---|---|---|
+| `askOrigin` | unset (feature off) | DNS name of the host, e.g. `ec2-34-237-187-140.compute-1.amazonaws.com`. CloudFront does not accept a bare IP, scheme or path. |
+| `askOriginPort` | `8095` | 80, 443 or 1024–65535 |
+| `askOriginProtocol` | `http-only` | `http-only` (the host has no TLS) or `https-only` (only with a valid certificate on the host) |
+| `askEdgeKeyParam` | none, **required** with `askOrigin` | name of an SSM **String** parameter holding the edge key, e.g. `/i595/ask/edge-key`. The stack refuses to synth without it, because otherwise it would be an open proxy to a paid model. |
+| `askOriginKeepaliveSeconds` | `4` | must stay below the host's idle timeout (Node's default is 5 s), or CloudFront reuses closed sockets and returns 502. Raise to 60 once the host sets `server.keepAliveTimeout = 65_000` and `server.headersTimeout = 66_000`. |
+| `askCorsOrigins` | `https://meta-dev-coder.github.io` | comma list of origins allowed by CORS |
+| `retireAskLambda` | `false` | `true` removes `AskTheTwinFn`, its function URL, its IAM grants and its output. It is refused without `askOrigin`. |
+
+**What the flags produce**
+
+- Origin `askOrigin:askOriginPort`, read timeout 60 s (CloudFront's maximum without a quota increase; it
+  counts time to the first byte and then between bytes, not the whole turn), 5 s connect timeout × 2
+  attempts, and the custom origin header `x-ask-edge-key`. Its value is
+  `ssm.StringParameter.valueForStringParameter(askEdgeKeyParam)`, a CloudFormation parameter resolved at
+  each deploy. It is never in git or in `cdk.out`.
+- Behaviour `/api/i595/ask*`, the same pattern the Lambda uses, so `POST /api/i595/ask` and
+  `GET /api/i595/ask/status` both match: `CachingDisabled`, all methods, **`compress: false`** (gzip would
+  buffer `text/event-stream`), HTTPS only for viewers.
+- Origin request policy: forwards `Accept` (SSE vs JSON), `Content-Type`, `Origin` and
+  `CloudFront-Viewer-Address`. It forwards **no cookies** (the host session cannot be used through this path)
+  and no query strings. `Host` is not forwarded, so the host sees `Host: <askOrigin>`.
+- Response headers policy (CORS, `originOverride`): allows the Pages origin(s), `GET, HEAD, POST, OPTIONS`,
+  the headers `content-type` and `accept`, no credentials, and a 10 min max-age. The host does not need to
+  send CORS headers itself.
+- With `retireAskLambda=false` the Lambda moves to `/api/i595/ask-lambda*`, ordered **before**
+  `/api/i595/ask*` because CloudFront takes the first match. The Lambda ignores the path. This is the
+  rollback route.
+- With chunked origin responses and caching disabled, CloudFront forwards each chunk as it arrives, so SSE
+  streams end to end.
+
+**Edge key (set up by a person before the deploy)**
+
+```bash
+# String, not SecureString: CloudFormation's AWS::SSM::Parameter::Value<String> cannot resolve SecureString
+aws ssm put-parameter --region us-east-1 --name /i595/ask/edge-key --type String \
+  --value "$(openssl rand -base64 48 | tr -d '=+/\n')"
+```
+
+The value ends up in the distribution config, which anyone with `cloudfront:GetDistributionConfig` can read.
+That is acceptable for a demo-grade shared secret, but it is not a vault. To rotate: put both keys on the
+host (`new,old`), change the parameter, `cdk deploy` (the parameter is read again on every deploy), then
+remove `old` from the host.
+
+**Host contract (not implemented; for the engineer who adds it)**
+
+1. **Header:** `x-ask-edge-key`. Accepted keys come from the host env, e.g.
+   `ASK_TWIN_EDGE_KEYS=<key>[,<previous key>]` in `/etc/live-dc/env`. (Reading SSM from the host instead
+   would need `ssm:GetParameter` added to `iam-policy.json`.) Compare in constant time, e.g.
+   `crypto.timingSafeEqual` over SHA-256 digests. With no keys configured, the feature is off.
+2. **Scope:** a valid key replaces the session cookie **only** for `POST /api/i595/ask`,
+   `GET /api/i595/ask/status` and `OPTIONS /api/i595/ask*` (answer `204`, no body, so the CORS preflight
+   succeeds). Every other path keeps requiring the session, even with a valid key. A missing or wrong key
+   falls through to today's cookie check, so a signed-in browser on `:8095` is unaffected. Reject without a
+   session: `401 {"error": "…"}`. Do not log the header.
+3. **Client IP:** for edge requests only, take the viewer IP from `CloudFront-Viewer-Address` (`ip:port`;
+   strip the part after the last `:`; IPv6 has no brackets). Without the edge key, never trust that header or
+   `X-Forwarded-For`.
+4. **Rate limits** (suggested; edge requests get their own buckets, separate from the 120-per-session limit):
+   - per viewer IP: 6 questions/min and 40/hour, and at most 2 open streams;
+   - global across all edge requests: 300 questions/hour, which bounds model spend from an anonymous page;
+   - `/status`: 30/min per IP.
+
+   Over a limit, answer `429` with `Retry-After` and `{"error": "Too many questions — try again in N s."}`.
+   `askRemote` shows `error` as-is. Keep the existing body caps (question ≤ 512 chars, body ≤ 8 KB).
+5. **Streaming:** when `Accept` includes `text/event-stream`, send `content-type: text/event-stream`,
+   `cache-control: no-cache`, no `Content-Length` and no `Content-Encoding`, and flush per event. Send a
+   comment line (`: ping`) at least every 15 s so the 60 s read timeout never trips during long tool rounds.
+   A non-streamed JSON answer must finish within 60 s, or CloudFront returns 504.
+6. **Logging:** mark edge turns in the `ask_turn` line (e.g. `"via": "edge"`, the viewer IP hashed) so cost
+   per path can be read.
+
+**Network (a person, AWS console)**
+
+The security group `dev-access-us` allows 8095 only from listed IPs. For CloudFront, add inbound TCP 8095 from
+the AWS-managed prefix list `com.amazonaws.global.cloudfront.origin-facing`. It counts as about 55 rules
+against the group's rule quota (60 by default), so a separate security group attached to the instance may be
+needed. This opens 8095 to every CloudFront distribution, not just ours. That is why the key is mandatory and
+the password gate stays on for everything else. The CloudFront → host leg is plain HTTP over the internet
+(questions, answers and the edge key in clear) until the host has TLS and `askOriginProtocol=https-only`.
+Port 443 there belongs to `aws-import`'s nginx.
+
+**GitHub Pages build**
+
+`.github/workflows/deploy.yml` ("Build demo branch (I-595)") already sets
+`VITE_ASK_THE_TWIN_API: https://d3syo4sqvwi009.cloudfront.net/api/i595/ask`, so **no workflow change is
+needed**. As soon as the CDK deploy with `askOrigin` finishes, the live Pages site asks EC2. If that line were
+ever missing, the one-line change is to add it back under that step's `env:`. Rollback without a CDK deploy
+(only while `retireAskLambda=false`): change the URL to `…/api/i595/ask-lambda` and rebuild Pages. Rollback
+with a deploy: deploy without `-c askOrigin`.
+
+**Order:** (1) the host release that accepts the key, with `ASK_TWIN_EDGE_KEYS` set and verified on the host;
+(2) the SSM parameter; (3) the security group rule; (4) `cdk diff`, then
+`cdk deploy -c askOrigin=ec2-34-237-187-140.compute-1.amazonaws.com -c askEdgeKeyParam=/i595/ask/edge-key`.
+The context must be passed on **every** later deploy, or the route reverts to the Lambda. Alternatively, put
+it in `cdk.json` `context`. (5) Verify:
+
+```bash
+curl -sS https://d3syo4sqvwi009.cloudfront.net/api/i595/ask/status
+curl -N -X POST https://d3syo4sqvwi009.cloudfront.net/api/i595/ask -H 'accept: text/event-stream' \
+  -H 'content-type: application/json' -d '{"question":"current closures?"}'          # events arrive one by one
+curl -si -X OPTIONS https://d3syo4sqvwi009.cloudfront.net/api/i595/ask \
+  -H 'Origin: https://meta-dev-coder.github.io' -H 'Access-Control-Request-Method: POST' | head -20
+curl -si -X POST http://ec2-34-237-187-140.compute-1.amazonaws.com:8095/api/i595/ask -d '{}' | head -1   # 401: no key, no session
+```
+
+(6) Only after a week without problems: `-c retireAskLambda=true`.
+
+**Cost:** CloudFront requests and transfer for chat traffic are negligible. The real cost is model tokens
+from an anonymous page, which the global cap bounds. Retiring the Lambda saves almost nothing, since it is pay
+per use, but it removes a second backend with a different answer quality.
 
 ---
 
