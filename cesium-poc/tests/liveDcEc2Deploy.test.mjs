@@ -6,7 +6,7 @@ import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { createServer } from 'node:http';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -93,7 +93,9 @@ describe('EC2 bundle', () => {
     // PATH without an aws CLI and no secret names: the service must still start (snapshot store, replay model).
     const env = { PATH: '/usr/bin:/bin', HOME: state, ASK_TWIN_STORE: join(state, 'twin.sqlite'), ASK_TWIN_PORT: String(port),
       ASK_TWIN_REPLAY: join(state, 'none.json'), ASK_TWIN_REFRESH: 'off' };
-    const child = spawn(process.execPath, [join(box, 'dist', 'live-dc-ask.mjs')], { cwd: box, env, stdio: ['ignore', 'pipe', 'pipe'] });
+    // Started through a symlink, as systemd does with /opt/live-dc/current/live-dc-ask.mjs.
+    symlinkSync(join(box, 'dist'), join(box, 'current'));
+    const child = spawn(process.execPath, [join(box, 'current', 'live-dc-ask.mjs')], { cwd: box, env, stdio: ['ignore', 'pipe', 'pipe'] });
     let output = '';
     child.stdout.on('data', c => { output += c; });
     child.stderr.on('data', c => { output += c; });

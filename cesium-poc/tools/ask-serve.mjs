@@ -16,9 +16,9 @@
  * listens on 127.0.0.1 only and has no sign-in: it is a local verification tool, not a public server.
  * Read-only against DataConnect.
  */
+import { realpathSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
-import { resolve } from 'node:path';
 import { originOf } from '../server/ask/twinStore.mjs';
 
 export const DEFAULT_PORT = 8787;
@@ -102,7 +102,13 @@ async function main() {
   process.on('SIGTERM', stop);
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Compared after resolving symlinks: on EC2 the unit starts /opt/live-dc/current/live-dc-ask.mjs, and
+// `current` is a symlink to the release, so a plain path compare would exit 0 without starting.
+const isMain = () => {
+  try { return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
+};
+
+if (process.argv[1] && isMain()) {
   main().catch(error => {
     console.error(`ask-the-twin service: ${error.message}`);
     process.exitCode = 1;

@@ -140,7 +140,7 @@ if [ "$4" = "-" ]; then cat "${s3}/$src"; else cp "${s3}/$src" "$4"; fi
     for (const f of ['aws', 'systemctl', 'journalctl', 'curl', 'userdel']) chmodSync(join(bin, f), 0o755);
     env = {
       PATH: `${bin}:/usr/bin:/bin:/usr/sbin:/sbin`, HOME: dir, LIVE_DC_TEST_MODE: '1',
-      LIVE_DC_ROOT: root, LIVE_DC_CONF_DIR: conf, LIVE_DC_UNIT_PATH: unit, LIVE_DC_STATE_DIR: join(dir, 'state'),
+      LIVE_DC_ROOT: root, LIVE_DC_CONF_DIR: conf, LIVE_DC_UNIT_PATH: unit, LIVE_DC_ASK_UNIT_PATH: join(dir, 'live-dc-ask.service'), LIVE_DC_STATE_DIR: join(dir, 'state'),
     };
 
     const web = join(dir, 'web');
