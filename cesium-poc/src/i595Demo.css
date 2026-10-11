@@ -695,6 +695,41 @@ body.ask-twin-docked { position: relative; width: calc(100% - var(--ask-twin-doc
 .ask-twin-btn[hidden] { display: none; }
 .ask-twin-dock .ask-twin-title { white-space: nowrap; min-width: 0; overflow: hidden; }
 
+/* ── Docked panel typography and rhythm ──────────────────────────────────
+   One type scale (13.5 body, 12 secondary, 11 meta), answers as plain text rather than boxed
+   bubbles, and every button a compact pill on one wrapping row. The `.ask-twin-panel.ask-twin-dock`
+   prefix is deliberate: it outranks the floating-panel and light-theme rules above. */
+.ask-twin-panel.ask-twin-dock { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 13px;
+  -webkit-font-smoothing: antialiased; font-feature-settings: "cv11", "ss01"; }
+.ask-twin-panel.ask-twin-dock .ask-twin-messages { gap: 18px; padding: 16px 18px 12px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-msg { gap: 6px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-msg--user { align-items: flex-end; }
+.ask-twin-panel.ask-twin-dock .ask-twin-msg--user .ask-twin-bubble { font-size: 13px; font-weight: 500; line-height: 1.45; padding: 7px 12px;
+  border-radius: 14px 14px 4px 14px; max-width: 88%; }
+.ask-twin-panel.ask-twin-dock .ask-twin-msg--assistant .ask-twin-bubble { background: transparent; border: 0; padding: 0; border-radius: 0;
+  font-size: 13.5px; line-height: 1.6; color: var(--ui-text); max-width: 100%; letter-spacing: -0.003em; }
+.ask-twin-panel.ask-twin-dock .ask-twin-meta { gap: 8px; font-size: 11px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-sources { font-size: 11px; color: var(--ui-text-muted); }
+.ask-twin-panel.ask-twin-dock .ask-twin-confidence { font-size: 9.5px; padding: 1px 6px; }
+.ask-twin-action-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-fly-btn { font-size: 12px; font-weight: 500; padding: 4px 11px; border-radius: 999px; gap: 5px;
+  background: transparent; border: 1px solid var(--ui-border); color: var(--ui-text-secondary); line-height: 1.4; }
+.ask-twin-panel.ask-twin-dock .ask-twin-fly-btn:hover:not(:disabled) { border-color: var(--ui-accent-line); color: var(--ui-accent-strong); background: var(--ui-accent-tint); }
+.ask-twin-panel.ask-twin-dock .ask-twin-fly-btn:disabled { color: var(--ui-text-muted); border-color: var(--ui-border-soft); }
+.ask-twin-panel.ask-twin-dock .ask-twin-fly-btn svg { width: 12px; height: 12px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-chip { font-size: 12px; padding: 5px 11px; border-radius: 999px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-suggestions { padding: 10px 18px; gap: 6px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-form { padding: 10px 14px 12px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-input { font-size: 13px; padding: 9px 12px; border-radius: 10px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-area-bar { padding: 8px 18px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-turn + .ask-twin-turn, .ask-twin-panel.ask-twin-dock .ask-twin-msg--user { margin-top: 2px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-turn { padding-bottom: 16px; border-bottom: 1px solid var(--ui-border-soft); }
+.ask-twin-panel.ask-twin-dock .ask-twin-activity { font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.ask-twin-panel.ask-twin-dock .ask-twin-basis { font-size: 12px; line-height: 1.5; }
+:root[data-theme="light"] .ask-twin-panel.ask-twin-dock .ask-twin-msg--assistant .ask-twin-bubble { background: transparent; border: 0; color: #182b49; }
+:root[data-theme="light"] .ask-twin-panel.ask-twin-dock .ask-twin-fly-btn { background: transparent; border-color: #c9d9f5; color: #24406b; }
+:root[data-theme="light"] .ask-twin-panel.ask-twin-dock .ask-twin-fly-btn:hover:not(:disabled) { background: #eaf1ff; border-color: #80aaff; color: #003da8; }
+
 /* Settings, under the header */
 .ask-twin-settings { display: flex; flex-direction: column; gap: 6px; padding: 10px 18px; border-bottom: 1px solid var(--ui-border-soft); font-size: 12px; color: var(--ui-text-secondary); }
 .ask-twin-settings[hidden] { display: none; }

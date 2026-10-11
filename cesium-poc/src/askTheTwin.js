@@ -380,7 +380,7 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
           flyTo(meta.action.coordinates, flyBtn);
           if (shown.labels.length) addMsg('assistant', `Switched on ${shown.labels.join(' and ')} so you can see them on the map.`, null, container);
         };
-        wrap.appendChild(flyBtn);
+        actionRow(wrap).appendChild(flyBtn);
       }
 
       if (meta.follow_ups?.length) {
@@ -442,7 +442,7 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     bubble.textContent = text;
     const meta = document.createElement('div');
     meta.className = 'ask-twin-meta';
-    meta.innerHTML = '<span class="ask-twin-sources">📍 Map assets</span>';
+    meta.innerHTML = '<span class="ask-twin-sources">From the map</span>';
     wrap.append(bubble, meta);
     for (const { label, onClick } of actions) {
       const button = document.createElement('button');
@@ -450,19 +450,44 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
       button.className = 'ask-twin-fly-btn';
       button.textContent = label;
       button.onclick = () => onClick(button);
-      wrap.appendChild(button);
+      actionRow(wrap).appendChild(button);
     }
     messages.appendChild(wrap);
     scrollBottom();
     return wrap;
   }
 
+  /** A message's buttons sit together on one wrapping row, not one per line. */
+  function actionRow(message) {
+    let row = message.querySelector(':scope > .ask-twin-action-row');
+    if (!row) { row = document.createElement('div'); row.className = 'ask-twin-action-row'; message.appendChild(row); }
+    return row;
+  }
+
+  /**
+   * When an asset's layer cannot put it on the map — a placed 3D model whose file did not load — the
+   * camera still goes to where the asset is, rather than the answer stopping at "could not".
+   */
+  function flyToLocation(asset) {
+    const c = asset?.coordinates;
+    if (!Number.isFinite(c?.longitude) || !Number.isFinite(c?.latitude)) return false;
+    flyTo({ lon: c.longitude, lat: c.latitude }, null, 700);
+    return true;
+  }
+  const MODEL_TYPES = new Set(['gantry', 'laneBarrier']);
+  // Locally the corridor's GLB models are git-ignored and load from VITE_I595_MODEL_BASE_URL.
+  const notDrawnReason = asset => (MODEL_TYPES.has(asset?.assetType)
+    ? `its 3D model did not load${import.meta.env?.DEV && !import.meta.env?.VITE_I595_MODEL_BASE_URL ? ' (set VITE_I595_MODEL_BASE_URL in .env to load the corridor models)' : ''}`
+    : 'its layer did not load');
+
   async function flyToAsset(asset) {
     const description = describeAsset(asset);
     const message = addLocalMsg(`Flying to ${description}.`);
     const flown = await assetExplorer.flyToAsset(asset);
     if (!flown) {
-      message.querySelector('.ask-twin-bubble').textContent = `Found ${description}, but its layer did not load, so the map could not move there.`;
+      message.querySelector('.ask-twin-bubble').textContent = flyToLocation(asset)
+        ? `Showing where ${description} is — ${notDrawnReason(asset)}, so it is not drawn.`
+        : `Found ${description}, but ${notDrawnReason(asset)} and it has no position, so the map could not move there.`;
       return;
     }
     addBackButton(message);
@@ -474,7 +499,7 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     back.className = 'ask-twin-fly-btn';
     back.textContent = '↩ Back to previous view';
     back.onclick = () => { assetExplorer.returnFromInspection(); back.disabled = true; back.textContent = '✓ Back'; };
-    message.appendChild(back);
+    actionRow(message).appendChild(back);
     scrollBottom();
   }
 
@@ -680,10 +705,15 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     const flew = frameAll(assets);
     const when = LIVE_TYPES.has(assetType) ? ' right now' : '';
     const intro = assets.length === 1 ? `There is 1 ${config.singular.toLowerCase()} on I-595${when}` : `There are ${assets.length} ${pluralOf(config)} on I-595${when}`;
+    // "Show all" brings the list back to the bottom rather than adding a second copy of it.
+    tour.overviewMessage?.remove();
+    tour.stepMessage?.remove();
+    tour.stepMessage = null;
     const message = addLocalMsg(`${intro}, marked on the map. Pick one to fly there, or say "next" to go through them in order.`, [
       ...assets.map((asset, i) => ({ label: `${i + 1}. ${clip(inList(asset))}`, onClick: () => { void goTo(i); } })),
       ...(assets.length > 1 ? [{ label: `▶ Start with the first ${config.singular.toLowerCase()}`, onClick: () => { void goTo(0); } }] : []),
     ]);
+    tour.overviewMessage = message;
     if (flew) addBackButton(message);
   }
 
@@ -695,15 +725,19 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     tour.index = i;
     const asset = assets[i];
     const flown = await assetExplorer.flyToAsset(asset);
+    const located = flown || flyToLocation(asset);
     const last = i === assets.length - 1;
-    const text = flown
-      ? `${config.singular} ${i + 1} of ${assets.length}: ${inList(asset)}.${last ? (assets.length > 1 ? ` That's the last ${singular}.` : '') : ` Go to the next ${singular}?`}`
-      : `Couldn't show ${describeAsset(asset)} — its layer did not load.`;
+    const step = `${config.singular} ${i + 1} of ${assets.length}: ${inList(asset)}.`;
+    const text = (flown ? step : located ? `${step} Showing where it is — ${notDrawnReason(asset)}.` : `Couldn't show ${describeAsset(asset)} — ${notDrawnReason(asset)}.`)
+      + (located && !last ? ` Go to the next ${singular}?` : located && last && assets.length > 1 ? ` That's the last ${singular}.` : '');
+    // One step of a tour is on screen at a time: the next step replaces it instead of piling up.
+    tour.stepMessage?.remove();
     const message = addLocalMsg(text, [
       ...(!last ? [{ label: `Next ${singular} →`, onClick: () => { void goTo(i + 1); } }] : []),
       ...(i > 0 ? [{ label: `← Previous ${singular}`, onClick: () => { void goTo(i - 1); } }] : []),
       ...(assets.length > 1 ? [{ label: `Show all ${assets.length}`, onClick: () => showOverview() }] : []),
     ]);
+    tour.stepMessage = message;
     if (flown) addBackButton(message);
   }
 
