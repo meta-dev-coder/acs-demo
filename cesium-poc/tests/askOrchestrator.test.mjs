@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EnvelopeError, sanitizeEnvelope, screenBlock, MAX_HISTORY_TURNS } from '../server/ask/envelope.mjs';
 import { createAnthropicProvider, createRecordingProvider, createReplayProvider, ProviderError, requestKey } from '../server/ask/modelProvider.mjs';
-import { checkAction, computeConfidence, createOrchestrator, finalizeAnswer } from '../server/ask/orchestrator.mjs';
+import { checkAction, claimsFromText, computeConfidence, createOrchestrator, finalizeAnswer } from '../server/ask/orchestrator.mjs';
 import { createTools } from '../server/ask/tools.mjs';
 import { openTwinStore, writeTwinStore } from '../server/ask/twinStore.mjs';
 import { storeSummary, SYSTEM_PROMPT, systemPrompt } from '../server/ask/prompt.mjs';
@@ -400,5 +400,70 @@ describe('ask answer checks', () => {
     assert.equal(answer.answer, 'Just some prose.');
     assert.equal(answer.action.type, 'none');
     assert.equal(answer.confidence, 'low');
+  });
+});
+
+describe('incomplete answers', () => {
+  test('prose with inline refs: claims are read from the text, capped at medium and labelled as inferred', () => {
+    assert.deepEqual(claimsFromText('Two closures are near I-95 (R1). None at the Turnpike [R1, r2]. No ref here.'),
+      [{ claim: 'Two closures are near I-95 (R1).', refs: ['R1'] }, { claim: 'None at the Turnpike [R1, r2].', refs: ['R1', 'R2'] }]);
+    const calls = [{ ref: 'R1', evidence: true, status: 'ok', source: 'DataConnect · Live Events', output: {} }];
+    const answer = finalizeAnswer('Two closures are near I-95 (R1).', calls);
+    assert.equal(answer.confidence, 'medium');
+    assert.match(answer.confidence_reason, /read from the answer text/);
+    assert.equal(answer.basis_inferred, true);
+    assert.deepEqual(answer.cited, ['R1']);
+    assert.deepEqual(answer.uncited, []);
+  });
+
+  test("a 'none' tool call after the answer ends the turn instead of costing another round", async () => {
+    const { tools, cleanup } = fixtureTools();
+    try {
+      const provider = scripted([
+        toolUse(['t1', 'list_live_events', {}]),
+        { content: [{ type: 'text', text: 'One closure at SR-7 (R1).' }, { type: 'tool_use', id: 't2', name: 'none', input: {} }], stop_reason: 'tool_use', usage: {} },
+      ]);
+      const orchestrator = createOrchestrator({ provider, tools: tools, logger: quiet, system: 's' });
+      const { events, emit } = collect();
+      const answer = await orchestrator.run(envelope('closures at the turnpike?'), emit);
+      assert.equal(provider.requests.length, 2);
+      assert.equal(answer.answer, 'One closure at SR-7 (R1).');
+      assert.ok(!events.some(e => e.type === 'ToolCallStart' && e.name === 'none'));
+    } finally { cleanup(); }
+  });
+
+  test('the round before the last tells the model to reply with the JSON', async () => {
+    const { tools, cleanup } = fixtureTools();
+    try {
+      const provider = scripted([toolUse(['t1', 'list_live_events', {}]), toolUse(['t2', 'list_live_events', {}]), reply({ answer: 'ok', basis: [] })]);
+      await createOrchestrator({ provider, tools, logger: quiet, system: 's' }).run(envelope('q'), () => {});
+      const lastUser = provider.requests[2].messages.at(-1).content;
+      assert.equal(lastUser.at(-1).type, 'text');
+      assert.match(lastUser.at(-1).text, /JSON object only/);
+      assert.ok(!provider.requests[1].messages.at(-1).content.some(b => b.type === 'text'), 'not before round 2');
+    } finally { cleanup(); }
+  });
+
+  test('records_near counts records around every feature matching a place, with groups and nearest', async () => {
+    const { tools, cleanup } = fixtureTools();
+    try {
+      const near = await tools.run('records_near', { class_name: 'Florida I595 Incidents', place: { layer: 'i595_corridor_cameras.geojson', text: 'turnpike' }, radius_m: 3000, group_by: 'weather' });
+      // INC-1/2 are ~5 km east of the Turnpike camera, INC-3 ~10 km west: none within 3 km.
+      assert.equal(near.output.totalCount, 0);
+      const point = await tools.run('records_near', { class_name: 'Florida I595 Incidents', near: { lon: -80.2, lat: 26.08 }, radius_m: 1500, group_by: 'weather' });
+      assert.equal(point.output.totalCount, 2);
+      assert.deepEqual(point.output.nearest.map(r => r.key), ['INC-1', 'INC-2']);
+      assert.equal(point.output.nearest[0].distance_m, 0);
+      assert.deepEqual(point.output.groups, [{ value: 'Light Rain', count: 1 }, { value: 'Clear', count: 1 }]);
+      assert.match(point.source, /Florida I595 Incidents \(snapshot\)/);
+      assert.match((await tools.run('records_near', { class_name: 'Florida I595 Incidents', place: { layer: 'i595_corridor_cameras.geojson', text: 'nowhere' } })).output.error, /No feature/);
+      assert.match((await tools.run('records_near', { class_name: 'Florida I595 Incidents' })).output.error, /place|near/);
+      assert.match((await tools.run('records_near', { class_name: 'Florida I595 Incidents', near: { lon: -80.2, lat: 26.08 }, group_by: 'bogus' })).output.error, /not a field/);
+    } finally { cleanup(); }
+  });
+
+  test('the prompt points place questions at records_near and says action is not a tool', () => {
+    assert.match(SYSTEM_PROMPT, /records_near with place/);
+    assert.match(SYSTEM_PROMPT, /no tool named "none"/);
   });
 });

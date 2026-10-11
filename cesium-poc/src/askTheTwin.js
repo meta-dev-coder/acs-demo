@@ -1113,8 +1113,8 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
         screen: screenSnapshot(),
         ...(activeSpatialContext ? { spatialContext: activeSpatialContext } : {}),
       }, { onEvent: event => { activity.add(event); scrollBottom(); } });
-      // An older service sends no events; the log then says only that it answered.
-      if (!activity.el.querySelector('li')) activity.add({ type: 'RunFinished', ms: 0, rounds: 1 });
+      // An older service sends no events; the log then says only how long it took, on its own clock.
+      if (activity.empty) activity.add({ type: 'RunFinished' });
       remember('user', question);
       remember('assistant', data.answer);
       // The remote service can guess coordinates from general knowledge. A location nowhere near

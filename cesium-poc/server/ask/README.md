@@ -9,7 +9,7 @@ step 1 of that spec, done locally first.
 | `envelope.mjs` | Cleans up the browser's request: question, plain-text history (capped), screen snapshot (known fields only). The browser is context, never authority. |
 | `orchestrator.mjs` | The bounded tool loop (rounds, per-tool and run deadlines). It computes `sources`, `confidence` and map-action provenance from this turn's tool results, emits progress events and writes one JSON log line per turn. |
 | `modelProvider.mjs` | The real model through `@anthropic-ai/sdk`, plus **replay** (recorded responses: offline, free, deterministic) and **recording**. |
-| `tools.mjs` | Read-only tools: `describe_store`, `query_records`, `count_records`, `list_live_events`, `find_corridor_features`, `get_weather`. Each returns its source; a missing or stale table is a typed gap, never an empty list. |
+| `tools.mjs` | Read-only tools: `describe_store`, `query_records`, `count_records`, `records_near` (records around a point or a named place), `list_live_events`, `find_corridor_features`, `get_weather`. Each returns its source; a missing or stale table is a typed gap, never an empty list. |
 | `twinStore.mjs` | The SQLite read model (`node:sqlite`) with `store_meta`, atomic rebuilds and read-only opening. |
 | `httpAdapter.mjs` | `POST /api/i595/ask`: Server-Sent Events for `Accept: text/event-stream` (with heartbeats), otherwise one JSON answer. A client disconnect aborts the run. |
 | `localAsk.mjs` | Environment wiring for `npm run dev` (mounted by `vite.config.js`) and `npm run ask:serve`. |

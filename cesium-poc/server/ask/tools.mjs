@@ -12,12 +12,17 @@
 import DATA_GUIDE from '../../config/askTwin/dataGuide.json' with { type: 'json' };
 import { createAskTools, fitResult } from '../liveDc/askTools.mjs';
 import { ASK_LAYER_FILES } from '../liveDc/dataDictionary.mjs';
+import { haversineMeters } from '../geo.mjs';
 import { MAX_LIMIT, OPERATORS, originOf } from './twinStore.mjs';
 
 const MAX_STRING = 300;
 const EVENT_TYPES = ['INCIDENT', 'CLOSURE', 'CONSTRUCTION', 'CONGESTION', 'DISABLED'];
 /** Weather only near the corridor, so the tool is not a general weather proxy. */
 const WEATHER_BOX = { minLat: 25, maxLat: 27.5, minLon: -81.5, maxLon: -79.5 };
+
+/** records_near: the largest radius, and how many anchor features a place may resolve to. */
+const MAX_NEAR_M = 3_000;
+const MAX_ANCHORS = 40;
 
 const FILTERS_SCHEMA = {
   type: 'array', maxItems: 5,
@@ -66,6 +71,18 @@ export const TOOL_DEFINITIONS = Object.freeze([
       properties: { layer: { type: 'string', enum: [...ASK_LAYER_FILES] }, text: { type: 'string' },
         near: { type: 'object', required: ['lon', 'lat'], properties: { lon: { type: 'number' }, lat: { type: 'number' }, radius_m: { type: 'number', maximum: 10_000 } } },
         limit: { type: 'integer', minimum: 1, maximum: 20 } },
+    },
+  },
+  {
+    name: 'records_near',
+    description: 'Records of one class within a radius of a point or of a named place (e.g. every ramp whose text matches "Turnpike" in the ramps layer), with the total, optional groups and the nearest records. Use this for any question about a place — an interchange, road, bridge or camera — instead of the coarse Segment field.',
+    input_schema: {
+      type: 'object', required: ['class_name'],
+      properties: { class_name: { type: 'string' },
+        place: { type: 'object', required: ['layer', 'text'], properties: { layer: { type: 'string', enum: [...ASK_LAYER_FILES] }, text: { type: 'string' } } },
+        near: { type: 'object', required: ['lon', 'lat'], properties: { lon: { type: 'number' }, lat: { type: 'number' } } },
+        radius_m: { type: 'number', minimum: 50, maximum: MAX_NEAR_M, description: 'Default 500' },
+        group_by: { type: 'string' }, limit: { type: 'integer', minimum: 1, maximum: 20 } },
     },
   },
   {
@@ -133,6 +150,50 @@ export function createTools({ store, getLiveEvents = null, readLayer = null, fet
     async find_corridor_features(input = {}) {
       const output = JSON.parse(await layerTools.run('find_corridor_features', input));
       return { output, source: output.error ? null : `Corridor layer · ${input.layer}` };
+    },
+
+    async records_near({ class_name, place, near, radius_m, group_by, limit } = {}) {
+      const radius = Math.min(MAX_NEAR_M, Math.max(50, Number(radius_m) || 500));
+      let anchors = [], anchorLabel = null;
+      if (place?.layer && String(place.text ?? '').trim()) {
+        const found = JSON.parse(await layerTools.run('find_corridor_features', { layer: place.layer, text: place.text, limit: MAX_ANCHORS }));
+        if (found.error) return { output: { error: found.error }, source: null };
+        anchors = (found.features ?? []).filter(f => Number.isFinite(f.lon) && Number.isFinite(f.lat)).map(f => ({ lon: f.lon, lat: f.lat }));
+        anchorLabel = `${anchors.length} feature(s) in ${place.layer} matching "${place.text}"${found.total > anchors.length ? ` (first ${anchors.length} of ${found.total})` : ''}`;
+        if (!anchors.length) return { output: { error: `No feature in ${place.layer} matches "${place.text}". Try another layer or a shorter text.` }, source: null };
+      } else if (Number.isFinite(Number(near?.lon)) && Number.isFinite(Number(near?.lat))) {
+        anchors = [{ lon: Number(near.lon), lat: Number(near.lat) }];
+        anchorLabel = `point ${anchors[0].lon}, ${anchors[0].lat}`;
+      } else {
+        return { output: { error: 'Give place {layer, text} or near {lon, lat}.' }, source: null };
+      }
+      const result = store.rows(class_name);
+      if (result.gap) return { output: result, source: null };
+      const fields = sourceOf(result.className)?.fields ?? [];
+      if (group_by && !fields.includes(group_by)) return { output: { error: `'${group_by}' is not a field of ${result.className}. Fields: ${fields.join(', ')}` }, source: null };
+      let unplaced = 0;
+      const hits = [];
+      for (const record of result.records) {
+        if (!Number.isFinite(record._lon) || !Number.isFinite(record._lat) || record._lon === null) { unplaced++; continue; }
+        let best = Infinity;
+        for (const a of anchors) best = Math.min(best, haversineMeters(a.lon, a.lat, record._lon, record._lat));
+        if (best <= radius) hits.push({ record, distance: Math.round(best) });
+      }
+      hits.sort((a, b) => a.distance - b.distance);
+      const groups = new Map();
+      if (group_by) for (const { record } of hits) { const v = record[group_by] ?? '(none)'; groups.set(v, (groups.get(v) ?? 0) + 1); }
+      const strip = ({ _lon, _lat, _segment, _at, ...rest }) => Object.fromEntries(Object.entries({ ...rest, lon: _lon, lat: _lat }).map(([k, v]) => [k, clip(v)]));
+      return {
+        output: {
+          className: result.className, asOf: result.asOf, anchor: anchorLabel, anchorPoint: anchors[0], radius_m: radius,
+          totalCount: hits.length, ...(group_by ? { groupBy: group_by, groups: [...groups].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([value, count]) => ({ value, count })) } : {}),
+          nearest: hits.slice(0, limitOf(limit, 20)).map(({ record, distance }) => ({ distance_m: distance, ...strip(record) })),
+          ...(unplaced ? { gaps: [`${unplaced} of ${result.records.length} ${result.className} records have no coordinates and could not be placed.`] } : {}),
+          ...(result.truncated ? { truncated: true } : {}),
+        },
+        source: classSource({ ...result, source: sourceOf(result.className)?.source }),
+        summary: `${hits.length} within ${radius} m`,
+      };
     },
 
     async get_weather({ lon, lat } = {}) {

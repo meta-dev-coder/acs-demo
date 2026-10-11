@@ -50,6 +50,21 @@ function claimsOf(basis) {
 }
 
 /**
+ * Claims read from "(R1)" / "[R1, R2]" in the answer text, one per sentence that cites. Only used when
+ * the model wrote prose instead of the JSON basis: the operator saw the refs in the answer, and
+ * reporting "no claim rests on a lookup" next to them was wrong (and read as a broken answer).
+ */
+export function claimsFromText(answer) {
+  const sentences = String(answer ?? '').match(/[^.!?]+[.!?]*/g) ?? [];
+  const claims = [];
+  for (const sentence of sentences) {
+    const refs = [...sentence.matchAll(/[([]\s*(R\d+(?:\s*,\s*R\d+)*)\s*[)\]]/gi)].flatMap(m => m[1].split(',').map(r => r.trim().toUpperCase()));
+    if (refs.length) claims.push({ claim: sentence.trim().slice(0, 300), refs: [...new Set(refs)] });
+  }
+  return claims;
+}
+
+/**
  * Confidence from the claims the answer makes and the lookups they cite.
  * high   — every claim cites at least one successful lookup, and no data gap was stated
  * medium — some claims are backed by lookups, but others are not, or a gap was stated
@@ -109,9 +124,15 @@ export function checkAction(action, calls) {
 export function finalizeAnswer(rawText, calls) {
   const parsed = parseModelReply(rawText);
   const { action, dropped } = checkAction(parsed.action, calls);
-  const claims = claimsOf(parsed.basis);
+  const structured = claimsOf(parsed.basis);
+  const inferred = !structured.length ? claimsFromText(parsed.answer) : [];
+  const claims = structured.length ? structured : inferred;
   const gaps = Array.isArray(parsed.gaps) ? parsed.gaps.filter(g => typeof g === 'string' && g.trim()).slice(0, 5).map(g => g.trim().slice(0, 200)) : [];
-  const confidence = computeConfidence(claims, calls, gaps);
+  let confidence = computeConfidence(claims, calls, gaps);
+  // Citations read from prose are weaker than a basis: never more than medium, and the reason says so.
+  if (inferred.length) {
+    confidence = { level: confidence.level === 'high' ? 'medium' : confidence.level, reason: `${confidence.reason} Citations were read from the answer text.` };
+  }
   const byRef = new Map(calls.map(call => [call.ref, call]));
   const cited = [...new Set(claims.flatMap(claim => claim.refs))].filter(ref => byRef.get(ref)?.evidence);
   const sources = [...new Set(cited.map(ref => byRef.get(ref).source).filter(Boolean))];
@@ -131,6 +152,7 @@ export function finalizeAnswer(rawText, calls) {
     gaps,
     recommendations,
     follow_ups: followUps,
+    ...(inferred.length ? { basis_inferred: true } : {}),
     cited,
     uncited: calls.filter(call => call.evidence && !cited.includes(call.ref)).map(call => call.ref),
   };
@@ -242,6 +264,7 @@ export function createOrchestrator({ provider, tools, system = systemPrompt(), l
       const messages = [...envelope.history, { role: 'user', content: `${screenBlock(envelope.screen)}${prefetched}${envelope.question}` }];
       const turnSystem = typeof system === 'function' ? system(envelope) : system;
 
+      const known = new Set((tools.definitions ?? []).map(d => d.name));
       let text = '';
       for (let round = 1; round <= maxRounds; round++) {
         const remaining = deadline - now();
@@ -259,8 +282,13 @@ export function createOrchestrator({ provider, tools, system = systemPrompt(), l
         const uses = content.filter(block => block?.type === 'tool_use');
         emit({ type: 'ModelRound', round, ms: now() - t0, stop: response.stop_reason ?? null, toolCalls: uses.length, usage: usageOf(response.usage) });
         if (response.stop_reason === 'refusal') throw new RunError('The assistant declined to answer this question.');
-        if (last || response.stop_reason !== 'tool_use' || !uses.length) {
-          text = content.filter(block => block?.type === 'text').map(block => block.text).join('\n');
+        const roundText = content.filter(block => block?.type === 'text').map(block => block.text).join('\n');
+        // A model that "calls" a tool the twin does not have (seen: 'none', from action.type) after
+        // writing its answer is finishing, not looking something up. Spending a round on the error cost
+        // ~4 s, so the text it wrote is taken as the answer.
+        const unknownOnly = uses.length > 0 && uses.every(use => !known.has(use.name)) && roundText.trim();
+        if (last || response.stop_reason !== 'tool_use' || !uses.length || unknownOnly) {
+          text = roundText;
           break;
         }
         // What the model says between lookups is its own account of its plan; it is shown, not trusted.
@@ -271,8 +299,10 @@ export function createOrchestrator({ provider, tools, system = systemPrompt(), l
           const { call, text: labelled } = await lookup(use.id, use.name, use.input, 'model');
           return { type: 'tool_result', tool_use_id: use.id, content: labelled, ...(call.status === 'error' || call.status === 'timeout' ? { is_error: true } : {}) };
         }));
-        // Every result of one round goes back in a single user turn.
-        messages.push({ role: 'user', content: results });
+        // Every result of one round goes back in a single user turn. Before the last round the model is
+        // told it cannot look anything else up, so it writes the JSON instead of prose or another call.
+        const finalNudge = round + 1 === maxRounds ? [{ type: 'text', text: 'No more lookups are possible. Reply now with the JSON object only.' }] : [];
+        messages.push({ role: 'user', content: [...results, ...finalNudge] });
       }
       const answer = finalizeAnswer(text, calls);
       emit({ type: 'Checks', confidence: answer.confidence, reason: answer.confidence_reason, cited: answer.cited,

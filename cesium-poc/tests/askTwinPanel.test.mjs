@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { activityEntry, activitySummary, describeInput } from '../src/askTwinActivity.js';
+import { activityEntry, activityStep, activitySummary, currentActivity, describeInput, fmtElapsed } from '../src/askTwinActivity.js';
 import { clampWidth, DEFAULT_SETTINGS, DEFAULT_WIDTH, loadPrefs, MIN_WIDTH, savePrefs } from '../src/askTwinDock.js';
 
 describe('activity log wording', () => {
@@ -39,9 +39,58 @@ describe('activity log wording', () => {
   test('inputs are described in a few words, and the summary counts the work', () => {
     assert.equal(describeInput('find_corridor_features', { layer: 'i595_corridor_cameras.geojson', near: { lon: -80.25, lat: 26.07, radius_m: 500 } }),
       'corridor_cameras · within 500 m of 26.0700, -80.2500');
-    assert.equal(activitySummary({ running: true, lookups: 1 }), 'Working… 1 lookup so far');
-    assert.equal(activitySummary({ rounds: 2, lookups: 3, ms: 4200 }), 'Activity · 3 lookups · 2 model rounds · 4.2 s');
     assert.equal(activityEntry({ type: 'Unknown' }), null);
+  });
+});
+
+describe('activity line and timeline', () => {
+  test('the timer shows tenths under a minute, then minutes and seconds', () => {
+    assert.equal(fmtElapsed(4210), '4.2 s');
+    assert.equal(fmtElapsed(65_400), '1m 05s');
+    assert.equal(fmtElapsed(-5), '0.0 s');
+  });
+
+  test('the collapsed line says what it is doing now, then a calm summary', () => {
+    assert.equal(currentActivity({ type: 'ToolCallStart', name: 'list_live_events' }), 'Reading live FL511 events…');
+    assert.equal(currentActivity({ type: 'ToolCallStart', name: 'none' }), 'Looking something up…');
+    assert.equal(currentActivity({ type: 'StepStarted', round: 1 }), 'Thinking…');
+    assert.equal(currentActivity({ type: 'StepStarted', round: 3, last: true }), 'Writing the answer…');
+    assert.equal(currentActivity({ type: 'Checks' }), 'Checking citations…');
+    assert.equal(currentActivity({ type: 'ModelNote', round: 1, text: 'x' }), null);
+    assert.equal(activitySummary({ running: true, current: 'Thinking…' }), 'Thinking…');
+    assert.equal(activitySummary({ lookups: 2, ms: 8900 }), 'Worked for 8.9 s · 2 lookups');
+    assert.equal(activitySummary({ lookups: 0, ms: 1200 }), 'Worked for 1.2 s');
+    assert.equal(activitySummary({ failed: true, ms: 3100 }), 'Stopped after 3.1 s');
+  });
+
+  test('steps put plain words first and the numbers in the detail', () => {
+    const round = activityStep({ type: 'ModelRound', round: 2, ms: 2400, toolCalls: 1, usage: { input_tokens: 2, output_tokens: 111, cache_read_input_tokens: 5665 } });
+    assert.equal(round.title, 'Decided on 1 lookup');
+    assert.equal(round.detail, 'Claude · round 2 · 2.4 s · 2 in, 5,665 cached / 111 out tokens');
+    assert.equal(round.key, activityStep({ type: 'StepStarted', round: 2 }).key);
+    assert.equal(activityStep({ type: 'ModelRound', round: 3, ms: 900, toolCalls: 0, usage: {} }).title, 'Wrote the answer');
+    const tool = activityStep({ type: 'ToolCallEnd', id: 'a', ref: 'R1', name: 'list_live_events', status: 'ok', ms: 581, source: 'DataConnect · Live Events' });
+    assert.deepEqual([tool.title, tool.detail, tool.warning], ['Reading live FL511 events', 'R1 · DataConnect · Live Events · 581 ms', undefined]);
+    const gap = activityStep({ type: 'ToolCallEnd', id: 'b', ref: 'R2', name: 'count_records', status: 'gap', ms: 4, detail: 'Unknown class.' });
+    assert.equal(gap.warning, 'No data: Unknown class.');
+  });
+
+  test('a call to a tool the twin does not have reads as skipped, not as an error', () => {
+    const step = activityStep({ type: 'ToolCallEnd', id: 'c', ref: 'R2', name: 'none', status: 'error', ms: 0, detail: "Unknown tool 'none'." });
+    assert.equal(step.title, 'Skipped an invalid lookup');
+    assert.equal(step.status, 'skipped');
+    assert.equal(step.warning, undefined);
+  });
+
+  test('model notes are thoughts grouped under their round; checks keep gaps as a muted warning', () => {
+    assert.deepEqual(activityStep({ type: 'ModelNote', round: 2, text: 'Checking the cameras near the crash.' }),
+      { key: 'note-2-Checking the cameras nea', kind: 'note', round: 2, title: 'Checking the cameras near the crash.' });
+    const checks = activityStep({ type: 'Checks', confidence: 'medium', reason: 'One claim cites nothing.', uncited: ['R2'], gaps: ['no lane status'] });
+    assert.equal(checks.title, 'Checked the answer · medium confidence');
+    assert.equal(checks.detail, 'One claim cites nothing. · not used in the answer: R2');
+    assert.equal(checks.warning, 'Stated gaps: no lane status');
+    assert.equal(activityStep({ type: 'RunError', message: 'Out of time.' }).warning, 'Out of time.');
+    assert.equal(activityStep({ type: 'AnswerReady' }), null);
   });
 });
 

@@ -72,6 +72,7 @@ export const TOOL_LABELS = Object.freeze({
   count_records: 'Counting records',
   list_live_events: 'Reading live FL511 events',
   find_corridor_features: 'Searching corridor layers',
+  records_near: 'Finding records near a place',
   get_weather: 'Checking the weather',
   explain_incident: 'Assessing the incident with the TMC risk model',
   rank_incidents: 'Ranking active incidents by risk',

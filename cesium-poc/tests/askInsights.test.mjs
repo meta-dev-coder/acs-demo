@@ -142,4 +142,19 @@ describe('prefetch plans the obvious insight first', () => {
     assert.deepEqual(planPrefetch(env('How long is I-595?')), []);
     assert.deepEqual(planPrefetch(env('Why is this high risk?')), [], 'no selection, no incident to explain');
   });
+  test('an incident-history question about a named interchange counts incidents around its ramps', () => {
+    const [plan] = planPrefetch(env('What is the incident history at the Turnpike interchange?'));
+    assert.equal(plan.name, 'records_near');
+    assert.deepEqual(plan.input.place, { layer: 'i595_ramps_connectors_classified.geojson', text: 'Turnpike' });
+    assert.equal(planPrefetch(env('How many crashes near SR-7?'))[0].input.place.text, 'US-441');
+    assert.deepEqual(planPrefetch(env('Is the Turnpike ramp open?')), [], 'a status question is not a history question');
+    assert.deepEqual(planPrefetch(env('Crash hotspots near I-95')).map(p => p.name), ['crash_hotspots']);
+  });
+  test('every configured place text matches a ramp in the layer', async () => {
+    const { readFileSync } = await import('node:fs');
+    const places = JSON.parse(readFileSync(new URL('../config/askTwin/places.json', import.meta.url), 'utf8'));
+    const ramps = JSON.parse(readFileSync(new URL(`../public/data/${places.layer}`, import.meta.url), 'utf8'));
+    const text = ramps.features.map(f => Object.values(f.properties ?? {}).join(' ').toLowerCase()).join('\n');
+    for (const p of places.places) assert.ok(text.includes(p.text.toLowerCase()), `${p.name}: '${p.text}' not in ${places.layer}`);
+  });
 });

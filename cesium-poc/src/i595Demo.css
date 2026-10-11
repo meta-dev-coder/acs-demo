@@ -740,17 +740,83 @@ body.ask-twin-docked { position: relative; width: calc(100% - var(--ask-twin-doc
 
 /* One section per remote turn: activity log, then the answer under it */
 .ask-twin-turn { display: flex; flex-direction: column; gap: 8px; }
-.ask-twin-activity { font-size: 11.5px; color: var(--ui-text-muted); border-left: 2px solid var(--ui-accent-line); padding: 2px 0 2px 10px; }
-.ask-twin-activity summary { cursor: pointer; color: var(--ui-text-secondary); font-weight: 600; letter-spacing: .02em; }
-.ask-twin-activity ol { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; line-height: 1.45; }
-.ask-twin-activity li { position: relative; padding-left: 16px; }
-.ask-twin-activity li::before { content: '•'; position: absolute; left: 3px; color: var(--ui-text-muted); }
-.ask-twin-activity li.is-running::before { content: '◌'; color: var(--ui-accent-strong); animation: ask-pulse 1.2s ease-in-out infinite; }
-.ask-twin-activity li.is-ok::before { content: '✓'; color: var(--ui-status-live, #4ade80); }
-.ask-twin-activity li.is-gap::before, .ask-twin-activity li.is-timeout::before { content: '!'; color: #fbbf24; }
-.ask-twin-activity li.is-error::before { content: '✕'; color: #f87171; }
-.ask-twin-activity-note { font-style: italic; color: var(--ui-text-secondary); }
-.ask-twin-activity-checks { color: var(--ui-text-secondary); }
+/* The activity log reads like a chat assistant's "thinking" line: one quiet row (pulsing dots, what
+   it is doing now, a timer, a chevron) that opens into a timeline. The row keeps one fixed height in
+   every state, so the answer landing under it never shifts it. Amber, not red, for problems: a lookup
+   that found nothing is normal and should not look like an alarm. */
+.ask-twin-activity { --act-warn: #d9a441; font-size: 11.5px; color: var(--ui-text-muted); font-variant-numeric: tabular-nums; min-width: 0; }
+.ask-twin-activity-head { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 26px; padding: 3px 6px 3px 2px; margin: 0;
+  background: none; border: 0; border-radius: 7px; color: var(--ui-text-secondary); font: inherit; text-align: left; cursor: pointer; }
+.ask-twin-activity-head:hover { background: var(--ui-hover); }
+.ask-twin-activity-head:focus-visible { outline: 2px solid var(--ui-accent-line); outline-offset: 1px; }
+.ask-twin-activity-indicator { display: inline-flex; align-items: center; justify-content: center; gap: 3px; width: 22px; flex-shrink: 0; color: var(--ui-accent); }
+.ask-twin-activity-indicator > span { width: 4.5px; height: 4.5px; border-radius: 50%; background: var(--ui-accent-strong); animation: ask-dot 1.2s infinite ease-in-out; }
+.ask-twin-activity-indicator > span:nth-child(2) { animation-delay: .16s; }
+.ask-twin-activity-indicator > span:nth-child(3) { animation-delay: .32s; }
+.ask-twin-activity[data-state="done"] .ask-twin-activity-indicator { color: var(--ui-status-live); }
+.ask-twin-activity[data-state="error"] .ask-twin-activity-indicator { color: var(--act-warn); }
+/* The label clips to one line; the old text and the new one share the box while they cross over. */
+.ask-twin-activity-label { position: relative; flex: 1 1 auto; min-width: 0; height: 18px; overflow: hidden; }
+.ask-twin-activity-label-text { position: absolute; inset: 0; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ask-twin-activity[data-state="running"] .ask-twin-activity-label-text { color: var(--ui-text); }
+.ask-twin-activity-label-text.is-entering { animation: ask-act-in 260ms ease-out both; }
+.ask-twin-activity-label-text.is-leaving { animation: ask-act-out 220ms ease-in both; }
+@keyframes ask-act-in { from { opacity: 0; transform: translateY(55%); } to { opacity: 1; transform: none; } }
+@keyframes ask-act-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-55%); } }
+.ask-twin-activity-time { flex-shrink: 0; color: var(--ui-text-muted); font-size: 11px; }
+.ask-twin-activity-time:empty { display: none; }
+.ask-twin-activity-chevron { display: inline-flex; flex-shrink: 0; color: var(--ui-text-muted); transition: transform 180ms ease; }
+.ask-twin-activity.is-open .ask-twin-activity-chevron { transform: rotate(90deg); }
+
+/* Opens with a 0fr → 1fr grid row, so nothing needs measuring; `visibility` keeps the closed
+   timeline out of the tab order and away from screen readers. */
+.ask-twin-activity-body { display: grid; grid-template-rows: 0fr; visibility: hidden; transition: grid-template-rows 220ms ease, visibility 0s linear 220ms; }
+.ask-twin-activity.is-open .ask-twin-activity-body { grid-template-rows: 1fr; visibility: visible; transition: grid-template-rows 220ms ease; }
+.ask-twin-activity-inner { min-height: 0; overflow: hidden; }
+
+/* Timeline: a thin line through small dots; plain title, then muted detail. */
+.ask-twin-activity-timeline, .ask-twin-step-sub { list-style: none; margin: 0; padding: 0; }
+.ask-twin-activity-timeline { position: relative; padding: 6px 0 2px 2px; display: flex; flex-direction: column; gap: 9px; }
+.ask-twin-step { position: relative; display: flex; gap: 10px; min-width: 0; line-height: 1.4; }
+/* The connector runs from each dot down to the next one; the last step has none. */
+.ask-twin-activity-timeline > .ask-twin-step:not(:last-child)::after { content: ''; position: absolute; left: 10px; top: 14px; bottom: -11px; width: 1px; background: var(--ui-border-strong); }
+.ask-twin-step-dot { position: relative; z-index: 1; flex: 0 0 21px; display: flex; justify-content: center; padding-top: 5px; }
+.ask-twin-step-dot::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--ui-text-muted); }
+.ask-twin-step--model > .ask-twin-step-dot::before { background: var(--ui-accent-strong); }
+.ask-twin-step--context > .ask-twin-step-dot::before { width: 5px; height: 5px; margin-top: 1px; }
+.ask-twin-step--tool > .ask-twin-step-dot::before { width: 5px; height: 5px; border-radius: 1.5px; margin-top: 1px; transform: rotate(45deg); }
+.ask-twin-step--checks > .ask-twin-step-dot::before, .ask-twin-step--done > .ask-twin-step-dot::before { background: var(--ui-status-live); }
+.ask-twin-step.is-running > .ask-twin-step-dot::before { background: var(--ui-accent-strong); animation: ask-act-pulse 1.2s ease-in-out infinite; }
+:is(.ask-twin-step.is-gap, .ask-twin-step.is-timeout, .ask-twin-step.is-error) > .ask-twin-step-dot::before { background: var(--act-warn); }
+.ask-twin-step.is-skipped > .ask-twin-step-dot::before { background: transparent; box-shadow: inset 0 0 0 1px var(--ui-text-muted); }
+@keyframes ask-act-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
+.ask-twin-step--tool.is-running > .ask-twin-step-dot::before { animation-name: ask-act-pulse-tool; }
+@keyframes ask-act-pulse-tool { 0%, 100% { opacity: 1; transform: rotate(45deg) scale(1); } 50% { opacity: .35; transform: rotate(45deg) scale(.7); } }
+.ask-twin-step-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.ask-twin-step-title { color: var(--ui-text-secondary); font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+.ask-twin-step.is-running > .ask-twin-step-text > .ask-twin-step-title { color: var(--ui-text); }
+.ask-twin-step.is-skipped > .ask-twin-step-text > .ask-twin-step-title { color: var(--ui-text-muted); font-weight: 400; }
+.ask-twin-step-detail { color: var(--ui-text-muted); font-size: 10.5px; overflow-wrap: anywhere; }
+.ask-twin-step-detail:empty { display: none; }
+.ask-twin-step-warning { display: flex; align-items: flex-start; gap: 5px; color: var(--act-warn); font-size: 10.5px; overflow-wrap: anywhere; opacity: .9; }
+.ask-twin-step-warning svg { flex-shrink: 0; margin-top: 1px; width: 11px; height: 11px; }
+/* The model's own words between lookups: a thought, not a step. */
+.ask-twin-step-notes:empty { display: none; }
+.ask-twin-step-thought { margin: 3px 0 1px; padding-left: 8px; border-left: 2px solid var(--ui-border-soft); font-style: italic; font-size: 11.5px; line-height: 1.45; color: var(--ui-text-secondary); overflow-wrap: anywhere; }
+/* A round's lookups sit under it, a step in, without their own connector. */
+.ask-twin-step-sub { display: flex; flex-direction: column; gap: 6px; margin-top: 5px; }
+.ask-twin-step-sub:empty { display: none; }
+.ask-twin-step-sub .ask-twin-step { gap: 6px; }
+.ask-twin-step-sub .ask-twin-step-dot { flex-basis: 11px; justify-content: flex-start; }
+.ask-twin-step-sub .ask-twin-step-title { font-size: 11.5px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ask-twin-activity-indicator > span, .ask-twin-step.is-running > .ask-twin-step-dot::before,
+  .ask-twin-activity-label-text.is-entering, .ask-twin-activity-label-text.is-leaving { animation: none; }
+  .ask-twin-activity-label-text.is-leaving { display: none; }
+  .ask-twin-activity-indicator > span { opacity: .8; }
+  .ask-twin-activity-body, .ask-twin-activity.is-open .ask-twin-activity-body, .ask-twin-activity-chevron { transition: none; }
+}
 
 /* Answer extras: why the twin is sure, the claims and what each cites, what the twin does not have */
 .ask-twin-confidence-reason { font-size: 10.5px; color: var(--ui-text-muted); }
@@ -772,7 +838,7 @@ body.ask-twin-docked { position: relative; width: calc(100% - var(--ask-twin-doc
 .ask-twin-context-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--ui-border-soft); font-size: 10.5px; color: var(--ui-text-secondary); background: var(--ui-surface); }
 .ask-twin-context-remove { border: 0; background: none; color: var(--ui-text-muted); padding: 0 0 0 2px; font-size: 12px; line-height: 1; cursor: pointer; }
 .ask-twin-context-remove:hover { color: var(--ui-text); }
-:root[data-theme="light"] .ask-twin-activity li.is-ok::before { color: #166534; }
+:root[data-theme="light"] .ask-twin-activity { --act-warn: #a16207; }
 :root[data-theme="light"] .ask-twin-gaps, :root[data-theme="light"] .ask-twin-refs.is-uncited { color: #92400e; }
 
 /* Floating panels: the heading is the grab handle, and a dragged panel lifts above its neighbours. */

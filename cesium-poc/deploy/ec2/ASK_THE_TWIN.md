@@ -214,7 +214,10 @@ The DataConnect writer is unaffected by all of these.
 
 - Phase 2 wiring: the demo-server proxy, `live-dc-ask.service`, and two-unit `install.sh`/`livedc.sh` (section 5).
 - The HTTPS path for GitHub Pages and retiring the Lambda (needs CDK and an auth decision).
-- Answer completeness: a forced structured final answer, an inline-citation fallback, handling of a
-  model calling the `none` "tool", and a `records_near` spatial lookup for "near the Turnpike" questions.
+- Answer completeness: done so far are the inline-citation fallback (capped at medium), ending the turn on a
+  call to the non-existent `none` tool, a "reply with the JSON" nudge before the last round, `records_near`, and
+  a prefetch for named interchanges (`config/askTwin/places.json`). Still to do: a forced structured
+  `final_answer` tool (or structured outputs), one bounded retry round when the model gives up, and
+  flagging uncited numbers or ids in "general knowledge" claims.
 - From the spec: answer blocks (KPI/trend), the Twin UI API registry, a verified-question eval set,
   spend limits, a fallback model, and historical replay in `explain_incident`.
