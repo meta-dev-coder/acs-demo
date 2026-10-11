@@ -142,9 +142,21 @@ confirmation card with a disabled "Commit (not in POC)" button. It's tangible in
 
 1. Will ACS open the GitHub Pages URL or the EC2-served URL? This decides same-origin cookie auth vs.
    token + CORS.
-2. Does Bentley have, or plan, MCP servers for iTwin or DataConnect? If yes, `i595-data` builds on them.
-3. How much of `src/tmc/*` is pure (no Cesium or DOM imports)? This sets the cost of moving it to
-   `i595-insights`.
+2. ~~Does Bentley have or plan iTwin/DataConnect MCP servers?~~ **Answered: not currently.** `i595-data` is
+   our own server.
+3. ~~How much of `src/tmc/*` is pure?~~ **Answered (2026-10-11): almost all of it.** Of the 27 modules only
+   three touch Cesium or the DOM: `tmcWorkspace.js` (the 4,300-line screen), `patrolMapLayer.js` and
+   `upstreamProtectionMapLayer.js` (map drawing). `tmcMapMarkers.js` is drawing too. Everything else,
+   including `tmcService.assessCorridor`, secondary risk, mitigation, patrol simulation and dispatch, upstream
+   protection and historical location safety, is plain JS, and their shared imports outside `tmc/`
+   (`carriagewayModel`, `operationalImpact`, `corridorPosition`, `crashRibbon`) are too. 135 TMC unit tests
+   pass under Node. `i595-insights` can import these modules as they are.
+   **Remaining risk: keeping the screen and the chat consistent.** `assessCorridor` is pure, but its
+   *inputs* (live events, historical crash register, weather per incident, sections, cameras, signs,
+   temporal mode) are gathered by `tmcWorkspace.js` at that moment. The server must load the same sources,
+   and the envelope should carry the screen's temporal mode/date plus an input signature, so a chat answer
+   never ranks a different set of incidents than the screen shows. Decide: the server loads its own inputs
+   and checks against the screen's signature, or the browser sends the input ids it assessed.
 4. Personas for Phase 1 (proposed: TMC operator, maintenance manager, safety engineer, maybe an executive),
    and the one forecasting / risk-mitigation scenario (proposed: weather-driven crash risk for the next 6 h,
    with patrol pre-positioning).
