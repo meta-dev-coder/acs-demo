@@ -22,6 +22,7 @@ import { fetchEventWeather } from '../liveDc/eventWeather.mjs';
 import { createAskHttpHandler } from './httpAdapter.mjs';
 import { createAnthropicProvider, createRecordingProvider, createReplayProvider } from './modelProvider.mjs';
 import { createOrchestrator } from './orchestrator.mjs';
+import { systemPrompt } from './prompt.mjs';
 import { createTools } from './tools.mjs';
 import { buildStoreFromSnapshot, openTwinStore } from './twinStore.mjs';
 
@@ -42,13 +43,15 @@ export function providerFromEnv(env, { readSecret = readSecretString } = {}) {
   const secretName = String(env.ASK_TWIN_ANTHROPIC_SECRET_NAME ?? '').trim();
   if (!apiKey && !secretName) return { provider: null, label: 'off: set ANTHROPIC_API_KEY, ASK_TWIN_ANTHROPIC_SECRET_NAME or ASK_TWIN_REPLAY in .env.local' };
   const model = String(env.ASK_TWIN_MODEL ?? '').trim() || DEFAULT_ASK_MODEL;
+  // low | medium | high | xhigh | max; empty uses the model's own default.
+  const effort = String(env.ASK_TWIN_EFFORT ?? 'low').trim() || null;
   // The same secret the EC2 host reads (JSON {"api_key"}), through the AWS CLI and your own AWS
   // credentials, on the first question — never at startup, never logged.
   const region = String(env.LIVE_DC_AWS_REGION ?? '').trim() || undefined;
-  const live = apiKey ? createAnthropicProvider({ apiKey, model })
-    : createAnthropicProvider({ model, getApiKey: async () => apiKeyFromSecret(await readSecret(secretName, { region, policyHint: 'your AWS credentials need secretsmanager:GetSecretValue on it' }), secretName) });
+  const live = apiKey ? createAnthropicProvider({ apiKey, model, effort })
+    : createAnthropicProvider({ model, effort, getApiKey: async () => apiKeyFromSecret(await readSecret(secretName, { region, policyHint: 'your AWS credentials need secretsmanager:GetSecretValue on it' }), secretName) });
   const record = String(env.ASK_TWIN_RECORD ?? '').trim();
-  const via = apiKey ? '' : ` (key from secret ${secretName})`;
+  const via = `${effort ? `, effort ${effort}` : ''}${apiKey ? '' : ` (key from secret ${secretName})`}`;
   return record ? { provider: createRecordingProvider(live, { path: record }), label: `${model}${via}, recording to ${record}` } : { provider: live, label: `${model}${via}` };
 }
 
@@ -72,13 +75,15 @@ export function createLocalAsk({ env = process.env, getLiveEvents = null, logger
     const { classes } = buildStoreFromSnapshot({ snapshotDir: SNAPSHOT_DIR, outPath: storePath });
     logger.log?.(`ask-the-twin: built the twin store from the snapshot (${classes.reduce((n, c) => n + c.rowCount, 0)} records) at ${storePath}`);
   }
+  const store = openTwinStore(storePath);
   const tools = createTools({
-    store: openTwinStore(storePath),
+    store,
     getLiveEvents,
     readLayer: file => { const path = join(LAYER_DIR, file); return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null; },
     fetchWeather: point => fetchEventWeather(point),
   });
-  const orchestrator = createOrchestrator({ provider, tools, logger });
+  // The store's classes go into the cached system prompt, so the model does not spend a round asking.
+  const orchestrator = createOrchestrator({ provider, tools, logger, system: systemPrompt({ classes: store.classes() }) });
   logger.log?.(`ask-the-twin (local): ${label}, store ${storePath}`);
   return { label, ...createAskHttpHandler({ orchestrator }) };
 }

@@ -117,8 +117,8 @@ describe('ask HTTP adapter', () => {
 describe('local ask configuration', () => {
   test('replay wins over a key; a key alone uses the EC2 default model; nothing set is off with a reason', () => {
     assert.match(providerFromEnv({ ASK_TWIN_REPLAY: '/r.json', ANTHROPIC_API_KEY: 'k' }).label, /^replay/);
-    assert.equal(providerFromEnv({ ANTHROPIC_API_KEY: 'k' }).label, 'claude-sonnet-5');
-    assert.equal(providerFromEnv({ ANTHROPIC_API_KEY: 'k', ASK_TWIN_MODEL: 'claude-x' }).label, 'claude-x');
+    assert.equal(providerFromEnv({ ANTHROPIC_API_KEY: 'k' }).label, 'claude-sonnet-5, effort low');
+    assert.equal(providerFromEnv({ ANTHROPIC_API_KEY: 'k', ASK_TWIN_MODEL: 'claude-x', ASK_TWIN_EFFORT: '' }).label, 'claude-x');
     assert.match(providerFromEnv({ ANTHROPIC_API_KEY: 'k', ASK_TWIN_RECORD: '/rec.json' }).label, /recording to \/rec\.json/);
     const off = providerFromEnv({});
     assert.equal(off.provider, null);
@@ -129,7 +129,7 @@ describe('local ask configuration', () => {
     const reads = [];
     const readSecret = async (name, options) => { reads.push([name, options.region]); throw new Error('access denied reading secret'); };
     const { provider, label } = providerFromEnv({ ASK_TWIN_ANTHROPIC_SECRET_NAME: 'i595/anthropic-key', ASK_TWIN_MODEL: 'claude-sonnet-5', LIVE_DC_AWS_REGION: 'us-east-1' }, { readSecret });
-    assert.equal(label, 'claude-sonnet-5 (key from secret i595/anthropic-key)');
+    assert.equal(label, 'claude-sonnet-5, effort low (key from secret i595/anthropic-key)');
     assert.deepEqual(reads, []);
     const error = await provider.complete({ messages: [], maxTokens: 10 }).catch(e => e);
     assert.match(error.message, /key could not be read: access denied/);
@@ -138,7 +138,7 @@ describe('local ask configuration', () => {
     await provider.complete({ messages: [], maxTokens: 10 }).catch(() => {});
     assert.equal(reads.length, 2);
     // A key in the environment wins over the secret.
-    assert.equal(providerFromEnv({ ANTHROPIC_API_KEY: 'k', ASK_TWIN_ANTHROPIC_SECRET_NAME: 's' }, { readSecret }).label, 'claude-sonnet-5');
+    assert.equal(providerFromEnv({ ANTHROPIC_API_KEY: 'k', ASK_TWIN_ANTHROPIC_SECRET_NAME: 's' }, { readSecret }).label, 'claude-sonnet-5, effort low');
   });
 
   test('with no model configured the route answers 503 saying what to set', async () => {
@@ -170,10 +170,10 @@ describe('local ask configuration', () => {
       store.close();
       const { fitResult } = await import('../server/liveDc/askTools.mjs');
       const secondKey = requestKey({ messages: [question, { role: 'assistant', content: call.content },
-        { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tu1', content: fitResult(count) }] }], tools: TOOL_DEFINITIONS });
+        { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tu1', content: `ref R1\n${fitResult(count)}` }] }], tools: TOOL_DEFINITIONS });
       writeFileSync(recordings, JSON.stringify({ version: 1, entries: {
         [requestKey(first)]: call,
-        [secondKey]: { content: [{ type: 'text', text: JSON.stringify({ answer: `${count.totalCount} incidents.`, action: { type: 'none' } }) }], stop_reason: 'end_turn', usage: {} },
+        [secondKey]: { content: [{ type: 'text', text: JSON.stringify({ answer: `${count.totalCount} incidents.`, basis: [{ claim: `${count.totalCount} incidents`, refs: ['R1'] }], action: { type: 'none' } }) }], stop_reason: 'end_turn', usage: {} },
       } }));
       const ask = createLocalAsk({ env, logger: quiet });
       await serve(ask, async base => {

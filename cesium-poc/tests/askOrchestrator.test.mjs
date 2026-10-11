@@ -8,7 +8,7 @@ import { createAnthropicProvider, createRecordingProvider, createReplayProvider,
 import { checkAction, computeConfidence, createOrchestrator, finalizeAnswer } from '../server/ask/orchestrator.mjs';
 import { createTools } from '../server/ask/tools.mjs';
 import { openTwinStore, writeTwinStore } from '../server/ask/twinStore.mjs';
-import { SYSTEM_PROMPT } from '../server/ask/prompt.mjs';
+import { storeSummary, SYSTEM_PROMPT, systemPrompt } from '../server/ask/prompt.mjs';
 
 const quiet = { log() {}, warn() {}, error() {} };
 const reply = obj => ({ content: [{ type: 'text', text: JSON.stringify(obj) }], stop_reason: 'end_turn', usage: { input_tokens: 10, output_tokens: 5 } });
@@ -141,22 +141,67 @@ describe('ask orchestrator', () => {
     try {
       const provider = scripted([
         toolUse(['t1', 'count_records', { class_name: 'Florida I595 Incidents', filters: [{ field: 'weather', operator: 'equals', value: 'Light Rain' }] }]),
-        reply({ answer: '2 incidents happened in light rain.', action: { type: 'none' }, confidence: 'low', sources: ['made_up'], follow_ups: ['Which segment?'] }),
+        reply({ answer: '2 incidents happened in light rain.', basis: [{ claim: '2 incidents in light rain', refs: ['r1'] }], action: { type: 'none' },
+          confidence: 'low', sources: ['made_up'], follow_ups: ['Which segment?'] }),
       ]);
       const { events, emit } = collect();
       const answer = await createOrchestrator({ provider, tools, logger: quiet }).run(envelope('How many incidents in rain?'), emit);
-      assert.deepEqual(events.map(e => e.type), ['RunStarted', 'StepStarted', 'ToolCallStart', 'ToolCallEnd', 'StepStarted', 'AnswerReady', 'RunFinished']);
-      assert.equal(events[3].status, 'ok');
-      assert.equal(events[3].source, 'DataConnect · Florida I595 Incidents (snapshot)');
+      assert.deepEqual(events.map(e => e.type), ['RunStarted', 'ContextUsed', 'StepStarted', 'ModelRound', 'ToolCallStart', 'ToolCallEnd',
+        'StepStarted', 'ModelRound', 'Checks', 'AnswerReady', 'RunFinished']);
+      const end = events.find(e => e.type === 'ToolCallEnd');
+      assert.equal(end.status, 'ok');
+      assert.equal(end.ref, 'R1');
+      assert.equal(end.source, 'DataConnect · Florida I595 Incidents (snapshot)');
+      const { ms, ...round } = events.find(e => e.type === 'ModelRound');
+      assert.ok(Number.isFinite(ms));
+      assert.deepEqual(round, { type: 'ModelRound', round: 1, stop: 'tool_use', toolCalls: 1,
+        usage: { input_tokens: 20, output_tokens: 8, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } });
       assert.equal(answer.confidence, 'high');
       assert.deepEqual(answer.sources, ['DataConnect · Florida I595 Incidents (snapshot)']);
       assert.deepEqual(answer.follow_ups, ['Which segment?']);
       // The tool's real result went back to the model in one user turn.
       const toolTurn = provider.requests[1].messages.at(-1);
       assert.equal(toolTurn.role, 'user');
-      assert.match(toolTurn.content[0].content, /"totalCount":2/);
+      assert.match(toolTurn.content[0].content, /^ref R1\n.*"totalCount":2/s);
       assert.equal(provider.requests[0].system, SYSTEM_PROMPT);
+      assert.deepEqual(answer.basis, [{ claim: '2 incidents in light rain', refs: ['R1'], sources: ['DataConnect · Florida I595 Incidents (snapshot)'] }]);
     } finally { cleanup(); }
+  });
+
+  test('prefetched lookups run before the model, stream at once and reach it as cited data', async () => {
+    const { tools, cleanup } = fixtureTools();
+    try {
+      const provider = scripted([reply({ answer: 'One closure.', basis: [{ claim: 'one closure', refs: ['R1'] }] })]);
+      const { events, emit } = collect();
+      const answer = await createOrchestrator({ provider, tools, logger: quiet,
+        prefetch: () => [{ name: 'list_live_events', input: {}, why: 'Checking live events first.' }] }).run(envelope('anything closed?'), emit);
+      assert.deepEqual(events.slice(0, 5).map(e => e.type), ['RunStarted', 'ContextUsed', 'ModelNote', 'ToolCallStart', 'ToolCallEnd']);
+      assert.equal(events[3].origin, 'prefetch');
+      assert.equal(provider.requests.length, 1);
+      assert.match(provider.requests[0].messages.at(-1).content, /TWIN DATA ALREADY LOOKED UP[\s\S]*ref R1\n[\s\S]*FL511-876564[\s\S]*anything closed\?$/);
+      assert.equal(answer.confidence, 'high');
+      assert.deepEqual(answer.sources, ['FL511 live events']);
+    } finally { cleanup(); }
+  });
+
+  test('what the model says between lookups is shown as a note', async () => {
+    const { tools, cleanup } = fixtureTools();
+    try {
+      const provider = scripted([
+        { content: [{ type: 'text', text: 'I will check the live feed.' }, { type: 'tool_use', id: 'a', name: 'list_live_events', input: {} }], stop_reason: 'tool_use', usage: {} },
+        reply({ answer: 'ok' }),
+      ]);
+      const { events, emit } = collect();
+      await createOrchestrator({ provider, tools, logger: quiet }).run(envelope('q'), emit);
+      assert.deepEqual(events.find(e => e.type === 'ModelNote'), { type: 'ModelNote', round: 1, text: 'I will check the live feed.' });
+    } finally { cleanup(); }
+  });
+
+  test('the store summary goes in the cached system prompt, so no round is spent describing the store', () => {
+    const system = systemPrompt({ classes: [{ className: 'Florida I595 Incidents', rowCount: 178, asOf: '2026-10-01T00:00:00Z', fields: ['weather', 'Segment'] }] });
+    assert.match(system, /TWIN STORE[\s\S]*Florida I595 Incidents \(178 records, loaded 2026-10-01\): weather, Segment/);
+    assert.match(storeSummary([]), /not built yet/);
+    assert.doesNotMatch(SYSTEM_PROMPT, /TWIN STORE \(record classes/);
   });
 
   test('the screen goes in the user turn, never in system; history precedes it', async () => {
@@ -199,7 +244,7 @@ describe('ask orchestrator', () => {
       const provider = scripted([
         toolUse(['a', 'count_records', { class_name: 'Florida I595 Incidents' }], ['b', 'query_records', { class_name: 'Florida I595 Tickets' }],
           ['c', 'query_records', { class_name: 'Florida I595 Incidents', filters: [{ field: 'bogus', operator: 'equals', value: 'x' }] }]),
-        reply({ answer: 'partial' }),
+        reply({ answer: 'partial', basis: [{ claim: 'count', refs: ['R1'] }, { claim: 'tickets', refs: ['R2'] }] }),
       ]);
       const { events, emit } = collect();
       const answer = await createOrchestrator({ provider, tools, logger: quiet }).run(envelope('q'), emit);
@@ -231,7 +276,8 @@ describe('ask orchestrator', () => {
     try {
       const provider = scripted([
         toolUse(['e', 'list_live_events', {}]),
-        reply({ answer: 'One closure at SR-7.', action: { type: 'show_event', entity_id: 'FL511-876564', coordinates: { lon: -80.2034, lat: 26.0839 } } }),
+        reply({ answer: 'One closure at SR-7.', basis: [{ claim: 'one closure at SR-7', refs: ['R1'] }],
+          action: { type: 'show_event', entity_id: 'FL511-876564', coordinates: { lon: -80.2034, lat: 26.0839 } } }),
       ]);
       const answer = await createOrchestrator({ provider, tools, logger: quiet }).run(envelope('closures?'), () => {});
       assert.deepEqual(answer.action, { type: 'show_event', entity_id: 'FL511-876564', coordinates: { lon: -80.2034, lat: 26.0839 } });
@@ -248,7 +294,7 @@ describe('ask orchestrator', () => {
       const twice = scripted([busy(), busy()]);
       const { events, emit } = collect();
       assert.equal(await createOrchestrator({ provider: twice, tools, logger: quiet, retryDelayMs: () => 0 }).run(envelope('q'), emit), null);
-      assert.deepEqual(events.map(e => e.type), ['RunStarted', 'StepStarted', 'RunError']);
+      assert.deepEqual(events.map(e => e.type), ['RunStarted', 'ContextUsed', 'StepStarted', 'RunError']);
       assert.equal(events.at(-1).retryable, true);
     } finally { cleanup(); }
   });
@@ -292,7 +338,7 @@ describe('ask orchestrator', () => {
 });
 
 describe('ask answer checks', () => {
-  const calls = [{ name: 'find_corridor_features', status: 'ok', evidence: true, source: 'Corridor layer · cams',
+  const calls = [{ ref: 'R1', name: 'find_corridor_features', status: 'ok', evidence: true, source: 'Corridor layer · cams',
     output: { features: [{ camera_id: 'CAM-12', lon: -80.254, lat: 26.071 }] } }];
 
   test('an action at coordinates no tool returned is dropped with a reason', () => {
@@ -308,10 +354,28 @@ describe('ask answer checks', () => {
     assert.equal(checkAction({ type: 'teleport', coordinates: { lon: -80.254, lat: 26.071 } }, calls).action.type, 'none');
   });
 
-  test('confidence comes from tool results only', () => {
-    assert.equal(computeConfidence([]).level, 'low');
-    assert.equal(computeConfidence(calls).level, 'high');
-    assert.equal(computeConfidence([...calls, { status: 'gap', evidence: false }]).level, 'medium');
+  test('confidence comes from the claims and the lookups they cite, not from lookups merely running', () => {
+    const gap = { ref: 'R2', status: 'gap', evidence: false };
+    assert.equal(computeConfidence([], calls).level, 'low');
+    // The express-lane case: lookups ran, but the claim rests on general knowledge.
+    const uncited = computeConfidence([{ claim: 'EB is open in the PM peak', refs: [] }], calls);
+    assert.equal(uncited.level, 'low');
+    assert.match(uncited.reason, /1 lookup ran, but no claim/);
+    assert.equal(computeConfidence([{ claim: 'camera CAM-12', refs: ['R1'] }], calls).level, 'high');
+    assert.equal(computeConfidence([{ claim: 'camera CAM-12', refs: ['R1'] }, { claim: 'general', refs: [] }], calls).level, 'medium');
+    assert.equal(computeConfidence([{ claim: 'camera CAM-12', refs: ['R1'] }], calls, ['no live lane status feed']).level, 'medium');
+    assert.equal(computeConfidence([{ claim: 'x', refs: ['R2'] }], [...calls, gap]).level, 'low');
+    assert.equal(computeConfidence([{ claim: 'x', refs: ['R9'] }], calls).level, 'low');
+  });
+
+  test('sources and basis name only the lookups the answer cites; gaps are passed on', () => {
+    const answer = finalizeAnswer(JSON.stringify({ answer: 'a', basis: [{ claim: 'c', refs: ['R1'] }], gaps: ['no lane status feed'] }),
+      [...calls, { ref: 'R2', name: 'list_live_events', status: 'ok', evidence: true, source: 'FL511 live events', output: { events: [] } }]);
+    assert.deepEqual(answer.sources, ['Corridor layer · cams']);
+    assert.deepEqual(answer.cited, ['R1']);
+    assert.deepEqual(answer.uncited, ['R2']);
+    assert.deepEqual(answer.gaps, ['no lane status feed']);
+    assert.equal(answer.confidence, 'medium');
   });
 
   test('prose instead of JSON still renders, at low confidence with no action', () => {

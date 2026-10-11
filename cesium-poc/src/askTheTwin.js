@@ -1,10 +1,11 @@
 import { Cartesian3, Cartographic, Math as CesiumMath, JulianDate } from 'cesium';
-import { makeDraggable } from './draggablePanel.js';
 import { eventLayersToShow } from './safety/answerLayers.js';
 import { framedDestination } from './cameraFraming.js';
 import { answerTmcQuestion, parseTmcQuestion, tmcSuggestionsForTab, TWIN_ACTIONS, TMC_HISTORICAL_INCIDENT_SUGGESTIONS, TMC_HISTORICAL_SUGGESTIONS, TMC_INCIDENT_SUGGESTIONS, TMC_SUGGESTIONS } from './tmc/tmcAnswers.js';
 import { ASK_THE_TWIN_EVENT } from './askTheTwinBridge.js';
-import { AskError, askRemote, TOOL_LABELS, traceLine } from './askTwinStream.js';
+import { AskError, askRemote } from './askTwinStream.js';
+import { createActivityLog } from './askTwinActivity.js';
+import { createDock } from './askTwinDock.js';
 import { eventPlace, isBareSegmentRequest, MAX_REMOTE_OFFSET_M, parseFlyRequest, parseRoadRequest, parseSegmentFollowUp, parseSegmentRequests, parseTourCommand, parseTypeBrowse, resolveFlyTarget, searchAssets, segmentPoint, typeHints } from './assetExplorer/assetSearch.js';
 import { corridorPositionOf } from './assetExplorer/corridorPosition.js';
 import { assetTypeConfig } from './assetExplorer/assetTypes.js';
@@ -27,12 +28,6 @@ const SUGGESTIONS = [
   'Fly to bridge 860384',
 ];
 
-// Shown only by a service that does not stream its progress; a streaming one says what it is doing.
-const STEPS = [
-  { label: 'Reading live events…', ms: 0 },
-  { label: 'Asking Claude about I-595…', ms: 900 },
-  { label: 'Processing response…', ms: 2400 },
-];
 
 /** Older services name their sources with keys; the orchestrator sends readable labels as they are. */
 const SOURCE_LABELS = Object.freeze({ live_events: 'FL511 live data', static_knowledge: 'Corridor knowledge', dataconnect: 'DataConnect', corridor_layers: 'Corridor layers', weather: 'Weather' });
@@ -95,20 +90,30 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
   document.body.appendChild(btn);
 
   // ── Panel ─────────────────────────────────────────────────────────────
-  const panel = document.createElement('div');
-  panel.className = 'ask-twin-panel';
+  // Docked on the right of the whole application (askTwinDock.js): full height, resizable from its
+  // left edge, with a reading mode that gives the conversation most of the screen.
+  const panel = document.createElement('aside');
+  panel.className = 'ask-twin-panel ask-twin-dock';
+  panel.setAttribute('aria-label', 'Ask the Twin');
   panel.hidden = true;
   panel.innerHTML = `
-    <div class="ask-twin-header" title="Drag to move">
+    <div class="ask-twin-resize" role="separator" aria-orientation="vertical" aria-label="Resize Ask the Twin" tabindex="0" title="Drag to resize"></div>
+    <div class="ask-twin-header">
       <span class="ask-twin-title">
         <span class="ask-twin-indicator"></span>
         Ask the Twin
-        <span class="ask-twin-subtitle">I-595 Digital Twin · FL511 live data</span>
+        <span class="ask-twin-subtitle">I-595 Digital Twin · live data and records</span>
       </span>
       <div class="ask-twin-controls">
-        <button class="ask-twin-icon-btn ask-twin-minimize" title="Minimise" aria-label="Minimise">▾</button>
-        <button class="ask-twin-icon-btn ask-twin-close" title="Close" aria-label="Close">✕</button>
+        <button type="button" class="ask-twin-icon-btn ask-twin-new" title="New conversation" aria-label="New conversation">＋</button>
+        <button type="button" class="ask-twin-icon-btn ask-twin-settings-btn" title="Settings" aria-label="Settings" aria-expanded="false">⚙</button>
+        <button type="button" class="ask-twin-icon-btn ask-twin-expand" title="Reading mode" aria-label="Reading mode" aria-pressed="false">⤢</button>
+        <button type="button" class="ask-twin-icon-btn ask-twin-close" title="Close" aria-label="Close">✕</button>
       </div>
+    </div>
+    <div class="ask-twin-settings" hidden>
+      <label><input type="checkbox" data-setting="autoRunMap"/> Move the map automatically for high-confidence answers</label>
+      <label><input type="checkbox" data-setting="keepActivityOpen"/> Keep each answer's activity log open</label>
     </div>
     <div class="ask-twin-body">
       <div class="ask-twin-area-bar">
@@ -119,8 +124,9 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
         <button type="button" class="ask-twin-area-btn ask-twin-area-clear" hidden>Clear Area</button>
         <span class="ask-twin-area-state" role="status"></span>
       </div>
-      <div class="ask-twin-messages"></div>
+      <div class="ask-twin-messages" role="log" aria-live="polite"></div>
       <div class="ask-twin-suggestions"></div>
+      <div class="ask-twin-context" aria-label="What the next question is about"></div>
       <form class="ask-twin-form">
         <input class="ask-twin-input" type="text" placeholder="Ask about I-595…" maxlength="512" autocomplete="off"/>
         <button type="submit" class="ask-twin-send" aria-label="Send">
@@ -130,14 +136,15 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     </div>`;
   document.body.appendChild(panel);
 
-  const header   = panel.querySelector('.ask-twin-header');
-  const body     = panel.querySelector('.ask-twin-body');
   const messages = panel.querySelector('.ask-twin-messages');
   const suggestEl = panel.querySelector('.ask-twin-suggestions');
+  const contextEl = panel.querySelector('.ask-twin-context');
   const form     = panel.querySelector('.ask-twin-form');
   const input    = panel.querySelector('.ask-twin-input');
   const sendBtn  = panel.querySelector('.ask-twin-send');
-  const minBtn   = panel.querySelector('.ask-twin-minimize');
+  const settingsEl = panel.querySelector('.ask-twin-settings');
+  const settingsBtn = panel.querySelector('.ask-twin-settings-btn');
+  const expandBtn = panel.querySelector('.ask-twin-expand');
   const areaSelectBtn = panel.querySelector('.ask-twin-area-select');
   const areaClearBtn  = panel.querySelector('.ask-twin-area-clear');
   const areaStateEl   = panel.querySelector('.ask-twin-area-state');
@@ -180,36 +187,55 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     }
   }
 
-  // ── Drag ──────────────────────────────────────────────────────────────
-  // Shared with every details panel, so the whole map drags the same way — and so a panel cannot
-  // be dropped somewhere it can no longer be grabbed.
-  const drag = makeDraggable(panel, header);
-
-  // ── Minimise ──────────────────────────────────────────────────────────
-  let minimised = false;
-  function minimise(next = !minimised) {
-    minimised = next;
-    body.hidden = minimised;
-    minBtn.textContent = minimised ? '▴' : '▾';
-    panel.classList.toggle('ask-twin-panel--minimised', minimised);
+  // ── Dock, settings, open / close ──────────────────────────────────────
+  // The map re-renders at its new size as soon as the dock changes width.
+  const dock = createDock(panel, panel.querySelector('.ask-twin-resize'), { onResize: () => viewer.scene?.requestRender?.() });
+  for (const box of settingsEl.querySelectorAll('input[data-setting]')) {
+    box.checked = Boolean(dock.settings[box.dataset.setting]);
+    box.onchange = () => dock.setSetting(box.dataset.setting, box.checked);
   }
-  minBtn.onclick = () => minimise();
+  settingsBtn.onclick = () => {
+    settingsEl.hidden = !settingsEl.hidden;
+    settingsBtn.setAttribute('aria-expanded', String(!settingsEl.hidden));
+  };
+  expandBtn.onclick = () => {
+    dock.setExpanded(!dock.expanded);
+    expandBtn.setAttribute('aria-pressed', String(dock.expanded));
+    expandBtn.title = dock.expanded ? 'Back to the side panel' : 'Reading mode';
+  };
 
-  // ── Open / close ──────────────────────────────────────────────────────
+  // Kept for callers that open a minimised panel: docked, the panel is either open or closed.
+  const minimised = false;
+  const minimise = () => {};
+
   let open = false;
   function toggle(force) {
     open = force !== undefined ? force : !open;
     panel.hidden = !open;
+    btn.hidden = open;
     btn.classList.toggle('active', open);
-    if (open && !minimised) { renderSuggestions(); input.focus(); scrollBottom(); }
+    dock.setDocked(open);
+    if (open) { renderSuggestions(); renderContext(); input.focus(); scrollBottom(); }
   }
   btn.onclick = () => toggle();
   panel.querySelector('.ask-twin-close').onclick = () => toggle(false);
 
+  /** A fresh conversation: the transcript and the history sent to the model both go. */
+  function newConversation() {
+    conversation.length = 0;
+    lastTurn = null;
+    messages.replaceChildren();
+    renderSuggestions();
+    suggestEl.hidden = false;
+    input.focus();
+  }
+  panel.querySelector('.ask-twin-new').onclick = () => newConversation();
+
   // ── Messages ──────────────────────────────────────────────────────────
   function scrollBottom() { messages.scrollTop = messages.scrollHeight; }
 
-  function addMsg(role, text, meta) {
+  /** @param {HTMLElement} [container]  a remote turn's section, so its answer sits under its activity log */
+  function addMsg(role, text, meta, container = messages) {
     suggestEl.hidden = true;
     const wrap = document.createElement('div');
     wrap.className = `ask-twin-msg ask-twin-msg--${role}`;
@@ -241,16 +267,34 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
 
       wrap.appendChild(row);
 
-      // What ran in the background to produce this answer, collapsed to one line.
-      if (meta.trace?.length) {
-        const trace = document.createElement('details');
-        trace.className = 'ask-twin-trace';
-        const summary = document.createElement('summary');
-        summary.textContent = `${meta.trace.length} lookup${meta.trace.length === 1 ? '' : 's'}${meta.elapsedMs ? ` · ${(meta.elapsedMs / 1000).toFixed(1)} s` : ''}`;
+      // Why the twin is (or is not) sure, in its own words: which claims cite which lookups.
+      if (meta.confidence_reason) {
+        const why = document.createElement('span');
+        why.className = 'ask-twin-confidence-reason';
+        why.textContent = meta.confidence_reason;
+        row.appendChild(why);
+      }
+
+      // Each claim with the lookups (R1, R2 …) it rests on; a claim citing nothing says so.
+      if (meta.basis?.length) {
         const list = document.createElement('ul');
-        for (const line of meta.trace) { const li = document.createElement('li'); li.textContent = line; list.appendChild(li); }
-        trace.append(summary, list);
-        wrap.appendChild(trace);
+        list.className = 'ask-twin-basis';
+        for (const item of meta.basis) {
+          const li = document.createElement('li');
+          li.textContent = item.claim;
+          const refs = document.createElement('span');
+          refs.className = `ask-twin-refs${item.refs.length ? '' : ' is-uncited'}`;
+          refs.textContent = item.refs.length ? `${item.refs.join(', ')}${item.sources?.length ? ` · ${item.sources.join(', ')}` : ''}` : 'general knowledge';
+          li.appendChild(refs);
+          list.appendChild(li);
+        }
+        wrap.appendChild(list);
+      }
+      if (meta.gaps?.length) {
+        const gaps = document.createElement('div');
+        gaps.className = 'ask-twin-gaps';
+        gaps.textContent = `Not in the twin: ${meta.gaps.join(' · ')}`;
+        wrap.appendChild(gaps);
       }
 
       // Action button
@@ -266,7 +310,7 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
           // arrives rather than appearing a beat later on a corridor that looked empty.
           const shown = await showEventLayersFor(meta.action.coordinates);
           flyTo(meta.action.coordinates, flyBtn);
-          if (shown.length) addMsg('assistant', `Switched on ${shown.join(' and ')} so you can see them on the map.`);
+          if (shown.labels.length) addMsg('assistant', `Switched on ${shown.labels.join(' and ')} so you can see them on the map.`, null, container);
         };
         wrap.appendChild(flyBtn);
       }
@@ -286,7 +330,7 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
       }
     }
 
-    messages.appendChild(wrap);
+    container.appendChild(wrap);
     scrollBottom();
   }
 
@@ -297,11 +341,14 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     // The eye goes BEHIND the subject, not on top of it: a fly that lands on the coordinates and
     // then looks down at an angle leaves the subject about two kilometres off screen.
     const eye = framedDestination(lon, lat, alt, FLY_PITCH_DEG);
+    // A move the twin makes is not the operator taking the map (see watchOperator).
+    programmaticMove = true;
     viewer.camera.flyTo({
       destination: Cartesian3.fromDegrees(eye.longitude, eye.latitude, eye.height),
       orientation: { heading: CesiumMath.toRadians(0), pitch: CesiumMath.toRadians(FLY_PITCH_DEG), roll: 0 },
       duration: 2,
-      complete: () => { if (flyBtn) { flyBtn.innerHTML = '✓ On map'; } },
+      complete: () => { programmaticMove = false; if (flyBtn) { flyBtn.innerHTML = '✓ On map'; } },
+      cancel: () => { programmaticMove = false; },
     });
   }
 
@@ -377,15 +424,17 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
    * and the corridor was bare, because the layer that draws closures was off and nothing turned it
    * on. `eventLayersToShow` decides which; see it for why distance alone was not enough.
    *
-   * @returns {string[]} the labels switched on, for the note that says what changed
+   * @returns {{ids: string[], labels: string[]}} what was switched on: ids for Restore view, labels
+   *   for the note that says what changed
    */
   async function showEventLayersFor(coordinates) {
-    if (!layerStore?.setVisible) return [];
-    const turnedOn = [];
+    const turnedOn = { ids: [], labels: [] };
+    if (!layerStore?.setVisible) return turnedOn;
     for (const id of eventLayersToShow(currentEvents(), coordinates)) {
       if (['on', 'partial'].includes(layerStore.stateOf(id))) continue;
       await layerStore.setVisible(id, true);
-      turnedOn.push(layerStore.get(id)?.label ?? id);
+      turnedOn.ids.push(id);
+      turnedOn.labels.push(layerStore.get(id)?.label ?? id);
     }
     return turnedOn;
   }
@@ -839,6 +888,7 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     areaSelectBtn.textContent = activeSpatialContext ? 'Select New Area' : 'Select Area';
     areaStateEl.textContent = activeSpatialContext ? `📍 ${areaIndicatorText(activeSpatialContext)}` : '';
     panel.classList.toggle('ask-twin-panel--area', Boolean(activeSpatialContext));
+    renderContext();
   }
 
   /** §29: the area goes, and nothing else does. */
@@ -868,27 +918,6 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     return true;
   }
 
-  // ── Thinking with step labels ─────────────────────────────────────────
-  function addThinking() {
-    const wrap = document.createElement('div');
-    wrap.className = 'ask-twin-msg ask-twin-msg--assistant';
-    wrap.innerHTML = `<div class="ask-twin-bubble ask-twin-thinking">
-      <span class="ask-twin-dots"><span></span><span></span><span></span></span>
-      <span class="ask-twin-step-label"></span>
-    </div>`;
-    messages.appendChild(wrap);
-    scrollBottom();
-
-    const stepLabel = wrap.querySelector('.ask-twin-step-label');
-    const timers = STEPS.map(({ label, ms }) =>
-      setTimeout(() => { stepLabel.textContent = label; }, ms)
-    );
-    const clear = () => timers.forEach(clearTimeout);
-
-    // A streaming service reports what it is actually doing; the timed labels give way to it.
-    return { el: wrap, clear, setLabel: text => { clear(); stepLabel.textContent = text; scrollBottom(); } };
-  }
-
   // ── Request envelope ──────────────────────────────────────────────────
   /** Plain-text remote turns, oldest first; local answers are not part of the model's conversation. */
   const conversation = [];
@@ -898,16 +927,51 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     while (conversation.length > MAX_HISTORY_TURNS * 2) conversation.shift();
   }
 
+  /** A selection the operator removed from the context; it comes back when the selection changes. */
+  let omittedSelection = null;
+
   /** What the operator is looking at, as ids: the service treats it as context, never as authority. */
   function screenSnapshot() {
     const screen = { workspace: document.body.dataset.section || null };
     if (tmc && screen.workspace === 'tmc') {
       if (tmc.temporal?.mode) screen.temporal = { mode: tmc.temporal.mode, ...(tmc.temporal.date ? { date: String(tmc.temporal.date) } : {}) };
-      if (tmc.selectedIncidentId) screen.selection = { type: 'incident', id: String(tmc.selectedIncidentId) };
+      const id = tmc.selectedIncidentId ? String(tmc.selectedIncidentId) : null;
+      if (id && id !== omittedSelection) screen.selection = { type: 'incident', id };
     }
     const rect = viewer.camera.computeViewRectangle?.();
     if (rect) screen.view = { bbox: [rect.west, rect.south, rect.east, rect.north].map(r => Number(CesiumMath.toDegrees(r).toFixed(5))) };
     return screen;
+  }
+
+  /**
+   * The chips above the input: what the next question will be about. The operator sees exactly what
+   * travels with it, and can take the selection or the drawn area out before asking.
+   */
+  const WORKSPACE_LABELS = Object.freeze({ traffic: 'Traffic', safety: 'Safety', maintenance: 'Maintenance', liveOps: 'Live Ops', tmc: 'TMC' });
+  function renderContext() {
+    if (tmc?.selectedIncidentId && String(tmc.selectedIncidentId) !== omittedSelection) omittedSelection = null;
+    const screen = screenSnapshot();
+    const chips = [];
+    if (screen.workspace) chips.push({ text: `${WORKSPACE_LABELS[screen.workspace] ?? screen.workspace} screen` });
+    if (screen.temporal?.mode) chips.push({ text: screen.temporal.mode === 'HISTORICAL' ? `Historical ${screen.temporal.date ?? ''}`.trim() : 'Live' });
+    if (screen.selection) chips.push({ text: `Incident ${screen.selection.id}`, remove: () => { omittedSelection = screen.selection.id; renderContext(); } });
+    if (activeSpatialContext) chips.push({ text: `Area: ${areaIndicatorText(activeSpatialContext)}`, remove: () => clearArea() });
+    chips.push({ text: 'Visible map area' });
+    contextEl.replaceChildren(...chips.map(({ text, remove }) => {
+      const chip = document.createElement('span');
+      chip.className = 'ask-twin-context-chip';
+      chip.textContent = text;
+      if (remove) {
+        const x = document.createElement('button');
+        x.type = 'button';
+        x.className = 'ask-twin-context-remove';
+        x.setAttribute('aria-label', `Leave out ${text}`);
+        x.textContent = '×';
+        x.onclick = remove;
+        chip.appendChild(x);
+      }
+      return chip;
+    }));
   }
 
   // ── Submit ────────────────────────────────────────────────────────────
@@ -927,9 +991,15 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
       console.warn('[ask-the-twin] local asset lookup failed', error);
     }
     if (answered) { release(); return; }
-    const thinking = addThinking();
-    const trace = [];
-    const started = Date.now();
+    // One section per remote turn: the activity log fills in as the orchestrator works, then the
+    // answer lands under it. The log stays with the answer so a wrong answer can be traced.
+    const turn = document.createElement('section');
+    turn.className = 'ask-twin-turn';
+    messages.appendChild(turn);
+    const activity = createActivityLog({ expanded: dock.settings.keepActivityOpen });
+    turn.appendChild(activity.el);
+    scrollBottom();
+    const watch = watchOperator();
     try {
       // The structured context rides along for the free-form questions this does not answer
       // locally: the screen as ids, the drawn area as the context already resolved for it, and the
@@ -939,18 +1009,11 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
         history: conversation.slice(),
         screen: screenSnapshot(),
         ...(activeSpatialContext ? { spatialContext: activeSpatialContext } : {}),
-      }, {
-        onEvent: event => {
-          if (event.type === 'StepStarted') thinking.setLabel(event.round === 1 ? 'Reading the question…' : 'Putting the answer together…');
-          if (event.type === 'ToolCallStart') thinking.setLabel(`${TOOL_LABELS[event.name] ?? event.name}…`);
-          if (event.type === 'ToolCallEnd') trace.push(traceLine(event));
-        },
-      });
-      thinking.clear();
-      thinking.el.remove();
+      }, { onEvent: event => { activity.add(event); scrollBottom(); } });
+      // An older service sends no events; the log then says only that it answered.
+      if (!activity.el.querySelector('li')) activity.add({ type: 'RunFinished', ms: 0, rounds: 1 });
       remember('user', question);
       remember('assistant', data.answer);
-      const meta = { ...data, trace, elapsedMs: Date.now() - started };
       // The remote service can guess coordinates from general knowledge. A location nowhere near
       // I-595 is reported, not flown to: it once sent "the end of segment one" to a spot 5 km off
       // the corridor.
@@ -960,33 +1023,102 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
       // locations from general knowledge are guesses to check.
       const fromLiveFeed = (data.sources ?? []).some(isLiveSource);
       if (!fromLiveFeed && Number.isFinite(offsetM) && offsetM > MAX_REMOTE_OFFSET_M) {
-        addMsg('assistant', data.answer, { ...meta, action: { type: 'none' } });
-        addMsg('assistant', `The location in that answer (${Number(coords.lat).toFixed(5)}, ${Number(coords.lon).toFixed(5)}) is ${(offsetM / 1000).toFixed(1)} km from I-595, so the map was not moved.`);
+        addMsg('assistant', data.answer, { ...data, action: { type: 'none' } }, turn);
+        addMsg('assistant', `The location in that answer (${Number(coords.lat).toFixed(5)}, ${Number(coords.lon).toFixed(5)}) is ${(offsetM / 1000).toFixed(1)} km from I-595, so the map was not moved.`, null, turn);
         offerFromMap(question);
         return;
       }
-      addMsg('assistant', data.answer, meta);
+      addMsg('assistant', data.answer, data, turn);
       // The service checks that a map action points at something a lookup returned, and says so
       // when it dropped one rather than leaving the operator wondering why nothing moved.
-      if (data.action_note) addMsg('assistant', data.action_note);
+      if (data.action_note) addMsg('assistant', data.action_note, null, turn);
       offerFromMap(question);
-      // auto-act on high confidence responses with coordinates (the orchestrator computes the
-      // confidence from its own lookups; the older service reports the model's)
-      if (data.confidence === 'high' && data.action?.coordinates) {
-        if (data.action.type === 'open_camera') openNearestCameras(data.action.coordinates);
-        else {
-          const shown = await showEventLayersFor(data.action.coordinates);
-          flyTo(data.action.coordinates);
-          if (shown.length) addMsg('assistant', `Switched on ${shown.join(' and ')} so you can see them on the map.`);
-        }
-      }
+      await autoRun(data, turn, watch);
     } catch (error) {
-      thinking.clear();
-      thinking.el.remove();
-      addMsg('assistant', error instanceof AskError ? error.message : 'Could not reach the twin. Check your connection.');
+      activity.add({ type: 'RunError', message: error instanceof AskError ? error.message : 'Could not reach the twin.' });
+      addMsg('assistant', error instanceof AskError ? error.message : 'Could not reach the twin. Check your connection.', null, turn);
     } finally {
+      watch.stop();
       release();
     }
+  }
+
+  // ── Auto-run and Restore view ─────────────────────────────────────────
+  /**
+   * Notices the operator taking the map while an answer is being worked out. Moving the camera or
+   * changing the selection means they are busy with something; an answer arriving afterwards must
+   * not yank the view away from it.
+   */
+  function watchOperator() {
+    const selectionAtStart = tmc?.selectedIncidentId ?? null;
+    let moved = false;
+    const onMove = () => { if (!programmaticMove) moved = true; };
+    const remove = viewer.camera.moveStart.addEventListener(onMove);
+    return {
+      get busy() {
+        if (moved) return 'you moved the map while the answer was being worked out';
+        if ((tmc?.selectedIncidentId ?? null) !== selectionAtStart) return 'the selection changed while the answer was being worked out';
+        return null;
+      },
+      stop: () => remove(),
+    };
+  }
+  let programmaticMove = false;
+
+  /** What Restore view puts back: the camera, and the layers an answer switched on. */
+  function viewCheckpoint() {
+    const c = viewer.camera;
+    return { destination: c.positionWC.clone(), orientation: { direction: c.directionWC.clone(), up: c.upWC.clone() }, layersOn: [] };
+  }
+
+  /** The latest turn that moved the map; only it offers Restore view, since a later move overwrites it. */
+  let lastTurn = null;
+
+  function addRestore(turn, checkpoint) {
+    if (lastTurn?.restoreBtn) { lastTurn.restoreBtn.disabled = true; lastTurn.restoreBtn.title = 'A later answer moved the map since'; }
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'ask-twin-fly-btn ask-twin-restore';
+    button.textContent = '↩ Restore view';
+    button.onclick = async () => {
+      button.disabled = true;
+      for (const id of checkpoint.layersOn) await layerStore?.setVisible?.(id, false);
+      programmaticMove = true;
+      viewer.camera.flyTo({ ...checkpoint, duration: 1.2, complete: () => { programmaticMove = false; }, cancel: () => { programmaticMove = false; } });
+      button.textContent = '✓ View restored';
+    };
+    turn.appendChild(button);
+    lastTurn = { restoreBtn: button };
+  }
+
+  /**
+   * Run an answer's map action on its own, when every rule allows it: the setting is on, the server
+   * computed high confidence from cited lookups, the target came from a lookup (checked server-side
+   * and again here), and the operator has not taken the map since asking. Otherwise the action stays
+   * a button, with the reason it did not run.
+   */
+  async function autoRun(data, turn, watch) {
+    const action = data.action;
+    if (!action?.coordinates || action.type === 'none') return;
+    const skip = !dock.settings.autoRunMap ? 'automatic map moves are off in settings'
+      : data.confidence !== 'high' ? `confidence is ${data.confidence ?? 'unknown'}`
+        : watch.busy;
+    if (skip) {
+      const note = document.createElement('p');
+      note.className = 'ask-twin-autorun-note';
+      note.textContent = `The map was not moved automatically (${skip}). Use the button to go there.`;
+      turn.appendChild(note);
+      return;
+    }
+    const checkpoint = viewCheckpoint();
+    if (action.type === 'open_camera') openNearestCameras(action.coordinates);
+    else {
+      const shown = await showEventLayersFor(action.coordinates);
+      checkpoint.layersOn = shown.ids;
+      flyTo(action.coordinates);
+      if (shown.labels.length) addMsg('assistant', `Switched on ${shown.labels.join(' and ')} so you can see them on the map.`, null, turn);
+    }
+    addRestore(turn, checkpoint);
   }
 
   function release() {
@@ -1026,12 +1158,13 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     get spatialContext() { return activeSpatialContext; },
     selectArea: () => { selection.start(); updateAreaBar(); },
     /** Offer the questions that suit wherever the operator now is — a new screen, a new selection. */
-    refreshSuggestions: renderSuggestions,
+    refreshSuggestions: () => { renderSuggestions(); renderContext(); },
+    newConversation,
     clearArea,
     ask,
     destroy() {
       document.removeEventListener(ASK_THE_TWIN_EVENT, onAskEvent);
-      selection.destroy(); btn.remove(); panel.remove();
+      selection.destroy(); dock.destroy(); btn.remove(); panel.remove();
     },
   };
 }

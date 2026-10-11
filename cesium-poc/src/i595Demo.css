@@ -665,6 +665,72 @@ body:has(.street-view[data-state="active"]) :is(.ramp-details, .road-details, .s
 :root[data-theme="light"] .ask-twin-confidence--low { background: #fff1f2; color: #be123c; border-color: #fecdd3; }
 :root[data-theme="light"] .ask-twin-panel button:focus-visible { outline: 2px solid #80aaff; outline-offset: 2px; }
 
+/* ── Ask the Twin, docked ─────────────────────────────────────────────────
+   A full-height column on the right of the whole application. Docking narrows <body> and makes it
+   the containing block of the map and its absolutely positioned overlays, so all of them move left
+   with the map instead of sitting under the panel (askTwinDock.js). */
+:root { --ask-twin-dock: 0px; }
+body.ask-twin-docked { position: relative; width: calc(100% - var(--ask-twin-dock)); }
+.ask-twin-panel.ask-twin-dock { position: fixed; top: 0; right: 0; bottom: 0; left: auto; width: var(--ask-twin-dock); max-height: none;
+  border-radius: 0; border-width: 0 0 0 1px; box-shadow: -12px 0 32px var(--ui-shadow-color); z-index: 60; }
+.ask-twin-dock .ask-twin-header { cursor: default; padding: 12px 12px 12px 18px; }
+.ask-twin-dock .ask-twin-header:active { cursor: default; }
+.ask-twin-dock .ask-twin-title { font-size: 13px; }
+.ask-twin-dock .ask-twin-title > span:first-of-type ~ .ask-twin-subtitle { display: inline; }
+.ask-twin-dock .ask-twin-body { flex: 1; min-height: 0; }
+.ask-twin-dock .ask-twin-messages { max-height: none; padding: 14px 16px 10px; gap: 14px; }
+.ask-twin-dock .ask-twin-bubble { font-size: 13px; max-width: 100%; }
+.ask-twin-dock .ask-twin-icon-btn { font-size: 15px; padding: 4px 8px; }
+.ask-twin-dock .ask-twin-icon-btn:hover, .ask-twin-dock .ask-twin-icon-btn[aria-pressed="true"], .ask-twin-dock .ask-twin-icon-btn[aria-expanded="true"] { color: var(--ui-text); background: var(--ui-surface-raised); }
+.ask-twin-resize { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; z-index: 2; touch-action: none; }
+.ask-twin-resize:hover, .ask-twin-resize:focus-visible { background: linear-gradient(90deg, transparent 3px, var(--ui-accent-line) 3px, var(--ui-accent-line) 5px, transparent 5px); outline: none; }
+.ask-twin-panel--expanded .ask-twin-resize { display: none; }
+.ask-twin-panel--expanded .ask-twin-messages { padding: 20px max(24px, calc((100% - 860px) / 2)); }
+@media (max-width: 700px) {
+  body.ask-twin-docked { width: 100%; }
+  .ask-twin-panel.ask-twin-dock { width: 100%; }
+}
+.ask-twin-area-btn[hidden] { display: none; }
+/* `display: flex` on the launch button would otherwise keep it on screen beside the open panel. */
+.ask-twin-btn[hidden] { display: none; }
+.ask-twin-dock .ask-twin-title { white-space: nowrap; min-width: 0; overflow: hidden; }
+
+/* Settings, under the header */
+.ask-twin-settings { display: flex; flex-direction: column; gap: 6px; padding: 10px 18px; border-bottom: 1px solid var(--ui-border-soft); font-size: 12px; color: var(--ui-text-secondary); }
+.ask-twin-settings[hidden] { display: none; }
+.ask-twin-settings label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+
+/* One section per remote turn: activity log, then the answer under it */
+.ask-twin-turn { display: flex; flex-direction: column; gap: 8px; }
+.ask-twin-activity { font-size: 11.5px; color: var(--ui-text-muted); border-left: 2px solid var(--ui-accent-line); padding: 2px 0 2px 10px; }
+.ask-twin-activity summary { cursor: pointer; color: var(--ui-text-secondary); font-weight: 600; letter-spacing: .02em; }
+.ask-twin-activity ol { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; line-height: 1.45; }
+.ask-twin-activity li { position: relative; padding-left: 16px; }
+.ask-twin-activity li::before { content: '•'; position: absolute; left: 3px; color: var(--ui-text-muted); }
+.ask-twin-activity li.is-running::before { content: '◌'; color: var(--ui-accent-strong); animation: ask-pulse 1.2s ease-in-out infinite; }
+.ask-twin-activity li.is-ok::before { content: '✓'; color: var(--ui-status-live, #4ade80); }
+.ask-twin-activity li.is-gap::before, .ask-twin-activity li.is-timeout::before { content: '!'; color: #fbbf24; }
+.ask-twin-activity li.is-error::before { content: '✕'; color: #f87171; }
+.ask-twin-activity-note { font-style: italic; color: var(--ui-text-secondary); }
+.ask-twin-activity-checks { color: var(--ui-text-secondary); }
+
+/* Answer extras: why the twin is sure, the claims and what each cites, what the twin does not have */
+.ask-twin-confidence-reason { font-size: 10.5px; color: var(--ui-text-muted); }
+.ask-twin-basis { margin: 0; padding-left: 18px; font-size: 12px; color: var(--ui-text-secondary); display: flex; flex-direction: column; gap: 3px; }
+.ask-twin-refs { margin-left: 6px; font-size: 10.5px; color: var(--ui-accent-strong); }
+.ask-twin-refs.is-uncited { color: #fbbf24; }
+.ask-twin-gaps { font-size: 11.5px; color: #fbbf24; }
+.ask-twin-autorun-note { margin: 0; font-size: 11px; color: var(--ui-text-muted); }
+
+/* Context chips: what the next question is about */
+.ask-twin-context { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 12px 0; }
+.ask-twin-context:empty { display: none; }
+.ask-twin-context-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--ui-border-soft); font-size: 10.5px; color: var(--ui-text-secondary); background: var(--ui-surface); }
+.ask-twin-context-remove { border: 0; background: none; color: var(--ui-text-muted); padding: 0 0 0 2px; font-size: 12px; line-height: 1; cursor: pointer; }
+.ask-twin-context-remove:hover { color: var(--ui-text); }
+:root[data-theme="light"] .ask-twin-activity li.is-ok::before { color: #166534; }
+:root[data-theme="light"] .ask-twin-gaps, :root[data-theme="light"] .ask-twin-refs.is-uncited { color: #92400e; }
+
 /* Floating panels: the heading is the grab handle, and a dragged panel lifts above its neighbours. */
 .panel-drag-handle { cursor: grab; user-select: none; touch-action: none; }
 .panel-drag-handle:active { cursor: grabbing; }

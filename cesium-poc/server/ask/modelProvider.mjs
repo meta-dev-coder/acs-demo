@@ -23,11 +23,11 @@ export class ProviderError extends Error {
 }
 
 /**
- * @param {{apiKey?: string, getApiKey?: () => Promise<string>, model: string, client?: object}} options
+ * @param {{apiKey?: string, getApiKey?: () => Promise<string>, model: string, effort?: string|null, client?: object}} options
  *   `getApiKey` reads the key on the first question (e.g. from Secrets Manager) and again after the
  *   key is rejected; `client` injects a fake in tests.
  */
-export function createAnthropicProvider({ apiKey, getApiKey = null, model, client = null }) {
+export function createAnthropicProvider({ apiKey, getApiKey = null, model, effort = null, client = null }) {
   let sdk = client ?? (apiKey ? new Anthropic({ apiKey, maxRetries: 0 }) : null);
   let pending = null;
   const sdkFor = async () => {
@@ -53,6 +53,8 @@ export function createAnthropicProvider({ apiKey, getApiKey = null, model, clien
           system,
           messages,
           ...(tools?.length ? { tools, ...(toolChoice ? { tool_choice: toolChoice } : {}) } : {}),
+          // Chat lookups rarely need deep reasoning; a lower effort means fewer, faster rounds.
+          ...(effort ? { output_config: { effort } } : {}),
         }, { signal });
         return { content: response.content, stop_reason: response.stop_reason, usage: response.usage ?? null };
       } catch (error) {
