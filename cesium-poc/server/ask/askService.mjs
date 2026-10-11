@@ -54,7 +54,7 @@ export function createAskService({ provider, storePath, snapshotDir, readLayer, 
     return prompts.get(persona);
   };
   const orchestrator = createOrchestrator({ provider, tools, logger, prefetch: planPrefetch, system, ...(spend ? { spend } : {}) });
-  return { store, refresher, spend, ...createAskHttpHandler({ orchestrator, ...(clientKey ? { clientKey } : {}), ...(limiter ? { limiter } : {}) }) };
+  return { store, refresher, spend, orchestrator, ...createAskHttpHandler({ orchestrator, ...(clientKey ? { clientKey } : {}), ...(limiter ? { limiter } : {}) }) };
 }
 
 /**

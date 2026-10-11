@@ -22,7 +22,8 @@
     "live-dc:classes": "node tools/live-dc-classes.mjs",
     "twin:store": "node --no-warnings tools/twin-store.mjs --from-snapshot",
     "twin:store:dc": "node --no-warnings tools/twin-store.mjs --from-dataconnect",
-    "ask:serve": "node --no-warnings tools/ask-serve.mjs"
+    "ask:serve": "node --no-warnings tools/ask-serve.mjs",
+    "ask:eval": "node --no-warnings tools/ask-eval.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

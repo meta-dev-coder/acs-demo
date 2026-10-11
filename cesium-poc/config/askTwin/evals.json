@@ -1,0 +1,29 @@
+{
+  "_comment": "Verified questions for Ask the Twin (npm run ask:eval). Each expectation is checked against the run's events: which lookups ran (tools, and a class substring in their input), the confidence floor/ceiling, stated gaps, the answer text, and the round budget. Add a question here whenever an answer regresses.",
+  "questions": [
+    { "id": "rain-count", "question": "How many incidents happened in light rain?",
+      "expect": { "tools": ["count_records", "query_records"], "classIncludes": "Incidents", "minConfidence": "medium", "answerMatches": "\\d", "mustNotUse": ["records_near"], "maxRounds": 3 } },
+    { "id": "turnpike-history", "question": "What is the incident history at the Turnpike interchange?",
+      "expect": { "tools": ["records_near"], "classIncludes": "Incidents", "minConfidence": "medium", "answerMatches": "\\d", "maxRounds": 3 } },
+    { "id": "live-closures", "question": "Are there any closures on I-595 right now?",
+      "expect": { "tools": ["list_live_events", "query_records", "count_records"], "minConfidence": "medium", "maxRounds": 3 } },
+    { "id": "live-tickets", "question": "How many open live tickets are there, and for which events?",
+      "expect": { "tools": ["count_records", "query_records"], "classIncludes": "Live Tickets", "minConfidence": "medium", "maxRounds": 3 } },
+    { "id": "wet-hotspots", "question": "Where are the crash hotspots in wet weather?",
+      "expect": { "tools": ["crash_hotspots"], "minConfidence": "medium", "blocks": true, "maxRounds": 2 } },
+    { "id": "riskiest", "question": "Which incidents are riskiest right now?",
+      "expect": { "tools": ["rank_incidents"], "minConfidence": "medium", "maxRounds": 2, "allowGap": true } },
+    { "id": "rain-forecast", "question": "Rain is coming this afternoon. Where should we pre-position patrols?",
+      "expect": { "tools": ["weather_risk_forecast"], "minConfidence": "medium", "maxRounds": 2 } },
+    { "id": "work-orders-status", "question": "How many work orders are there by status?",
+      "expect": { "tools": ["count_records"], "classIncludes": "Work Orders", "minConfidence": "medium", "blocks": true, "maxRounds": 3 } },
+    { "id": "recorded-incident", "question": "Explain incident INC-200014.",
+      "expect": { "tools": ["explain_incident", "query_records"], "minConfidence": "medium", "answerMatches": "INC-200014", "maxRounds": 3 } },
+    { "id": "turnpike-camera", "question": "Which camera covers the Turnpike interchange?",
+      "expect": { "tools": ["find_corridor_features"], "minConfidence": "medium", "maxRounds": 3 } },
+    { "id": "express-gap", "question": "Are the express lanes open eastbound right now?",
+      "expect": { "maxConfidence": "medium", "gaps": true, "maxRounds": 3 } },
+    { "id": "corridor-length", "question": "How long is I-595?",
+      "expect": { "answerMatches": "(11|17)", "maxRounds": 2 } }
+  ]
+}

@@ -14,6 +14,10 @@ step 1 of that spec, done locally first.
 | `httpAdapter.mjs` | `POST /api/i595/ask`: Server-Sent Events for `Accept: text/event-stream` (with heartbeats), otherwise one JSON answer. A client disconnect aborts the run. |
 | `localAsk.mjs` | Environment wiring for `npm run dev` (mounted by `vite.config.js`) and `npm run ask:serve`. |
 | `dataConnectPull.mjs` | Read-only pull of every SDNA live class and every historical class, compacted into the store (`npm run twin:store:dc`). |
+| `evalGrade.mjs` | Grades a run against a verified question (`config/askTwin/evals.json`, `npm run ask:eval`). |
+| `answerBlocks.mjs` | KPI/bars/table/trend blocks and evidence records, copied from the lookups an answer cites. |
+| `spendGuard.mjs` | Daily token budget (`ASK_TWIN_DAILY_TOKENS`). |
+| `askProxy.mjs` | live-dc forwards the ask route to `live-dc-ask.service` (`ASK_TWIN_SERVICE_URL`). |
 | `storeRefresh.mjs` | Keeps the store current: live classes every 5 min, historical daily, atomic swap and reopen; a failed refresh keeps the last good store. |
 
 ## Run it locally

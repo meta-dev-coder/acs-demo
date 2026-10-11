@@ -105,7 +105,10 @@ Refresh settings: `ASK_TWIN_REFRESH=off` (snapshot only), `ASK_TWIN_LIVE_REFRESH
    Check the activity log, the confidence reason, that fly-to works and that Restore view works.
 6. Kill DataConnect access (comment out `LIVE_DC_READ_BASE_URL`, restart `ask:serve`). Answers still come
    from the last store, and the status shows the classes' old `asOf`. That is the "last good store" behaviour.
-7. Optional, offline: record answers with `ASK_TWIN_RECORD=.twin-store/rec.json`, then replay them with
+7. `npm run ask:eval`: the 12 verified questions (`config/askTwin/evals.json`) against the real model, graded on the
+   lookups used, confidence, gaps, the answer text and the round budget (report in `.twin-store/eval-report.json`).
+   Add `--record .twin-store/eval-rec.json` once; afterwards `--replay` re-grades offline after every code change.
+8. Optional, offline: record answers with `ASK_TWIN_RECORD=.twin-store/rec.json`, then replay them with
    `ASK_TWIN_REPLAY=…` and no key.
 
 Only when 1–6 pass do we move to section 6.
