@@ -4,8 +4,10 @@
  *
  * Model, first match wins:
  *   ASK_TWIN_REPLAY=<file>      replay recorded responses — offline, free, deterministic
- *   ANTHROPIC_API_KEY=<key>     the real model (ASK_TWIN_MODEL, default as on EC2); add
- *                               ASK_TWIN_RECORD=<file> to save every response for later replay
+ *   ANTHROPIC_API_KEY=<key>     the real model (ASK_TWIN_MODEL, default as on EC2)
+ *   ASK_TWIN_ANTHROPIC_SECRET_NAME=<name>  the same, with the key read from AWS Secrets Manager
+ *                               (aws CLI + your AWS credentials), as the EC2 host does
+ *   with either, ASK_TWIN_RECORD=<file> saves every response for later replay
  * Neither set → /api/i595/ask answers 503 saying what to set; the built-in answers still work.
  *
  * Data: the SQLite twin store at ASK_TWIN_STORE (default .twin-store/twin.sqlite), built from the
@@ -14,7 +16,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DEFAULT_ASK_MODEL } from '../liveDc/askTwin.mjs';
+import { apiKeyFromSecret, DEFAULT_ASK_MODEL } from '../liveDc/askTwin.mjs';
+import { readSecretString } from '../liveDc/awsSecret.mjs';
 import { fetchEventWeather } from '../liveDc/eventWeather.mjs';
 import { createAskHttpHandler } from './httpAdapter.mjs';
 import { createAnthropicProvider, createRecordingProvider, createReplayProvider } from './modelProvider.mjs';
@@ -27,16 +30,26 @@ export const DEFAULT_STORE_PATH = join(ROOT, '.twin-store', 'twin.sqlite');
 const SNAPSHOT_DIR = join(ROOT, 'public', 'dataconnect-data');
 const LAYER_DIR = join(ROOT, 'public', 'data');
 
-/** The model provider the environment asks for, or null with the reason. */
-export function providerFromEnv(env) {
+/**
+ * The model provider the environment asks for, or null with the reason.
+ * @param {object} env
+ * @param {{readSecret?: (name: string, options: object) => Promise<string>}} [deps]  injected in tests
+ */
+export function providerFromEnv(env, { readSecret = readSecretString } = {}) {
   const replay = String(env.ASK_TWIN_REPLAY ?? '').trim();
   if (replay) return { provider: createReplayProvider({ path: replay }), label: `replay (${replay})` };
   const apiKey = String(env.ANTHROPIC_API_KEY ?? '').trim();
-  if (!apiKey) return { provider: null, label: 'off: set ANTHROPIC_API_KEY or ASK_TWIN_REPLAY in .env.local' };
+  const secretName = String(env.ASK_TWIN_ANTHROPIC_SECRET_NAME ?? '').trim();
+  if (!apiKey && !secretName) return { provider: null, label: 'off: set ANTHROPIC_API_KEY, ASK_TWIN_ANTHROPIC_SECRET_NAME or ASK_TWIN_REPLAY in .env.local' };
   const model = String(env.ASK_TWIN_MODEL ?? '').trim() || DEFAULT_ASK_MODEL;
-  const live = createAnthropicProvider({ apiKey, model });
+  // The same secret the EC2 host reads (JSON {"api_key"}), through the AWS CLI and your own AWS
+  // credentials, on the first question — never at startup, never logged.
+  const region = String(env.LIVE_DC_AWS_REGION ?? '').trim() || undefined;
+  const live = apiKey ? createAnthropicProvider({ apiKey, model })
+    : createAnthropicProvider({ model, getApiKey: async () => apiKeyFromSecret(await readSecret(secretName, { region, policyHint: 'your AWS credentials need secretsmanager:GetSecretValue on it' }), secretName) });
   const record = String(env.ASK_TWIN_RECORD ?? '').trim();
-  return record ? { provider: createRecordingProvider(live, { path: record }), label: `${model}, recording to ${record}` } : { provider: live, label: model };
+  const via = apiKey ? '' : ` (key from secret ${secretName})`;
+  return record ? { provider: createRecordingProvider(live, { path: record }), label: `${model}${via}, recording to ${record}` } : { provider: live, label: `${model}${via}` };
 }
 
 /**
@@ -49,7 +62,7 @@ export function createLocalAsk({ env = process.env, getLiveEvents = null, logger
     const handle = (req, res) => {
       req.resume();
       res.writeHead(503, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-      res.end(JSON.stringify({ error: 'Ask the Twin is not configured locally: set ANTHROPIC_API_KEY (or ASK_TWIN_REPLAY) in cesium-poc/.env.local.' }));
+      res.end(JSON.stringify({ error: 'Ask the Twin is not configured locally: set ANTHROPIC_API_KEY, ASK_TWIN_ANTHROPIC_SECRET_NAME or ASK_TWIN_REPLAY in cesium-poc/.env.local.' }));
     };
     return { label, handle, middleware: (req, res, next) => (new URL(req.originalUrl ?? req.url, 'http://localhost').pathname === '/api/i595/ask' ? handle(req, res) : next()) };
   }

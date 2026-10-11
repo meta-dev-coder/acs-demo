@@ -19,7 +19,12 @@ step 1 of that spec, done locally first.
 ```bash
 npm install
 npm run twin:store          # optional: the dev route builds the store on first use anyway
-# .env.local: ANTHROPIC_API_KEY=…  (or ASK_TWIN_REPLAY=<recordings.json> for offline answers)
+# .env.local, one of:
+#   ASK_TWIN_ANTHROPIC_SECRET_NAME=i595/anthropic-key   (key from AWS Secrets Manager, as on EC2;
+#                                                        needs the aws CLI and an AWS login first)
+#   ANTHROPIC_API_KEY=…
+#   ASK_TWIN_REPLAY=<recordings.json>                   (offline answers)
+# ASK_TWIN_MODEL=claude-sonnet-5  LIVE_DC_AWS_REGION=us-east-1  AWS_PROFILE=<profile, if not default>
 npm run dev                 # http://localhost:5188/?demo=i595, open Ask the Twin
 ```
 

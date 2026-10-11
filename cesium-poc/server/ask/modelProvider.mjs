@@ -23,16 +23,29 @@ export class ProviderError extends Error {
 }
 
 /**
- * @param {{apiKey?: string, model: string, client?: object}} options  `client` injects a fake in tests
+ * @param {{apiKey?: string, getApiKey?: () => Promise<string>, model: string, client?: object}} options
+ *   `getApiKey` reads the key on the first question (e.g. from Secrets Manager) and again after the
+ *   key is rejected; `client` injects a fake in tests.
  */
-export function createAnthropicProvider({ apiKey, model, client = null }) {
-  const sdk = client ?? new Anthropic({ apiKey, maxRetries: 0 });
+export function createAnthropicProvider({ apiKey, getApiKey = null, model, client = null }) {
+  let sdk = client ?? (apiKey ? new Anthropic({ apiKey, maxRetries: 0 }) : null);
+  let pending = null;
+  const sdkFor = async () => {
+    if (sdk) return sdk;
+    if (!getApiKey) throw new ProviderError('No Anthropic API key is configured.');
+    pending ??= Promise.resolve().then(getApiKey).finally(() => { pending = null; });
+    let key;
+    try { key = await pending; } catch (error) { throw new ProviderError(`The Anthropic key could not be read: ${String(error?.message ?? error).slice(0, 200)}`); }
+    sdk = new Anthropic({ apiKey: key, maxRetries: 0 });
+    return sdk;
+  };
   return {
     name: `anthropic:${model}`,
     model,
     async complete({ system, messages, tools, toolChoice, maxTokens, signal }) {
+      const api = await sdkFor();
       try {
-        const response = await sdk.messages.create({
+        const response = await api.messages.create({
           model,
           max_tokens: maxTokens,
           // The system prompt and the tool list are identical on every question, so they are cached.
@@ -47,6 +60,8 @@ export function createAnthropicProvider({ apiKey, model, client = null }) {
         // Typed SDK errors, most specific first; the message never carries the key or the prompt.
         if (error instanceof Anthropic.RateLimitError) throw new ProviderError('The model is rate limited.', { retryable: true, status: 429 });
         if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
+          // A rotated secret: read it again on the next question.
+          if (getApiKey && !client) sdk = null;
           throw new ProviderError('The model rejected the API key.', { status: error.status });
         }
         if (error instanceof Anthropic.BadRequestError) throw new ProviderError(`The model rejected the request: ${String(error.message).slice(0, 200)}`, { status: 400 });

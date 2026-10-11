@@ -125,6 +125,22 @@ describe('local ask configuration', () => {
     assert.match(off.label, /ANTHROPIC_API_KEY/);
   });
 
+  test('a secret name reads the key from Secrets Manager on the first question, not at startup', async () => {
+    const reads = [];
+    const readSecret = async (name, options) => { reads.push([name, options.region]); throw new Error('access denied reading secret'); };
+    const { provider, label } = providerFromEnv({ ASK_TWIN_ANTHROPIC_SECRET_NAME: 'i595/anthropic-key', ASK_TWIN_MODEL: 'claude-sonnet-5', LIVE_DC_AWS_REGION: 'us-east-1' }, { readSecret });
+    assert.equal(label, 'claude-sonnet-5 (key from secret i595/anthropic-key)');
+    assert.deepEqual(reads, []);
+    const error = await provider.complete({ messages: [], maxTokens: 10 }).catch(e => e);
+    assert.match(error.message, /key could not be read: access denied/);
+    assert.deepEqual(reads, [['i595/anthropic-key', 'us-east-1']]);
+    // A failed read is retried on the next question rather than cached.
+    await provider.complete({ messages: [], maxTokens: 10 }).catch(() => {});
+    assert.equal(reads.length, 2);
+    // A key in the environment wins over the secret.
+    assert.equal(providerFromEnv({ ANTHROPIC_API_KEY: 'k', ASK_TWIN_ANTHROPIC_SECRET_NAME: 's' }, { readSecret }).label, 'claude-sonnet-5');
+  });
+
   test('with no model configured the route answers 503 saying what to set', async () => {
     const ask = createLocalAsk({ env: {}, logger: quiet });
     await serve(ask, async base => {
