@@ -839,10 +839,29 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
     } while (corridorDirty);
   }
 
+  /**
+   * Set once the operator has hand-picked segments, after which the corridor is theirs.
+   *
+   * The re-assert above could not tell a layer loading in late from an operator deliberately
+   * ticking a segment in Map Explorer, so it suppressed both: a segment switched on vanished
+   * again within a frame, every time.
+   *
+   * `partial` is the signal that separates them. The store reports it only when the parent
+   * checkbox is INDETERMINATE — some segments on, some off — which is exactly the shape of
+   * hand-picking. A layer arriving late goes straight from off to on and never passes through
+   * partial. So partial means a person did this, and the hold stands down.
+   *
+   * Reset when the screen is re-entered, so the original behaviour returns on a fresh visit.
+   */
+  let operatorPickedSegments = false;
+
   const unwatchCorridor = hotspots
     ? layerStore?.subscribe?.(() => {
       if (!active || !hotspotsOn || !corridorWas) return;
-      if (roadLayers().some(id => ['on', 'partial'].includes(layerStore.stateOf(id)))) void holdCorridorOff();
+      const states = roadLayers().map(id => layerStore.stateOf(id));
+      if (states.includes('partial')) { operatorPickedSegments = true; return; }
+      if (operatorPickedSegments) return;
+      if (states.includes('on')) void holdCorridorOff();
     }) ?? (() => {})
     : () => {};
 
@@ -974,10 +993,21 @@ export function installLiveEventsWorkspace({ cards, className, label, assetExplo
   return {
     root,
     get activeKey() { return activeKey; },
+    /**
+     * The crash corpus the hotspot badges are clustered from.
+     *
+     * Exposed because the area query was reading the incident register alone while the map was
+     * drawing register crashes PLUS crashes derived from the live feed. A badge saying "2 crashes"
+     * sat over a box the area query reported as holding zero historical records — both correct,
+     * about different corpora, with nothing on screen to say so. One accessor, one corpus.
+     */
+    crashRecords: () => crashRecords(),
     choose,
     activate() {
       if (active) return;
       active = true;
+      // A fresh visit starts with the corridor held off again.
+      operatorPickedSegments = false;
       root.hidden = false;
       if (suppressCorridorStatus) corridorStatus?.setSuppressed?.(true, 'safety');
       render();

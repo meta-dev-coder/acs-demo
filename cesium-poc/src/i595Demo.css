@@ -568,7 +568,13 @@ body:has(.street-view[data-state="active"]) :is(.ramp-details, .road-details, .s
 .ask-twin-msg { display: flex; flex-direction: column; gap: 5px; }
 .ask-twin-msg--user { align-items: flex-end; }
 .ask-twin-msg--assistant { align-items: flex-start; }
-.ask-twin-bubble { padding: 8px 11px; border-radius: 11px; font-size: 12.5px; line-height: 1.6; max-width: 92%; }
+/* Newlines are content. Without pre-wrap the bubble collapsed every line break, so a grouped
+   answer — area summary, historical record breakdown, multi-step investigation — arrived as one
+   unreadable paragraph however carefully it was composed. */
+.ask-twin-bubble {
+  padding: 8px 11px; border-radius: 11px; font-size: 12.5px; line-height: 1.6; max-width: 92%;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
 .ask-twin-msg--user .ask-twin-bubble { background: var(--ui-surface-raised); border: 1px solid var(--ui-accent-tint); color: var(--ui-text); border-bottom-right-radius: 3px; }
 .ask-twin-msg--assistant .ask-twin-bubble { background: #111d2e; border: 1px solid var(--ui-border-soft); color: var(--ui-text); border-bottom-left-radius: 3px; }
 

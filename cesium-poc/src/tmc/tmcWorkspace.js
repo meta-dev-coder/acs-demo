@@ -4116,6 +4116,10 @@ export function installTmcWorkspace({
      */
     get patrolScenario() { return patrolScenarioFor(selected()); },
 
+    /** What the map is emphasising and which patrol is picked — read by Ask the Twin's context. */
+    get responseFocus() { return selectedId && activeTab === 'response' ? responseFocus : null; },
+    get selectedPatrolId() { return selectedPatrolId; },
+
     /** The upstream assessment and the warning scenario the screen is showing. */
     get upstreamProtection() { return upstreamProtectionFor(selected()); },
     get warningScenario() { return warningScenarioFor(selected()); },

@@ -12,12 +12,15 @@ import { assetTypeConfig } from './assetExplorer/assetTypes.js';
 import { carriagewayLines, loadCorridorContext } from './assetExplorer/incidentContext.js';
 import { createRectangleSelection } from './spatial/rectangleSelection.js';
 import { buildSpatialContext } from './spatial/spatialQuery.js';
-import { AREA_SUGGESTIONS, answerAreaQuestion, areaIndicatorText, areaSummaryLines, parseAreaQuestion } from './spatial/areaAnswers.js';
+import { AREA_SUGGESTIONS, answerAreaQuestion, areaIndicatorText, areaSummaryLines, filterAreaRecords, isMapInstruction, parseAreaQuestion } from './spatial/areaAnswers.js';
 import { geometryIntersectsBounds } from './spatial/areaGeometry.js';
 import { createTwinUiApi, logLine } from './twinUiApi.js';
 import { renderBlocks } from './askTwinBlocks.js';
 import { createEvidenceChips } from './askTwinEvidence.js';
 import { loadSources, normalizeSources, presetFor, saveSources, scopeLine, SOURCES, sourcesForScreen, toggleSource } from './askTwinSources.js';
+import { buildTwinContext, REFERENT_KINDS } from './spatial/twinContext.js';
+import { createCapabilityRegistry, PROVENANCE } from './twin/capabilities.js';
+import { isCompoundQuestion, planFor, runInvestigation } from './twin/orchestrator.js';
 
 // `npm run dev` serves the orchestrator itself (server/ask/localAsk.mjs), so a dev build asks it
 // same-origin; a build without VITE_ASK_THE_TWIN_API keeps the deployed service.
@@ -49,8 +52,6 @@ const SOURCE_LABELS = Object.freeze({ live_events: 'FL511 live data', static_kno
 const sourceLabel = source => SOURCE_LABELS[source] ?? source;
 /** Coordinates from the live feed are real even just past the corridor's ends; see submit(). */
 const isLiveSource = source => source === 'live_events' || /live events/i.test(String(source));
-/** Remote turns sent back as plain-text history so "and westbound?" can follow the last answer. */
-const MAX_HISTORY_TURNS = 6;
 
 // Find cameras within radiusM metres of lon/lat, sorted by distance
 function nearbyCameras(cameraControls, lon, lat, radiusM = 800) {
@@ -96,7 +97,48 @@ export function describeAsset(asset) {
  *   coordinates of their own: the position of the work IS the position of its asset
  */
 export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segments, layerStore, centerline = [],
-  liveEvents = null, maintenanceRecords = null, assetIndex = null, tmc = null } = {}) {
+  liveEvents = null, maintenanceRecords = null, assetIndex = null, tmc = null, crashRecords = null,
+  maintenanceView = null } = {}) {
+  /**
+   * What the last answer was about, so a follow-up can say "it".
+   *
+   * Set only from identifiers the application itself produced — a selected incident, a resolved
+   * camera, a patrol the provider returned. Never from anything the model said, which is what
+   * makes it safe to act on later.
+   */
+  /**
+   * The last few turns, so "compare that with last month" has a that.
+   *
+   * Short on purpose: enough for a follow-up to make sense, not so much that an old answer keeps
+   * steering a new question. The transcript is the operator's own words and the assistant's own
+   * replies — no tool output, no context blob.
+   */
+  const TURNS_KEPT = 6;
+  const transcript = [];
+  const recordTurn = (role, content) => {
+    if (!content) return;
+    transcript.push({ role, content: String(content).slice(0, 1200) });
+    while (transcript.length > TURNS_KEPT) transcript.shift();
+  };
+  const recentTurns = () => transcript.map(turn => ({ ...turn }));
+
+  let lastReferenced = null;
+  const remember = (kind, id, label = null) => {
+    if (!id) return;
+    lastReferenced = { kind, id: String(id), label: label ?? String(id) };
+  };
+
+  /** Everything the assistant may treat as "here" and "this", assembled from real state. */
+  const twinContext = () => buildTwinContext({
+    screen: document.body.dataset.section ?? null,
+    role: document.body.dataset.role ?? null,
+    viewer,
+    layerStore,
+    tmc,
+    selectedAssetId: assetExplorer?.selectedAssetId ?? null,
+    spatialContext: activeSpatialContext,
+    referent: lastReferenced,
+  });
   // ── Toggle button ──────────────────────────────────────────────────────
   const btn = document.createElement('button');
   btn.className = 'ask-twin-btn';
@@ -277,7 +319,7 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
 
   /** A fresh conversation: the transcript and the history sent to the model both go. */
   function newConversation() {
-    conversation.length = 0;
+    transcript.length = 0;
     lastTurn = null;
     messages.replaceChildren();
     renderSuggestions();
@@ -291,6 +333,9 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
 
   /** @param {HTMLElement} [container]  a remote turn's section, so its answer sits under its activity log */
   function addMsg(role, text, meta, container = messages) {
+    // Recorded here rather than at each call site: the deterministic TMC, area and asset answers
+    // all come through addMsg too, and a follow-up after one of those has to work the same way.
+    recordTurn(role, text);
     suggestEl.hidden = true;
     const wrap = document.createElement('div');
     wrap.className = `ask-twin-msg ask-twin-msg--${role}`;
@@ -987,6 +1032,13 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     });
     if (!answer) return false;
     addMsg('assistant', answer.answer);
+    // The deterministic answers name their subject, so "show it on the map" has something real to
+    // bind to without the operator repeating an id.
+    remember(REFERENT_KINDS.INCIDENT, answer.incidentId);
+    for (const action of answer.actions ?? []) {
+      if (action.resourceId) remember(action.resourceType === 'sign' ? REFERENT_KINDS.SIGN : REFERENT_KINDS.CAMERA, action.resourceId);
+      if (action.patrolId) remember(REFERENT_KINDS.PATROL, action.patrolId);
+    }
     offerTmcActions(answer.actions);
     return true;
   }
@@ -1075,7 +1127,124 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
   }
 
   /** @returns {Promise<boolean>} true when the question was about a map asset and is answered. */
+  /** The capabilities, built against the same services the screens use. */
+  const capabilities = createCapabilityRegistry({
+    tmc,
+    maintenanceRecords,
+    assetIndex: typeof assetIndex === 'function' ? assetIndex : () => assetIndex,
+    centerline,
+  });
+
+  /**
+   * A question with more than one clause, answered in full.
+   *
+   * This runs BEFORE the single-clause deterministic handlers, and only when the question is
+   * genuinely compound. "Why is this high risk, and which patrol should respond?" used to match
+   * the risk handler, get answered, and lose the patrol clause with no sign it had been dropped.
+   *
+   * A question that is not compound falls straight through, so every existing handler keeps its
+   * behaviour unchanged.
+   */
+  async function answerByInvestigation(question) {
+    if (!isCompoundQuestion(question)) return false;
+    const context = twinContext();
+    const plan = planFor(question);
+    if (plan.length < 2) return false;
+
+    const traces = [];
+    const run = await runInvestigation(plan, capabilities, context, { trace: entry => traces.push(entry) });
+    // Nothing came back with evidence: fall through rather than present an empty investigation.
+    if (!run.grounded) return false;
+
+    addMsg('assistant', composeInvestigation(run, context));
+    // Only the actions the capabilities themselves returned, each already naming a real id.
+    offerTmcActions(run.actions.map(toTwinAction).filter(Boolean));
+    // A trace for diagnosis, never shown to the operator and carrying no record contents.
+    console.debug('[ask-the-twin] investigation', JSON.stringify(traces));
+    for (const result of Object.values(run.results)) {
+      for (const item of result.evidence ?? []) {
+        if (item.entityType === 'incident') remember(REFERENT_KINDS.INCIDENT, item.entityId);
+        if (item.entityType === 'camera') remember(REFERENT_KINDS.CAMERA, item.entityId);
+        if (item.entityType === 'sign') remember(REFERENT_KINDS.SIGN, item.entityId);
+      }
+    }
+    return true;
+  }
+
+  /** A capability action, mapped onto the existing validated twin-action vocabulary. */
+  function toTwinAction(action) {
+    const incidentId = tmc?.selectedIncidentId ?? null;
+    switch (action.type) {
+      case 'SELECT_INCIDENT': return { id: 'incident', type: TWIN_ACTIONS.SELECT_INCIDENT, label: action.label, incidentId: action.incidentId };
+      case 'INSPECT_UPSTREAM': return { id: 'upstream', type: TWIN_ACTIONS.INSPECT_UPSTREAM, label: action.label, incidentId };
+      case 'SHOW_PATROLS': return { id: 'patrols', type: TWIN_ACTIONS.SHOW_PATROLS, label: action.label, incidentId };
+      case 'SELECT_PATROL': return { id: `patrol-${action.patrolId}`, type: TWIN_ACTIONS.SELECT_PATROL, label: action.label, patrolId: action.patrolId, incidentId };
+      case 'COMPARE_PATROLS': return { id: 'compare', type: TWIN_ACTIONS.COMPARE_PATROLS, label: action.label, incidentId };
+      // An action with no existing validated counterpart is dropped rather than invented.
+      default: return null;
+    }
+  }
+
+  /** The investigation as the structure the spec asks for, and only where it earns its place. */
+  function composeInvestigation(run, context) {
+    const out = [];
+    const r = run.results;
+    const risk = r.get_incident_analysis?.data;
+    const upstream = r.analyze_upstream_protection?.data;
+    const patrol = r.get_patrol_response_options?.data;
+    const scenarios = r.compare_response_scenarios?.data;
+    const work = r.search_work_orders?.data;
+    const history = r.get_asset_history?.data;
+
+    if (risk) {
+      out.push(`${risk.incidentId} scores ${risk.score}/100 (${risk.levelLabel}) for secondary-incident risk, `
+        + `data confidence ${risk.confidence.label}.`);
+      if (risk.contributors.length) {
+        out.push('What drives it:');
+        for (const factor of risk.contributors) out.push(`• ${factor.label} — ${factor.detail} (+${factor.points})`);
+      }
+      if (risk.unknown.length) out.push(`Could not be evaluated: ${risk.unknown.map(f => f.label).join(', ')}.`);
+    }
+    if (upstream) {
+      out.push('');
+      out.push(upstream.resolved
+        ? `Upstream approach: resolved — ${upstream.sections.join(', ') || 'no named sections'}. `
+          + `Traffic ${upstream.traffic.status}. Queue ${upstream.queue.status}.`
+        : `Upstream approach: UNRESOLVED — ${upstream.reason}.`);
+      if (upstream.nearestDms) out.push(`• Nearest upstream DMS ${upstream.nearestDms.id} at ${upstream.nearestDms.upstreamMiles} mi — activation ${upstream.warningActivation.status}.`);
+      if (upstream.nearestCamera) out.push(`• Nearest upstream camera ${upstream.nearestCamera.id} at ${upstream.nearestCamera.upstreamMiles} mi.`);
+    }
+    if (patrol) {
+      out.push('');
+      out.push(`Simulated patrol response: ${patrol.eligible.length} eligible of ${patrol.availability.total}.`);
+      for (const option of patrol.eligible) out.push(`• ${option.patrolId} — about ${option.travelMinutes} min, ${option.routeKm} km, route ${option.routeConfidence.toLowerCase()}`);
+      for (const option of patrol.ineligible.slice(0, 3)) out.push(`• ${option.patrolId} — ${option.reason}`);
+    }
+    if (scenarios?.warning) {
+      out.push('');
+      out.push(`Warning timing: activating at ${scenarios.warning.scenarioB.delayMinutes} min instead of `
+        + `${scenarios.warning.scenarioA.delayMinutes} min is ${scenarios.warning.earlierByMinutes} minutes earlier. `
+        + 'The queue model is identical in both — an earlier warning does not shorten it.');
+    }
+    if (work) { out.push(''); out.push(`Work orders: ${work.total} match.`); }
+    if (history) { out.push(''); out.push(`Asset ${history.assetId}: ${history.total} linked maintenance records.`); }
+
+    if (run.limitations.length) {
+      out.push('');
+      out.push('Limitations');
+      for (const line of [...new Set(run.limitations)].slice(0, 6)) out.push(`• ${line}`);
+    }
+    if (run.provenance === PROVENANCE.MIXED) {
+      out.push('');
+      out.push('This answer mixes recorded data with explicitly simulated scenarios; each section above says which.');
+    }
+    return out.join('\n');
+  }
+
   async function answerLocally(question) {
+    // A compound question is investigated first, so its later clauses are not discarded by a
+    // handler that recognises only the first.
+    if (await answerByInvestigation(question)) return true;
     // The TMC's own questions come first while that screen is open: "which incident has the highest
     // secondary-incident risk" is answered by a deterministic service, never by the model looking at
     // raw incidents and deciding. The ranking an operator acts on must be the same one the screen
@@ -1173,6 +1342,8 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
       assetEntries: assetExplorer?.searchableAssets?.() ?? [],
       maintenanceLookup: maintenanceRecords,
       assetIndex: assetIndex?.() ?? new Map(),
+      // The corpus the hotspot badges are drawn from, so the panel and the map agree.
+      crashRecords,
     });
     // §20: the sections the area crosses get a halo, drawn under whatever colour they already have.
     selection.highlightSegments(lines.filter(line =>
@@ -1223,20 +1394,100 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
   function answerAboutArea(question) {
     const intent = parseAreaQuestion(question, Boolean(activeSpatialContext));
     if (!intent) return false;
+    /**
+     * Instruction or question — decided here, where the records are known.
+     *
+     * The parser can spot the shape of an instruction but not whether the question names a subset
+     * that exists, and that is the difference between "show me the 6 windy incidents" (draw them)
+     * and "show me the incidents here" (list them). So the caller is the authority, and a
+     * `showRecords` intent that turns out to be a question about the map falls through to prose.
+     */
+    const filtered = filterAreaRecords(activeSpatialContext, question);
+    if (isMapInstruction(question, { qualified: filtered.matched })) {
+      void showAreaRecords(question);
+      return true;
+    }
+    // A map-shaped question that is not an instruction still gets answered, not dropped.
+    if (intent === 'showRecords') { addLocalMsg(answerAreaQuestion('incidents', activeSpatialContext)); return true; }
     const answer = answerAreaQuestion(intent, activeSpatialContext);
     if (!answer) return false;
     addLocalMsg(answer);
     return true;
   }
 
-  // ── Request envelope ──────────────────────────────────────────────────
-  /** Plain-text remote turns, oldest first; local answers are not part of the model's conversation. */
-  const conversation = [];
-  function remember(role, text) {
-    if (!text) return;
-    conversation.push({ role, text: String(text) });
-    while (conversation.length > MAX_HISTORY_TURNS * 2) conversation.shift();
+  /**
+   * Draw the records an answer just described, and frame them.
+   *
+   * Asking to see them used to re-run the matcher and repeat the previous answer, because every
+   * area route produced prose and none of them touched the map. This one reveals the incident
+   * class, narrows it to exactly the matched records, and moves the camera to their extent.
+   *
+   * The records come from the area context — the same ones the previous answer counted — so the
+   * map shows what was described rather than a fresh query that might differ.
+   */
+  /** "1 record" / "3 records" — this module has no shared pluraliser. */
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+  async function showAreaRecords(question) {
+    const { records, label, reason } = filterAreaRecords(activeSpatialContext, question);
+    if (!records.length) {
+      addLocalMsg(`I cannot show those — ${reason ?? 'no matching records are inside the selected area'}.`);
+      return;
+    }
+    const placed = records.filter(record => Number.isFinite(record.longitude) && Number.isFinite(record.latitude));
+    if (!maintenanceView?.showOnly) {
+      addLocalMsg(`${plural(records.length, 'record')} match ${label}, but this screen cannot draw them.`);
+      return;
+    }
+    const revealed = await maintenanceView.reveal?.('incidentRecord');
+    if (revealed === false) {
+      addLocalMsg('The incident register could not be revealed on the map.');
+      return;
+    }
+    /**
+     * The workspace's OWN records, resolved by id.
+     *
+     * The area context holds flattened copies — enough to count, group and answer with, and
+     * deliberately serialisable. The map layer and the Asset Explorer need the real records: the
+     * flattened ones drew plain pins with no crash-family pictogram and left the bottom list
+     * reading "0 assets", because nothing in them matched what the explorer indexes.
+     */
+    const byId = new Map((maintenanceRecords?.('incidentRecord') ?? []).map(record => [String(record.id), record]));
+    const originals = records.map(record => byId.get(String(record.id))).filter(Boolean);
+    const shown = originals.length ? originals : records;
+    maintenanceView.showOnly('incidentRecord', shown);
+    /**
+     * Clear the explorer's own date window.
+     *
+     * The bottom list defaults to the last six months. The records an area holds are whatever
+     * happened there, which is rarely all inside that window — so the map drew fourteen pins while
+     * the list underneath read "0 assets · No incidents found". The selection IS the filter here,
+     * exactly as it is when a crash hotspot is opened, which clears it for the same reason.
+     */
+    assetExplorer?.store?.setFilter?.({ from: null, to: null, id: null, query: '' });
+    addLocalMsg(`Showing ${plural(shown.length, 'record')} ${label} on the map.`
+      + (placed.length < records.length
+        // Said rather than silently dropped: a record with no position cannot be drawn.
+        ? ` ${records.length - placed.length} of them carry no coordinates and cannot be placed.`
+        : ''));
+    frameRecords(placed);
   }
+
+  /** Move the camera to hold a set of records, rather than centring on the first one. */
+  function frameRecords(records) {
+    if (!records.length || !viewer) return;
+    const lons = records.map(record => record.longitude);
+    const lats = records.map(record => record.latitude);
+    const west = Math.min(...lons), east = Math.max(...lons);
+    const south = Math.min(...lats), north = Math.max(...lats);
+    // Height from the spread, so one record is a close look and a scatter is framed whole.
+    const spanM = Math.max(
+      (east - west) * 111_320 * Math.cos(((north + south) / 2) * Math.PI / 180),
+      (north - south) * 110_540,
+    );
+    flyTo({ lon: (west + east) / 2, lat: (south + north) / 2 }, null, Math.max(900, spanM * 1.8));
+  }
+
 
   /** A selection the operator removed from the context; it comes back when the selection changes. */
   let omittedSelection = null;
@@ -1320,14 +1571,16 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
       // last remote turns as plain text.
       const data = await askRemote(ASK_URL, {
         question,
-        history: conversation.slice(),
+        // Every turn so far, local answers included, so "show it on the map" can follow a TMC or area
+        // answer; the question just asked is already the last entry and travels as `question`.
+        history: recentTurns().slice(0, -1).map(({ role, content }) => ({ role, text: content })),
         screen: screenSnapshot(),
+        // The resolved "here" and "this" (twinContext.js), for services that read it.
+        context: twinContext(),
         ...(activeSpatialContext ? { spatialContext: activeSpatialContext } : {}),
       }, { onEvent: event => { activity.add(event); scrollBottom(); } });
       // An older service sends no events; the log then says only how long it took, on its own clock.
       if (activity.empty) activity.add({ type: 'RunFinished' });
-      remember('user', question);
-      remember('assistant', data.answer);
       // The remote service can guess coordinates from general knowledge. A location nowhere near
       // I-595 is reported, not flown to: it once sent "the end of segment one" to a spot 5 km off
       // the corridor.
@@ -1343,6 +1596,8 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
         return;
       }
       addMsg('assistant', data.answer, data, turn);
+      // Bind "it" to whatever the service resolved, so the next question can refer back to it.
+      if (data.action?.entity_id) remember(REFERENT_KINDS.INCIDENT, data.action.entity_id);
       // The service checks that a map action points at something a lookup returned, and says so
       // when it dropped one rather than leaving the operator wondering why nothing moved.
       if (data.action_note) addMsg('assistant', data.action_note, null, turn);
@@ -1464,6 +1719,8 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     /** Test/diagnostic hook: the area currently scoping the conversation. */
     get spatialContext() { return activeSpatialContext; },
     selectArea: () => { selection.start(); updateAreaBar(); },
+    /** Diagnostics/tests: apply an area without dragging a rectangle on the globe. */
+    applyArea: bounds => applyArea(bounds),
     /** Offer the questions that suit wherever the operator now is — a new screen, a new selection. */
     refreshSuggestions: () => { renderSuggestions(); renderContext(); },
     newConversation,

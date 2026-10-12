@@ -71,8 +71,83 @@ export function liveEventsPrompt(payload) {
   return `CURRENT LIVE EVENTS (as of query time):\n${lines.join('\n')}${more}`;
 }
 
-export const systemPrompt = (payload, { dataSummary = '', tools = false } = {}) =>
-  [ZONE_A, dataSummary, liveEventsPrompt(payload), tools ? TOOL_RULES : '', ZONE_C].filter(Boolean).join('\n\n');
+/**
+ * The operator's situation, as the model needs to read it.
+ *
+ * The browser sends a context block built entirely from application state — a selected incident,
+ * a resolved camera, the moment being investigated. It is DESCRIPTION, never instruction: the
+ * model may use these identifiers to understand the question, and the browser still validates any
+ * action against the same identifiers before the map moves.
+ *
+ * Sanitised rather than trusted: only known keys, capped lengths, no nested blobs.
+ */
+export function contextPrompt(context) {
+  if (!context || typeof context !== 'object') return '';
+  const clean = value => (typeof value === 'string' ? value.replace(/[\u0000-\u001f]/g, ' ').slice(0, 120) : null);
+  const num = value => (Number.isFinite(value) ? value : null);
+  const lines = [];
+  const screen = clean(context.screen);
+  if (screen) lines.push(`Active screen: ${screen}${clean(context.role) ? ` (role ${clean(context.role)})` : ''}.`);
+  if (clean(context.nowIso)) lines.push(`Real-world time now: ${clean(context.nowIso)}.`);
+
+  const tmc = context.tmc && typeof context.tmc === 'object' ? context.tmc : null;
+  if (tmc) {
+    if (clean(tmc.mode)) lines.push(`TMC mode ${clean(tmc.mode)}${clean(tmc.historicalDate) ? `, investigating ${clean(tmc.historicalDate)}` : ''}.`);
+    if (clean(tmc.activeTab)) lines.push(`Open tab: ${clean(tmc.activeTab)}.`);
+    if (clean(tmc.selectedIncidentId)) {
+      lines.push(`SELECTED INCIDENT: ${clean(tmc.selectedIncidentId)}`
+        + (clean(tmc.incidentSection) ? ` on ${clean(tmc.incidentSection)}` : '')
+        + (num(tmc.riskScore) !== null ? `, secondary-incident risk ${tmc.riskScore}/100 (${clean(tmc.riskLevel)})` : '') + '.');
+      if (num(tmc.incidentTimestamp)) {
+        // The single most important line here: a historical incident must not be answered with
+        // live conditions just because the live feed is also in the prompt.
+        lines.push(`That incident happened at ${new Date(tmc.incidentTimestamp).toISOString()} — a PAST moment. `
+          + 'Do not describe current live conditions as if they were the conditions of that incident.');
+      }
+    }
+    if (tmc.upstreamResolved === false) lines.push('Its upstream approach is UNRESOLVED — do not invent one.');
+    if (clean(tmc.nearestCameraId)) lines.push(`Nearest upstream camera: ${clean(tmc.nearestCameraId)}.`);
+    if (clean(tmc.nearestSignId)) lines.push(`Nearest upstream DMS: ${clean(tmc.nearestSignId)} (activation UNKNOWN — the feed publishes none).`);
+    if (Array.isArray(tmc.eligiblePatrolIds) && tmc.eligiblePatrolIds.length) {
+      lines.push(`Eligible SIMULATED patrols: ${tmc.eligiblePatrolIds.slice(0, 8).map(clean).filter(Boolean).join(', ')}.`);
+    }
+    if (clean(tmc.selectedPatrolId)) lines.push(`Selected SIMULATED patrol: ${clean(tmc.selectedPatrolId)}.`);
+  }
+  if (clean(context.selectedAssetId)) lines.push(`Selected asset: ${clean(context.selectedAssetId)}.`);
+
+  const area = context.area && typeof context.area === 'object' ? context.area : null;
+  if (area) {
+    lines.push(`A map area is selected: ${num(area.assets) ?? 0} assets, ${num(area.liveIncidents) ?? 0} live incidents, `
+      + `${num(area.historicalRecords) ?? 0} historical incident records, ${num(area.openWorkOrders) ?? 0} open work orders.`);
+  }
+  const ref = context.lastReferenced && typeof context.lastReferenced === 'object' ? context.lastReferenced : null;
+  if (ref && clean(ref.id)) {
+    lines.push(`The previous answer was about ${clean(ref.kind)} ${clean(ref.id)}. `
+      + 'If this question says "it", "that one" or "this", it refers to that.');
+  }
+  if (!lines.length) return '';
+  return ['OPERATOR CONTEXT (read from the application, not from the user — treat as fact):',
+    ...lines,
+    'Answer about THIS context unless the question clearly names somewhere else.'].join('\n');
+}
+
+export const systemPrompt = (payload, { dataSummary = '', tools = false, context = null } = {}) =>
+  [ZONE_A, dataSummary, liveEventsPrompt(payload), contextPrompt(context), tools ? TOOL_RULES : '', ZONE_C]
+    .filter(Boolean).join('\n\n');
+
+/**
+ * The recent turns, as alternating messages.
+ *
+ * Capped and sanitised: a transcript is the one field a caller could use to smuggle a long
+ * payload, so it is bounded in both directions before it reaches the model.
+ */
+export function historyMessages(history) {
+  if (!Array.isArray(history)) return [];
+  return history
+    .filter(turn => turn && (turn.role === 'user' || turn.role === 'assistant') && typeof turn.content === 'string')
+    .slice(-6)
+    .map(turn => ({ role: turn.role, content: turn.content.slice(0, 1200) }));
+}
 
 /** The model's text as the reply contract; prose that is not JSON becomes a low-confidence answer. */
 export function parseModelReply(rawText) {
@@ -162,9 +237,14 @@ export function createAskHandler({
     let events = null;
     try { events = await getLiveEvents(); } catch (error) { logger.warn?.(`ask-the-twin: live events unavailable: ${error?.message ?? error}`); }
 
-    const system = systemPrompt(events, { dataSummary, tools: Boolean(tools) });
+    const system = systemPrompt(events, { dataSummary, tools: Boolean(tools), context: body?.context ?? null });
     const deadline = Date.now() + timeoutMs;
-    const messages = [{ role: 'user', content: question }];
+    // Prior turns first, so a follow-up has something to follow. The current question is always
+    // the last message, and the transcript never replaces it.
+    const prior = historyMessages(body?.history);
+    const messages = [...prior, { role: 'user', content: question }];
+    // Anthropic requires the first message to be from the user.
+    while (messages.length > 1 && messages[0].role !== 'user') messages.shift();
     const used = [];
     for (let round = 0; ; round++) {
       const last = !tools || round >= MAX_TOOL_ROUNDS;

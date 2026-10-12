@@ -17,6 +17,7 @@
 
 import { assetTypeConfig } from '../assetExplorer/assetTypes.js';
 import { CARRIAGEWAYS } from '../liveOps/carriagewayModel.js';
+import { weatherOf } from '../safety/weatherTrend.js';
 import { liveEventLabel } from '../liveEventsData.js';
 import { boundsCenter, boundsToPolygon, geometryIntersectsBounds, isUsableBounds, pointInBounds } from './areaGeometry.js';
 
@@ -234,6 +235,15 @@ export function findMaintenance(bounds, lookup, assetIndex = new Map()) {
         assetType: text(record.assetType),
         reported: text(record.createdDate),
         live: record.live === true,
+        // Kept rather than flattened away: the register writes a condition on each record, and
+        // dropping it here meant "how are these related in terms of weather?" could only be
+        // answered with the generic type-and-location breakdown. Read through the Safety layer's
+        // own resolver so both screens group by the same vocabulary.
+        weather: weatherOf(record),
+        // The resolved position, so "show these on the map" can frame them. `locatedVia` already
+        // says whether this is the record's own coordinate or its asset's.
+        longitude: place.longitude,
+        latitude: place.latitude,
         // Said plainly, because it is the difference between "the work is here" and "the thing the
         // work is about is here".
         locatedVia: place.via,
@@ -241,6 +251,41 @@ export function findMaintenance(bounds, lookup, assetIndex = new Map()) {
     }
   }
   return found;
+}
+
+/**
+ * The crash records inside the box, split by where they came from.
+ *
+ * `fromRegister` are incident-register records; `fromFeed` are crashes the Safety layer derived
+ * from live FL511 events. The split is the whole point — it is what lets an answer explain a
+ * hotspot badge that the register alone cannot account for.
+ */
+export function findCrashes(bounds, crashRecords) {
+  const empty = Object.freeze({ total: 0, fromRegister: 0, fromFeed: 0, records: Object.freeze([]), available: false });
+  if (!isUsableBounds(bounds) || !Array.isArray(crashRecords)) return empty;
+  const inside = crashRecords.filter(crash =>
+    Number.isFinite(crash?.longitude) && Number.isFinite(crash?.latitude)
+    && pointInBounds(crash.longitude, crash.latitude, bounds));
+  // The feed's own ids are FL511-shaped; the register's are not.
+  const fromFeed = inside.filter(crash => /^FL511-/i.test(String(crash.id ?? ''))).length;
+  return Object.freeze({
+    total: inside.length,
+    fromRegister: inside.length - fromFeed,
+    fromFeed,
+    // The fields a correlation needs: what kind, where, and when. Without them the answer could
+    // only ever report a count, which is what "give me details how crashes are correlated"
+    // got back the first time.
+    records: Object.freeze(inside.map(crash => ({
+      id: text(crash.id),
+      title: text(crash.title) ?? text(crash.incidentType) ?? text(crash.type),
+      severity: text(crash.severity),
+      assetId: text(crash.assetId),
+      reported: text(crash.createdDate) ?? text(crash.reportedAt) ?? null,
+      reportedAtMs: Number.isFinite(crash.reportedAtMs) ? crash.reportedAtMs : null,
+      source: /^FL511-/i.test(String(crash.id ?? '')) ? 'feed' : 'register',
+    }))),
+    available: true,
+  });
 }
 
 /** Records an operator would still act on — anything a class has not marked as finished. */
@@ -253,7 +298,7 @@ export const isOpenRecord = record => Boolean(record?.status) && OPEN.test(recor
  * No Cesium types cross this boundary: what comes out is what can be shown in a summary, sent with
  * a question, and asserted in a test.
  */
-export function buildSpatialContext({ bounds, lines = [], liveEvents = [], assetEntries = [], maintenanceLookup = null, assetIndex = new Map(), selectedAt = null } = {}) {
+export function buildSpatialContext({ bounds, lines = [], liveEvents = [], assetEntries = [], maintenanceLookup = null, assetIndex = new Map(), crashRecords = null, selectedAt = null } = {}) {
   if (!isUsableBounds(bounds)) return null;
   const roadway = resolveRoadwayContext(bounds, lines);
   const events = findLiveEvents(bounds, liveEvents);
@@ -261,6 +306,28 @@ export function buildSpatialContext({ bounds, lines = [], liveEvents = [], asset
   const maintenance = maintenanceLookup
     ? findMaintenance(bounds, maintenanceLookup, assetIndex)
     : Object.fromEntries(Object.values(MAINTENANCE_TYPES).map(key => [key, []]));
+  /**
+   * How many records each class holds in total, loaded or not.
+   *
+   * Without this an empty result is ambiguous: the maintenance classes load lazily — measured at
+   * zero for the first ~12 seconds after the screen opens — so "no historical records in this
+   * area" could equally mean "the register has not arrived". The corpus size tells the two apart,
+   * and a zero here is reported as "not loaded" rather than as "none".
+   */
+  const corpus = Object.fromEntries(Object.entries(MAINTENANCE_TYPES).map(([assetType, key]) =>
+    [key, maintenanceLookup ? (maintenanceLookup(assetType) ?? []).length : 0]));
+  /**
+   * The crashes the Safety layer's hotspot badges count.
+   *
+   * Measured divergence: a badge reading "2 crashes within 100 m" sat over a box in which zero of
+   * the 181 register records fell. The badge was right — it clusters the register PLUS crashes
+   * derived from the live feed, which never enter the maintenance class. Counting the register
+   * alone made the panel contradict the map.
+   *
+   * Kept as its own bucket rather than folded into `maintenance.incidents`: a feed-derived crash
+   * is not a register record, and the two deserve separate names.
+   */
+  const crashes = findCrashes(bounds, typeof crashRecords === 'function' ? crashRecords() : crashRecords);
   return {
     selection: {
       type: 'RECTANGLE',
@@ -273,6 +340,9 @@ export function buildSpatialContext({ bounds, lines = [], liveEvents = [], asset
     liveEvents: events,
     assets,
     maintenance,
+    /** Totals across the whole corridor, so an empty area result can say which kind of empty. */
+    maintenanceCorpus: corpus,
+    crashes,
     totals: {
       events: Object.values(events).reduce((sum, list) => sum + list.length, 0),
       assets: assets.total,

@@ -544,6 +544,16 @@ try {
     tmc,
     maintenanceRecords: assetType => maintenanceWorkspace?.recordsForType(assetType) ?? [],
     assetIndex: () => maintenanceWorkspace?.assetIndex?.() ?? new Map(),
+    // The same crash corpus the Safety layer's hotspot badges are clustered from — the register
+    // PLUS crashes derived from the live feed. Without it a drawn area counted only the register
+    // and disagreed with the number on the map.
+    crashRecords: () => safety?.crashRecords?.() ?? [],
+    // Reveal and narrow the maintenance layer, so "show these on the map" can actually draw the
+    // records an answer just described rather than only naming them.
+    maintenanceView: {
+      reveal: type => maintenanceWorkspace?.reveal?.(type, { live: true }),
+      showOnly: (type, records) => maintenanceWorkspace?.showOnly?.(type, records),
+    },
   });
   if (import.meta.env.DEV) window.__askTwin = askTwin;
   if (import.meta.hot) import.meta.hot.dispose(() => { maintenancePulses.destroy(); eventPulses.destroy(); tmc.destroy(); liveOps.destroy(); traffic.destroy(); safety.destroy(); maintenance.destroy(); maintenanceLayer.destroy(); appNav.destroy(); assetExplorer.destroy(); lightingControls.destroy(); messageSignControls.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });

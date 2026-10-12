@@ -14,6 +14,7 @@
  */
 
 import { CARRIAGEWAY_LABELS } from '../liveOps/carriagewayModel.js';
+import { registerInstant } from '../tmc/registerIncidents.js';
 import { isOpenRecord } from './spatialQuery.js';
 
 /**
@@ -25,11 +26,28 @@ import { isOpenRecord } from './spatialQuery.js';
  */
 const CORRIDOR_WIDE = /\b(entire|whole|all of|across the|corridor[- ]wide|anywhere)\b.*\b(corridor|i[- ]?595)\b|\b(corridor[- ]wide)\b/i;
 
+/** The map-action vocabulary, as sources, so INTENTS and isMapInstruction cannot drift apart. */
+const MAP_VERB_SRC = '\\b(show|display|highlight|plot|focus|zoom|fly|flies|locate|pin|mark|centre|center|take me|go to|jump to|navigate)\\b';
+const MAP_WORD_SRC = '\\b(map|cesium|globe|3d view|on screen|on the view)\\b';
+
 /** The area questions this answers, most specific first — "open work orders" before "work". */
 const INTENTS = Object.freeze([
   { id: 'workOrders', match: /\bwork[- ]?orders?\b/i },
   { id: 'maintenance', match: /\b(maintenance|tickets?|tasks?|inspections?|repairs?)\b/i },
-  { id: 'incidents', match: /\bincidents?|crash(es)?\b/i },
+  // "Show them on the map" is an instruction, not a question, and must be recognised before the
+  // matchers that would answer it in prose. It needs an explicit map word so that "show open work
+  // orders" still means "list them".
+  // Both orders, because "show it on the map" and "on the map, show it" are the same instruction.
+  { id: 'showRecords', match: new RegExp(
+    `(?:${MAP_VERB_SRC})[\\s\\S]*(?:${MAP_WORD_SRC})|(?:${MAP_WORD_SRC})[\\s\\S]*(?:${MAP_VERB_SRC})`, 'i') },
+  // Weather first: "how are these incidents related in terms of weather" is a question about the
+  // records' conditions, and the general incidents matcher would otherwise swallow it and return
+  // the type-and-location breakdown instead.
+  { id: 'incidentWeather', match: /\bweather|rain\w*|storm\w*|wet\b|fog\w*|overcast|humid|windy\b/i },
+  // "historical", "past" and "before" route here too: a follow-up like "I am asking historical"
+  // carries no incident word at all, and used to fall through to the remote model, which had no
+  // idea what the previous question had been about.
+  { id: 'incidents', match: /\bincidents?|crash(es)?|historical|histor(y|ic)|\bpast\b|previously|before\b/i },
   { id: 'closures', match: /\bclosures?|closed\b/i },
   { id: 'cameras', match: /\bcameras?\b|\bcctv\b/i },
   { id: 'signs', match: /\b(message signs?|dms|signs?)\b/i },
@@ -62,7 +80,14 @@ export function parseAreaQuestion(question, hasArea) {
 }
 
 const count = (n, singular, plural = `${singular}s`) => `${n} ${n === 1 ? singular : plural}`;
-const lines = parts => parts.filter(Boolean).join('\n');
+/**
+ * Join the parts that have something to say.
+ *
+ * `null` and `undefined` are "nothing to say" and vanish; an empty string is a deliberate blank
+ * line and survives. Filtering on truthiness dropped both, which collapsed a grouped answer into
+ * one unreadable block.
+ */
+const lines = parts => parts.filter(part => part !== null && part !== undefined).join('\n');
 
 /** "I-595 Eastbound · Section 03", the way the rest of the app writes a place. */
 function segmentLine(segment) {
@@ -80,6 +105,328 @@ export function describeRoadway(context) {
     ? '• I-595 Express — operational sections are not defined for Express, so no section is named'
     : null;
   return lines(['The selected area intersects:', ...sections, express]);
+}
+
+/**
+ * Incidents, both kinds, because the map shows both and they are not the same thing.
+ *
+ * The context carries `liveEvents.incidents` (happening now, from FL511) and
+ * `maintenance.incidents` (the historical crash register, which the Safety layer clusters into the
+ * numbered hotspot badges). Answering only from the first produced "No incidents are inside the
+ * selected area" while a red "23" sat inside the box — both true, both about different data, and
+ * no way for an operator to tell.
+ *
+ * So the answer always states the live position, and whenever historical records are present it
+ * says so too, in their own words: records, not live incidents.
+ */
+export function describeIncidents(context) {
+  const live = context.liveEvents.incidents ?? [];
+  const historical = context.maintenance?.incidents ?? [];
+
+  const liveBlock = live.length
+    ? lines([`${count(live.length, 'live incident')} inside the selected area:`,
+      ...live.map(event => `• ${event.title}${event.severity ? ` · ${event.severity}` : ''}${event.status ? ` · ${event.status}` : ''}${event.carriagewayLabel ? ` · ${event.carriagewayLabel}` : ''}`)])
+    : 'No live incidents are inside the selected area.';
+
+  const crashes = context.crashes ?? null;
+  /**
+   * The hotspot badges' own count, reconciled.
+   *
+   * The Safety layer clusters register crashes together with crashes derived from the live feed.
+   * Reporting only the register made a "2 crashes" badge sit over an area the panel called empty.
+   * Where the two differ, the difference is named rather than hidden.
+   */
+  const crashLine = crashes?.available && crashes.total
+    ? lines([
+      `${count(crashes.total, 'crash record')} inside the area on the Safety layer — the number its `
+        + `hotspot badges count. ${crashes.fromRegister} from the incident register, `
+        + `${crashes.fromFeed} derived from the live FL511 feed (not register records).`,
+      ...crashPointers(crashes.records),
+    ])
+    : null;
+
+  if (!historical.length) {
+    /**
+     * Two different empties, never conflated.
+     *
+     * The register loads lazily, so a question asked in the first seconds after the screen opens
+     * found zero records and the answer said nothing at all about history — indistinguishable
+     * from a genuinely quiet stretch of road. The corpus total settles it.
+     */
+    const corpus = context.maintenanceCorpus?.incidents ?? 0;
+    return lines([
+      liveBlock,
+      '',
+      corpus === 0
+        ? 'Historical incident records cannot be counted yet — the incident register has not finished '
+          + 'loading. Ask again in a moment.'
+        : `None of the ${corpus} incident records in the register fall inside the selected area.`,
+      ...(crashLine ? ['', crashLine] : []),
+    ]);
+  }
+  return lines([liveBlock, '', ...historicalPointers(historical),
+    ...(crashLine && crashes.total !== historical.length ? ['', crashLine] : [])]);
+}
+
+/**
+ * Twenty-three record ids are not an answer.
+ *
+ * The first version listed eight of them and said "…and 15 more", which told an operator nothing
+ * about what the records had in common — which is the only reason they were asked about. These
+ * are the things that actually correlate them: what kind of event, which asset they cluster on,
+ * and over what period. Source wording is counted as-is and never rewritten into a tidier label.
+ */
+export function summariseHistoricalRecords(records = []) {
+  const tally = (list, keyOf) => {
+    const counts = new Map();
+    for (const item of list) {
+      const key = keyOf(item);
+      if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])));
+  };
+  const byType = tally(records, record => record.title);
+  const byAsset = tally(records, record => record.assetId);
+  const times = records
+    .map(record => registerInstant(record.reported))
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b);
+  // Only where the register actually said so: a record with no coordinates of its own is placed
+  // at its damaged asset, and that is a different claim about where it happened.
+  const viaAsset = records.filter(record => record.locatedVia === 'asset').length;
+  return Object.freeze({
+    total: records.length,
+    byType, byAsset,
+    distinctTypes: byType.length,
+    distinctAssets: byAsset.length,
+    from: times.length ? times[0] : null,
+    to: times.length ? times[times.length - 1] : null,
+    datedRecords: times.length,
+    viaAsset,
+  });
+}
+
+const monthYear = ms => new Date(ms).toLocaleDateString('en-US',
+  { month: 'short', year: 'numeric', timeZone: 'America/New_York' });
+
+/**
+ * What the crashes in an area have in common.
+ *
+ * "How are these correlated?" was answered with a count, because the count was all the context
+ * carried. These are the only relations the records actually support — what kind of event, where
+ * they sit, and when — and each is stated as a grouping, never as a cause.
+ */
+function crashPointers(records = []) {
+  if (records.length < 2) {
+    // One record has nothing to correlate with; list it rather than imply a pattern.
+    return records.length === 1
+      ? ['', `The one record is ${records[0].id}${records[0].title ? ` · ${records[0].title}` : ''}.`]
+      : [];
+  }
+  const tally = keyOf => {
+    const counts = new Map();
+    for (const record of records) { const key = keyOf(record); if (key) counts.set(key, (counts.get(key) ?? 0) + 1); }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])));
+  };
+  const byType = tally(record => record.title);
+  const bySeverity = tally(record => record.severity);
+  const times = records.map(record => record.reportedAtMs).filter(Number.isFinite).sort((a, b) => a - b);
+  const out = ['', 'What they have in common'];
+  if (byType.length) {
+    out.push(byType.length === records.length
+      ? `• Type: all different — ${byType.map(([title]) => title).join(', ')}`
+      : `• Type: ${byType.map(([title, n]) => `${n} × ${title}`).join(', ')}`);
+  }
+  if (bySeverity.length) out.push(`• Severity: ${bySeverity.map(([value, n]) => `${n} × ${value}`).join(', ')}`);
+  if (times.length > 1) {
+    const span = Math.round((times[times.length - 1] - times[0]) / 86_400_000);
+    out.push(`• Reported ${span === 0 ? 'on the same day' : `${span} day${span === 1 ? '' : 's'} apart`}`);
+  } else if (!times.length) {
+    out.push('• No reported times are published on these records, so they cannot be ordered in time.');
+  }
+  out.push(`• Source: ${tally(record => record.source).map(([value, n]) => `${n} × ${value}`).join(', ')}`);
+  out.push('');
+  out.push('They share a location because they fall in the area you drew — that is proximity, not a '
+    + 'common cause. Nothing in these records links one to another.');
+  return out;
+}
+
+/** The summary as the bullets an operator can read in one pass. */
+function historicalPointers(records) {
+  const summary = summariseHistoricalRecords(records);
+  const TOP = 4;
+  const typeLines = summary.byType.slice(0, TOP).map(([title, n]) => `• ${n} × ${title}`);
+  if (summary.byType.length > TOP) {
+    const rest = summary.byType.slice(TOP).reduce((sum, [, n]) => sum + n, 0);
+    typeLines.push(`• ${rest} across ${summary.byType.length - TOP} other `
+      + `${summary.byType.length - TOP === 1 ? 'type' : 'types'}`);
+  }
+  const assetLines = summary.byAsset.slice(0, 3).map(([assetId, n]) => `• ${n} at asset ${assetId}`);
+  if (summary.distinctAssets > 3) {
+    assetLines.push(`• spread across ${summary.distinctAssets} distinct asset locations in all`);
+  }
+  const when = summary.from
+    ? (monthYear(summary.from) === monthYear(summary.to)
+      ? `• All in ${monthYear(summary.from)}`
+      : `• ${monthYear(summary.from)} – ${monthYear(summary.to)}`)
+    : '• No reported dates on these records';
+
+  return [
+    `The register holds ${count(summary.total, 'historical incident record')} inside the area — past `
+      + 'records, not current conditions, and the number the Safety layer\'s hotspot badges count.',
+    '',
+    'What they are',
+    ...typeLines,
+    '',
+    'Where they cluster',
+    ...assetLines,
+    '',
+    'When',
+    when,
+    summary.datedRecords && summary.datedRecords < summary.total
+      ? `• ${summary.total - summary.datedRecords} without a reported date` : null,
+    '',
+    'How to read this',
+    summary.viaAsset
+      ? `• ${summary.viaAsset === summary.total ? `All ${summary.total}` : `${summary.viaAsset} of ${summary.total}`} `
+        + 'are positioned at the damaged asset rather than at surveyed coordinates, so they group by '
+        + 'asset, not by an exact spot.'
+      : '• Positions come from the records themselves.',
+    '• "Records" is deliberate — the register does not confirm every one as a crash.',
+    '• A count in one place is a concentration of reports, not a measured crash rate.',
+  ];
+}
+
+/**
+ * The conditions the records were logged in.
+ *
+ * A correlation and nothing more. The register writes a condition on each record; counting them
+ * says how many fell in each, not that the weather had anything to do with it — a tall "Rain"
+ * count may only mean it rains often here. That caveat is part of the answer, not a footnote.
+ */
+export function describeIncidentWeather(context) {
+  const records = context.maintenance?.incidents ?? [];
+  const corpus = context.maintenanceCorpus?.incidents ?? 0;
+  if (!records.length) {
+    return corpus === 0
+      ? 'Historical incident records cannot be grouped by weather yet — the incident register has '
+        + 'not finished loading. Ask again in a moment.'
+      : `None of the ${corpus} incident records in the register fall inside the selected area, so `
+        + 'there is nothing to group by weather.';
+  }
+  const counts = new Map();
+  let unknown = 0;
+  for (const record of records) {
+    const condition = record.weather;
+    if (!condition) { unknown += 1; continue; }
+    counts.set(condition, (counts.get(condition) ?? 0) + 1);
+  }
+  if (!counts.size) {
+    return lines([
+      `${count(records.length, 'historical incident record')} fall inside the selected area, but none `
+        + 'of them carries a recorded weather condition — so they cannot be grouped by weather.',
+      'The register writes the condition per record; where it is absent nothing is inferred from the date.',
+    ]);
+  }
+  const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const known = records.length - unknown;
+  const share = n => `${Math.round((n / known) * 100)}%`;
+  return lines([
+    `${count(records.length, 'historical incident record')} inside the area. `
+      + `${known} carry a recorded weather condition${unknown ? `, ${unknown} do not` : ''}. `
+      + `Shares below are of those ${known}:`,
+    '',
+    // The denominator is stated once above rather than repeated on every line.
+    ...ranked.map(([condition, n]) => `• ${n} × ${condition} — ${share(n)}`),
+    '',
+    'How to read this',
+    `• ${ranked[0][0]} is the most common condition here, which is not the same as the most dangerous: `
+      + 'a large count may only mean those conditions are common on this corridor.',
+    '• This is a correlation between a record and the condition written on it. It does not establish '
+      + 'that the weather contributed to any of them.',
+    '• No exposure denominator is available — there is no count of how much traffic ran in each '
+      + 'condition — so these cannot be turned into per-condition rates.',
+  ]);
+}
+
+/**
+ * The ways an operator asks for something to be put on the map.
+ *
+ * "fly" was missing from the first version, which is the phrasing this application uses in its own
+ * buttons — so "fly to the windy incidents on the cesium map" matched nothing and was answered in
+ * prose. The vocabulary is kept in one place because two matchers below need it.
+ */
+const MAP_VERB = new RegExp(MAP_VERB_SRC, 'i');
+const MAP_WORD = new RegExp(MAP_WORD_SRC, 'i');
+
+/**
+ * Whether a question is asking for a map action rather than an explanation.
+ *
+ * Two shapes count. An explicit map word with a verb is unambiguous. A verb alone counts only when
+ * the question also names a subset the records actually contain — "show me the 6 windy incidents"
+ * is an instruction, while "show me the incidents here" is a request to list them.
+ *
+ * Allowing a map word to stand in for an unrecognised verb is deliberate: "fky to … on cesium mao"
+ * should still work, and guessing at spellings is a worse answer than reading the noun.
+ */
+export function isMapInstruction(question, { qualified = false } = {}) {
+  const text = String(question ?? '');
+  const verb = MAP_VERB.test(text);
+  const place = MAP_WORD.test(text);
+  /**
+   * A question ABOUT the map is not an instruction TO it.
+   *
+   * "What does the cesium map show?" carries both a verb and a map word and would otherwise draw
+   * every record in the area. A leading interrogative marks it as a question — unless it also
+   * names a subset, because "which windy incidents can you show on the map?" is an instruction
+   * wearing a question mark.
+   */
+  const asksAbout = /^\s*(what|which|how|why|does|do|did|is|are|can|could|should)\b/i.test(text);
+  if (verb && place) return qualified || !asksAbout;
+  if (verb && qualified) return true;
+  // A map word plus a named subset, where the verb was mistyped or left out.
+  return place && qualified;
+}
+
+/**
+ * Which of the area's records a "show these" instruction means.
+ *
+ * The filter is read from the conditions and types the records ACTUALLY carry, never from a fixed
+ * vocabulary: "the one with light rain" is resolved by finding a weather value present in this
+ * set, so a condition the register has never used cannot be matched and a new one needs no code
+ * change. An instruction naming nothing selects everything, which is what "show them" means.
+ *
+ * @returns {{records: object[], label: string, matched: boolean, reason: string|null}}
+ */
+export function filterAreaRecords(context, question) {
+  const all = context?.maintenance?.incidents ?? [];
+  const text = String(question ?? '').toLowerCase();
+  if (!all.length) {
+    const corpus = context?.maintenanceCorpus?.incidents ?? 0;
+    return { records: [], label: 'historical incident records', matched: false,
+      reason: corpus === 0
+        ? 'the incident register has not finished loading'
+        : 'no incident records fall inside the selected area' };
+  }
+
+  // Weather, matched against the values present here.
+  const conditions = [...new Set(all.map(record => record.weather).filter(Boolean))]
+    .sort((a, b) => b.length - a.length);   // longest first: "light rain" before "rain"
+  const condition = conditions.find(value => text.includes(value.toLowerCase()));
+  if (condition) {
+    const records = all.filter(record => record.weather === condition);
+    return { records, label: `recorded in ${condition}`, matched: true, reason: null };
+  }
+
+  // Failing that, an incident type.
+  const types = [...new Set(all.map(record => record.title).filter(Boolean))]
+    .sort((a, b) => b.length - a.length);
+  const type = types.find(value => text.includes(value.toLowerCase()));
+  if (type) {
+    return { records: all.filter(record => record.title === type), label: type, matched: true, reason: null };
+  }
+
+  return { records: all, label: 'historical incident records', matched: false, reason: null };
 }
 
 /** One class of live event, or an honest nothing. */
@@ -128,8 +475,9 @@ export function describeMaintenance(context, { openOnly = false, group = null } 
 /** The whole picture — §23. */
 export function describeSummary(context) {
   const events = context.liveEvents;
+  const historical = context.maintenance?.incidents ?? [];
   const operations = [
-    `• ${count(events.incidents.length, 'incident')}`,
+    `• ${count(events.incidents.length, 'live incident')}`,
     `• ${count(events.closures.length, 'closure')}`,
     `• ${count(events.disabledVehicles.length, 'disabled vehicle')}`,
     `• ${count(events.congestion.length, 'congestion report')}`,
@@ -138,6 +486,9 @@ export function describeSummary(context) {
   const open = context.totals.openWorkOrders;
   const maintenance = context.totals.maintenance
     ? `• ${count(context.totals.maintenance, 'maintenance record')}${open ? `, ${count(open, 'open work order')}` : ''}`
+      + (historical.length
+        ? `\n• ${count(historical.length, 'historical incident record')} (past records, not current conditions)`
+        : '')
     : '• No maintenance records';
   return lines([
     describeRoadway(context),
@@ -165,7 +516,10 @@ export function answerAreaQuestion(intent, context) {
   switch (intent) {
     case 'summary': return describeSummary(context);
     case 'roadway': return describeRoadway(context);
-    case 'incidents': return eventSection(context, 'incidents', 'incidents');
+    // showRecords is executed by the caller, which owns the map; the text is produced there too.
+    case 'showRecords': return null;
+    case 'incidentWeather': return describeIncidentWeather(context);
+    case 'incidents': return describeIncidents(context);
     case 'closures': return eventSection(context, 'closures', 'closures');
     case 'assets': return describeAssets(context);
     case 'cameras': return describeAssetCategory(context, /camera/i, 'traffic cameras');
@@ -199,17 +553,44 @@ export function areaIndicatorText(context) {
 export function areaSummaryLines(context) {
   if (!context) return [];
   const { roadway, totals, liveEvents } = context;
+  const historical = context.maintenance?.incidents ?? [];
+  const corpus = context.maintenanceCorpus?.incidents ?? 0;
+  const crashes = context.crashes ?? null;
   const where = roadway.intersectsI595
     ? [...roadway.segments.map(segment => `${CARRIAGEWAY_LABELS[segment.carriageway]} · ${segment.sectionLabel}`),
       ...(roadway.includesExpress ? ['I-595 Express'] : [])]
     : ['Does not intersect the modelled I-595 corridor'];
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+  /**
+   * One fact per row.
+   *
+   * These were already separate lines; the bubble's CSS collapsed them into a paragraph, so the
+   * whole summary arrived as a wall of words. Headed groups and bullets make it scannable now
+   * that the line breaks actually survive.
+   */
   return [
-    ...where,
-    `${totals.sections} roadway ${totals.sections === 1 ? 'section' : 'sections'}`,
-    `${totals.assets} ${totals.assets === 1 ? 'asset' : 'assets'}`,
-    `${liveEvents.closures.length} ${liveEvents.closures.length === 1 ? 'closure' : 'closures'}`,
-    `${liveEvents.incidents.length} ${liveEvents.incidents.length === 1 ? 'incident' : 'incidents'}`,
-    `${totals.openWorkOrders} open work ${totals.openWorkOrders === 1 ? 'order' : 'orders'}`,
+    'Roadway',
+    ...where.map(line => `• ${line}`),
+    '',
+    'In this area',
+    `• ${plural(totals.sections, 'roadway section', 'roadway sections')}`,
+    `• ${plural(totals.assets, 'asset', 'assets')}`,
+    `• ${plural(liveEvents.closures.length, 'closure', 'closures')}`,
+    // "live" is not decoration: an area can hold zero live incidents and dozens of historical
+    // records, and the unqualified word made those two read as a contradiction.
+    `• ${plural(liveEvents.incidents.length, 'live incident', 'live incidents')}`,
+    historical.length
+      ? `• ${plural(historical.length, 'historical incident record', 'historical incident records')}`
+      : (corpus === 0
+        ? '• Historical incident records — register still loading'
+        : '• 0 historical incident records'),
+    // What the map's hotspot badges count, whenever it differs from the register alone.
+    ...(crashes?.available && crashes.total !== historical.length
+      ? [`• ${plural(crashes.total, 'crash record', 'crash records')} on the Safety layer`
+        + ` (${crashes.fromFeed} from the live feed)`]
+      : []),
+    `• ${plural(totals.openWorkOrders, 'open work order', 'open work orders')}`,
   ];
 }
 
@@ -217,6 +598,8 @@ export function areaSummaryLines(context) {
 export const AREA_SUGGESTIONS = Object.freeze([
   'What is happening in this area?',
   'Are there any incidents here?',
+  'Have there been crashes here before?',
+  'What weather were these incidents recorded in?',
   'What closures affect this area?',
   'Which roadway segments are selected?',
   'What assets are here?',
