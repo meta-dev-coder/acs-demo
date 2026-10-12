@@ -14,6 +14,7 @@ import { createInsights } from './insights.mjs';
 import { createOrchestrator } from './orchestrator.mjs';
 import { planPrefetch } from './prefetch.mjs';
 import { systemPrompt } from './prompt.mjs';
+import { createScope } from './sources.mjs';
 import { createTools } from './tools.mjs';
 import { createReloadingStore, createStoreRefresher } from './storeRefresh.mjs';
 import { buildStoreFromSnapshot } from './twinStore.mjs';
@@ -50,8 +51,11 @@ export function createAskService({ provider, storePath, snapshotDir, readLayer, 
   const system = envelope => {
     if (promptVersion !== store.version) { prompts = new Map(); promptVersion = store.version; }
     const persona = envelope.screen?.persona ?? null;
-    if (!prompts.has(persona)) prompts.set(persona, systemPrompt({ classes: store.classes(), persona }));
-    return prompts.get(persona);
+    // One cached prompt per persona and source selection; the default (all sources) is the common case.
+    const scope = createScope(envelope.screen?.sources ?? null);
+    const key = `${persona}|${scope.key}`;
+    if (!prompts.has(key)) prompts.set(key, systemPrompt({ classes: store.classes(), persona, scope }));
+    return prompts.get(key);
   };
   const orchestrator = createOrchestrator({ provider, tools, logger, prefetch: planPrefetch, system, ...(spend ? { spend } : {}) });
   return { store, refresher, spend, orchestrator, ...createAskHttpHandler({ orchestrator, ...(clientKey ? { clientKey } : {}), ...(limiter ? { limiter } : {}) }) };

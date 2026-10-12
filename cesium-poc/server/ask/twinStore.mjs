@@ -52,7 +52,9 @@ export const SNAPSHOT_CLASSES = Object.freeze([
     lon: ['x_coordinate (from roadway)'], lat: ['y_coordinate (from roadway)'], segment: ['Segment'] },
 ]);
 
-export const OPERATORS = Object.freeze(['equals', 'contains']);
+export const OPERATORS = Object.freeze(['equals', 'not_equals', 'contains', 'before', 'after']);
+/** The pseudo-field naming a class's indexed date column (its `at` spec), for before/after filters. */
+export const DATE_FIELD = 'date';
 export const MAX_LIMIT = 50;
 /** Upper bound for `rows()`: an insight that needs more should aggregate in SQL instead. */
 export const MAX_ROWS = 50_000;
@@ -75,6 +77,17 @@ const firstOf = (row, names) => {
   }
   return null;
 };
+/**
+ * A date as sortable ISO text. The register mixes MM/DD/YYYY strings and ISO timestamps, and the
+ * indexed column is ordered as text, so "oldest first" was wrong across the two formats.
+ */
+export function normalizeDate(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const text = String(value).trim();
+  const us = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/.exec(text);
+  if (us) return `${us[3]}-${us[1].padStart(2, '0')}-${us[2].padStart(2, '0')}${us[4] ? `T${us[4].padStart(2, '0')}:${us[5]}:00` : ''}`;
+  return text;
+}
 const finite = value => (Number.isFinite(Number(value)) && value !== null && value !== '' ? Number(value) : null);
 
 /**
@@ -119,7 +132,7 @@ export function writeTwinStore({ outPath, classes, asOf = new Date().toISOString
         for (const name of Object.keys(row)) names.add(name);
         const segment = firstOf(row, spec.segment);
         insert.run(spec.className, key, segment === null ? null : String(segment), finite(firstOf(row, spec.lon)),
-          finite(firstOf(row, spec.lat)), firstOf(row, spec.at) === null ? null : String(firstOf(row, spec.at)), JSON.stringify(row));
+          finite(firstOf(row, spec.lat)), normalizeDate(firstOf(row, spec.at)), JSON.stringify(row));
       }
       for (const name of names) column.run(spec.className, name);
       const rowCount = stored.get(spec.className).n;
@@ -220,11 +233,17 @@ export function openTwinStore(path, { now = Date.now, staleAfterMs = 0 } = {}) {
       const field = String(filter.field ?? '');
       let expression;
       if (field === 'key') expression = 'key';
+      else if (field === DATE_FIELD && !columns.includes(field)) expression = 'at';
       else if (columns.includes(field)) { expression = 'CAST(json_extract(json, ?) AS TEXT)'; params.push(`$."${field}"`); }
       else throw new TypeError(`'${field}' is not a field of ${entry.class}. Fields: ${columns.slice(0, 40).join(', ')}${columns.length > 40 ? ', …' : ''}.`);
-      if (filter.operator === 'equals') {
-        clauses.push(`${expression} = ?`);
-        params.push(String(filter.value ?? ''));
+      if (filter.operator === 'equals' || filter.operator === 'not_equals') {
+        // Case-insensitive, so "closed" excludes "Closed"; a missing value counts as not equal.
+        clauses.push(filter.operator === 'equals' ? `lower(${expression}) = ?` : `coalesce(lower(${expression}), '') <> ?`);
+        params.push(String(filter.value ?? '').toLowerCase());
+      } else if (filter.operator === 'before' || filter.operator === 'after') {
+        // Dates compare as ISO text (normalised at write for the indexed column).
+        clauses.push(`${expression} ${filter.operator === 'before' ? '<' : '>='} ?`);
+        params.push(normalizeDate(filter.value) ?? '');
       } else {
         clauses.push(`lower(${expression}) LIKE ? ESCAPE '\\'`);
         params.push(`%${String(filter.value ?? '').toLowerCase().replace(/[\\%_]/g, c => `\\${c}`)}%`);
@@ -245,23 +264,25 @@ export function openTwinStore(path, { now = Date.now, staleAfterMs = 0 } = {}) {
     check,
 
     /**
-     * Matching records of one class, newest first.
-     * @returns {{className, asOf, totalCount, records: object[]} | {gap}}
+     * Matching records of one class, newest first (or oldest first: `order: 'oldest'`, for
+     * first-in-first-out questions). Records with no date sort last either way.
+     * @returns {{className, asOf, totalCount, order, records: object[]} | {gap}}
      */
-    query(className, { filters = [], fields = null, limit } = {}) {
+    query(className, { filters = [], fields = null, limit, order = 'newest' } = {}) {
       const checked = check(className);
       if (checked.gap) return checked;
       const { entry, columns } = checked;
       const { sql, params } = where(entry, columns, filters);
       const wanted = Array.isArray(fields) && fields.length ? fields.filter(name => columns.includes(name)) : null;
       const totalCount = db.prepare(`SELECT count(*) AS n FROM records WHERE ${sql}`).get(...params).n;
-      const rows = db.prepare(`SELECT key, json FROM records WHERE ${sql} ORDER BY at DESC, key LIMIT ?`).all(...params, limitOf(limit, MAX_LIMIT));
+      const direction = order === 'oldest' ? 'ASC' : 'DESC';
+      const rows = db.prepare(`SELECT key, at, json FROM records WHERE ${sql} ORDER BY at IS NULL, at ${direction}, key LIMIT ?`).all(...params, limitOf(limit, MAX_LIMIT));
       const records = rows.map(row => {
         const record = JSON.parse(row.json);
         const picked = wanted ? Object.fromEntries(wanted.map(name => [name, record[name]])) : record;
         return { key: row.key, ...Object.fromEntries(Object.entries(picked).filter(([, value]) => value !== null && value !== '')) };
       });
-      return { className: entry.class, asOf: entry.as_of, totalCount, records };
+      return { className: entry.class, asOf: entry.as_of, totalCount, order: direction === 'ASC' ? 'oldest' : 'newest', records };
     },
 
     /**

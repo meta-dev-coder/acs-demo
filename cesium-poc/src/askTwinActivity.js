@@ -16,7 +16,7 @@
 import { TOOL_LABELS } from './askTwinStream.js';
 
 const WORKSPACE_LABELS = Object.freeze({ traffic: 'Traffic', safety: 'Safety', maintenance: 'Maintenance', liveOps: 'Live Ops', tmc: 'TMC' });
-export const PERSONA_LABELS = Object.freeze({ tmc_operator: 'TMC operator', maintenance_manager: 'Maintenance manager', safety_engineer: 'Safety engineer' });
+export const PERSONA_LABELS = Object.freeze({ tmc_operator: 'TMC operator', maintenance_manager: 'Maintenance manager', safety_engineer: 'Safety engineer', executive: 'Executive' });
 const fmtMs = ms => (ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms)} ms`);
 const fmtInt = n => Number(n || 0).toLocaleString('en-US');
 
@@ -56,6 +56,7 @@ export function activityEntry(event) {
       if (event.hasArea) parts.push('drawn area');
       if (event.hasView) parts.push('visible map area');
       if (event.historyTurns) parts.push(`${event.historyTurns} earlier turn${event.historyTurns === 1 ? '' : 's'}`);
+      if (event.toggledOff?.length) parts.push(`sources: ${event.sources.join(', ')} (off: ${event.toggledOff.join(', ')})`);
       return { key: 'context', kind: 'context', text: `Context sent: ${parts.length ? parts.join(' · ') : 'question only'}` };
     }
     case 'ModelNote':

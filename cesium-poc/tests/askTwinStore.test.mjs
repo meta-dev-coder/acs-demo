@@ -105,3 +105,41 @@ test('twin-store CLI: a source is required and --out overrides the env default',
   assert.equal(parseArgs(['--from-snapshot', '--out', '/tmp/a.sqlite'], {}).out, '/tmp/a.sqlite');
   assert.throws(() => parseArgs(['--from-snapshot', '--bogus'], {}), /unknown argument/);
 });
+
+describe('twin store: FIFO and date filters', () => {
+  const spec = { className: 'WOs', key: ['id'], at: ['opened'], lon: [], lat: [], segment: [] };
+  const rows = [
+    { id: 'A', opened: '01/17/2025', status: 'In Progress' },
+    { id: 'B', opened: '2024-08-21', status: 'Open' },
+    { id: 'C', opened: '2025-05-07T09:00:00', status: 'Awaiting Parts' },
+    { id: 'D', opened: '2023-02-01', status: 'Closed' },
+    { id: 'E', status: 'Open' },
+  ];
+  const withWos = fn => {
+    const dir = mkdtempSync(join(tmpdir(), 'twin-store-'));
+    try {
+      writeTwinStore({ outPath: join(dir, 's.sqlite'), classes: [{ spec, rows, source: 'test' }] });
+      const store = openTwinStore(join(dir, 's.sqlite'));
+      try { fn(store); } finally { store.close(); }
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  };
+
+  test('oldest first across mixed date formats, undated last, not_equals excludes closed', () => withWos(store => {
+    const open = store.query('WOs', { filters: [{ field: 'status', operator: 'not_equals', value: 'closed' }], order: 'oldest' });
+    assert.deepEqual(open.records.map(r => r.key), ['B', 'A', 'C', 'E']);
+    assert.equal(open.order, 'oldest');
+    assert.deepEqual(store.query('WOs', {}).records.map(r => r.key), ['C', 'A', 'B', 'D', 'E']);
+  }));
+
+  test('before/after on the indexed date', () => withWos(store => {
+    assert.deepEqual(store.query('WOs', { filters: [{ field: 'date', operator: 'after', value: '2025-01-01' }], order: 'oldest' }).records.map(r => r.key), ['A', 'C']);
+    assert.equal(store.count('WOs', { filters: [{ field: 'date', operator: 'before', value: '01/01/2025' }] }).totalCount, 2);
+  }));
+
+  test('normalizeDate', async () => {
+    const { normalizeDate } = await import('../server/ask/twinStore.mjs');
+    assert.equal(normalizeDate('1/7/2025'), '2025-01-07');
+    assert.equal(normalizeDate('2024-08-21T00:00:00'), '2024-08-21T00:00:00');
+    assert.equal(normalizeDate(''), null);
+  });
+});

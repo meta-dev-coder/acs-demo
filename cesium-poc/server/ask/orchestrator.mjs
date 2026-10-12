@@ -21,6 +21,7 @@ import { screenBlock } from './envelope.mjs';
 import { ProviderError } from './modelProvider.mjs';
 import { buildAnswerExtras } from './answerBlocks.mjs';
 import { ANSWER_SCHEMA, systemPrompt } from './prompt.mjs';
+import { createScope, labelOf } from './sources.mjs';
 
 export const DEFAULT_LIMITS = Object.freeze({ maxRounds: 3, toolTimeoutMs: 8_000, runTimeoutMs: 45_000, maxTokens: 2_000 });
 const COORD_TOLERANCE = 1e-4;
@@ -159,7 +160,7 @@ export function isStructuredReply(text) {
 }
 
 /** The reply contract the client renders, with sources, confidence and action decided here. */
-export function finalizeAnswer(rawText, calls) {
+export function finalizeAnswer(rawText, calls, { scope = null } = {}) {
   const parsed = parseModelReply(rawText);
   const { action, dropped } = checkAction(parsed.action, calls);
   const structured = claimsOf(parsed.basis);
@@ -199,6 +200,9 @@ export function finalizeAnswer(rawText, calls) {
     ...(inferred.length ? { basis_inferred: true } : {}),
     ...(unverified.length ? { unverified } : {}),
     ...(blocks.length ? { blocks } : {}),
+    // Which sources the answer drew on and which the user had toggled off, so a narrow answer is
+    // never read as the whole picture.
+    ...(scope ? { scope: { used: scope.usedBy(calls.filter(c => cited.includes(c.ref))).map(labelOf), excluded: scope.excluded.map(labelOf) } } : {}),
     ...(Object.keys(evidence).length ? { evidence } : {}),
     cited,
     uncited: calls.filter(call => call.evidence && !cited.includes(call.ref)).map(call => call.ref),
@@ -283,7 +287,8 @@ export function createOrchestrator({ provider, tools, system = systemPrompt(), l
       log({ runId, ok: false, rounds: 0, ms: now() - started, usage, calls, error: 'daily limit' });
       return null;
     }
-    emit({ type: 'ContextUsed', ...contextSummary(envelope) });
+    const scope = createScope(envelope.screen?.sources ?? null);
+    emit({ type: 'ContextUsed', ...contextSummary(envelope), ...(scope.all ? {} : { sources: scope.selected.map(labelOf), toggledOff: scope.excluded.map(labelOf) }) });
 
     /** Run one lookup with a deadline; record it, emit start and end, return its labelled result text. */
     async function lookup(id, name, input, origin) {
@@ -292,7 +297,7 @@ export function createOrchestrator({ provider, tools, system = systemPrompt(), l
       calls.push(call);
       emit({ type: 'ToolCallStart', id, ref, name, input: call.input, origin });
       const t0 = now();
-      const result = await withDeadline(tools.run(name, input), toolTimeoutMs);
+      const result = await withDeadline(tools.run(name, input, { scope }), toolTimeoutMs);
       call.status = result.timedOut ? 'timeout' : statusOf(result.output);
       call.source = result.source;
       call.evidence = !result.timedOut && isEvidence(name, result.output);
@@ -307,7 +312,7 @@ export function createOrchestrator({ provider, tools, system = systemPrompt(), l
 
     try {
       // Lookups the question obviously needs run first, in parallel, and go to the model as data.
-      const planned = (signal?.aborted ? [] : prefetch(envelope)) ?? [];
+      const planned = ((signal?.aborted ? [] : prefetch(envelope)) ?? []).filter(item => !scope.refusal(item.name, item.input));
       let prefetched = '';
       if (planned.length) {
         const done = await Promise.all(planned.map((item, i) => {
@@ -410,16 +415,16 @@ export function createOrchestrator({ provider, tools, system = systemPrompt(), l
       let text = await playRounds(1, maxRounds);
       // A give-up ("the twin cannot isolate…") that rests on no lookup gets one more try, told what
       // can answer such questions, while there is time. At most once per question.
-      const first = finalizeAnswer(text, calls);
+      const first = finalizeAnswer(text, calls, { scope });
       if (givesUp(first) && deadline - now() > GIVE_UP_MIN_MS) {
         emit({ type: 'ModelNote', round: rounds, text: 'The answer gave up without using the data; trying one more lookup.' });
         messages.push({ role: 'assistant', content: [{ type: 'text', text }] }, { role: 'user', content: GIVE_UP_NOTE });
         const retried = await playRounds(rounds + 1, rounds + 2).catch(error => { if (signal?.aborted) throw error; return null; });
         if (retried) text = retried;
       }
-      const answer = finalizeAnswer(text, calls);
+      const answer = finalizeAnswer(text, calls, { scope });
       emit({ type: 'Checks', confidence: answer.confidence, reason: answer.confidence_reason, cited: answer.cited,
-        uncited: answer.uncited, gaps: answer.gaps, actionNote: answer.action_note ?? null, ...(answer.unverified ? { unverified: answer.unverified } : {}) });
+        uncited: answer.uncited, gaps: answer.gaps, actionNote: answer.action_note ?? null, ...(answer.scope?.excluded?.length ? { toggledOff: answer.scope.excluded } : {}), ...(answer.unverified ? { unverified: answer.unverified } : {}) });
       emit({ type: 'AnswerReady', answer });
       emit({ type: 'RunFinished', runId, ms: now() - started, rounds, usage });
       log({ runId, ok: true, rounds, ms: now() - started, usage, calls });

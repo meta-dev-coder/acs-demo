@@ -28,7 +28,7 @@ const FILTERS_SCHEMA = {
   type: 'array', maxItems: 5,
   items: {
     type: 'object', required: ['field', 'operator', 'value'],
-    properties: { field: { type: 'string', description: "A field name exactly as describe_store lists it, or 'key'" },
+    properties: { field: { type: 'string', description: "A field name exactly as describe_store lists it, 'key', or 'date' (the class's indexed date, for before/after)" },
       operator: { type: 'string', enum: [...OPERATORS] }, value: { type: 'string' } },
   },
 };
@@ -41,10 +41,10 @@ export const TOOL_DEFINITIONS = Object.freeze([
   },
   {
     name: 'query_records',
-    description: 'Matching records of one class (newest first), e.g. work orders for an asset or incidents on a segment. Returns totalCount and up to `limit` records.',
+    description: 'Matching records of one class, newest first or oldest first (order: "oldest" for first-in-first-out), e.g. open work orders for cameras. Filters: equals / not_equals (case-insensitive), contains, before / after (dates, e.g. field "date"). Returns totalCount and up to `limit` records.',
     input_schema: {
       type: 'object', required: ['class_name'],
-      properties: { class_name: { type: 'string' }, filters: FILTERS_SCHEMA,
+      properties: { class_name: { type: 'string' }, filters: FILTERS_SCHEMA, order: { type: 'string', enum: ['newest', 'oldest'] },
         fields: { type: 'array', items: { type: 'string' }, description: 'Fields to return (default all)' },
         limit: { type: 'integer', minimum: 1, maximum: MAX_LIMIT } },
     },
@@ -113,11 +113,12 @@ export function createTools({ store, getLiveEvents = null, readLayer = null, fet
   const sourceOf = className => store.classes().find(c => c.className.toLowerCase() === String(className ?? '').toLowerCase());
 
   const handlers = {
-    describe_store({ class_name } = {}) {
-      const classes = store.classes();
+    describe_store({ class_name } = {}, { scope = null } = {}) {
+      const classes = store.classes().filter(c => !scope || scope.allowsClass(c.className));
       if (!classes.length) return { output: { gap: { type: 'not_ready', detail: 'The twin store has not been built yet.' } }, source: null };
       if (!class_name) {
-        return { output: { classes: classes.map(({ className, rowCount, asOf, source }) => ({ className, origin: originOf(source), rowCount, asOf })) }, source: 'Twin store' };
+        return { output: { classes: classes.map(({ className, rowCount, asOf, source }) => ({ className, origin: originOf(source), rowCount, asOf })),
+          ...(scope && !scope.all ? { toggledOff: scope.excluded } : {}) }, source: 'Twin store' };
       }
       const entry = sourceOf(class_name);
       if (!entry) return { output: { gap: { type: 'not_ready', className: class_name, detail: `Unknown class. Classes: ${classes.map(c => c.className).join(', ')}.` } }, source: null };
@@ -125,8 +126,8 @@ export function createTools({ store, getLiveEvents = null, readLayer = null, fet
       return { output: { ...entry, origin: originOf(entry.source), purpose: guide.purpose ?? null, notes: guide.notes ?? null }, source: classSource(entry) };
     },
 
-    query_records({ class_name, filters = [], fields, limit } = {}) {
-      const result = store.query(class_name, { filters, fields, limit: limitOf(limit, MAX_LIMIT) });
+    query_records({ class_name, filters = [], fields, limit, order } = {}) {
+      const result = store.query(class_name, { filters, fields, limit: limitOf(limit, MAX_LIMIT), order });
       if (result.gap) return { output: result, source: null };
       return { output: { ...result, records: result.records.map(r => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, clip(v)]))) },
         source: classSource({ ...result, source: sourceOf(result.className)?.source }) };
@@ -216,11 +217,14 @@ export function createTools({ store, getLiveEvents = null, readLayer = null, fet
      * Run one tool. Never throws: bad input becomes `{error}` the model can correct.
      * @returns {Promise<{text: string, output: object, source: string|null, summary?: string}>}
      */
-    async run(name, input) {
+    async run(name, input, { scope = null } = {}) {
       const handler = Object.hasOwn(handlers, name) ? handlers[name] : null;
       let result;
       try {
-        result = handler ? await handler(input ?? {}) : { output: { error: `Unknown tool '${name}'.` }, source: null };
+        // A source the user toggled off is refused here, the one place every lookup passes through.
+        const refused = handler && scope ? scope.refusal(name, input ?? {}) : null;
+        result = refused ? { output: refused, source: null }
+          : handler ? await handler(input ?? {}, { scope }) : { output: { error: `Unknown tool '${name}'.` }, source: null };
       } catch (error) {
         result = { output: { error: String(error?.message ?? error).slice(0, 300) }, source: null };
       }

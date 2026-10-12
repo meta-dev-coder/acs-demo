@@ -17,6 +17,7 @@ import { geometryIntersectsBounds } from './spatial/areaGeometry.js';
 import { createTwinUiApi, logLine } from './twinUiApi.js';
 import { renderBlocks } from './askTwinBlocks.js';
 import { createEvidenceChips } from './askTwinEvidence.js';
+import { loadSources, normalizeSources, presetFor, saveSources, scopeLine, SOURCES, sourcesForScreen, toggleSource } from './askTwinSources.js';
 
 // `npm run dev` serves the orchestrator itself (server/ask/localAsk.mjs), so a dev build asks it
 // same-origin; a build without VITE_ASK_THE_TWIN_API keeps the deployed service.
@@ -36,6 +37,7 @@ const SUGGESTIONS = [
 const PERSONA_SUGGESTIONS = Object.freeze({
   tmc_operator: ['Which incident is riskiest right now?', 'Any closures on I-595 right now, and which camera is closest?', 'Rain is coming this afternoon — where should we pre-position patrols?'],
   maintenance_manager: ['How many work orders are still open, by asset type?', 'Which assets have the most tickets?', 'Which ITS inspections failed most recently?'],
+  executive: ['Which camera sites should we fix first, and what does waiting cost?', 'Prioritize the open camera work orders', 'Where is toll revenue most at risk from open maintenance?'],
   safety_engineer: ['Where are the crash hotspots in wet weather?', 'How many incidents involved injuries, by segment?', 'Rain is forecast — which sections are most at risk?'],
 });
 const PERSONA_KEY = 'askTwin.persona.v1';
@@ -133,9 +135,10 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
           <option value="tmc_operator">TMC operator</option>
           <option value="maintenance_manager">Maintenance manager</option>
           <option value="safety_engineer">Safety engineer</option>
+          <option value="executive">Executive</option>
         </select>
       </label>
-      <p class="ask-twin-persona-note">A persona changes the emphasis and starter questions only. Everyone gets the same read-only data until sign-in exists.</p>
+      <p class="ask-twin-persona-note">A persona changes the emphasis, the starter questions and the default data sources. Toggle sources under the conversation; it narrows what a question reads (focus, not access control).</p>
     </div>
     <div class="ask-twin-body">
       <div class="ask-twin-area-bar">
@@ -148,6 +151,7 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
       </div>
       <div class="ask-twin-messages" role="log" aria-live="polite"></div>
       <div class="ask-twin-suggestions"></div>
+      <div class="ask-twin-sources-bar" role="group" aria-label="Data sources for the next question"></div>
       <div class="ask-twin-context" aria-label="What the next question is about"></div>
       <form class="ask-twin-form">
         <input class="ask-twin-input" type="text" placeholder="Ask about I-595…" maxlength="512" autocomplete="off"/>
@@ -161,6 +165,7 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
   const messages = panel.querySelector('.ask-twin-messages');
   const suggestEl = panel.querySelector('.ask-twin-suggestions');
   const contextEl = panel.querySelector('.ask-twin-context');
+  const sourcesBar = panel.querySelector('.ask-twin-sources-bar');
   const form     = panel.querySelector('.ask-twin-form');
   const input    = panel.querySelector('.ask-twin-input');
   const sendBtn  = panel.querySelector('.ask-twin-send');
@@ -223,7 +228,31 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
   let persona = readPersona();
   const personaSelect = settingsEl.querySelector('.ask-twin-persona-select');
   personaSelect.value = persona ?? '';
-  personaSelect.onchange = () => { persona = personaSelect.value || null; writePersona(persona); renderSuggestions(); renderContext(); };
+  // Data sources, toggled like map layers; picking a persona applies its preset.
+  let sources = loadSources();
+  function renderSources() {
+    sourcesBar.replaceChildren(...SOURCES.map(({ id, label, short }) => {
+      const on = sources.includes(id);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `ask-twin-source-toggle${on ? ' is-on' : ''}`;
+      btn.textContent = short;
+      btn.title = `${label}: ${on ? 'included' : 'toggled off'} for the next question`;
+      btn.setAttribute('aria-pressed', String(on));
+      btn.onclick = () => { sources = toggleSource(sources, id); saveSources(sources); renderSources(); };
+      return btn;
+    }));
+  }
+  renderSources();
+  personaSelect.onchange = () => {
+    persona = personaSelect.value || null;
+    writePersona(persona);
+    sources = normalizeSources(presetFor(persona));
+    saveSources(sources);
+    renderSources();
+    renderSuggestions();
+    renderContext();
+  };
   expandBtn.onclick = () => {
     dock.setExpanded(!dock.expanded);
     expandBtn.setAttribute('aria-pressed', String(dock.expanded));
@@ -307,6 +336,15 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
       row.appendChild(conf);
 
       wrap.appendChild(row);
+
+      // What the answer drew on and what was toggled off: a narrow answer never passes for the whole picture.
+      const scopeText = scopeLine(meta.scope);
+      if (scopeText) {
+        const line = document.createElement('div');
+        line.className = `ask-twin-scope${meta.scope.excluded?.length ? ' is-narrowed' : ''}`;
+        line.textContent = scopeText;
+        wrap.appendChild(line);
+      }
 
       // Why the twin is (or is not) sure, in its own words: which claims cite which lookups.
       if (meta.confidence_reason) {
@@ -1206,6 +1244,8 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
   /** What the operator is looking at, as ids: the service treats it as context, never as authority. */
   function screenSnapshot() {
     const screen = { workspace: document.body.dataset.section || null, ...(persona ? { persona } : {}) };
+    const picked = sourcesForScreen(sources);
+    if (picked) screen.sources = picked;
     if (tmc && screen.workspace === 'tmc') {
       if (tmc.temporal?.mode) screen.temporal = { mode: tmc.temporal.mode, ...(tmc.temporal.date ? { date: String(tmc.temporal.date) } : {}) };
       const id = tmc.selectedIncidentId ? String(tmc.selectedIncidentId) : null;

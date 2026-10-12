@@ -7,12 +7,15 @@
  * answer look verified — history goes back to the model as plain text, capped, and the screen as a
  * short labelled block. Badges, numbers and confidence bind only to this turn's own tool results.
  */
+import { sanitizeSources } from './sources.mjs';
+
 export const MAX_QUESTION = 512;
 /**
- * Demo personas. A persona picks the playbook and the starter questions; it never grants tools or
- * data — every session gets the same read-only tool set until real sign-in exists.
+ * Demo personas. A persona picks the playbook, the starter questions and the default data sources
+ * (config/askTwin/sources.json presets). It never grants anything: sources only narrow what a
+ * question reads, and there is no sign-in yet, so this is focus, not access control.
  */
-export const PERSONAS = Object.freeze(['tmc_operator', 'maintenance_manager', 'safety_engineer']);
+export const PERSONAS = Object.freeze(['tmc_operator', 'maintenance_manager', 'safety_engineer', 'executive']);
 export const MAX_HISTORY_TURNS = 6;
 export const MAX_HISTORY_CHARS = 6_000;
 const MAX_TURN_CHARS = 1_500;
@@ -56,6 +59,8 @@ function sanitizeScreen(screen, spatialContext) {
   const workspace = text(screen.workspace, 32);
   if (workspace) out.workspace = workspace;
   if (PERSONAS.includes(screen.persona)) out.persona = screen.persona;
+  const sources = sanitizeSources(screen.sources);
+  if (sources) out.sources = sources;
   const mode = text(screen.temporal?.mode, 16);
   if (mode) out.temporal = { mode, ...(text(screen.temporal?.date, 32) ? { date: text(screen.temporal.date, 32) } : {}) };
   const selectionId = text(screen.selection?.id, MAX_ID);

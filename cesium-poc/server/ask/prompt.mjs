@@ -7,6 +7,7 @@
  * spends a whole round asking what data exists before it asks for the data.
  */
 import { ZONE_A } from '../liveDc/askTwin.mjs';
+import { scopePrompt } from './sources.mjs';
 import { originOf } from './twinStore.mjs';
 
 const MAX_FIELDS = 30;
@@ -44,6 +45,7 @@ ACTION RULES: an action's coordinates and entity_id must be ones a lookup return
 export const PERSONA_PLAYBOOKS = Object.freeze({
   tmc_operator: 'PERSONA (demo): TMC operator on shift. Lead with what needs action now: active incidents, their secondary-incident risk and rank, upstream congestion, the nearest upstream camera, and the mitigation the twin recommends. Keep answers short and operational.',
   maintenance_manager: 'PERSONA (demo): maintenance manager. Lead with assets, open tickets and work orders, inspection results and recurring failures; tie live events to the assets and records they touch. Prefer counts and ids over narrative.',
+  executive: 'PERSONA (demo): executive. Lead with the business trade-off: what it costs or puts at risk (revenue, availability, safety exposure), what changes if the order of work changes, and which data the answer could not include. Keep it short and decision-ready.',
   safety_engineer: 'PERSONA (demo): safety engineer. Lead with crash history: hotspots by section, wet versus dry weather, lane-closure hours and injury crashes, and what the record cannot show (exposure, speed). Be explicit about baselines.',
 });
 
@@ -59,8 +61,10 @@ export function storeSummary(classes) {
  * @param {{classes?: object[], persona?: string|null}} [options]  the store's classes (from
  *   `store.classes()`) and the demo persona; each persona's prompt is cached on its own
  */
-export function systemPrompt({ classes = null, persona = null } = {}) {
-  return [ZONE_A, classes ? storeSummary(classes) : '', RULES, PERSONA_PLAYBOOKS[persona] ?? '', OUTPUT].filter(Boolean).join('\n\n');
+export function systemPrompt({ classes = null, persona = null, scope = null } = {}) {
+  // Only the classes in scope are described, so the model does not plan lookups that will be refused.
+  const visible = classes && scope ? classes.filter(c => scope.allowsClass(c.className)) : classes;
+  return [ZONE_A, visible ? storeSummary(visible) : '', scope ? scopePrompt(scope) : '', RULES, PERSONA_PLAYBOOKS[persona] ?? '', OUTPUT].filter(Boolean).join('\n\n');
 }
 
 export const SYSTEM_PROMPT = systemPrompt();

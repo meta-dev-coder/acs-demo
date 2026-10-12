@@ -838,6 +838,14 @@ body.ask-twin-docked { position: relative; width: calc(100% - var(--ask-twin-doc
 .ask-twin-context-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--ui-border-soft); font-size: 10.5px; color: var(--ui-text-secondary); background: var(--ui-surface); }
 .ask-twin-context-remove { border: 0; background: none; color: var(--ui-text-muted); padding: 0 0 0 2px; font-size: 12px; line-height: 1; cursor: pointer; }
 .ask-twin-context-remove:hover { color: var(--ui-text); }
+/* Data-source toggles (askTwinSources.js): like layer switches, on = filled accent, off = outline. */
+.ask-twin-sources-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding: 0 12px 4px; }
+.ask-twin-sources-bar::before { content: 'Sources'; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ui-text-muted); margin-right: 2px; }
+.ask-twin-source-toggle { padding: 2px 9px; border-radius: 10px; border: 1px solid var(--ui-border-soft); background: transparent; color: var(--ui-text-muted); font-size: 10.5px; cursor: pointer; text-decoration: line-through; text-decoration-color: color-mix(in srgb, currentColor 45%, transparent); }
+.ask-twin-source-toggle.is-on { background: var(--ui-accent-soft, var(--ui-surface)); border-color: var(--ui-accent-line); color: var(--ui-text); text-decoration: none; }
+.ask-twin-source-toggle:focus-visible { outline: 2px solid var(--ui-accent-strong); outline-offset: 1px; }
+.ask-twin-scope { font-size: 10.5px; color: var(--ui-text-muted); }
+.ask-twin-scope.is-narrowed { color: var(--ui-text-secondary); }
 :root[data-theme="light"] .ask-twin-activity { --act-warn: #a16207; }
 :root[data-theme="light"] .ask-twin-gaps, :root[data-theme="light"] .ask-twin-refs.is-uncited { color: #92400e; }
 
