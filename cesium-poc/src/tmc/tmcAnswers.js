@@ -125,9 +125,19 @@ const has = (question, ...words) => {
 };
 
 /** Which TMC question, if any, this is. Matched on wording the suggestions actually use. */
+/**
+ * "What is a DMS?" is a vocabulary question, not an incident question.
+ *
+ * It contains "dms", so the warning matcher claimed it and replied "Warning activation is UNKNOWN
+ * for FL511-INCIDENT-882157" — a confident answer to something nobody asked. Definitional phrasing
+ * is handed on rather than captured.
+ */
+const DEFINITIONAL = /^\s*(what|who)\s+(is|are|does|do)\s+(a|an|the)?\s*[\w-]+\s*\??\s*$|^\s*(define|meaning of)\b/i;
+
 export function parseTmcQuestion(question) {
   const text = String(question ?? '').toLowerCase().trim();
   if (!text) return null;
+  if (DEFINITIONAL.test(text)) return null;
   // Upstream protection. Before the patrol block, because "compare patrol and warning response"
   // mentions both and the warning is the part the patrol answers cannot speak to.
   if (/\bwarning\b|\bdms\b/.test(text)) {
