@@ -115,6 +115,35 @@ Only when 1–6 pass do we move to section 6.
 
 ---
 
+## 3.4 Data sources, site prioritisation and toll data
+
+**Data-source toggles.** The panel shows `Sources: Maintenance · Safety · Traffic · Tolling` under the conversation, toggled like
+map layers (`config/askTwin/sources.json`). The selection travels with each question; the server describes only the classes in
+scope, refuses lookups outside it (`out_of_scope` gap) and every answer ends with "Answered from … · Toggled off: …". Picking a
+persona applies its preset (maintenance manager → Maintenance only; executive → all). This is focus, not access control.
+
+**Site prioritisation.** `prioritize_sites` ranks sites with open work orders (default: cameras) by weighted criteria from
+`config/askTwin/prioritization.json`: FIFO age, distance from the depot, inspection risk, work-order priority, and toll revenue at
+risk (only when Tolling is on). Presets: maintenance, nearest, executive. On the committed snapshot:
+- Maintenance view: CCTV 5078 (open since 2024-08-21) → CCTV 5075 → CCTV 5079.
+- Executive view (Tolling on): CCTV 5079 first (▲2), because of its revenue at risk, then 5078, 5075.
+
+Assumptions you must state when demoing: the depot location is assumed; the three sites are traffic CCTV, not toll plate cameras,
+so their camera-to-gantry links are demo authoring; the toll transactions are SYNTHETIC (`config/askTwin/syntheticTolls.json`,
+`npm run tolls:synthetic`); FDOT operates I-595 Express tolling and keeps the revenue, while ACS is paid availability payments,
+so "revenue impact" is FDOT's view unless availability deductions are modelled.
+
+**Real toll data (phase 4).** When FDOT / Florida's Turnpike provide an extract:
+```bash
+npm run tolls:import -- path/to/extract.csv --dry-run     # validates and reports: days, gantries, unknown ids, rows without image split
+npm run tolls:import -- path/to/extract.csv               # replaces the synthetic class in ASK_TWIN_STORE as origin 'imported'
+```
+Format: `config/askTwin/toll-import-template.csv` (hourly or daily rows; aliases such as `plaza_id`, `video_transactions`, `revenue`
+are accepted). Revenue at risk needs the image-dependent split (plate/video transactions); without it the criterion is NA. The
+import survives DataConnect refreshes; restart the ask service to use it at once. What to request from FDOT: per gantry, per hour or
+day, total transactions, transponder vs image-based (toll-by-plate / violation) transactions, revenue, and unbillable image counts;
+plus which roadside cameras each gantry's image capture depends on (to replace the demo links).
+
 ## 4. Packages and services to install on the EC2 host
 
 | Item | Needed for | Notes |

@@ -23,7 +23,9 @@
     "twin:store": "node --no-warnings tools/twin-store.mjs --from-snapshot",
     "twin:store:dc": "node --no-warnings tools/twin-store.mjs --from-dataconnect",
     "ask:serve": "node --no-warnings tools/ask-serve.mjs",
-    "ask:eval": "node --no-warnings tools/ask-eval.mjs"
+    "ask:eval": "node --no-warnings tools/ask-eval.mjs",
+    "tolls:import": "node --no-warnings tools/import-toll-transactions.mjs",
+    "tolls:synthetic": "node tools/generate-toll-transactions.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

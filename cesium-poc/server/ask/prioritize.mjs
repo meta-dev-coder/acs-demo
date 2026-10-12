@@ -70,9 +70,11 @@ export function createPrioritizer({ store, now = Date.now }) {
     const perGantry = new Map();
     for (const r of tolls.records) {
       const id = r.gantry_id;
-      const g = perGantry.get(id) ?? { days: 0, image: 0, transactions: 0 };
+      const g = perGantry.get(id) ?? { days: 0, imageDays: 0, image: 0, transactions: 0 };
       g.days += 1;
-      g.image += Number(r.image_dependent_revenue_usd) || 0;
+      // Imported data may lack the image-dependent split; then revenue at risk is NA, never 0.
+      const image = r.image_dependent_revenue_usd;
+      if (image !== null && image !== undefined && image !== '' && Number.isFinite(Number(image))) { g.image += Number(image); g.imageDays += 1; }
       g.transactions += Number(r.transactions) || 0;
       perGantry.set(id, g);
     }
@@ -80,8 +82,8 @@ export function createPrioritizer({ store, now = Date.now }) {
     for (const name of names) {
       const link = links.get(String(name).toLowerCase());
       const g = link ? perGantry.get(link.gantry_id) : null;
-      if (!link || !g?.days) { out.set(name, null); continue; }
-      const daily = g.image / g.days;
+      if (!link || !g?.imageDays) { out.set(name, null); continue; }
+      const daily = g.image / g.imageDays;
       out.set(name, { usdPerDay: round(daily * link.share * CONFIG.siteRevenue.unrecoverableFraction, 0), gantry: link.gantry_id,
         gantryTransactionsPerDay: Math.round(g.transactions / g.days), share: link.share, why: link.why });
     }

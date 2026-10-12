@@ -18,6 +18,8 @@ step 1 of that spec, done locally first.
 | `answerBlocks.mjs` | KPI/bars/table/trend blocks and evidence records, copied from the lookups an answer cites. |
 | `spendGuard.mjs` | Daily token budget (`ASK_TWIN_DAILY_TOKENS`). |
 | `askProxy.mjs` | live-dc forwards the ask route to `live-dc-ask.service` (`ASK_TWIN_SERVICE_URL`). |
+| `sources.mjs` | Per-question data-source scope (`config/askTwin/sources.json`): refusals, scoped prompt, used/excluded in answers. |
+| `prioritize.mjs` | `prioritize_sites`: switchable-criteria site ranking (FIFO, distance, inspection, priority, revenue) with presets. |
 | `storeRefresh.mjs` | Keeps the store current: live classes every 5 min, historical daily, atomic swap and reopen; a failed refresh keeps the last good store. |
 
 ## Run it locally
