@@ -34,6 +34,8 @@ export function describeInput(name, input = {}) {
   else if (name === 'records_near' && input.near) parts.push(`within ${input.radius_m ?? 500} m of ${Number(input.near.lat).toFixed(4)}, ${Number(input.near.lon).toFixed(4)}`);
   else if (input.near) parts.push(`within ${input.near.radius_m ?? 1000} m of ${Number(input.near.lat).toFixed(4)}, ${Number(input.near.lon).toFixed(4)}`);
   if (input.incident_id) parts.push(input.incident_id);
+  if (input.asset_type) parts.push(input.asset_type);
+  if (input.preset) parts.push(`${input.preset} preset`);
   if (input.weather && input.weather !== 'any') parts.push(`${input.weather} weather`);
   if (input.hours) parts.push(`next ${input.hours} h`);
   if (name === 'get_weather' && Number.isFinite(input.lat)) parts.push(`${Number(input.lat).toFixed(3)}, ${Number(input.lon).toFixed(3)}`);

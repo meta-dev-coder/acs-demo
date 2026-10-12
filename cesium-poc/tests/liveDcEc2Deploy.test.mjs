@@ -104,7 +104,8 @@ describe('EC2 bundle', () => {
         status = await fetch(`http://127.0.0.1:${port}/api/i595/ask/status`).then(r => r.json()).catch(() => null);
       }
       assert.ok(status, `status answered (output: ${output.slice(0, 500)})`);
-      assert.equal(status.store.snapshot, SNAPSHOT_CLASSES.length);
+      assert.equal(status.store.snapshot + status.store.synthetic, SNAPSHOT_CLASSES.length);
+      assert.equal(status.store.synthetic, 1, 'the toll transactions are labelled synthetic');
       assert.equal(status.refresh.off, true);
     } finally {
       child.kill('SIGTERM');

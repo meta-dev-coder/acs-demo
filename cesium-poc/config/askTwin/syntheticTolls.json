@@ -1,0 +1,20 @@
+{
+  "$comment": "SYNTHETIC demo assumptions for public/dataconnect-data/toll_transactions_synthetic.json (tools/generate-toll-transactions.mjs). No published per-gantry I-595 Express volumes, image shares or revenue exist (research notes: 'Ask the Twin data source toggles'). Volumes are scaled from the FDOT express-lane bridge count (~9,700 vehicles/day, 2022) and plausible toll levels ($0.50 minimum, dynamic). FDOT operates the tolling and keeps the revenue. Replace with real data via tools/import-toll-transactions.mjs.",
+  "endDate": "2026-09-30",
+  "days": 28,
+  "seed": 595,
+  "imageDependentShare": 0.06,
+  "weekendFactor": 0.55,
+  "gantries": {
+    "GNT-W01": { "dailyTransactions": 6200, "avgTollUsd": 1.10 },
+    "GNT-M01": { "dailyTransactions": 8800, "avgTollUsd": 1.35 },
+    "GNT-FL":  { "dailyTransactions": 3900, "avgTollUsd": 1.05 },
+    "GNT-M02": { "dailyTransactions": 9400, "avgTollUsd": 1.45 },
+    "GNT-M03": { "dailyTransactions": 10100, "avgTollUsd": 1.60 },
+    "GNT-M04": { "dailyTransactions": 10800, "avgTollUsd": 1.75 },
+    "GNT-TP":  { "dailyTransactions": 5200, "avgTollUsd": 1.25 },
+    "GNT-M05": { "dailyTransactions": 12400, "avgTollUsd": 2.10 },
+    "GNT-M06": { "dailyTransactions": 11200, "avgTollUsd": 1.90 },
+    "GNT-E01": { "dailyTransactions": 7400, "avgTollUsd": 1.15 }
+  }
+}

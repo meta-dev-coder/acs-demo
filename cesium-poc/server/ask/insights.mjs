@@ -17,6 +17,7 @@ import { assessCorridor } from '../../src/tmc/tmcService.js';
 import { liveContext } from '../../src/tmc/temporalContext.js';
 import { haversineMeters } from '../geo.mjs';
 import { originOf } from './twinStore.mjs';
+import { createPrioritizer, PRIORITIZE_DEFINITION } from './prioritize.mjs';
 
 /** A crash further than this from every FDOT section is not placed on one. */
 export const PLACE_WITHIN_M = 400;
@@ -149,7 +150,10 @@ export function createInsights({ store, getLiveEvents = null, readLayer = () => 
       summary: here ? `${record.key} · ${section.sectionLabel}: ${here.crashes} crashes on record (rank ${output.section.rankOnCorridor} of ${ranked.length})` : `${record.key} · recorded incident` };
   }
 
+  const prioritizeSites = createPrioritizer({ store, now });
   const handlers = {
+    prioritize_sites: (input, options) => prioritizeSites(input, options),
+
     async explain_incident({ incident_id, temporal } = {}) {
       // A past date, or an id from the crash register, is explained from the record.
       const recorded = explainRecorded(incident_id);
@@ -316,6 +320,7 @@ export function groupBySection(rows, sections) {
 }
 
 export const INSIGHT_DEFINITIONS = Object.freeze([
+  PRIORITIZE_DEFINITION,
   {
     name: 'explain_incident',
     description: 'Why an active incident has the secondary-incident risk it has: score, rank among active incidents, the factors driving it, upstream sections and congestion, recommended mitigation, nearest upstream camera, and what could not be evaluated. Computed by the TMC risk model the screen uses. For a recorded (past) incident id such as INC-200014, or in historical mode, it explains the record and its section\'s crash history instead.',

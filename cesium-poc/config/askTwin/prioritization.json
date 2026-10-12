@@ -1,0 +1,28 @@
+{
+  "$comment": "prioritize_sites (server/ask/prioritize.mjs). Presets are weight sets over normalised criteria (0 = least urgent among the candidates, 1 = most). The same data gives each stakeholder its own order; switching preset shows how far each site moves and why. Weighted sum, not TOPSIS, so each contribution is explainable. No SLA or safety pins yet: the twin holds no response-time targets.",
+  "criteria": {
+    "fifo": "Age of the oldest open work order (days): first in, first out",
+    "distance": "Distance from the depot (km): closer is sooner",
+    "inspection": "Worst ITS inspection risk rating (1-5) in the last 3 inspections",
+    "priority": "Highest open work-order priority (High 3, Medium 2, Low 1)",
+    "revenue": "Toll revenue at risk per day while the camera is down (needs Tolling & revenue)"
+  },
+  "presets": {
+    "maintenance": { "label": "Maintenance & operations", "weights": { "fifo": 0.5, "distance": 0.3, "inspection": 0.1, "priority": 0.1 } },
+    "nearest": { "label": "Nearest first (crew routing)", "weights": { "distance": 1 } },
+    "executive": { "label": "Executive (revenue impact)", "weights": { "fifo": 0.15, "distance": 0.05, "inspection": 0.1, "priority": 0.1, "revenue": 0.6 } }
+  },
+  "openStatuses": { "exclude": ["closed", "completed", "complete", "cancelled", "canceled"] },
+  "depots": [
+    { "id": "D4-BROWARD-OPS", "name": "Broward maintenance yard (ASSUMED location for the demo)", "lon": -80.2420, "lat": 26.0870, "assumed": true }
+  ],
+  "siteRevenue": {
+    "$comment": "SYNTHETIC demo authoring. Which toll gantry each camera's images support, and what share of that gantry's image-dependent revenue is lost while the camera is down. The three cameras are traffic CCTV, not toll plate cameras: these links stand in for the real camera-to-gantry dependency an agency would supply. Revenue at risk/day = average daily image-dependent revenue of the gantry x share x unrecoverableFraction.",
+    "unrecoverableFraction": 0.85,
+    "links": [
+      { "asset": "CCTV 5079", "gantry_id": "GNT-M05", "share": 0.6, "why": "demo assumption: covers the MP 7.8 ORT gantry approach" },
+      { "asset": "CCTV 5078", "gantry_id": "GNT-TP", "share": 0.1, "why": "demo assumption: secondary view of the Turnpike connector" },
+      { "asset": "CCTV 5075", "gantry_id": "GNT-M04", "share": 0.05, "why": "demo assumption: distant view of the MP 6.1 gantry" }
+    ]
+  }
+}

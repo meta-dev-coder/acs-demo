@@ -94,7 +94,12 @@ export const TOOL_DEFINITIONS = Object.freeze([
 
 const clip = value => (typeof value === 'string' && value.length > MAX_STRING ? `${value.slice(0, MAX_STRING)}…` : value);
 const limitOf = (value, max, fallback = 10) => Math.min(max, Math.max(1, Number.parseInt(value ?? fallback, 10) || fallback));
-const classSource = result => `DataConnect · ${result.className}${originOf(result.source) === 'snapshot' ? ' (snapshot)' : ''}`;
+const classSource = result => {
+  const origin = originOf(result.source);
+  if (origin === 'synthetic') return `SYNTHETIC demo data · ${result.className}`;
+  if (origin === 'imported') return `Imported file · ${result.className}`;
+  return `DataConnect · ${result.className}${origin === 'snapshot' ? ' (snapshot)' : ''}`;
+};
 
 const compactEvent = e => ({
   id: e.id, type: e.type, title: clip(e.title), description: clip(e.description),

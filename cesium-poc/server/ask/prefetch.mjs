@@ -15,6 +15,10 @@ const SAFETY = /\b(crash|crashes|risk|patrol|where|segment|section|safety|danger
 const HOTSPOT = /\b(hotspots?|most crashes|worst (segment|section|stretch|spot)|dangerous|crash-prone|high-crash)\b/;
 /** Words that make a weather question about what is coming, not about the past record. */
 const AHEAD = /\b(forecast|coming|expected|later|tonight|tomorrow|today|this (afternoon|evening|morning)|pre-?position|prepare)\b|next \d+ ?(h|hours?)/;
+/** "Which sites first?" questions: the twin ranks sites itself (prioritize_sites). */
+const PRIORITIZE = /\b(prioriti[sz]e|priority order|which (one|site|camera|sign|detector)s? (first|next)|fix first|repair first|order of (work|repairs?)|replace(ment)?s? first|what (should|do) we (fix|repair) first)\b/;
+const ASSET_TYPES = [[/\b(cameras?|cctv)\b/, 'Camera'], [/\b(dms|message signs?)\b/, 'DMS'], [/\bdetectors?\b/, 'Detector'], [/\bgenerators?\b/, 'Generator']];
+
 /** Words that make a place question about the record (records_near over incidents). */
 const HISTORY = /\b(history|historical|incidents?|crash(es)?|accidents?|how many|record(ed)?|past|happened)\b/;
 const PLACE_PATTERNS = PLACES.places.map(p => ({ ...p, re: new RegExp(p.match) }));
@@ -38,6 +42,10 @@ export function planPrefetch(envelope) {
     plan.push({ name: 'weather_risk_forecast', input: { hours: 6 }, why: 'Checking the rain forecast against wet-weather crash history first.' });
   } else if (HOTSPOT.test(q)) {
     plan.push({ name: 'crash_hotspots', input: { weather: /\b(wet|rain)/.test(q) ? 'wet' : 'any' }, why: 'Ranking crash hotspots from the register first.' });
+  }
+  if (PRIORITIZE.test(q)) {
+    const type = ASSET_TYPES.find(([re]) => re.test(q))?.[1] ?? 'Camera';
+    plan.push({ name: 'prioritize_sites', input: { asset_type: type }, why: `Ranking ${type.toLowerCase()} sites with open work orders first.` });
   }
   // "Incident history at the Turnpike interchange": the model used to fall back on the coarse Segment
   // field and give up. The incidents around that interchange's ramps answer it directly.

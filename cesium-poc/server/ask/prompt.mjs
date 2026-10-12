@@ -18,6 +18,7 @@ const RULES = `HOW TO ANSWER
 - The twin's record classes and fields are listed under TWIN STORE below; use them directly. Call describe_store only for a class whose fields are not listed.
 - For why an incident is risky, which incidents are riskiest, crash hotspots, and rain or weather risk, use explain_incident, rank_incidents, crash_hotspots and weather_risk_forecast. They are computed by the twin itself; never rank incidents or estimate risk yourself.
 - Only when the question names a place (an interchange such as the Turnpike or I-95, a road, a bridge, a camera), use records_near with place {layer, text}, usually the ramps layer for an interchange, rather than the coarse Segment field, and state the radius in the answer. Do not give up on a place question before trying it, and do not use records_near for questions that name no place ("how many incidents in light rain" is count_records with a weather filter).
+- For "which sites or assets should we fix first" questions use prioritize_sites. It picks the preset from the sources in scope (revenue only when Tolling & revenue is on); explain the order with its contributions and, when a comparison is given, say which sites moved and why. Revenue figures from SYNTHETIC data must be called synthetic.
 - When TWIN DATA ALREADY LOOKED UP is given, start from it and do not repeat those lookups.
 - A playbook recommendation in a lookup result is the twin's; mention it and cite it, do not reword its action or invent one.
 - Request independent lookups together in one step rather than one after another.
@@ -52,7 +53,7 @@ export const PERSONA_PLAYBOOKS = Object.freeze({
 /** A compact, stable description of what the store holds, for the cached system prompt. */
 export function storeSummary(classes) {
   if (!classes?.length) return 'TWIN STORE: not built yet — record lookups will report a gap.';
-  const label = { live: 'LIVE, SDNA (FL511 sync)', historical: 'historical, DataConnect', snapshot: 'historical, snapshot', other: 'other' };
+  const label = { live: 'LIVE, SDNA (FL511 sync)', historical: 'historical, DataConnect', snapshot: 'historical, snapshot', synthetic: 'SYNTHETIC demo data: say so whenever you use it', imported: 'imported file', other: 'other' };
   const lines = classes.map(c => `- ${c.className} [${label[originOf(c.source)]}] (${c.rowCount} records, loaded ${String(c.asOf).slice(0, 16)}): ${c.fields.slice(0, MAX_FIELDS).join(', ')}${c.fields.length > MAX_FIELDS ? ', …' : ''}`);
   return `TWIN STORE (record classes for query_records / count_records; field names exactly as listed). LIVE classes are the current FL511 chain (Events → Tickets → Tasks → Work Orders → Inspections → Asset Status), linked by event id; historical classes are the customer's records — say which one an answer uses:\n${lines.join('\n')}`;
 }

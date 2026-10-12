@@ -56,6 +56,20 @@ function blocksOf(call) {
         { type: 'kpi', ref, label: 'Wet-weather share', value: Math.round((o.section.wetShare ?? 0) * 100), unit: '%', note: `corridor ${Math.round((o.section.corridorWetShare ?? 0) * 100)}%` }];
       return [];
     }
+    case 'prioritize_sites': {
+      const sites = o.sites ?? [];
+      if (!sites.length) return [];
+      const money = v => (v === null || v === undefined ? null : `$${Math.round(v).toLocaleString('en-US')}`);
+      const moved = s => (s.moved === undefined ? null : s.moved > 0 ? `▲ ${s.moved}` : s.moved < 0 ? `▼ ${-s.moved}` : '—');
+      const withRevenue = sites.some(s => s.revenue_at_risk_usd_per_day !== null && s.revenue_at_risk_usd_per_day !== undefined);
+      const columns = ['#', 'Site', 'Open since', 'km', 'Risk', ...(withRevenue ? ['Revenue/day'] : []), ...(o.compared_with ? [`vs ${o.compared_label}`] : [])];
+      const rows = sites.map(s => [s.rank, s.site, s.oldest_open_since, s.distance_km, s.inspection_risk,
+        ...(withRevenue ? [money(s.revenue_at_risk_usd_per_day)] : []), ...(o.compared_with ? [moved(s)] : [])]);
+      const out = [{ type: 'table', ref, title: `Fix order · ${o.preset_label}`, columns, rows, rowLocations: sites.map(loc) }];
+      const top = sites[0];
+      out.push({ type: 'bars', ref, title: `Why ${top.site} is first`, items: Object.entries(top.contributions ?? {}).filter(([, v]) => v !== null).map(([k, v]) => ({ label: k, value: v })) });
+      return out;
+    }
     case 'weather_risk_forecast': {
       const out = [];
       const hours = o.forecast?.hours ?? [];
@@ -72,9 +86,9 @@ function blocksOf(call) {
 /** The records behind one lookup, for the evidence chip: id, a label, a position and a few fields. */
 function recordsOf(call) {
   const o = call.output ?? {};
-  const list = o.records ?? o.nearest ?? o.events ?? o.hotspots ?? o.ranked ?? o.features ?? (o.incident ? [o.incident] : []);
+  const list = o.records ?? o.nearest ?? o.events ?? o.hotspots ?? o.ranked ?? o.sites ?? o.features ?? (o.incident ? [o.incident] : []);
   return list.slice(0, MAX_EVIDENCE).map(r => {
-    const id = r.key ?? r.id ?? r.section ?? r.camera_id ?? r.name ?? null;
+    const id = r.key ?? r.id ?? r.site ?? r.section ?? r.camera_id ?? r.name ?? null;
     const fields = Object.fromEntries(Object.entries(r).filter(([k, v]) => !['key', 'id', 'lon', 'lat', 'longitude', 'latitude', 'distance_m'].includes(k) && primitive(v) && v !== null).slice(0, 6));
     return { id: id === null ? null : String(id), label: r.title ?? r.type ?? r.incident_type ?? r.section ?? null, ...(loc(r) ?? (num(r.longitude) !== null ? { lon: num(r.longitude), lat: num(r.latitude) } : {})),
       ...(num(r.distance_m) !== null ? { distance_m: num(r.distance_m) } : {}), fields };

@@ -19,6 +19,7 @@
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { originOf } from '../server/ask/twinStore.mjs';
 
 export const DEFAULT_PORT = 8787;
 
@@ -30,14 +31,14 @@ export function statusOf({ label, store = null, refresher = null, spend = null, 
     model: label,
     checkedAt: new Date(now()).toISOString(),
     store: { classes, live: classes.filter(c => c.origin === 'live').length, historical: classes.filter(c => c.origin === 'historical').length,
-      snapshot: classes.filter(c => c.origin === 'snapshot').length },
+      snapshot: classes.filter(c => c.origin === 'snapshot').length, synthetic: classes.filter(c => c.origin === 'synthetic').length,
+      imported: classes.filter(c => c.origin === 'imported').length },
     refresh: refresher ? { ...refresher.status } : { off: true },
     usage: spend?.status?.() ?? null,
   };
 }
 
-const originOfSource = source => (source === 'dataconnect:live' ? 'live' : source === 'dataconnect:historical' ? 'historical'
-  : String(source ?? '').startsWith('snapshot:') ? 'snapshot' : 'other');
+const originOfSource = source => originOf(source);
 
 /**
  * The request handler around an ask service (createLocalAsk's result). Exported for tests.

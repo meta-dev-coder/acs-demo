@@ -50,6 +50,11 @@ export const SNAPSHOT_CLASSES = Object.freeze([
     at: ['inspection_date'], lon: ['x_coordinate'], lat: ['y_coordinate'], segment: ['segment'] },
   { file: 'safety_inspections_v3.json', className: 'Florida I595 Safety Inspections', key: ['record_id'], at: ['date'],
     lon: ['x_coordinate (from roadway)'], lat: ['y_coordinate (from roadway)'], segment: ['Segment'] },
+  // SYNTHETIC: no per-gantry I-595 transactions are published (tools/generate-toll-transactions.mjs).
+  // Marked synthetic in store_meta, so every answer and the prompt say so; replaced by
+  // tools/import-toll-transactions.mjs when real data arrives.
+  { file: 'toll_transactions_synthetic.json', className: 'I595 Toll Transactions', key: ['record_id'], at: ['date'],
+    lon: ['lon'], lat: ['lat'], segment: ['gantry_id'], synthetic: true },
 ]);
 
 export const OPERATORS = Object.freeze(['equals', 'not_equals', 'contains', 'before', 'after']);
@@ -167,7 +172,7 @@ export function snapshotClasses(snapshotDir) {
   return SNAPSHOT_CLASSES.map(spec => {
     const rows = JSON.parse(readFileSync(join(snapshotDir, spec.file), 'utf8'));
     if (!Array.isArray(rows)) throw new Error(`${spec.file} is not a JSON array`);
-    return { spec, rows, source: `snapshot:${spec.file}` };
+    return { spec, rows, source: `${spec.synthetic ? 'synthetic' : 'snapshot'}:${spec.file}` };
   });
 }
 
@@ -178,12 +183,16 @@ export function buildStoreFromSnapshot({ snapshotDir, outPath, asOf }) {
 
 /**
  * Where a class's rows came from, from its store_meta source: 'live' (an SDNA live class from
- * DataConnect), 'historical' (a customer class from DataConnect) or 'snapshot' (the committed JSON).
+ * DataConnect), 'historical' (a customer class from DataConnect), 'snapshot' (the committed JSON),
+ * 'synthetic' (demo data generated for a gap, e.g. toll transactions) or 'imported' (a file loaded
+ * with tools/import-toll-transactions.mjs).
  */
 export function originOf(source) {
   const s = String(source ?? '');
   if (s === 'dataconnect:live') return 'live';
   if (s === 'dataconnect:historical') return 'historical';
+  if (s.startsWith('synthetic:')) return 'synthetic';
+  if (s.startsWith('import:')) return 'imported';
   return s.startsWith('snapshot:') ? 'snapshot' : 'other';
 }
 
