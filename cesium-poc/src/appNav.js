@@ -24,6 +24,11 @@ const ICONS = Object.freeze({
   // A monitor wall with a warning triangle: the TMC watches the corridor and warns about it.
   tmc: '<rect x="2.6" y="4" width="14.8" height="9.4" rx="1.6"/><path d="M7.4 16.4h5.2M10 13.4v3"/><path d="M10 6.6 8 10.6h4z"/>',
   layers: '<path d="m10 3.2 6.6 3.4L10 10 3.4 6.6z"/><path d="m3.4 10 6.6 3.4L16.6 10"/><path d="m3.4 13.4 6.6 3.4 6.6-3.4"/>',
+  // A shield with a magnifier over it: the Safety screen, but reading evidence rather than
+  // watching. Deliberately close to `safety` and clearly not it.
+  safetyIntel: '<path d="M9.4 3.2 4.4 5.2v4c0 3 2 5.7 5 6.9"/><path d="M9.4 3.2l5 2v2.4"/><circle cx="13.2" cy="12" r="3.1"/><path d="m15.5 14.3 1.9 2"/>',
+  // A gantry: a portal over the road with a reader beneath it, which is what tolling looks like.
+  tolling: '<path d="M3 15.4V7.2M17 15.4V7.2"/><path d="M2.2 7.2h15.6"/><rect x="8.4" y="8.8" width="3.2" height="2.4" rx=".5"/><path d="M10 11.2v1.6"/><path d="M5.6 15.4h8.8"/>',
 });
 
 /** The workspaces, in the order they are shown. */
@@ -33,6 +38,8 @@ export const NAV_SECTIONS = Object.freeze([
   Object.freeze({ id: 'safety', label: 'Safety', icon: 'safety' }),
   Object.freeze({ id: 'liveOps', label: 'Live Ops', icon: 'liveOps' }),
   Object.freeze({ id: 'tmc', label: 'TMC', icon: 'tmc' }),
+  Object.freeze({ id: 'tolling', label: 'Tolling', icon: 'tolling' }),
+  Object.freeze({ id: 'safetyIntel', label: 'Safety Intel', icon: 'safetyIntel' }),
 ]);
 
 /**
@@ -46,6 +53,11 @@ export const APP_ROLES = Object.freeze([
   { id: 'maintenanceTeam', label: 'Maintenance Team', sections: ['maintenance'] },
   { id: 'agency', label: 'Agency', sections: ['safety'] },
   { id: 'tmc', label: 'TMC', sections: ['tmc'] },
+  { id: 'tolling', label: 'Tolling', sections: ['tolling'] },
+  // Safety Intelligence is its own role, not an extra tab on the TMC's. The TMC answers "what is
+  // happening on the corridor now"; this answers "where has the corridor been hurting people, and
+  // what is the evidence". Giving it to the TMC role would invite the two screens to merge.
+  { id: 'safetyIntel', label: 'Safety Intelligence', sections: ['safetyIntel'] },
 ]);
 export const DEFAULT_SECTION = 'liveOps';
 export const resolveRole = id => APP_ROLES.find(role => role.id === id) ?? APP_ROLES[0];

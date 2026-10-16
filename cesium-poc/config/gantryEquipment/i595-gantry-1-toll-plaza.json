@@ -1,0 +1,1487 @@
+{
+  "gantryId": "I595_G01",
+  "modelId": "i595-gantry-1-toll-plaza",
+  "source": {
+    "file": "gantry-1-toll-plaza-v2.glb",
+    "bytes": 76140772,
+    "sha256": "90c744685ae09303c30e4ae2344e95b2c193e8caa9933bee95f7ad2c17340778",
+    "generator": "Khronos glTF Blender I/O v5.0.21",
+    "nodes": 62,
+    "meshes": 62,
+    "namedNodes": 62,
+    "duplicateNames": [],
+    "nodeExtras": 0,
+    "meshExtras": 0
+  },
+  "generatedBy": "tools/inspect-gantry-glb.mjs",
+  "inventory": [
+    {
+      "type": "RFID_ANTENNA",
+      "label": "RFID antennas",
+      "count": 22
+    },
+    {
+      "type": "VES_CAMERA",
+      "label": "VES cameras",
+      "count": 12
+    },
+    {
+      "type": "TOLL_CAMERA",
+      "label": "Toll cameras",
+      "count": 8
+    },
+    {
+      "type": "CCTV_CAMERA",
+      "label": "CCTV cameras",
+      "count": 4
+    },
+    {
+      "type": "DIGITAL_SIGN",
+      "label": "Digital screens",
+      "count": 2
+    },
+    {
+      "type": "STATIC_SIGN",
+      "label": "Signage",
+      "count": 1
+    },
+    {
+      "type": "STRUCTURE",
+      "label": "Gantry structure",
+      "count": 1
+    },
+    {
+      "type": "UNCLASSIFIED",
+      "label": "Unclassified equipment",
+      "count": 12
+    }
+  ],
+  "assets": [
+    {
+      "assetId": "I595_G01_A_DISPLAY_001",
+      "gantryId": "I595_G01",
+      "nodeName": "Digital screen A",
+      "type": "DIGITAL_SIGN",
+      "typeLabel": "Digital screen",
+      "laneGroup": null,
+      "side": "A",
+      "name": "Digital screen — Side A",
+      "equipmentFunction": "Displays the toll rate or operational message to approaching traffic.",
+      "identification": "GROUP_UNKNOWN",
+      "nodeIndex": 0,
+      "centre": [
+        1.4533,
+        -11.3121,
+        7.4936
+      ],
+      "halfSize": [
+        0.05,
+        1.4123,
+        0.279
+      ]
+    },
+    {
+      "assetId": "I595_G01_B_DISPLAY_001",
+      "gantryId": "I595_G01",
+      "nodeName": "Digital screen B",
+      "type": "DIGITAL_SIGN",
+      "typeLabel": "Digital screen",
+      "laneGroup": null,
+      "side": "B",
+      "name": "Digital screen — Side B",
+      "equipmentFunction": "Displays the toll rate or operational message to approaching traffic.",
+      "identification": "GROUP_UNKNOWN",
+      "nodeIndex": 1,
+      "centre": [
+        -1.4343,
+        11.3398,
+        7.5171
+      ],
+      "halfSize": [
+        0.05,
+        1.4123,
+        0.279
+      ]
+    },
+    {
+      "assetId": "I595_G01_SIGN_001",
+      "gantryId": "I595_G01",
+      "nodeName": "Sun pass board",
+      "type": "STATIC_SIGN",
+      "typeLabel": "Sign",
+      "laneGroup": null,
+      "side": null,
+      "name": "Sign",
+      "equipmentFunction": "Fixed signage mounted on the gantry.",
+      "identification": "GROUP_UNKNOWN",
+      "nodeIndex": 2,
+      "centre": [
+        0.0095,
+        0.0139,
+        8.7938
+      ],
+      "halfSize": [
+        1.4477,
+        12.8929,
+        0.7223
+      ]
+    },
+    {
+      "assetId": "I595_G01_STRUCT_001",
+      "gantryId": "I595_G01",
+      "nodeName": "gantry main",
+      "type": "STRUCTURE",
+      "typeLabel": "Structure",
+      "laneGroup": null,
+      "side": null,
+      "name": "Structure",
+      "equipmentFunction": "The gantry span and its supports.",
+      "identification": "GROUP_UNKNOWN",
+      "nodeIndex": 3,
+      "centre": [
+        0.1305,
+        -0.0039,
+        5.1533
+      ],
+      "halfSize": [
+        1.6411,
+        13.752,
+        5.2533
+      ]
+    },
+    {
+      "assetId": "I595_G01_L01_B_VES_001",
+      "gantryId": "I595_G01",
+      "nodeName": "VES camera Lane 1 B",
+      "type": "VES_CAMERA",
+      "typeLabel": "VES camera",
+      "laneGroup": 1,
+      "side": "B",
+      "name": "VES camera — Lane 1, Side B",
+      "equipmentFunction": "Video enforcement: images a vehicle whose toll is not read electronically.",
+      "identification": "NAMED",
+      "nodeIndex": 4,
+      "centre": [
+        0.9644,
+        9.0918,
+        6.4752
+      ],
+      "halfSize": [
+        0.2522,
+        0.4088,
+        0.2371
+      ]
+    },
+    {
+      "assetId": "I595_G01_L01_A_VES_001",
+      "gantryId": "I595_G01",
+      "nodeName": "VES camera Lane 1 A",
+      "type": "VES_CAMERA",
+      "typeLabel": "VES camera",
+      "laneGroup": 1,
+      "side": "A",
+      "name": "VES camera — Lane 1, Side A",
+      "equipmentFunction": "Video enforcement: images a vehicle whose toll is not read electronically.",
+      "identification": "NAMED",
+      "nodeIndex": 5,
+      "centre": [
+        -1.0497,
+        9.3552,
+        6.4646
+      ],
+      "halfSize": [
+        0.2522,
+        0.4088,
+        0.2371
+      ]
+    },
+    {
+      "assetId": "I595_G01_L01_A_RFID_001",
+      "gantryId": "I595_G01",
+      "nodeName": "RFID Lane 1 A",
+      "type": "RFID_ANTENNA",
+      "typeLabel": "RFID antenna",
+      "laneGroup": 1,
+      "side": "A",
+      "name": "RFID antenna — Lane 1, Side A",
+      "equipmentFunction": "Reads compatible electronic toll transponders.",
+      "identification": "NAMED",
+      "nodeIndex": 6,
+      "centre": [
+        -1.1603,
+        8.2743,
+        6.18
+      ],
+      "halfSize": [
+        0.093,
+        0.3803,
+        0.2294
+      ]
+    },
+    {
+      "assetId": "I595_G01_L01_B_RFID_001",
+      "gantryId": "I595_G01",
+      "nodeName": "RFID Lane 1 B",
+      "type": "RFID_ANTENNA",
+      "typeLabel": "RFID antenna",
+      "laneGroup": 1,
+      "side": "B",
+      "name": "RFID antenna — Lane 1, Side B",
+      "equipmentFunction": "Reads compatible electronic toll transponders.",
+      "identification": "NAMED",
+      "nodeIndex": 7,
+      "centre": [
+        1.1448,
+        7.9941,
+        6.1804
+      ],
+      "halfSize": [
+        0.223,
+        0.428,
+        0.1597
+      ]
+    },
+    {
+      "assetId": "I595_G01_L01_B_RFID_002",
+      "gantryId": "I595_G01",
+      "nodeName": "RFID Lane 1 B.001",
+      "type": "RFID_ANTENNA",
+      "typeLabel": "RFID antenna",
+      "laneGroup": 1,
+      "side": "B",
+      "name": "RFID antenna — Lane 1, Side B",
+      "equipmentFunction": "Reads compatible electronic toll transponders.",
+      "identification": "NAMED",
+      "nodeIndex": 8,
+      "centre": [
+        1.075,
+        10.1726,
+        6.1906
+      ],
+      "halfSize": [
+        0.093,
+        0.3803,
+        0.2294
+      ]
+    },
+    {
+      "assetId": "I595_G01_L02_A_VES_001",
+      "gantryId": "I595_G01",
+      "nodeName": "VES camera Lane 2 A",
+      "type": "VES_CAMERA",
+      "typeLabel": "VES camera",
+      "laneGroup": 2,
+      "side": "A",
+      "name": "VES camera — Lane 2, Side A",
+      "equipmentFunction": "Video enforcement: images a vehicle whose toll is not read electronically.",
+      "identification": "NAMED",
+      "nodeIndex": 9,
+      "centre": [
+        -1.0497,
+        5.4519,
+        6.4646
+      ],
+      "halfSize": [
+        0.2522,
+        0.4088,
+        0.2371
+      ]
+    },
+    {
+      "assetId": "I595_G01_L02_B_VES_001",
+      "gantryId": "I595_G01",
+      "nodeName": "VES camera Lane 2 B",
+      "type": "VES_CAMERA",
+      "typeLabel": "VES camera",
+      "laneGroup": 2,
+      "side": "B",
+      "name": "VES camera — Lane 2, Side B",
+      "equipmentFunction": "Video enforcement: images a vehicle whose toll is not read electronically.",
+      "identification": "NAMED",
+      "nodeIndex": 10,
+      "centre": [
+        0.9644,
+        5.4349,
+        6.4752
+      ],
+      "halfSize": [
+        0.2522,
+        0.4088,
+        0.2371
+      ]
+    },
+    {
+      "assetId": "I595_G01_L02_A_RFID_001",
+      "gantryId": "I595_G01",
+      "nodeName": "RFID Lane 2 A",
+      "type": "RFID_ANTENNA",
+      "typeLabel": "RFID antenna",
+      "laneGroup": 2,
+      "side": "A",
+      "name": "RFID antenna — Lane 2, Side A",
+      "equipmentFunction": "Reads compatible electronic toll transponders.",
+      "identification": "NAMED",
+      "nodeIndex": 11,
+      "centre": [
+        -1.23,
+        6.5495,
+        6.1699
+      ],
+      "halfSize": [
+        0.223,
+        0.428,
+        0.1597
+      ]
+    },
+    {
+      "assetId": "I595_G01_L02_A_RFID_002",
+      "gantryId": "I595_G01",
+      "nodeName": "RFID Lane 2 A.001",
+      "type": "RFID_ANTENNA",
+      "typeLabel": "RFID antenna",
+      "laneGroup": 2,
+      "side": "A",
+      "name": "RFID antenna — Lane 2, Side A",
+      "equipmentFunction": "Reads compatible electronic toll transponders.",
+      "identification": "NAMED",
+      "nodeIndex": 12,
+      "centre": [
+        -1.1603,
+        4.3711,
+        6.18
+      ],
+      "halfSize": [
+        0.093,
+        0.3803,
+        0.2294
+      ]
+    },
+    {
+      "assetId": "I595_G01_L02_B_RFID_001",
+      "gantryId": "I595_G01",
+      "nodeName": "RFID Lane 2 B",
+      "type": "RFID_ANTENNA",
+      "typeLabel": "RFID antenna",
+      "laneGroup": 2,
+      "side": "B",
+      "name": "RFID antenna — Lane 2, Side B",
+      "equipmentFunction": "Reads compatible electronic toll transponders.",
+      "identification": "NAMED",
+      "nodeIndex": 13,
+      "centre": [
+        1.1448,
+        4.3373,
+        6.1804
+      ],
+      "halfSize": [
+        0.223,
+        0.428,
+        0.1597
+      ]
+    },
+    {
+      "assetId": "I595_G01_L02_B_RFID_002",
+      "gantryId": "I595_G01",
+      "nodeName": "RFID Lane 2 B.001",
+      "type": "RFID_ANTENNA",
+      "typeLabel": "RFID antenna",
+      "laneGroup": 2,
+      "side": "B",
+      "name": "RFID antenna — Lane 2, Side B",
+      "equipmentFunction": "Reads compatible electronic toll transponders.",
+      "identification": "NAMED",
+      "nodeIndex": 14,
+      "centre": [
+        1.075,
+        6.5158,
+        6.1906
+      ],
+      "halfSize": [
+        0.093,
+        0.3803,
+        0.2294
+      ]
+    },
+    {
+      "assetId": "I595_G01_L02_B_TOLL_CAM_001",
+      "gantryId": "I595_G01",
+      "nodeName": "Toll cameras Lane 2 B",
+      "type": "TOLL_CAMERA",
+      "typeLabel": "Toll camera",
+      "laneGroup": 2,
+      "side": "B",
+      "name": "Toll camera — Lane 2, Side B",
+      "equipmentFunction": "Images the vehicle at the point of the toll transaction.",
+      "identification": "NAMED",
+      "nodeIndex": 15,
+      "centre": [
+        1.3391,
+        4.0664,
+        6.5911
+      ],
+      "halfSize": [
+        0.2996,
+        0.187,
+        0.3679
+      ]
+    },
+    {
+      "assetId": "I595_G01_L03_A_VES_001",
+      "gantryId": "I595_G01",
+      "nodeName": "VES camera Lane 3 A",
+      "type": "VES_CAMERA",
+      "typeLabel": "VES camera",
+      "laneGroup": 3,
+      "side": "A",
+      "name": "VES camera — Lane 3, Side A",
+      "equipmentFunction": "Video enforcement: images a vehicle whose toll is not read electronically.",
+      "identification": "NAMED",
+      "nodeIndex": 16,
+      "centre": [
+        -1.0497,
+        1.773,
+        6.4816
+      ],
+      "halfSize": [
+        0.2522,
+        0.4088,
+        0.2371
+      ]
+    },
+    {
+      "assetId": "I595_G01_L03_B_VES_001",
+      "gantryId": "I595_G01",
+      "nodeName": "VES camera Lane 3 B",
+      "type": "VES_CAMERA",
+      "typeLabel": "VES camera",
+      "laneGroup": 3,
+      "side": "B",
+      "name": "VES camera — Lane 3, Side B",
+      "equipmentFunction": "Video enforcement: images a vehicle whose toll is not read electronically.",
+      "identification": "NAMED",
+      "nodeIndex": 17,
+      "centre": [
+        0.9644,
+        1.7781,
+        6.4752
+      ],
+      "halfSize": [
+        0.2522,
+        0.4088,
+        0.2371
+      ]
+    },
+    {
+      "assetId": "I595_G01_L03_A_RFID_001",
+      "gantryId": "I595_G01",
+      "nodeName": "RFID Lane 3 A",
+      "type": "RFID_ANTENNA",
+      "typeLabel": "RFID antenna",
+      "laneGroup": 3,
+      "side": "A",
+      "name": "RFID antenna — Lane 3, Side A",
+      "equipmentFunction": "Reads compatible electronic toll transponders.",
+      "identification": "NAMED",
+      "nodeIndex": 18,
+      "centre": [
+        -1.23,
+        2.8706,
+        6.1869
+      ],
+      "halfSize": [
+        0.223,
+        0.428,
+        0.1597
+      ]
+    },
+    {
+      "assetId": "I595_G01_L03_A_RFID_002",
+      "gantryId": "I595_G01",
+      "nodeName": "RFID Lane 3 A.002",
+      "type": "RFID_ANTENNA",
+      "typeLabel": "RFID antenna",
+      "laneGroup": 3,
+      "side": "A",
+      "name": "RFID antenna — Lane 3, Side A",
+      "equipmentFunction": "Reads compatible electronic toll transponders.",
+      "identification": "NAMED",
+      "nodeIndex": 19,
+      "centre": [
+        -1.1603,
+        0.6922,
+        6.197
+      ],
+      "halfSize": [
+        0.093,
+        0.3803,
+        0.2294
+      ]
+    },
+    {
+      "assetId": "I595_G01_L03_B_RFID_002",
+      "gantryId": "I595_G01",
+      "nodeName": "RFID Lane 3 B.001",
+      "type": "RFID_ANTENNA",
+      "typeLabel": "RFID antenna",
+      "laneGroup": 3,
+      "side": "B",
+      "name": "RFID antenna — Lane 3, Side B",
+      "equipmentFunction": "Reads compatible electronic toll transponders.",
+      "identification": "NAMED",
+      "nodeIndex": 20,
+      "centre": [
+        1.1448,
+        0.6805,
+        6.1804
+      ],
+      "halfSize": [
+        0.223,
+        0.428,
+        0.1597
+      ]
+    },
+    {
+      "assetId": "I595_G01_L03_B_RFID_001",
+      "gantryId": "I595_G01",
+      "nodeName": "RFID Lane 3 B",
+      "type": "RFID_ANTENNA",
+      "typeLabel": "RFID antenna",
+      "laneGroup": 3,
+      "side": "B",
+      "name": "RFID antenna — Lane 3, Side B",
+      "equipmentFunction": "Reads compatible electronic toll transponders.",
+      "identification": "NAMED",
+      "nodeIndex": 21,
+      "centre": [
+        1.075,
+        2.8589,
+        6.1906
+      ],
+      "halfSize": [
+        0.093,
+        0.3803,
+        0.2294
+      ]
+    },
+    {
+      "assetId": "I595_G01_L03_A_TOLL_CAM_001",
+      "gantryId": "I595_G01",
+      "nodeName": "Toll cameras Lane 3 A",
+      "type": "TOLL_CAMERA",
+      "typeLabel": "Toll camera",
+      "laneGroup": 3,
+      "side": "A",
+      "name": "Toll camera — Lane 3, Side A",
+      "equipmentFunction": "Images the vehicle at the point of the toll transaction.",
+      "identification": "NAMED",
+      "nodeIndex": 22,
+      "centre": [
+        -1.5264,
+        2.5988,
+        6.6345
+      ],
+      "halfSize": [
+        0.3031,
+        0.1796,
+        0.3679
+      ]
+    },
+    {
+      "assetId": "I595_G01_L03_B_TOLL_CAM_002",
+      "gantryId": "I595_G01",
+      "nodeName": "Toll cameras Lane 3 B -2",
+      "type": "TOLL_CAMERA",
+      "typeLabel": "Toll camera",
+      "laneGroup": 3,
+      "side": "B",
+      "name": "Toll camera — Lane 3, Side B",
+      "equipmentFunction": "Images the vehicle at the point of the toll transaction.",
+      "identification": "NAMED",
+      "nodeIndex": 23,
+      "centre": [
+        1.4412,
+        0.8935,
+        6.6345
+      ],
+      "halfSize": [
+        0.3031,
+        0.1796,
+        0.3679
+      ]
+    },
+    {
+      "assetId": "I595_G01_L03_B_TOLL_CAM_001",
+      "gantryId": "I595_G01",
+      "nodeName": "Toll cameras Lane 3 B -1",
+      "type": "TOLL_CAMERA",
+      "typeLabel": "Toll camera",
+      "laneGroup": 3,
+      "side": "B",
+      "name": "Toll camera — Lane 3, Side B",
+      "equipmentFunction": "Images the vehicle at the point of the toll transaction.",
+      "identification": "NAMED",
+      "nodeIndex": 24,
+      "centre": [
+        1.4323,
+        0.5363,
+        6.6345
+      ],
+      "halfSize": [
+        0.312,
+        0.152,
+        0.3679
+      ]
+    },
+    {
+      "assetId": "I595_G01_L04_A_VES_001",
+      "gantryId": "I595_G01",
+      "nodeName": "VES camera Lane 4 A",
+      "type": "VES_CAMERA",
+      "typeLabel": "VES camera",
+      "laneGroup": 4,
+      "side": "A",
+      "name": "VES camera — Lane 4, Side A",
+      "equipmentFunction": "Video enforcement: images a vehicle whose toll is not read electronically.",
+      "identification": "NAMED",
+      "nodeIndex": 25,
+      "centre": [
+        -1.0497,
+        -1.8182,
+        6.4752
+      ],
+      "halfSize": [
+        0.2522,
+        0.4088,
+        0.2371
+      ]
+    },
+    {
+      "assetId": "I595_G01_L04_B_VES_001",
+      "gantryId": "I595_G01",
+      "nodeName": "VES camera Lane 4 B",
+      "type": "VES_CAMERA",
+      "typeLabel": "VES camera",
+      "laneGroup": 4,
+      "side": "B",
+      "name": "VES camera — Lane 4, Side B",
+      "equipmentFunction": "Video enforcement: images a vehicle whose toll is not read electronically.",
+      "identification": "NAMED",
+      "nodeIndex": 26,
+      "centre": [
+        0.9644,
+        -1.8131,
+        6.4816
+      ],
+      "halfSize": [
+        0.2522,
+        0.4088,
+        0.2371
+      ]
+    },
+    {
+      "assetId": "I595_G01_L04_A_RFID_002",
+      "gantryId": "I595_G01",
+      "nodeName": "RFID Lane 4 A.001",
+      "type": "RFID_ANTENNA",
+      "typeLabel": "RFID antenna",
+      "laneGroup": 4,
+      "side": "A",
+      "name": "RFID antenna — Lane 4, Side A",
+      "equipmentFunction": "Reads compatible electronic toll transponders.",
+      "identification": "NAMED",
+      "nodeIndex": 27,
+      "centre": [
+        -1.23,
+        -0.7206,
+        6.1804
+      ],
+      "halfSize": [
+        0.223,
+        0.428,
+        0.1597
+      ]
+    },
+    {
+      "assetId": "I595_G01_L04_A_RFID_001",
+      "gantryId": "I595_G01",
+      "nodeName": "RFID Lane 4 A",
+      "type": "RFID_ANTENNA",
+      "typeLabel": "RFID antenna",
+      "laneGroup": 4,
+      "side": "A",
+      "name": "RFID antenna — Lane 4, Side A",
+      "equipmentFunction": "Reads compatible electronic toll transponders.",
+      "identification": "NAMED",
+      "nodeIndex": 28,
+      "centre": [
+        -1.1603,
+        -2.899,
+        6.1906
+      ],
+      "halfSize": [
+        0.093,
+        0.3803,
+        0.2294
+      ]
+    },
+    {
+      "assetId": "I595_G01_L04_B_RFID_002",
+      "gantryId": "I595_G01",
+      "nodeName": "RFID Lane 4 B.001",
+      "type": "RFID_ANTENNA",
+      "typeLabel": "RFID antenna",
+      "laneGroup": 4,
+      "side": "B",
+      "name": "RFID antenna — Lane 4, Side B",
+      "equipmentFunction": "Reads compatible electronic toll transponders.",
+      "identification": "NAMED",
+      "nodeIndex": 29,
+      "centre": [
+        1.1448,
+        -2.9107,
+        6.1869
+      ],
+      "halfSize": [
+        0.223,
+        0.428,
+        0.1597
+      ]
+    },
+    {
+      "assetId": "I595_G01_L04_B_RFID_001",
+      "gantryId": "I595_G01",
+      "nodeName": "RFID Lane 4 B",
+      "type": "RFID_ANTENNA",
+      "typeLabel": "RFID antenna",
+      "laneGroup": 4,
+      "side": "B",
+      "name": "RFID antenna — Lane 4, Side B",
+      "equipmentFunction": "Reads compatible electronic toll transponders.",
+      "identification": "NAMED",
+      "nodeIndex": 30,
+      "centre": [
+        1.075,
+        -0.7322,
+        6.197
+      ],
+      "halfSize": [
+        0.093,
+        0.3803,
+        0.2294
+      ]
+    },
+    {
+      "assetId": "I595_G01_TOLL_CAM_001",
+      "gantryId": "I595_G01",
+      "nodeName": "Toll cameras",
+      "type": "TOLL_CAMERA",
+      "typeLabel": "Toll camera",
+      "laneGroup": null,
+      "side": null,
+      "name": "Toll camera",
+      "equipmentFunction": "Images the vehicle at the point of the toll transaction.",
+      "identification": "GROUP_UNKNOWN",
+      "nodeIndex": 31,
+      "centre": [
+        -1.5264,
+        -0.9335,
+        6.6345
+      ],
+      "halfSize": [
+        0.3031,
+        0.1796,
+        0.3679
+      ]
+    },
+    {
+      "assetId": "I595_G01_TOLL_CAM_003",
+      "gantryId": "I595_G01",
+      "nodeName": "Toll cameras.003",
+      "type": "TOLL_CAMERA",
+      "typeLabel": "Toll camera",
+      "laneGroup": null,
+      "side": null,
+      "name": "Toll camera",
+      "equipmentFunction": "Images the vehicle at the point of the toll transaction.",
+      "identification": "GROUP_UNKNOWN",
+      "nodeIndex": 32,
+      "centre": [
+        -1.5176,
+        -0.5763,
+        6.6345
+      ],
+      "halfSize": [
+        0.312,
+        0.152,
+        0.3679
+      ]
+    },
+    {
+      "assetId": "I595_G01_L04_B_TOLL_CAM_001",
+      "gantryId": "I595_G01",
+      "nodeName": "Toll cameras Lane 4 B",
+      "type": "TOLL_CAMERA",
+      "typeLabel": "Toll camera",
+      "laneGroup": 4,
+      "side": "B",
+      "name": "Toll camera — Lane 4, Side B",
+      "equipmentFunction": "Images the vehicle at the point of the toll transaction.",
+      "identification": "NAMED",
+      "nodeIndex": 33,
+      "centre": [
+        1.4412,
+        -2.6388,
+        6.6345
+      ],
+      "halfSize": [
+        0.3031,
+        0.1796,
+        0.3679
+      ]
+    },
+    {
+      "assetId": "I595_G01_L05_A_VES_001",
+      "gantryId": "I595_G01",
+      "nodeName": "VES camera Lane 5 A",
+      "type": "VES_CAMERA",
+      "typeLabel": "VES camera",
+      "laneGroup": 5,
+      "side": "A",
+      "name": "VES camera — Lane 5, Side A",
+      "equipmentFunction": "Video enforcement: images a vehicle whose toll is not read electronically.",
+      "identification": "NAMED",
+      "nodeIndex": 34,
+      "centre": [
+        -1.0497,
+        -5.475,
+        6.4752
+      ],
+      "halfSize": [
+        0.2522,
+        0.4088,
+        0.2371
+      ]
+    },
+    {
+      "assetId": "I595_G01_L05_B_VES_001",
+      "gantryId": "I595_G01",
+      "nodeName": "VES camera Lane 5 B",
+      "type": "VES_CAMERA",
+      "typeLabel": "VES camera",
+      "laneGroup": 5,
+      "side": "B",
+      "name": "VES camera — Lane 5, Side B",
+      "equipmentFunction": "Video enforcement: images a vehicle whose toll is not read electronically.",
+      "identification": "NAMED",
+      "nodeIndex": 35,
+      "centre": [
+        0.9644,
+        -5.492,
+        6.4646
+      ],
+      "halfSize": [
+        0.2522,
+        0.4088,
+        0.2371
+      ]
+    },
+    {
+      "assetId": "I595_G01_L05_A_RFID_002",
+      "gantryId": "I595_G01",
+      "nodeName": "RFID Lane 5 A.001",
+      "type": "RFID_ANTENNA",
+      "typeLabel": "RFID antenna",
+      "laneGroup": 5,
+      "side": "A",
+      "name": "RFID antenna — Lane 5, Side A",
+      "equipmentFunction": "Reads compatible electronic toll transponders.",
+      "identification": "NAMED",
+      "nodeIndex": 36,
+      "centre": [
+        -1.23,
+        -4.3774,
+        6.1804
+      ],
+      "halfSize": [
+        0.223,
+        0.428,
+        0.1597
+      ]
+    },
+    {
+      "assetId": "I595_G01_L05_A_RFID_001",
+      "gantryId": "I595_G01",
+      "nodeName": "RFID Lane 5 A",
+      "type": "RFID_ANTENNA",
+      "typeLabel": "RFID antenna",
+      "laneGroup": 5,
+      "side": "A",
+      "name": "RFID antenna — Lane 5, Side A",
+      "equipmentFunction": "Reads compatible electronic toll transponders.",
+      "identification": "NAMED",
+      "nodeIndex": 37,
+      "centre": [
+        -1.1603,
+        -6.5558,
+        6.1906
+      ],
+      "halfSize": [
+        0.093,
+        0.3803,
+        0.2294
+      ]
+    },
+    {
+      "assetId": "I595_G01_L05_B_RFID_002",
+      "gantryId": "I595_G01",
+      "nodeName": "RFID Lane 5 B.001",
+      "type": "RFID_ANTENNA",
+      "typeLabel": "RFID antenna",
+      "laneGroup": 5,
+      "side": "B",
+      "name": "RFID antenna — Lane 5, Side B",
+      "equipmentFunction": "Reads compatible electronic toll transponders.",
+      "identification": "NAMED",
+      "nodeIndex": 38,
+      "centre": [
+        1.1448,
+        -6.5896,
+        6.1699
+      ],
+      "halfSize": [
+        0.223,
+        0.428,
+        0.1597
+      ]
+    },
+    {
+      "assetId": "I595_G01_L05_B_RFID_001",
+      "gantryId": "I595_G01",
+      "nodeName": "RFID Lane 5 B",
+      "type": "RFID_ANTENNA",
+      "typeLabel": "RFID antenna",
+      "laneGroup": 5,
+      "side": "B",
+      "name": "RFID antenna — Lane 5, Side B",
+      "equipmentFunction": "Reads compatible electronic toll transponders.",
+      "identification": "NAMED",
+      "nodeIndex": 39,
+      "centre": [
+        1.075,
+        -4.4111,
+        6.18
+      ],
+      "halfSize": [
+        0.093,
+        0.3803,
+        0.2294
+      ]
+    },
+    {
+      "assetId": "I595_G01_TOLL_CAM_002",
+      "gantryId": "I595_G01",
+      "nodeName": "Toll cameras.002",
+      "type": "TOLL_CAMERA",
+      "typeLabel": "Toll camera",
+      "laneGroup": null,
+      "side": null,
+      "name": "Toll camera",
+      "equipmentFunction": "Images the vehicle at the point of the toll transaction.",
+      "identification": "GROUP_UNKNOWN",
+      "nodeIndex": 40,
+      "centre": [
+        -1.4244,
+        -4.1065,
+        6.5911
+      ],
+      "halfSize": [
+        0.2996,
+        0.187,
+        0.3679
+      ]
+    },
+    {
+      "assetId": "I595_G01_L06_A_VES_001",
+      "gantryId": "I595_G01",
+      "nodeName": "VES camera Lane 6 A",
+      "type": "VES_CAMERA",
+      "typeLabel": "VES camera",
+      "laneGroup": 6,
+      "side": "A",
+      "name": "VES camera — Lane 6, Side A",
+      "equipmentFunction": "Video enforcement: images a vehicle whose toll is not read electronically.",
+      "identification": "NAMED",
+      "nodeIndex": 41,
+      "centre": [
+        -1.0497,
+        -9.1318,
+        6.4752
+      ],
+      "halfSize": [
+        0.2522,
+        0.4088,
+        0.2371
+      ]
+    },
+    {
+      "assetId": "I595_G01_L06_B_VES_001",
+      "gantryId": "I595_G01",
+      "nodeName": "VES camera Lane 6 B",
+      "type": "VES_CAMERA",
+      "typeLabel": "VES camera",
+      "laneGroup": 6,
+      "side": "B",
+      "name": "VES camera — Lane 6, Side B",
+      "equipmentFunction": "Video enforcement: images a vehicle whose toll is not read electronically.",
+      "identification": "NAMED",
+      "nodeIndex": 42,
+      "centre": [
+        0.9644,
+        -9.3952,
+        6.4646
+      ],
+      "halfSize": [
+        0.2522,
+        0.4088,
+        0.2371
+      ]
+    },
+    {
+      "assetId": "I595_G01_L06_A_RFID_002",
+      "gantryId": "I595_G01",
+      "nodeName": "RFID Lane 6 A.001",
+      "type": "RFID_ANTENNA",
+      "typeLabel": "RFID antenna",
+      "laneGroup": 6,
+      "side": "A",
+      "name": "RFID antenna — Lane 6, Side A",
+      "equipmentFunction": "Reads compatible electronic toll transponders.",
+      "identification": "NAMED",
+      "nodeIndex": 43,
+      "centre": [
+        -1.23,
+        -8.0342,
+        6.1804
+      ],
+      "halfSize": [
+        0.223,
+        0.428,
+        0.1597
+      ]
+    },
+    {
+      "assetId": "I595_G01_L06_A_RFID_001",
+      "gantryId": "I595_G01",
+      "nodeName": "RFID Lane 6 A",
+      "type": "RFID_ANTENNA",
+      "typeLabel": "RFID antenna",
+      "laneGroup": 6,
+      "side": "A",
+      "name": "RFID antenna — Lane 6, Side A",
+      "equipmentFunction": "Reads compatible electronic toll transponders.",
+      "identification": "NAMED",
+      "nodeIndex": 44,
+      "centre": [
+        -1.1603,
+        -10.2127,
+        6.1906
+      ],
+      "halfSize": [
+        0.093,
+        0.3803,
+        0.2294
+      ]
+    },
+    {
+      "assetId": "I595_G01_L06_B_RFID_001",
+      "gantryId": "I595_G01",
+      "nodeName": "RFID Lane 6 B.002",
+      "type": "RFID_ANTENNA",
+      "typeLabel": "RFID antenna",
+      "laneGroup": 6,
+      "side": "B",
+      "name": "RFID antenna — Lane 6, Side B",
+      "equipmentFunction": "Reads compatible electronic toll transponders.",
+      "identification": "NAMED",
+      "nodeIndex": 45,
+      "centre": [
+        1.075,
+        -8.3144,
+        6.18
+      ],
+      "halfSize": [
+        0.093,
+        0.3803,
+        0.2294
+      ]
+    },
+    {
+      "assetId": "I595_G01_UNCL_001",
+      "gantryId": "I595_G01",
+      "nodeName": "Gantry assets",
+      "type": "UNCLASSIFIED",
+      "typeLabel": "Equipment",
+      "laneGroup": null,
+      "side": null,
+      "name": "Equipment",
+      "equipmentFunction": null,
+      "identification": "UNCLASSIFIED",
+      "nodeIndex": 46,
+      "centre": [
+        -0.1188,
+        5.678,
+        7.3047
+      ],
+      "halfSize": [
+        1.5678,
+        1.7168,
+        1.1444
+      ]
+    },
+    {
+      "assetId": "I595_G01_UNCL_002",
+      "gantryId": "I595_G01",
+      "nodeName": "Gantry assets.001",
+      "type": "UNCLASSIFIED",
+      "typeLabel": "Equipment",
+      "laneGroup": null,
+      "side": null,
+      "name": "Equipment",
+      "equipmentFunction": null,
+      "identification": "UNCLASSIFIED",
+      "nodeIndex": 47,
+      "centre": [
+        -0.1188,
+        1.9991,
+        7.3217
+      ],
+      "halfSize": [
+        1.5678,
+        1.7168,
+        1.1444
+      ]
+    },
+    {
+      "assetId": "I595_G01_UNCL_003",
+      "gantryId": "I595_G01",
+      "nodeName": "Gantry assets.002",
+      "type": "UNCLASSIFIED",
+      "typeLabel": "Equipment",
+      "laneGroup": null,
+      "side": null,
+      "name": "Equipment",
+      "equipmentFunction": null,
+      "identification": "UNCLASSIFIED",
+      "nodeIndex": 48,
+      "centre": [
+        -0.3232,
+        -1.5787,
+        7.3153
+      ],
+      "halfSize": [
+        1.7721,
+        1.7302,
+        1.1444
+      ]
+    },
+    {
+      "assetId": "I595_G01_UNCL_004",
+      "gantryId": "I595_G01",
+      "nodeName": "Gantry assets.003",
+      "type": "UNCLASSIFIED",
+      "typeLabel": "Equipment",
+      "laneGroup": null,
+      "side": null,
+      "name": "Equipment",
+      "equipmentFunction": null,
+      "identification": "UNCLASSIFIED",
+      "nodeIndex": 49,
+      "centre": [
+        -0.1188,
+        -8.9057,
+        7.3153
+      ],
+      "halfSize": [
+        1.5678,
+        1.7168,
+        1.1444
+      ]
+    },
+    {
+      "assetId": "I595_G01_UNCL_005",
+      "gantryId": "I595_G01",
+      "nodeName": "Gantry assets.004",
+      "type": "UNCLASSIFIED",
+      "typeLabel": "Equipment",
+      "laneGroup": null,
+      "side": null,
+      "name": "Equipment",
+      "equipmentFunction": null,
+      "identification": "UNCLASSIFIED",
+      "nodeIndex": 50,
+      "centre": [
+        -0.1188,
+        -5.2489,
+        7.3153
+      ],
+      "halfSize": [
+        1.5678,
+        1.7168,
+        1.1444
+      ]
+    },
+    {
+      "assetId": "I595_G01_UNCL_006",
+      "gantryId": "I595_G01",
+      "nodeName": "Gantry assets.005",
+      "type": "UNCLASSIFIED",
+      "typeLabel": "Equipment",
+      "laneGroup": null,
+      "side": null,
+      "name": "Equipment",
+      "equipmentFunction": null,
+      "identification": "UNCLASSIFIED",
+      "nodeIndex": 51,
+      "centre": [
+        -1.3462,
+        8.8266,
+        7.1325
+      ],
+      "halfSize": [
+        0.3405,
+        0.9621,
+        0.9711
+      ]
+    },
+    {
+      "assetId": "I595_G01_UNCL_007",
+      "gantryId": "I595_G01",
+      "nodeName": "Gantry assets.006",
+      "type": "UNCLASSIFIED",
+      "typeLabel": "Equipment",
+      "laneGroup": null,
+      "side": null,
+      "name": "Equipment",
+      "equipmentFunction": null,
+      "identification": "UNCLASSIFIED",
+      "nodeIndex": 52,
+      "centre": [
+        0.0336,
+        -5.716,
+        7.3047
+      ],
+      "halfSize": [
+        1.5678,
+        1.7168,
+        1.1444
+      ]
+    },
+    {
+      "assetId": "I595_G01_UNCL_008",
+      "gantryId": "I595_G01",
+      "nodeName": "Gantry assets.007",
+      "type": "UNCLASSIFIED",
+      "typeLabel": "Equipment",
+      "laneGroup": null,
+      "side": null,
+      "name": "Equipment",
+      "equipmentFunction": null,
+      "identification": "UNCLASSIFIED",
+      "nodeIndex": 53,
+      "centre": [
+        0.0336,
+        -2.0392,
+        7.3217
+      ],
+      "halfSize": [
+        1.5678,
+        1.7168,
+        1.1444
+      ]
+    },
+    {
+      "assetId": "I595_G01_UNCL_009",
+      "gantryId": "I595_G01",
+      "nodeName": "Gantry assets.008",
+      "type": "UNCLASSIFIED",
+      "typeLabel": "Equipment",
+      "laneGroup": null,
+      "side": null,
+      "name": "Equipment",
+      "equipmentFunction": null,
+      "identification": "UNCLASSIFIED",
+      "nodeIndex": 54,
+      "centre": [
+        0.2379,
+        1.5387,
+        7.3153
+      ],
+      "halfSize": [
+        1.7721,
+        1.7302,
+        1.1444
+      ]
+    },
+    {
+      "assetId": "I595_G01_UNCL_010",
+      "gantryId": "I595_G01",
+      "nodeName": "Gantry assets.009",
+      "type": "UNCLASSIFIED",
+      "typeLabel": "Equipment",
+      "laneGroup": null,
+      "side": null,
+      "name": "Equipment",
+      "equipmentFunction": null,
+      "identification": "UNCLASSIFIED",
+      "nodeIndex": 55,
+      "centre": [
+        0.0336,
+        5.2088,
+        7.3153
+      ],
+      "halfSize": [
+        1.5678,
+        1.7168,
+        1.1444
+      ]
+    },
+    {
+      "assetId": "I595_G01_UNCL_011",
+      "gantryId": "I595_G01",
+      "nodeName": "Gantry assets.010",
+      "type": "UNCLASSIFIED",
+      "typeLabel": "Equipment",
+      "laneGroup": null,
+      "side": null,
+      "name": "Equipment",
+      "equipmentFunction": null,
+      "identification": "UNCLASSIFIED",
+      "nodeIndex": 56,
+      "centre": [
+        0.0336,
+        8.8657,
+        7.3153
+      ],
+      "halfSize": [
+        1.5678,
+        1.7168,
+        1.1444
+      ]
+    },
+    {
+      "assetId": "I595_G01_UNCL_012",
+      "gantryId": "I595_G01",
+      "nodeName": "Gantry assets.011",
+      "type": "UNCLASSIFIED",
+      "typeLabel": "Equipment",
+      "laneGroup": null,
+      "side": null,
+      "name": "Equipment",
+      "equipmentFunction": null,
+      "identification": "UNCLASSIFIED",
+      "nodeIndex": 57,
+      "centre": [
+        1.2609,
+        -8.8666,
+        7.1325
+      ],
+      "halfSize": [
+        0.3405,
+        0.9621,
+        0.9711
+      ]
+    },
+    {
+      "assetId": "I595_G01_A_CCTV_001",
+      "gantryId": "I595_G01",
+      "nodeName": "CCTV camera A-1",
+      "type": "CCTV_CAMERA",
+      "typeLabel": "CCTV camera",
+      "laneGroup": null,
+      "side": "A",
+      "name": "CCTV camera — Side A",
+      "equipmentFunction": "Surveillance of the gantry and the carriageway beneath it.",
+      "identification": "GROUP_UNKNOWN",
+      "nodeIndex": 58,
+      "centre": [
+        -1.8182,
+        0.125,
+        8.1099
+      ],
+      "halfSize": [
+        0.1892,
+        0.1381,
+        0.1516
+      ]
+    },
+    {
+      "assetId": "I595_G01_A_CCTV_002",
+      "gantryId": "I595_G01",
+      "nodeName": "CCTV camera A-2",
+      "type": "CCTV_CAMERA",
+      "typeLabel": "CCTV camera",
+      "laneGroup": null,
+      "side": "A",
+      "name": "CCTV camera — Side A",
+      "equipmentFunction": "Surveillance of the gantry and the carriageway beneath it.",
+      "identification": "GROUP_UNKNOWN",
+      "nodeIndex": 59,
+      "centre": [
+        -1.8347,
+        -0.0651,
+        8.3744
+      ],
+      "halfSize": [
+        0.1948,
+        0.1094,
+        0.1474
+      ]
+    },
+    {
+      "assetId": "I595_G01_B_CCTV_001",
+      "gantryId": "I595_G01",
+      "nodeName": "CCTV camera B-1",
+      "type": "CCTV_CAMERA",
+      "typeLabel": "CCTV camera",
+      "laneGroup": null,
+      "side": "B",
+      "name": "CCTV camera — Side B",
+      "equipmentFunction": "Surveillance of the gantry and the carriageway beneath it.",
+      "identification": "GROUP_UNKNOWN",
+      "nodeIndex": 60,
+      "centre": [
+        1.7329,
+        -0.1651,
+        8.1099
+      ],
+      "halfSize": [
+        0.1892,
+        0.1381,
+        0.1516
+      ]
+    },
+    {
+      "assetId": "I595_G01_B_CCTV_002",
+      "gantryId": "I595_G01",
+      "nodeName": "CCTV camera B-2",
+      "type": "CCTV_CAMERA",
+      "typeLabel": "CCTV camera",
+      "laneGroup": null,
+      "side": "B",
+      "name": "CCTV camera — Side B",
+      "equipmentFunction": "Surveillance of the gantry and the carriageway beneath it.",
+      "identification": "GROUP_UNKNOWN",
+      "nodeIndex": 61,
+      "centre": [
+        1.7494,
+        0.0251,
+        8.3744
+      ],
+      "halfSize": [
+        0.1948,
+        0.1094,
+        0.1474
+      ]
+    }
+  ]
+}

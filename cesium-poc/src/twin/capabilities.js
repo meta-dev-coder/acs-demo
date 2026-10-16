@@ -63,11 +63,14 @@ const evidenceOf = (entityType, entityId, source, timestamp = null) =>
 /**
  * Build the registry against the live application services.
  *
- * @param {{tmc, maintenanceRecords, assetIndex, centerline}} services
+ * @param {{tmc, maintenanceRecords, assetIndex, centerline, safetyIntelligence}} services
  */
 export function createCapabilityRegistry({
   tmc = null, maintenanceRecords = null, assetIndex = null, centerline = [],
+  /** The Safety Intelligence screen's own state, as that screen computed it. */
+  safetyIntelligence = null,
 } = {}) {
+  const safety = () => (typeof safetyIntelligence === 'function' ? safetyIntelligence() : safetyIntelligence);
   /** The entry for whichever incident the screen has open, or null. */
   const selectedEntry = () => {
     const id = tmc?.selectedIncidentId;
@@ -103,6 +106,77 @@ export function createCapabilityRegistry({
             incidentTimestamp: tmc.upstreamProtection?.incidentTimestamp ?? null,
           },
           evidence: [evidenceOf('incident', entry.incident.id, 'DataConnect')],
+        });
+      },
+    },
+
+    // ───────────────────────────────────────────── Safety Intelligence
+    get_safety_overview: {
+      category: 'SAFETY',
+      description: 'What the Safety Intelligence screen has found: the incident register’s provenance, '
+        + 'where records concentrate, observed secondary incidents, asset-safety condition and hazard '
+        + 'findings — plus the KPIs that cannot be calculated and what each would need.',
+      screens: ['safetyIntel'],
+      requires: [],
+      temporal: 'EITHER',
+      handler() {
+        const context = safety();
+        if (!context) {
+          return unavailable('The Safety Intelligence screen has not finished reading the record yet.');
+        }
+        return ok({
+          data: {
+            records: context.records,
+            period: `${context.provenance.firstMonth} to ${context.provenance.lastMonth}`,
+            narrowedTo: context.narrowedTo,
+            concentrations: context.concentrations,
+            observedSecondaryRecords: context.secondary.observedRecords,
+            modelledElevatedLiveIncidents: context.secondary.modelledElevated,
+            assetSafety: context.assetSafety,
+            hazardFindings: context.hazards.findings,
+            hazardLocations: context.hazards.locations,
+            cannotBeCalculated: context.unavailable,
+          },
+          evidence: [evidenceOf('incidentRegister', 'Florida I595 Incidents', 'DataConnect')],
+          provenance: PROVENANCE.OBSERVED,
+          // The caveats travel with the numbers. An answer about safety that drops them is a more
+          // confident answer than the data supports.
+          limitations: [
+            context.provenance.statisticalStanding,
+            context.provenance.locationBasis,
+            context.hotspotCaveat,
+            context.secondary.caveat,
+            context.secondary.distinction,
+            context.hazards.caveat,
+            ...context.unavailable.map(kpi => `${kpi.label} is not available: needs ${kpi.requires}`),
+          ],
+        });
+      },
+    },
+
+    get_safety_priority_queue: {
+      category: 'SAFETY',
+      description: 'The Safety Priority Queue as the screen ranked it: each entry’s domain, urgency '
+        + 'band, the rule that put it there and what it counts.',
+      screens: ['safetyIntel'],
+      requires: [],
+      temporal: 'EITHER',
+      handler() {
+        const context = safety();
+        if (!context) return unavailable('The Safety Intelligence screen has not built the queue yet.');
+        return ok({
+          data: { entries: context.queue, methodology: context.queueMethodology },
+          evidence: context.queue.slice(0, 5)
+            .map(entry => evidenceOf('safetyQueueEntry', entry.id, 'DataConnect')),
+          provenance: PROVENANCE.OBSERVED,
+          limitations: [
+            context.queueMethodology.noCompositeScore,
+            context.queueMethodology.crossDomain,
+            context.queueMethodology.positions,
+          ],
+          actions: context.queue.slice(0, 5).map(entry => ({
+            type: 'SELECT_SAFETY_ENTRY', entryId: entry.id, label: `Show ${entry.title}`,
+          })),
         });
       },
     },

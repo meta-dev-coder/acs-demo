@@ -1,0 +1,11 @@
+import { chromium } from 'playwright';
+const browser = await chromium.launch({ channel: 'chrome' });
+const page = await browser.newPage();
+const bad = [];
+page.on('response', r => { if (r.status() >= 400) bad.push(`${r.status()} ${r.url().slice(0, 110)}`); });
+await page.goto('http://localhost:5188/?demo=i595', { waitUntil: 'load' });
+await page.waitForFunction(() => window.__safetyIntel, null, { timeout: 60000 });
+await page.selectOption('.app-role select', 'safetyIntel');
+await page.waitForTimeout(30000);
+console.log([...new Set(bad)].join('\n') || 'none');
+await browser.close();

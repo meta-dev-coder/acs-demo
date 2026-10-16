@@ -30,7 +30,7 @@ import { ASSET_CAMERA_PRESETS, SELECTION_FOCUS } from './assetTypes.js';
  */
 export const CORRIDOR_GROUND_HEIGHT_M = -25;
 /** Headroom above Cesium's minimum zoom distance for a close view, for trees and poles under it. */
-export const GROUND_CLEARANCE_MARGIN_M = 5;
+export const GROUND_CLEARANCE_MARGIN_M = 3;
 
 /** Fallback framing for a type with no preset — deliberately not a close-up. */
 export const DEFAULT_PRESET = Object.freeze({ rangeM: 220, pitchDeg: -30 });
@@ -111,7 +111,10 @@ export function createAssetNavigation(viewer, { presets = ASSET_CAMERA_PRESETS, 
     focusSelection(asset) {
       if (!asset?.coordinates) return false;
       const { headingDeg, extentMultiplier } = framingFor(asset, presets);
-      return flyTo(asset, { ...SELECTION_FOCUS, headingDeg, extentMultiplier }, FLIGHT_SECONDS.focus);
+      // A type may say what a moderate look means for it. The shared 420 m suits a crash site or a
+      // sign; a half-metre antenna on a gantry is invisible at that range.
+      const focus = presets[asset?.assetType]?.selection ?? SELECTION_FOCUS;
+      return flyTo(asset, { ...focus, headingDeg, extentMultiplier }, FLIGHT_SECONDS.focus);
     },
 
     /**

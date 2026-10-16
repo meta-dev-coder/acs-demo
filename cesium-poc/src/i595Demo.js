@@ -25,7 +25,7 @@ import { installSignStructureLayers } from "./signStructureLayers.js";
 import { SIGN_STRUCTURE_TYPES } from "./signStructureData.js";
 import { installI595ExpressLanes } from "./i595ExpressLanes.js";
 import { createI595StartupSequence, enableLayerCheckbox } from "./i595StartupSequence.js";
-import { installMapNavigationControls } from "./mapNavigationControls.js";
+import { cameraPivot, installMapNavigationControls, zoomRange } from "./mapNavigationControls.js";
 import { installCorridorStatusBar } from "./corridorStatusBar.js";
 import { createMapLayerStore } from "./mapLayerStore.js";
 import { createStreetViewService } from "./streetViewService.js";
@@ -37,8 +37,10 @@ import { installAppNav } from "./appNav.js";
 import { installMaintenanceLayer } from "./maintenance/maintenanceLayer.js";
 import { installMaintenanceWorkspace } from "./maintenance/maintenanceWorkspace.js";
 import { safetyMaintenance, installSafetyWorkspace, installTrafficWorkspace } from "./safetyWorkspace.js";
+import { installTollingWorkspace } from "./tolling/tollingWorkspace.js";
 import { installLiveOpsWorkspace } from "./liveOps/liveOpsWorkspace.js";
 import { installTmcWorkspace } from "./tmc/tmcWorkspace.js";
+import { installSafetyIntelligenceWorkspace } from "./safetyIntelligence/safetyIntelligenceWorkspace.js";
 import { getTrafficColor } from "./corridorVisualConfig.js";
 import { installI595RoadShields } from "./i595RoadShields.js";
 import { installI595ContextLabels } from "./i595ContextLabels.js";
@@ -122,15 +124,20 @@ try {
   controller.enableZoom = true;
   controller.enableTilt = true;
   controller.enableLook = true;
-  controller.minimumZoomDistance = 20;
+  // Gantry equipment is only metres across. Collision detection still keeps the camera out of the
+  // terrain, while this permits an inspection-distance approach to the model.
+  controller.minimumZoomDistance = 1.5;
   controller.maximumZoomDistance = 20000000;
   // Handle wheel/trackpad deltas consistently, keeping Cesium's drag and pinch zoom.
   controller.zoomEventTypes = [CameraEventType.RIGHT_DRAG, CameraEventType.PINCH];
   const zoom = (factor) => {
     viewer.camera.cancelFlight();
-    const height = viewer.camera.positionCartographic.height;
-    const target = Math.min(controller.maximumZoomDistance, Math.max(controller.minimumZoomDistance, height * factor));
-    viewer.camera.zoomIn(height - target);
+    // Move toward what is under the centre of the view, including a GLB model. Ellipsoid altitude
+    // is near-zero or negative at close range on this corridor and is not a usable zoom distance.
+    const pivot = cameraPivot(viewer);
+    const range = Cartesian3.distance(viewer.camera.positionWC, pivot);
+    const target = zoomRange(range, factor, controller.minimumZoomDistance, controller.maximumZoomDistance);
+    viewer.camera.zoomIn(range - target);
     viewer.scene.requestRender();
   };
   viewer.canvas.addEventListener("wheel", (event) => {
@@ -351,7 +358,9 @@ try {
   // where startup put it, and waiting on the 3D tiles would mean waiting on a network that may
   // never answer — so that path is settled immediately and the models still place when they can.
   let startupSettled = Promise.resolve();
-  if (showIntro) startupSettled = startupSequence.run().then(placeCorridorModels, () => {});
+  // Model placement must not depend on the intro succeeding. Tolling can be the initial screen,
+  // and its default gantry should still load if an optional startup stage fails.
+  if (showIntro) startupSettled = startupSequence.run().then(placeCorridorModels, placeCorridorModels);
   else {
     document.body.dataset.startup = "ready";
     void base3dReady.then(placeCorridorModels);
@@ -400,12 +409,34 @@ try {
   // able to search and reveal maintenance records. Late-bound rather than reordered: the workspace
   // genuinely depends on the explorer, so the cycle is resolved here instead of pretended away.
   let maintenanceWorkspace = null;
+  // The Tolling workspace owns the two gantry datasets the same way, and is built later still.
+  let tollingWorkspace = null;
+  // The explorer subscribes to map picks while it is being installed — before the workspace it
+  // subscribes to exists. The callbacks are held here and handed over when it does; without this
+  // the sources registered no listener at all and clicking a gantry marker selected nothing.
+  const tollingSelectionListeners = new Set();
   const assetExplorer = installAssetExplorer(document.body, viewer, {
     centerline: corridor,
     maintenanceRecords: assetType => maintenanceWorkspace?.recordsForType(assetType) ?? [],
     revealMaintenance: async assetType => {
       appNav.select('maintenance');
       return (await maintenanceWorkspace?.reveal(assetType)) ?? false;
+    },
+    // Late-bound for the same reason: the gantry classes have no Map Explorer layer, so the
+    // Tolling screen is what puts one on the map when a search or a related record asks for it.
+    tolling: {
+      recordsForType: assetType => tollingWorkspace?.recordsForType(assetType) ?? [],
+      shownType: () => tollingWorkspace?.shownType() ?? null,
+      highlightById: (id, assetType) => tollingWorkspace?.highlightById(id, assetType),
+      onSelection: fn => {
+        if (!fn) { tollingSelectionListeners.clear(); tollingWorkspace?.onSelection(null); return; }
+        tollingSelectionListeners.add(fn);
+        tollingWorkspace?.onSelection(fn);
+      },
+      reveal: async assetType => {
+        appNav.select('tolling');
+        return (await tollingWorkspace?.reveal(assetType)) ?? false;
+      },
     },
     layerStore,
     corridorModels: corridorModelLayers,
@@ -422,6 +453,10 @@ try {
     // The bottom edge is shared: the corridor strip yields it while the explorer is open.
     corridorStatus,
     roadShields,
+    // A type's own action from its details panel. Only the gantry equipment offers one.
+    onAssetAction: (action, asset) => {
+      if (action === 'simulateFailure') tollingWorkspace?.simulateFailure(asset);
+    },
     // Street View wants a labelled place, not bare coordinates.
     onViewCamera: streetViewEnabled
       ? asset => (asset?.coordinates ? openStreetView({ ...asset.coordinates, label: asset.name }) : undefined)
@@ -494,9 +529,47 @@ try {
   // Choosing an incident changes which questions are worth asking, so the chat's suggestions follow
   // the selection rather than only the screen.
   tmc.onSelectionChange(() => askTwin?.refreshSuggestions?.());
-  const CORRIDOR_VIEW_SECTIONS = new Set(["liveOps", "maintenance", "safety", "tmc"]);
-  const workspaces = { maintenance, safety, traffic, liveOps, tmc };
+  // Safety Intelligence opens on the whole corridor too: its map is a set of counted badges whose
+  // whole point is seeing WHERE to look, and arriving at street level shows one place out of 36.
+  // Listed here rather than flown from the workspace so the post-intro settle applies as well —
+  // the intro's own camera animation lands later and overrode a flight made on activate.
+  const CORRIDOR_VIEW_SECTIONS = new Set(["liveOps", "maintenance", "safety", "tmc", "safetyIntel"]);
+  // Tolling: the gantry screen. It owns no feed of its own — it reads the OSM toll gantry extract
+  // and the published express gantries, and browses each through the Asset Explorer.
+  const tolling = installTollingWorkspace({
+    viewer, host: document.body, assetExplorer, corridorStatus, resetView: flyToOperationsView,
+    // The gantry meshes are the corridor's `gantries` layer, and the records that match them are
+    // matched by distance against the same config the layer places. `corridorModels` is how the
+    // equipment layer reaches the placed model it picks nodes out of.
+    layerStore, modelConfigs: cesiumModels, corridorModels,
+  });
+  tollingWorkspace = tolling;
+  for (const listener of tollingSelectionListeners) tolling.onSelection(listener);
+  // Safety Intelligence: the corridor's safety EVIDENCE, as its own screen. It reads the register,
+  // the asset index, the work orders and the inspections the Maintenance workspace already loaded —
+  // reading them again here would mean two different answers to "how many records are there" — and
+  // it reuses the TMC's secondary-risk model unchanged. The TMC screen is untouched by it.
+  let safetyIntelContext = null;
+  // `askTwin` is installed further down this function, and a `const` is in its temporal dead zone
+  // until then — reading it from this callback would throw if the screen finished loading first.
+  let chat = null;
+  const safetyIntel = installSafetyIntelligenceWorkspace({
+    viewer, host: document.body, maintenance, tmc, corridorStatus, layerStore,
+    resetView: flyToOperationsView,
+    // The intro switches the corridor's road layers on as it runs, and it finishes after this
+    // screen may already have hidden them.
+    startupSettled,
+    // What is on the safety screen is a fair question for the chat, so the context follows the
+    // screen rather than being rebuilt from the records when a question arrives.
+    onContextChange: context => { safetyIntelContext = context; chat?.refreshSuggestions?.(); },
+  });
+  const workspaces = { maintenance, safety, traffic, liveOps, tmc, tolling, safetyIntel };
   appNav.onSelect(async section => {
+    // The Map Explorer belongs to the workspace it was opened from. A role change announces its
+    // newly allowed section through this same callback, so close the panel before the incoming
+    // workspace is activated instead of carrying the previous role's layer tree over it.
+    setExplorerCollapsed(true);
+    appNav.setLayersOpen(false, { notify: false });
     eventPulses.setActive(section === "liveOps");
     maintenancePulses.setActive(section === "maintenance");
     if (CORRIDOR_VIEW_SECTIONS.has(section)) flyToOperationsView();
@@ -523,7 +596,14 @@ try {
   workspaces[appNav.section]?.activate();
   // Landing directly on one of these — the Maintenance Team role opens on Maintenance — gets the
   // same corridor view as arriving by the nav bar, once the intro has finished with the camera.
-  if (CORRIDOR_VIEW_SECTIONS.has(appNav.section)) void startupSettled.then(() => flyToOperationsView());
+  //
+  // The section is re-read when the promise RESOLVES, not captured when it is created. The intro
+  // can settle seconds later, by which time the operator may have moved to a screen that frames
+  // its own subject — Tolling opens on its gantry — and this would fly them back to the corridor
+  // overview with no explanation.
+  if (CORRIDOR_VIEW_SECTIONS.has(appNav.section)) {
+    void startupSettled.then(() => { if (CORRIDOR_VIEW_SECTIONS.has(appNav.section)) flyToOperationsView(); });
+  }
   eventPulses.setActive(appNav.section === "liveOps");
   maintenancePulses.setActive(appNav.section === "maintenance");
   if (import.meta.env.DEV) { window.__maintenance = maintenance; window.__safety = safety; window.__traffic = traffic; window.__liveOps = liveOps; window.__tmc = tmc; window.__liveEvents = liveEventControls; window.__layerStore = layerStore; window.__segments = mainlineSegments; }
@@ -542,6 +622,12 @@ try {
     // The TMC's deterministic risk service, so "which incident is riskiest" is answered by the
     // same ranking the screen shows rather than by the model reading raw incidents.
     tmc,
+    // The Safety Intelligence screen's own state, caveats included, so an answer about safety
+    // carries the same qualifications the panels do.
+    safetyIntelligence: () => safetyIntelContext,
+    // The simulation session for whichever incident that screen has open, so the chat runs the same
+    // engine the Simulation Lab shows rather than describing numbers back.
+    safetySimulation: () => safetyIntel.simulationSession(),
     maintenanceRecords: assetType => maintenanceWorkspace?.recordsForType(assetType) ?? [],
     assetIndex: () => maintenanceWorkspace?.assetIndex?.() ?? new Map(),
     // The same crash corpus the Safety layer's hotspot badges are clustered from — the register
@@ -555,8 +641,11 @@ try {
       showOnly: (type, records) => maintenanceWorkspace?.showOnly?.(type, records),
     },
   });
+  chat = askTwin;
   if (import.meta.env.DEV) window.__askTwin = askTwin;
-  if (import.meta.hot) import.meta.hot.dispose(() => { maintenancePulses.destroy(); eventPulses.destroy(); tmc.destroy(); liveOps.destroy(); traffic.destroy(); safety.destroy(); maintenance.destroy(); maintenanceLayer.destroy(); appNav.destroy(); assetExplorer.destroy(); lightingControls.destroy(); messageSignControls.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
+  if (import.meta.env.DEV) window.__tolling = tolling;
+  if (import.meta.env.DEV) window.__safetyIntel = safetyIntel;
+  if (import.meta.hot) import.meta.hot.dispose(() => { safetyIntel.destroy(); tolling.destroy(); maintenancePulses.destroy(); eventPulses.destroy(); tmc.destroy(); liveOps.destroy(); traffic.destroy(); safety.destroy(); maintenance.destroy(); maintenanceLayer.destroy(); appNav.destroy(); assetExplorer.destroy(); lightingControls.destroy(); messageSignControls.destroy(); document.removeEventListener("keydown", onPlacementKey); streetViewPlacement.destroy(); placementChip.remove(); streetViewMode.destroy(); askTwin.destroy(); explorer.destroy(); layerStore.destroy(); corridorStatus.destroy(); clipEditor?.destroy(); photorealisticClipping.destroy(); corridorModelLayers.destroy(); corridorModels.destroy(); navigation.destroy(); hud.destroy(); contextLabels.destroy(); expressLanes.destroy(); roadShields.destroy(); baseEnvironmentControls.destroy(); baseEnvironment.destroy(); liveEventControls.destroy(); cameraControls.destroy(); signalControls.destroy(); gantryControls.destroy(); signStructureControls.destroy(); bridgeControls.destroy(); segmentControls.destroy(); mainlineSegments.destroy(); frontageControls.destroy(); rampControls.destroy(); });
   for (const input of inputs) {
     // Layers with their own loader, plus display options that are not data layers at all: this loop
     // fetches `data/<id>.geojson`, and "flow-direction" has no such file — being swept up here

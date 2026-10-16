@@ -6,7 +6,8 @@
  * actually support them — no disabled buttons padding out the panel.
  */
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { Box, Button, IconButton, Paper, Stack, Tab, Tabs, Tooltip, Typography } from '@mui/material';
+import { Box, Button, Chip, IconButton, LinearProgress, Paper, Stack, Tab, Tabs, Tooltip,
+  Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import MyLocationOutlinedIcon from '@mui/icons-material/MyLocationOutlined';
 import ArrowBackOutlinedIcon from '@mui/icons-material/ArrowBackOutlined';
@@ -17,9 +18,13 @@ import { RelatedRecords, relatedRecordCount, useRelatedGroups } from './RelatedR
 
 export const DETAILS_WIDTH = 310;
 
+/** The same tones the cards use, so one asset reads the same in the list and in its panel. */
+const TONE_COLOR = { ok: 'success.main', warn: 'warning.main', bad: 'error.main',
+  info: 'info.main', muted: 'text.secondary' };
+
 export function AssetDetailsPanel({
   asset, inspecting, onClose, onInspect, onReturn, onViewCamera,
-  lookupRecords = null, onOpenRecord = null,
+  lookupRecords = null, onOpenRecord = null, onAssetAction = null,
   top = 220, bottom = 16, right = 16,
 }) {
   const panelRef = useRef(null);
@@ -49,6 +54,10 @@ export function AssetDetailsPanel({
   // Status is a row like any other, so the panel reads as one definition list rather than a
   // heading, a loose caption and then a list — which is what made it look unlike the camera panel.
   const rows = [...(status ? [['Status', status.label]] : []), ...detailRows(asset)];
+  // A type may open its panel with a condition rather than a row — the gantry equipment does,
+  // because "which state is this part in" is the first thing asked of it and a word in a list of
+  // twenty is not an answer. Every other type leaves this undefined and is unchanged.
+  const banner = config?.detailsBanner?.(asset) ?? null;
   const title = config?.detailsTitle ?? `${config?.singular ?? 'Asset'} Details`;
   const canViewCamera = asset.assetType === 'camera' && asset.source?.video_enabled === true && Boolean(onViewCamera);
   const showRelated = Boolean(lookupRecords) && Boolean(asset.source?.type);
@@ -113,6 +122,42 @@ export function AssetDetailsPanel({
 
       {tab === 0 && (
         <>
+          {banner && (
+            <Stack spacing={1} sx={{ flex: 'none' }}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.75 }}>
+                <Chip
+                  size="small"
+                  label={banner.status.label}
+                  sx={{ height: 22, fontSize: 11.5, fontWeight: 600,
+                    color: TONE_COLOR[banner.status.tone] ?? 'text.secondary',
+                    borderColor: TONE_COLOR[banner.status.tone] ?? 'divider' }}
+                  variant="outlined"
+                />
+                {banner.note && (
+                  // The standing reminder: what this data is, wherever it is read.
+                  <Tooltip title={banner.note.tooltip}>
+                    <Chip size="small" label={banner.note.label} variant="outlined"
+                      sx={{ height: 22, fontSize: 11, color: 'text.secondary', borderStyle: 'dashed' }} />
+                  </Tooltip>
+                )}
+              </Stack>
+              {banner.meter && (
+                <Box>
+                  <Typography sx={{ fontSize: 11.5, color: 'text.secondary', mb: 0.5 }}>
+                    {`Health ${banner.meter.label}`}
+                  </Typography>
+                  <LinearProgress
+                    variant="determinate"
+                    value={Math.max(0, Math.min(100, banner.meter.value))}
+                    aria-label={`Health ${banner.meter.label}`}
+                    sx={{ height: 5, borderRadius: 3,
+                      '& .MuiLinearProgress-bar': { backgroundColor: TONE_COLOR[banner.meter.tone] ?? 'text.secondary' } }}
+                  />
+                </Box>
+              )}
+            </Stack>
+          )}
+
           {/* The same two-column definition grid the existing panels use. */}
           <Box
             component="dl"
@@ -138,8 +183,20 @@ export function AssetDetailsPanel({
       {showRelated && tab === 1 && <RelatedRecords groups={related} onOpen={openRelated} />}
 
       <Stack spacing={1}>
+        {/* A type may offer one action of its own — the gantry equipment offers a what-if — so the
+            thing an operator wants to do next is where they are already looking. */}
+        {config?.primaryAction && onAssetAction && (
+          <Button
+            variant="contained"
+            color="info"
+            onClick={() => onAssetAction(config.primaryAction.id, asset)}
+            aria-label={`${config.primaryAction.label} for ${asset.name}`}
+          >
+            {config.primaryAction.label}
+          </Button>
+        )}
         <Button
-          variant="contained"
+          variant={config?.primaryAction ? 'outlined' : 'contained'}
           startIcon={<MyLocationOutlinedIcon />}
           onClick={() => onInspect(asset)}
           disabled={!asset.coordinates}

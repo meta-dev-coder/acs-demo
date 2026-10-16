@@ -20,7 +20,10 @@ const TYPE_WORDS = [
   [/\b(?:cctv|cameras?|cams?)\b/, ['camera']],
   [/\bbridges?\b/, ['bridge']],
   [/\b(?:lighting|lights?|light\s*poles?|poles?|luminaires?)\b/, ['lighting']],
-  [/\b(?:toll\s+)?gantr(?:y|ies)\b/, ['gantry']],
+  // Express gantries are their own dataset, so they are named before the general word can take
+  // the query. A bare "gantry" means all three: the placed models and both published sets.
+  [/\bexpress\s+gantr(?:y|ies)\b/, ['expressGantry']],
+  [/\b(?:toll\s+)?gantr(?:y|ies)\b/, ['gantry', 'tollGantry', 'expressGantry']],
   [/\b(?:lane\s+)?barriers?\b/, ['laneBarrier']],
   [/\b(?:message\s+signs?|dms|vms)\b/, ['messageSign']],
   // Forgiving: "clousers", "closers", "incidnets" are what people actually type.

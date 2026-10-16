@@ -834,7 +834,8 @@ body[data-layers-open="false"] .layers { display: none; }
    Workspace KPI strip — shared by Maintenance and Safety. Deliberately plain: the map is the
    workspace, this is an instrument over it, and every colour is a theme token.
    ========================================================================================== */
-.maintenance-workspace, .safety-workspace, .traffic-workspace, .liveops-workspace { position: absolute; inset: 0; pointer-events: none; z-index: 22; }
+.maintenance-workspace, .safety-workspace, .traffic-workspace, .liveops-workspace,
+.tolling-workspace { position: absolute; inset: 0; pointer-events: none; z-index: 22; }
 
 /* Live Ops chips: shorter and lighter than the workspace KPI cards, because five of them sit over
    the map. One line for the label, one for the number. */
@@ -1762,3 +1763,706 @@ body[data-section="tmc"][data-tmc-investigating="true"] .ask-twin-btn { right: 4
 /* A blocked step still shows, with the reason: the operator learns the capability and the gap. */
 .tmc-explore li[data-blocked] button { opacity: .55; cursor: not-allowed; }
 .tmc-explore li[data-blocked] button span { color: #e5bc57; }
+
+/* ==========================================================================================
+   Equipment What-if — the Tolling screen's scenario panel.
+
+   One side panel, two states: setting up a failure, or reading what it did. Typography does the
+   work — a heading, a question, an answer — rather than cards, badges and tables. The technical
+   wording an engineer needs is one disclosure away, not in the operator's path.
+   ========================================================================================== */
+.sim-panel {
+  /* Clear of the workspace rail, like the KPI strip above it: at a bare 16px the nav bar covered
+     the panel's own buttons. */
+  position: absolute; left: calc(var(--app-nav-w) + 16px); top: 112px; width: 356px;
+  /* Stops short of the bottom-left corner, which belongs to the marker key and the conditions
+     chip: at calc(100% - 180px) the panel covered both of them. */
+  max-height: calc(100% - 250px);
+  display: flex; flex-direction: column; pointer-events: auto; z-index: 61;
+  background: var(--ui-surface); color: var(--ui-text);
+  border: 1px solid var(--ui-border); border-radius: 14px; box-shadow: var(--ui-shadow);
+  /* The workspace this sits in centres its chrome; a form reads left-aligned. */
+  font-size: 13px; overflow: hidden; text-align: left;
+}
+/* `hidden` is only a UA rule (`[hidden] { display: none }`), and any class rule that sets a
+   display beats it. Without this the panel was laid out from the moment the screen loaded: an
+   empty form sat over the map before anything had opened it. */
+.sim-panel[hidden] { display: none; }
+.sim-head {
+  position: relative; flex: none; display: flex; align-items: flex-start; gap: 10px;
+  padding: 16px 44px 14px 18px; border-bottom: 1px solid var(--ui-border-soft); cursor: grab;
+}
+.sim-head > div { flex: 1; min-width: 0; }
+.sim-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.sim-sub { margin: 3px 0 0; font-size: 12px; color: var(--ui-text-secondary); line-height: 1.4; }
+.sim-demo {
+  flex: none; padding: 3px 9px; border-radius: 999px; font-size: 10.5px; white-space: nowrap;
+  color: var(--ui-text-secondary); background: var(--ui-surface-sunken); border: 1px solid var(--ui-border-soft);
+}
+.sim-close {
+  position: absolute; top: 12px; right: 12px; width: 26px; height: 26px; border-radius: 7px;
+  border: 0; background: transparent; color: var(--ui-text-secondary); font-size: 16px; cursor: pointer;
+}
+.sim-close:hover { background: var(--ui-hover); color: var(--ui-text); }
+
+.sim-body { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 18px 18px; }
+.sim-view { display: flex; flex-direction: column; gap: 10px; }
+
+/* Two states, named as the operator thinks of them. Not a stepper: there is no third thing. */
+.sim-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.sim-tabs button {
+  padding: 6px 13px; border: 0; border-radius: 999px; font: inherit; font-size: 12.5px;
+  color: var(--ui-text-secondary); background: transparent; cursor: pointer;
+}
+.sim-tabs button[aria-selected="true"] { background: var(--ui-surface-raised); color: var(--ui-text); font-weight: 600; }
+.sim-tabs button:disabled { opacity: 0.4; cursor: default; }
+
+.sim-label {
+  margin: 6px 0 0; font-size: 11px; font-weight: 600; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--ui-text-muted);
+}
+.sim-asset-name { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+.sim-asset-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0; font-size: 12px; color: var(--ui-text-secondary); }
+.sim-chip { padding: 2px 9px; border-radius: 999px; font-size: 11.5px; background: var(--ui-surface-sunken); }
+.sim-chip[data-status="OPERATIONAL"] { color: #7ee3b0; }
+.sim-chip[data-status="DEGRADED"], .sim-chip[data-status="UNDER_MAINTENANCE"] { color: #f6c768; }
+.sim-chip[data-status="FAILED"] { color: #ff9b9b; }
+.sim-empty { margin: 0; font-size: 12.5px; color: var(--ui-text-muted); line-height: 1.5; }
+
+/* Radio rows, sized for a pointer and readable at a glance. */
+.sim-choices { display: flex; flex-direction: column; gap: 2px; }
+.sim-choices.sim-inline { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+.sim-choice {
+  display: flex; align-items: center; gap: 9px; min-height: 34px; margin: 0;
+  padding: 4px 6px; border: 0; border-radius: 8px; font-size: 13px; cursor: pointer;
+}
+.sim-choice:hover { background: var(--ui-hover); }
+.sim-choice input { width: 15px; height: 15px; accent-color: #38bdf8; cursor: pointer; }
+.sim-choice span { color: var(--ui-text); }
+.sim-inline .sim-choice { min-height: 30px; padding: 2px 10px 2px 6px; background: var(--ui-surface-sunken); }
+
+.sim-slider { display: flex; flex-direction: column; gap: 6px; }
+.sim-slider-head { display: flex; align-items: baseline; justify-content: space-between; font-size: 12.5px; color: var(--ui-text-secondary); }
+.sim-slider-head b { font-size: 15px; color: var(--ui-text); }
+.sim-slider input { width: 100%; accent-color: #38bdf8; }
+
+.sim-extra { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.sim-extra li { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 8px; background: var(--ui-surface-sunken); }
+.sim-extra b { flex: none; font-size: 12.5px; font-weight: 600; overflow-wrap: anywhere; }
+.sim-extra span { flex: 1; min-width: 0; font-size: 11.5px; color: var(--ui-text-secondary); }
+.sim-remove { width: 22px; height: 22px; flex: none; border: 0; border-radius: 6px; background: var(--ui-hover); color: var(--ui-text); cursor: pointer; }
+
+.sim-warn { margin: 0; padding: 9px 11px; border-radius: 8px; font-size: 12px; line-height: 1.5;
+  color: var(--ui-text); background: #f6c7681a; border: 1px solid #f6c76833; }
+
+.sim-actions { display: flex; gap: 8px; margin-top: 4px; }
+.sim-panel button:disabled { opacity: 0.45; cursor: default; }
+.sim-primary {
+  flex: 1; padding: 11px 16px; border: 0; border-radius: 10px; font: inherit; font-size: 13.5px;
+  font-weight: 600; color: #06243a; background: #38bdf8; cursor: pointer;
+}
+.sim-ghost {
+  padding: 11px 16px; border: 1px solid var(--ui-border); border-radius: 10px; font: inherit;
+  font-size: 13px; color: var(--ui-text); background: transparent; cursor: pointer;
+}
+.sim-small { padding: 5px 11px; font-size: 11.5px; border-radius: 8px; }
+.sim-add {
+  align-self: flex-start; padding: 6px 2px; border: 0; background: none; font: inherit;
+  font-size: 12.5px; color: #7cc9f0; cursor: pointer;
+}
+
+/* ── the answer ──────────────────────────────────────────────────────────────────────────── */
+.sim-headline { margin: 0; font-size: 15.5px; font-weight: 600; line-height: 1.4; }
+.sim-headline-detail { margin: 0; font-size: 12.5px; color: var(--ui-text-secondary); line-height: 1.5; }
+.sim-body-text { margin: 0; font-size: 12.5px; color: var(--ui-text-secondary); line-height: 1.55; }
+.sim-note { margin: 0; font-size: 12px; color: var(--ui-text-muted); line-height: 1.5; }
+.sim-affected { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.sim-affected li {
+  display: flex; align-items: center; gap: 10px; padding: 8px 9px; border-radius: 9px;
+  background: var(--ui-surface-sunken); border: 1px solid transparent;
+}
+.sim-affected li[data-current="true"] { border-color: #38bdf8; }
+.sim-affected-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sim-affected-text b { font-size: 12.5px; font-weight: 600; overflow-wrap: anywhere; }
+.sim-affected-text span { font-size: 11.5px; color: var(--ui-text-secondary); }
+/* The number here is the number on the marker in the scene. */
+.sim-marker {
+  display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px;
+  flex: none; border-radius: 50%; font-size: 11px; font-weight: 700; color: #0b1729; background: var(--ui-text-secondary);
+}
+.sim-marker[data-tone="failed"] { background: #ef4444; color: #fff; }
+.sim-marker[data-tone="impaired"] { background: #f59e0b; }
+.sim-step-nav { display: flex; align-items: center; gap: 8px; }
+.sim-step-nav span { flex: 1; min-width: 0; font-size: 11.5px; color: var(--ui-text-muted); }
+.sim-step-nav button {
+  width: 28px; height: 28px; flex: none; border: 1px solid var(--ui-border); border-radius: 8px;
+  background: transparent; color: var(--ui-text); cursor: pointer; font-size: 14px;
+}
+.sim-disclose {
+  align-self: flex-start; margin-top: 4px; padding: 6px 2px; border: 0; background: none;
+  font: inherit; font-size: 12.5px; color: var(--ui-text-secondary); cursor: pointer;
+}
+.sim-disclose::before { content: "▸ "; }
+.sim-disclose[aria-expanded="true"]::before { content: "▾ "; }
+.sim-technical { display: flex; flex-direction: column; gap: 8px; }
+.sim-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+.sim-table th, .sim-table td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--ui-border-soft); vertical-align: top; }
+.sim-table th { width: 38%; font-weight: 400; color: var(--ui-text-muted); overflow-wrap: anywhere; }
+.sim-table td { color: var(--ui-text-secondary); line-height: 1.45; }
+.sim-table td span { color: var(--ui-text-muted); }
+.sim-limits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.sim-limits li { font-size: 11.5px; color: var(--ui-text-muted); line-height: 1.45; padding-left: 12px; position: relative; }
+.sim-limits li::before { content: "·"; position: absolute; left: 3px; }
+
+/* The scene's own key, so a triangle and a ring are never guessed at. */
+.sim-legend {
+  position: absolute; left: calc(var(--app-nav-w) + 16px); bottom: 16px; z-index: 60;
+  display: flex; gap: 12px; padding: 7px 11px; pointer-events: none;
+  background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 9px;
+  box-shadow: var(--ui-shadow-soft); font-size: 11px; color: var(--ui-text-secondary);
+}
+.sim-legend[hidden] { display: none; }
+.sim-legend span { display: flex; align-items: center; gap: 5px; }
+.sim-legend i { width: 10px; height: 10px; display: inline-block; }
+.sim-legend i[data-mark="failed"] { background: #ef4444; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.sim-legend i[data-mark="impaired"] { background: #f59e0b; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.sim-legend i[data-mark="selected"] { border: 2px solid #ffd166; border-radius: 50%; box-sizing: border-box; }
+
+@media (max-width: 820px) {
+  /* One panel at a time: the form, the details and the inventory must not stack over each other. */
+  .sim-panel { left: 8px; right: 8px; width: auto; top: auto; bottom: 8px; max-height: 64%; }
+  .sim-legend { display: none; }
+}
+
+/* The name of the equipment under the pointer. Follows the cursor, never takes a click. */
+.gantry-tip {
+  position: fixed; z-index: 80; pointer-events: none; max-width: 240px;
+  padding: 4px 8px; border-radius: 6px; font-size: 11.5px; line-height: 1.35;
+  color: var(--ui-text); background: var(--ui-surface-solid);
+  border: 1px solid var(--ui-border); box-shadow: var(--ui-shadow-soft);
+}
+.gantry-tip[hidden] { display: none; }
+
+/* ── the synthetic financial estimate, inside the what-if panel ───────────────────────────── */
+.sim-synthetic { margin: 0; font-size: 11px; color: var(--ui-text-muted); }
+.sim-money { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sim-money-cell {
+  display: flex; flex-direction: column; gap: 2px; padding: 9px 10px; border-radius: 9px;
+  background: var(--ui-surface-sunken); border: 1px solid var(--ui-border-soft);
+}
+.sim-money-cell b { font-size: 16px; font-weight: 700; line-height: 1.15; }
+.sim-money-cell span { font-size: 10.5px; color: var(--ui-text-secondary); line-height: 1.3; }
+.sim-money-cell[data-tone="warn"] b { color: #f6c768; }
+.sim-money-cell[data-tone="bad"] b { color: #ff9b9b; }
+.sim-figures td { text-align: right; font-variant-numeric: tabular-nums; }
+.sim-figures thead th:not(:first-child) { text-align: right; }
+.sim-figures th { width: auto; color: var(--ui-text-secondary); }
+.sim-assumptions { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 9px; background: var(--ui-surface-sunken); }
+.sim-assumption {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  min-height: 0; margin: 0; padding: 0; border: 0; cursor: default; font-size: 12px;
+}
+.sim-assumption:hover { background: none; }
+.sim-assumption span { flex: 1; min-width: 0; color: var(--ui-text-secondary); }
+.sim-assumption input {
+  width: 92px; flex: none; padding: 5px 7px; font: inherit; font-size: 12px; text-align: right;
+  color: var(--ui-text); background: var(--ui-surface-raised);
+  border: 1px solid var(--ui-border-soft); border-radius: 6px;
+}
+
+/* The synthetic conditions in force, beside the marker key. Text only — no weather animation. */
+.sim-conditions {
+  position: absolute; left: calc(var(--app-nav-w) + 16px); bottom: 54px; z-index: 60;
+  display: flex; align-items: center; gap: 8px; padding: 6px 11px; pointer-events: none;
+  background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 9px;
+  box-shadow: var(--ui-shadow-soft); font-size: 11.5px; color: var(--ui-text);
+}
+.sim-conditions[hidden] { display: none; }
+.sim-conditions span { padding: 1px 8px; border-radius: 999px; background: var(--ui-surface-sunken); }
+.sim-conditions em { font-style: normal; font-size: 10.5px; color: var(--ui-text-muted); }
+.sim-choice em { display: block; font-style: normal; font-size: 11px; color: var(--ui-text-muted); line-height: 1.4; }
+
+/* ==========================================================================================
+   Safety Intelligence
+   ------------------------------------------------------------------------------------------
+   Five regions around an open centre: a KPI header, an analysis column on the left, the queue
+   and the selected entry's evidence on the right, a replay bar along the bottom — and the map
+   left visible between them, because every finding on this screen has a place.
+
+   The chrome takes pointer events; the gap in the middle does not, so the corridor can still be
+   panned and a concentration clicked.
+   ========================================================================================== */
+/* The workspace rail is hidden here. This screen is one destination with one role, so the rail
+   offered nothing to navigate to while taking a column of width from five regions that all want
+   it. The role selector stays, so leaving the screen is still one click. */
+body[data-section="safetyIntel"] .app-nav { display: none; }
+
+.si-workspace {
+  position: absolute; inset: 0; z-index: 22; pointer-events: none;
+  display: grid; text-align: left; font-size: 13px; color: var(--ui-text);
+  /* The analysis column carries the widest content on the screen — the Simulation Lab's form, the
+     section ranking and the charts — so it gets more room than the queue beside it. */
+  grid-template-columns: minmax(400px, 30vw) 1fr minmax(320px, 24vw);
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas: 'head head head' 'analysis map side' 'foot foot foot';
+  gap: 12px; padding: 12px 16px 14px;
+  transition: grid-template-columns 0.18s ease;
+}
+/* Folded away, a panel keeps a 34px strip carrying its own name: the map takes the rest. */
+.si-workspace.is-analysis-collapsed { grid-template-columns: 34px 1fr minmax(320px, 24vw); }
+/* 80px, not 34: folding the queue away uncovers the map's own navigation rail on the right edge,
+   and the strip would have sat on top of its buttons. The strip keeps 34px and stands clear. */
+.si-workspace.is-side-collapsed { grid-template-columns: minmax(400px, 30vw) 1fr 80px; }
+.si-workspace.is-analysis-collapsed.is-side-collapsed { grid-template-columns: 34px 1fr 80px; }
+.si-side[data-collapsed="true"] { margin-right: 46px; }
+.si-workspace[hidden] { display: none; }
+.si-workspace > * { pointer-events: auto; }
+
+/* --- Region 1: the KPI tiles ------------------------------------------------------------- */
+/* No panel and no screen title: the tiles float straight over the map, each carrying its own
+   surface. A bar behind them added a band of dark across the top of the corridor and a heading
+   that repeated what the navigation already says. */
+.si-header {
+  grid-area: head; display: flex; align-items: flex-start; gap: 8px;
+  /* Clear of the role selector, which floats over the top-right corner. The minimum height holds
+     that corner free even on the Outcomes tab, where every KPI is uncalculable and the row is
+     empty — without it the queue slid up under the selector, and the whole layout jumped on every
+     tab change. */
+  min-height: 44px; padding: 0 210px 0 0;
+  overflow-x: auto; background: none; border: 0; box-shadow: none;
+}
+.si-kpi-strip { display: flex; gap: 8px; }
+.si-kpi {
+  /* Never shrink: with the default flex-shrink the tiles collapsed into each other and their text
+     overlapped. The strip scrolls instead. */
+  flex: 0 0 auto;
+  display: flex; flex-direction: column; gap: 1px; min-width: 92px; max-width: 170px;
+  padding: 8px 11px; text-align: left;
+  background: var(--ui-surface); border: 1px solid var(--ui-border);
+  border-radius: 11px; box-shadow: var(--ui-shadow-soft); color: inherit; font: inherit;
+}
+.si-kpi-label { font-size: 10.5px; color: var(--ui-text-secondary); line-height: 1.25; }
+.si-kpi-value { font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.si-kpi-unit { font-size: 10px; color: var(--ui-text-muted); }
+/* --- Region 2: the analysis column -------------------------------------------------------- */
+.si-analysis {
+  grid-area: analysis; position: relative; display: flex; flex-direction: column; min-height: 0;
+  background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 14px;
+  box-shadow: var(--ui-shadow-soft); overflow: hidden;
+}
+.si-tabs { flex: none; display: flex; gap: 2px; padding: 8px 8px 0; border-bottom: 1px solid var(--ui-border-soft); }
+.si-tabs button {
+  /* No wrapping: with the collapse handle on the row, "Road Rangers" broke over two lines and
+     pushed the tab row taller than the others. */
+  flex: 1 1 auto; white-space: nowrap; padding: 7px 3px 8px; font: inherit; font-size: 11px; cursor: pointer;
+  background: transparent; border: 0; border-bottom: 2px solid transparent;
+  color: var(--ui-text-secondary); border-radius: 7px 7px 0 0;
+}
+.si-tabs button:hover { background: var(--ui-hover); color: var(--ui-text); }
+.si-tabs button[aria-selected="true"] { color: var(--ui-text); border-bottom-color: var(--ui-accent-strong); }
+.si-analysis-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px 18px; }
+.si-analysis-body h4 {
+  margin: 16px 0 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--ui-text-secondary);
+}
+.si-analysis-body h4:first-child { margin-top: 0; }
+.si-lede { margin: 0 0 8px; font-size: 13px; line-height: 1.5; }
+.si-note { margin: 6px 0 0; font-size: 10.5px; line-height: 1.45; color: var(--ui-text-muted); }
+/* The caveats are the point of this screen, so they are legible rather than fine print. */
+.si-warn {
+  margin: 8px 0 0; padding: 7px 9px; font-size: 10.5px; line-height: 1.5;
+  color: var(--ui-text-secondary); background: var(--ui-surface-sunken);
+  border-left: 2px solid var(--ui-status-alert); border-radius: 0 7px 7px 0;
+}
+.si-empty { margin: 6px 0; font-size: 11.5px; color: var(--ui-text-muted); }
+.si-focus {
+  margin: 0 0 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 11.5px; color: var(--ui-accent);
+}
+.si-provenance { margin: 0 0 4px; }
+.si-provenance p { margin: 0 0 5px; font-size: 11px; line-height: 1.5; color: var(--ui-text-secondary); }
+.si-facts { margin: 4px 0 0; padding-left: 18px; font-size: 11.5px; line-height: 1.6; }
+.si-facts strong { font-variant-numeric: tabular-nums; }
+
+/* Charts: inline SVG, no library — a bar's height IS its count. */
+.si-chart { display: block; width: 100%; height: 104px; }
+.si-chart-tick { font-size: 7px; fill: var(--ui-text-dim); }
+.si-chart-note { margin: 2px 0 0; font-size: 10px; color: var(--ui-text-muted); }
+.si-shares { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; }
+.si-shares li { display: grid; grid-template-columns: 1fr 70px auto auto; gap: 8px; align-items: center; font-size: 11px; }
+.si-share-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.si-share-bar { height: 6px; background: var(--ui-surface-raised); border-radius: 3px; overflow: hidden; }
+.si-share-bar i { display: block; height: 100%; border-radius: 3px; }
+.si-share-count { font-variant-numeric: tabular-nums; color: var(--ui-text-secondary); }
+.si-share-count small { color: var(--ui-text-muted); }
+.si-share-lift { font-size: 10px; color: var(--ui-text-muted); font-variant-numeric: tabular-nums; }
+
+.si-list, .si-gaps, .si-coverage { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; }
+.si-list button, .si-list-plain li {
+  display: grid; gap: 2px; width: 100%; padding: 7px 9px; text-align: left; font: inherit;
+  background: var(--ui-surface-raised); border: 1px solid var(--ui-border-soft);
+  border-radius: 9px; color: inherit; cursor: pointer;
+}
+.si-list-plain li { cursor: default; }
+.si-list button:hover { background: var(--ui-hover); border-color: var(--ui-border-strong); }
+.si-list-title { font-size: 11.5px; font-weight: 600; }
+.si-list-meta { font-size: 10.5px; line-height: 1.4; color: var(--ui-text-secondary); }
+.si-gaps li {
+  display: grid; gap: 2px; padding: 7px 9px; border-radius: 9px;
+  background: var(--ui-surface-sunken); border: 1px dashed var(--ui-border-soft);
+}
+.si-gaps strong { font-size: 11px; font-weight: 600; }
+.si-gaps span { font-size: 10.5px; line-height: 1.45; color: var(--ui-text-muted); }
+
+/* --- Region 3 is the map itself: the centre column is left empty on purpose. -------------- */
+
+/* --- Region 4: the queue and the selected entry ------------------------------------------- */
+.si-side {
+  grid-area: side; position: relative; display: flex; flex-direction: column; gap: 12px; min-height: 0;
+}
+.si-side-queue, .si-side-detail {
+  background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 14px;
+  box-shadow: var(--ui-shadow-soft); overflow-y: auto; padding: 12px 14px 14px;
+}
+.si-side-queue { flex: 1 1 58%; min-height: 0; }
+.si-side-detail { flex: 1 1 42%; min-height: 0; }
+.si-queue-head h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.si-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 6px; }
+.si-chip {
+  padding: 3px 9px; font: inherit; font-size: 10.5px; cursor: pointer; text-transform: capitalize;
+  background: var(--ui-surface-raised); color: var(--ui-text-secondary);
+  border: 1px solid var(--ui-border-soft); border-radius: 999px;
+}
+.si-chip:hover { background: var(--ui-hover); color: var(--ui-text); }
+.si-chip.is-on {
+  color: var(--ui-text); border-color: var(--chip, var(--ui-accent-line));
+  box-shadow: inset 2px 0 0 var(--chip, var(--ui-accent-strong));
+}
+.si-queue { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 5px; }
+.si-queue-item {
+  display: grid; gap: 2px; width: 100%; padding: 8px 10px 9px; text-align: left; font: inherit;
+  background: var(--ui-surface-raised); border: 1px solid var(--ui-border-soft);
+  border-left: 3px solid var(--tone, var(--ui-border-strong));
+  border-radius: 9px; color: inherit; cursor: pointer;
+}
+.si-queue-item:hover { background: var(--ui-hover); }
+.si-queue-item.is-on { background: var(--ui-accent-soft); border-color: var(--ui-accent-line); }
+.si-queue-band, .si-badge, .si-badges span {
+  display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 9.5px;
+  font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.si-band-IMMEDIATE { background: #e5484d2e; color: #ff9a8b; }
+.si-band-NEAR_TERM { background: #f4a7252e; color: var(--ui-status-express); }
+.si-band-MONITOR { background: #94a3b82e; color: var(--ui-text-secondary); }
+.si-badge { background: var(--ui-surface-raised); color: var(--ui-text-secondary); box-shadow: inset 2px 0 0 var(--tone); }
+.si-queue-title { font-size: 12px; font-weight: 600; }
+.si-queue-meta { font-size: 10.5px; color: var(--ui-text-secondary); }
+.si-queue-rule { font-size: 10px; line-height: 1.4; color: var(--ui-text-muted); }
+.si-method { margin: 10px 0 0; font-size: 10.5px; }
+.si-method summary { cursor: pointer; color: var(--ui-text-secondary); }
+.si-method p { margin: 6px 0 0; line-height: 1.5; color: var(--ui-text-muted); }
+.si-side-detail h3 { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+.si-side-detail h4 { margin: 12px 0 5px; font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ui-text-secondary); }
+.si-badges { display: flex; gap: 5px; margin: 0 0 8px; }
+.si-detail { margin: 0; display: grid; grid-template-columns: 1fr; gap: 2px; }
+.si-detail dt { font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ui-text-muted); margin-top: 7px; }
+.si-detail dd { margin: 0; font-size: 11.5px; line-height: 1.5; }
+.si-action {
+  margin: 10px 0 0; padding: 6px 12px; font: inherit; font-size: 11.5px; cursor: pointer;
+  background: var(--ui-accent-strong); color: var(--ui-accent-contrast);
+  border: 0; border-radius: 8px; font-weight: 600;
+}
+.si-action-quiet {
+  margin: 0; background: var(--ui-surface-raised); color: var(--ui-text-secondary);
+  border: 1px solid var(--ui-border-soft); font-weight: 500;
+}
+.si-action-quiet:hover { color: var(--ui-text); }
+
+/* --- Region 5: replay and coverage -------------------------------------------------------- */
+.si-foot {
+  grid-area: foot; display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap;
+  /* Clear of the Ask the Twin button in the bottom-right corner — at 230px the disclosure's own
+     summary ran under it. */
+  padding: 10px 262px 10px 16px; border-radius: 14px;
+  background: var(--ui-surface); border: 1px solid var(--ui-border); box-shadow: var(--ui-shadow-soft);
+}
+.si-foot-replay { flex: 1; min-width: 320px; }
+/* One row: the dwell note that used to sit under the controls is in the disclosure beside it. */
+.si-replay { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.si-play {
+  flex: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 11px;
+  background: var(--ui-accent-strong); color: var(--ui-accent-contrast); border: 0;
+}
+.si-scrub { flex: 1; min-width: 160px; accent-color: var(--ui-accent-strong); }
+.si-replay-read { font-size: 11px; color: var(--ui-text-secondary); }
+.si-replay-read strong { color: var(--ui-text); font-variant-numeric: tabular-nums; margin-right: 6px; }
+.si-speed { font-size: 10.5px; color: var(--ui-text-muted); display: flex; align-items: center; gap: 5px; }
+.si-speed select {
+  font: inherit; font-size: 10.5px; padding: 3px 6px; border-radius: 7px;
+  background: var(--ui-surface-raised); color: var(--ui-text); border: 1px solid var(--ui-border-soft);
+}
+.si-foot-coverage { flex: none; max-width: 380px; font-size: 10.5px; }
+.si-foot-coverage summary { cursor: pointer; color: var(--ui-text-secondary); padding: 6px 0; }
+.si-coverage li {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 5px 0;
+  border-bottom: 1px solid var(--ui-border-soft); font-size: 10.5px;
+}
+.si-coverage li.is-out { opacity: 0.6; }
+.si-coverage strong { font-variant-numeric: tabular-nums; color: var(--ui-text-secondary); }
+.si-coverage em { grid-column: 1 / -1; font-style: normal; color: var(--ui-text-muted); line-height: 1.4; }
+
+/* ---- Collapsing the two side panels ------------------------------------------------------ */
+.si-collapse {
+  flex: none; width: 24px; height: 24px; margin-left: auto; align-self: center; cursor: pointer;
+  background: transparent; border: 0; border-radius: 7px; font: inherit; font-size: 15px;
+  line-height: 1; color: var(--ui-text-muted);
+}
+.si-collapse:hover { background: var(--ui-hover); color: var(--ui-text); }
+.si-collapse-right {
+  position: absolute; top: 10px; right: 10px; z-index: 2; margin: 0;
+  background: var(--ui-surface-raised); border: 1px solid var(--ui-border-soft);
+}
+/* The reopen strip only exists while the panel is folded. */
+.si-reopen { display: none; }
+[data-collapsed="true"] > .si-reopen {
+  display: block; width: 100%; height: 100%; padding: 0; cursor: pointer;
+  background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 14px;
+  box-shadow: var(--ui-shadow-soft); color: var(--ui-text-secondary); font: inherit; font-size: 11.5px;
+}
+[data-collapsed="true"] > .si-reopen:hover { color: var(--ui-text); background: var(--ui-hover); }
+[data-collapsed="true"] > .si-reopen span {
+  display: block; writing-mode: vertical-rl; transform: rotate(180deg);
+  letter-spacing: 0.08em; text-transform: uppercase; font-size: 10px; white-space: nowrap;
+}
+.si-analysis[data-collapsed="true"] { background: transparent; border: 0; box-shadow: none; overflow: visible; }
+.si-analysis[data-collapsed="true"] > .si-tabs,
+.si-analysis[data-collapsed="true"] > .si-analysis-body,
+.si-side[data-collapsed="true"] > .si-side-queue,
+.si-side[data-collapsed="true"] > .si-side-detail,
+.si-side[data-collapsed="true"] > .si-collapse { display: none; }
+
+/* The footer folds the same way, to a pill in the bottom-left corner. It starts folded. */
+.si-collapse-foot {
+  position: absolute; top: 8px; right: 12px; margin: 0; z-index: 2;
+  background: var(--ui-surface-raised); border: 1px solid var(--ui-border-soft);
+}
+.si-foot { position: relative; }
+.si-foot[data-collapsed="true"] {
+  background: none; border: 0; box-shadow: none; padding: 0;
+  /* Clear of the map's own attribution strip along the bottom edge, which must stay readable. */
+  margin-bottom: 16px;
+}
+.si-foot[data-collapsed="true"] > .si-foot-replay,
+.si-foot[data-collapsed="true"] > .si-foot-coverage,
+.si-foot[data-collapsed="true"] > .si-collapse { display: none; }
+/* The footer's own reopen reads left to right: it is a pill on a horizontal edge, not a strip on
+   a vertical one. */
+.si-reopen-flat {
+  width: auto !important; height: auto !important; padding: 5px 14px !important;
+  /* The footer is a flex row; without this the pill stretched the full width of the screen. */
+  align-self: flex-start; margin-right: auto;
+}
+.si-reopen-flat span { writing-mode: horizontal-tb !important; transform: none !important; }
+
+/* Narrow windows: the side column goes under the analysis rather than squeezing both. */
+@media (max-width: 1180px) {
+  .si-workspace {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas: 'head head' 'analysis side' 'foot foot';
+  }
+}
+
+/* Light mode: the urgency bands are the only hard-coded colours on the screen, and a tone picked
+   for a dark panel is unreadable on a white one. Everything else runs off the tokens. */
+:root[data-theme="light"] .si-band-IMMEDIATE { background: #b03b2c1f; color: #96301f; }
+:root[data-theme="light"] .si-band-NEAR_TERM { background: #9a6b071f; color: #7a5304; }
+:root[data-theme="light"] .si-band-MONITOR { background: #4b5c6f1a; color: #4b5c6f; }
+/* No text-transform: the domain names are already written the way they should read, and
+   `capitalize` turned "2 from incident records" into "2 From Incident Records". */
+.si-queue-agree { font-size: 10px; color: var(--ui-accent); }
+
+/* ==========================================================================================
+   Safety Intelligence — the contextual investigation (right panel, mode 2)
+   ========================================================================================== */
+.si-side-investigation {
+  flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px 18px;
+  background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 14px;
+  box-shadow: var(--ui-shadow-soft);
+}
+.si-side-investigation[hidden] { display: none; }
+.si-inv-head { display: flex; gap: 6px; margin: 0 0 10px; }
+.si-investigation h3 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+.si-investigation h4 {
+  margin: 16px 0 6px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--ui-text-secondary);
+}
+.si-investigation h5 { margin: 0 0 4px; font-size: 11.5px; font-weight: 600; }
+.si-domain {
+  margin: 0 0 8px; padding: 8px 10px; border-radius: 9px;
+  background: var(--ui-surface-sunken); border: 1px solid var(--ui-border-soft);
+}
+.si-domain p { margin: 0 0 4px; font-size: 11px; color: var(--ui-text-secondary); line-height: 1.45; }
+.si-record { margin: 12px 0; padding: 10px; border-radius: 10px; background: var(--ui-surface-raised); }
+.si-record h4 { margin-top: 0; }
+
+/* A recommendation carries its own evidence: nothing here is a claim without a record behind it. */
+.si-rec {
+  margin: 0 0 8px; padding: 10px 11px; border-radius: 10px;
+  background: var(--ui-surface-raised); border: 1px solid var(--ui-border-soft);
+}
+.si-rec > header { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+.si-rec h5 { margin: 0 0 6px; font-size: 12px; line-height: 1.4; }
+.si-rec dl { margin: 0; display: grid; gap: 1px; }
+.si-rec dt {
+  margin-top: 6px; font-size: 9.5px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--ui-text-muted);
+}
+.si-rec dd { margin: 0; font-size: 11px; line-height: 1.5; }
+.si-rec-urgency, .si-rec-confidence {
+  padding: 2px 7px; border-radius: 999px; font-size: 9.5px; font-weight: 600;
+  letter-spacing: 0.03em; text-transform: uppercase;
+}
+.si-urgency-IMMEDIATE_RESPONSE { background: #e5484d2e; color: #ff9a8b; }
+.si-urgency-URGENT_INSPECTION { background: #f973162e; color: #ffb48b; }
+.si-urgency-OVERDUE_MAINTENANCE { background: #f4a7252e; color: var(--ui-status-express); }
+.si-urgency-PLANNED_ASSESSMENT { background: #38bdf82e; color: #8bd3ff; }
+.si-urgency-DATA_VALIDATION { background: #94a3b82e; color: var(--ui-text-secondary); }
+.si-rec-confidence { background: var(--ui-surface-sunken); color: var(--ui-text-muted); }
+.si-rec-sources { margin-top: 8px; font-size: 10.5px; }
+.si-rec-sources summary { cursor: pointer; color: var(--ui-accent); }
+.si-sources { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 3px; }
+.si-source {
+  display: grid; width: 100%; gap: 1px; padding: 5px 8px; text-align: left; font: inherit;
+  background: var(--ui-surface-sunken); border: 1px solid var(--ui-border-soft);
+  border-radius: 7px; color: inherit; cursor: pointer;
+}
+.si-source:hover { background: var(--ui-hover); }
+.si-source-kind { font-size: 9px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ui-text-muted); }
+.si-source-label { font-size: 10.5px; }
+
+/* Sections, ranked against the traffic each carries. */
+.si-sections { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 3px; }
+.si-section-row {
+  display: grid; grid-template-columns: 86px 1fr 42px; grid-template-areas: 'label bar rate' 'meta meta meta';
+  gap: 2px 8px; align-items: center; width: 100%; padding: 6px 9px; text-align: left; font: inherit;
+  background: var(--ui-surface-raised); border: 1px solid var(--ui-border-soft);
+  border-radius: 8px; color: inherit; cursor: pointer;
+}
+.si-section-row:hover { background: var(--ui-hover); }
+.si-section-row.is-on { background: var(--ui-accent-soft); border-color: var(--ui-accent-line); }
+.si-section-label { grid-area: label; font-size: 11px; font-weight: 600; }
+.si-section-bar { grid-area: bar; height: 6px; background: var(--ui-surface-sunken); border-radius: 3px; overflow: hidden; }
+.si-section-bar i { display: block; height: 100%; background: var(--ui-accent-strong); border-radius: 3px; }
+.si-section-rate { grid-area: rate; font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; }
+.si-section-meta { grid-area: meta; font-size: 10px; color: var(--ui-text-muted); }
+
+/* ==========================================================================================
+   Safety Intelligence — Simulation Lab
+   ========================================================================================== */
+.sim-baseline { margin: 0 0 12px; }
+.sim-quality { margin-top: 8px; }
+.sim-provenance { list-style: none; margin: 6px 0 10px; padding: 0; display: grid; gap: 3px; }
+.sim-provenance li {
+  display: grid; grid-template-columns: 74px 1fr; gap: 2px 8px; align-items: baseline;
+  font-size: 10.5px; padding: 4px 0; border-bottom: 1px solid var(--ui-border-soft);
+}
+.sim-p-tag {
+  font-size: 9px; letter-spacing: 0.05em; text-transform: uppercase; padding: 1px 6px;
+  border-radius: 999px; text-align: center;
+}
+.sim-p-OBSERVED .sim-p-tag { background: #4ade8029; color: #86efac; }
+.sim-p-DERIVED .sim-p-tag { background: #38bdf829; color: #8bd3ff; }
+.sim-p-ASSUMED .sim-p-tag { background: #f4a72529; color: var(--ui-status-express); }
+.sim-p-UNAVAILABLE .sim-p-tag { background: #94a3b829; color: var(--ui-text-muted); }
+.sim-p-note { grid-column: 2; font-size: 9.5px; line-height: 1.4; color: var(--ui-text-muted); }
+
+.sim-config { display: grid; gap: 8px; margin: 10px 0 14px; }
+.sim-group {
+  margin: 0; padding: 8px 10px 10px; border: 1px solid var(--ui-border-soft); border-radius: 9px;
+  display: grid; gap: 4px;
+}
+.sim-group legend {
+  padding: 0 5px; font-size: 9.5px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--ui-text-muted);
+}
+/* The global 48px centred `label` rule would otherwise swallow every field here. */
+.sim-field {
+  display: grid; grid-template-columns: 1fr 108px; gap: 8px; align-items: center;
+  font-size: 11px; font-weight: 400; text-align: left; letter-spacing: 0; color: var(--ui-text);
+  text-transform: none; margin: 0; line-height: 1.4;
+}
+.sim-field-wide { grid-template-columns: 1fr; gap: 4px; }
+.sim-field > span { display: flex; align-items: center; gap: 5px; }
+.sim-field input, .sim-field select {
+  width: 100%; min-width: 0; font: inherit; font-size: 11px; padding: 4px 7px; border-radius: 7px;
+  background: var(--ui-surface-raised); color: var(--ui-text); border: 1px solid var(--ui-border-soft);
+}
+.sim-field em { font-style: normal; font-size: 9.5px; color: var(--ui-text-muted); white-space: nowrap; }
+.sim-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+
+.sim-timeline { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 2px; }
+.sim-timeline li {
+  display: grid; grid-template-columns: 140px 1fr 48px; gap: 8px; align-items: center; font-size: 10.5px;
+}
+.sim-timeline li.is-parallel .sim-stage-label { color: var(--ui-accent); }
+.sim-stage-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sim-stage-bar { position: relative; height: 6px; background: var(--ui-surface-raised); border-radius: 3px; }
+.sim-stage-bar i {
+  position: absolute; top: -2px; width: 3px; height: 10px; border-radius: 2px;
+  background: var(--ui-accent-strong);
+}
+.sim-stage-at { text-align: right; font-variant-numeric: tabular-nums; color: var(--ui-text-secondary); }
+.sim-queue { height: 110px; }
+
+.sim-table { width: 100%; border-collapse: collapse; font-size: 10.5px; margin-top: 6px; }
+.sim-table th { text-align: left; font-weight: 600; padding: 5px 6px 5px 0; vertical-align: top; }
+.sim-table td { padding: 5px 6px 5px 0; vertical-align: top; font-variant-numeric: tabular-nums; }
+.sim-table tbody tr { border-bottom: 1px solid var(--ui-border-soft); }
+.sim-basis { color: var(--ui-text-muted); font-variant-numeric: normal; line-height: 1.4; }
+.sim-total th, .sim-total td { font-weight: 600; border-top: 1px solid var(--ui-border); }
+.sim-compare thead th {
+  font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ui-text-muted);
+}
+.sim-compare tbody tr { cursor: pointer; }
+.sim-compare tbody tr:hover { background: var(--ui-hover); }
+.sim-compare tbody tr.is-on { background: var(--ui-accent-soft); }
+.sim-compare tbody tr.is-best td:last-child { color: #86efac; font-weight: 600; }
+.sim-recommend h5 {
+  margin: 12px 0 4px; font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--ui-text-secondary);
+}
+
+/* The charts' hover layer. One element, outside the panels, so a re-render never destroys it. */
+.si-tip {
+  position: fixed; z-index: 90; pointer-events: none; max-width: 300px;
+  padding: 6px 9px; border-radius: 8px; font-size: 11px; line-height: 1.45;
+  background: var(--ui-surface-solid); color: var(--ui-text);
+  border: 1px solid var(--ui-border); box-shadow: var(--ui-shadow);
+}
+.si-tip[hidden] { display: none; }
+
+/* What the screen is waiting for. Twenty-five seconds of blank panel reads as a hang. */
+.si-loading {
+  margin: 10px 0; font-size: 12px; color: var(--ui-text-secondary); line-height: 1.5;
+}
+.si-loading::after {
+  content: ''; display: inline-block; width: 1.1em; text-align: left;
+  animation: si-ellipsis 1.4s steps(4, end) infinite;
+}
+@keyframes si-ellipsis { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } }
+
+/* Critical path, sensitivity and calibration tables in the Simulation Lab. */
+.sim-gates tr.is-binding th, .sim-gates tr.is-binding td { color: #ff9a8b; font-weight: 600; }
+.sim-sensitivity th:first-child { font-weight: 500; }
+.sim-verdict-MOVES_REOPENING th { color: var(--ui-text); }
+.sim-verdict-COSTS_WITHOUT_REOPENING { opacity: 0.75; }
+.sim-verdict-COSTS_WITHOUT_REOPENING th::after {
+  content: ' · costs, no benefit'; font-size: 9px; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--ui-status-alert);
+}
+.sim-verdict-NO_EFFECT_MODELLED { opacity: 0.6; }
+.sim-calibration > summary, .sim-explain > summary { color: var(--ui-accent); }
+.sim-calibration h5, .sim-explain h5 {
+  margin: 10px 0 4px; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--ui-text-secondary);
+}

@@ -1,0 +1,25 @@
+{
+  "type": "FeatureCollection",
+  "generator": "overpass-turbo",
+  "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL.",
+  "timestamp": "2026-10-13T08:29:58Z",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/3398439538",
+        "charge:sunpass": "0.50 USD",
+        "highway": "toll_gantry",
+        "operator": "Florida's Turnpike",
+        "payment:e_zpass": "yes",
+        "payment:leeway": "yes",
+        "payment:license_plate": "yes",
+        "payment:nc_quick_pass": "yes",
+        "payment:peach_pass": "yes",
+        "payment:sunpass": "yes"
+      },
+      "geometry": { "type": "Point", "coordinates": [-80.3170015, 26.1154018] },
+      "id": "node/3398439538"
+    }
+  ]
+}

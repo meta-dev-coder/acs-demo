@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import {
-  MAX_PITCH_DEG, MIN_PITCH_DEG, ROTATE_STEP_DEG, TILT_STEP_DEG, clampPitchDeg, normalizeHeadingDeg,
+  MAX_PITCH_DEG, MIN_PITCH_DEG, ROTATE_STEP_DEG, TILT_STEP_DEG, clampPitchDeg, normalizeHeadingDeg, zoomRange,
 } from '../src/mapNavigationControls.js';
 
 test('the tilt range keeps the camera the right way up', () => {
@@ -36,6 +36,12 @@ test('headings wrap rather than run away', () => {
   for (let i = 0; i < 360 / ROTATE_STEP_DEG; i++) heading = normalizeHeadingDeg(heading + ROTATE_STEP_DEG);
   assert.equal(heading, 74);
   assert.ok(Number.isInteger(360 / ROTATE_STEP_DEG), 'the rotate step must divide a full circle');
+});
+
+test('zoom follows eye-to-target range and respects close inspection limits', () => {
+  assert.equal(zoomRange(78, 0.75, 1.5, 20_000_000), 58.5);
+  assert.equal(zoomRange(2, 0.5, 1.5, 20_000_000), 1.5);
+  assert.equal(zoomRange(19_000_000, 2, 1.5, 20_000_000), 20_000_000);
 });
 
 test('no map feature is ever camera-tracked', () => {

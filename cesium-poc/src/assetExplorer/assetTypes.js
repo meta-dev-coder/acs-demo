@@ -12,12 +12,27 @@ import { corridorPositionOf } from './corridorPosition.js';
 // `field` resolves a DataConnect row's own columns, which live under raw.attributes.
 import { field } from '../maintenance/maintenanceRecords.js';
 import { clearedAtLabel, clearedDateKey, LIVE_EVENT_LABELS } from '../liveEventsData.js';
+import { EQUIPMENT_TYPES, NOT_AVAILABLE, NOT_CONNECTED, sideLabel } from '../tolling/gantryEquipment.js';
+import { formatDate, healthLabel, statusPresentation, SYNTHETIC_EXPLANATION, SYNTHETIC_LABEL,
+  syntheticProvenance } from '../tolling/gantryEquipmentSynthetic.js';
 import EVENT_FIELDS from '../../config/liveDc/eventFields.json' with { type: 'json' };
 
 /** Framing for the close inspection view, per type. Replaces per-layer magic numbers. */
 export const ASSET_CAMERA_PRESETS = Object.freeze({
   // An overhead gantry is read from slightly below its own height, looking along the road.
   gantry: Object.freeze({ rangeM: 78, pitchDeg: -16, useModelHeading: true }),
+  // The tolling gantries are structures over the carriageway, read from the same distance as a
+  // placed gantry model — but from the ground geometry, since these records carry no heading.
+  // A toll gantry that stands at a placed model is framed exactly as that model is — same
+  // distance, same pitch, and from the side the model records rather than from due north.
+  tollGantry: Object.freeze({ rangeM: 78, pitchDeg: -16, useModelHeading: true }),
+  // A single antenna or camera on the gantry: metres across, so the close view is metres away
+  // and nearly level with it rather than looking down on the span.
+  // A single antenna or camera on the gantry. `selection` overrides the shared 420 m "moderate
+  // look": at 420 m the part is a pixel, so choosing one from the inventory showed nothing.
+  gantryEquipment: Object.freeze({ rangeM: 12, pitchDeg: -8, useModelHeading: true,
+    selection: Object.freeze({ rangeM: 26, pitchDeg: -10 }) }),
+  expressGantry: Object.freeze({ rangeM: 90, pitchDeg: -18 }),
   // A camera is a small object on a pole: closer, and a little steeper to see what it overlooks.
   camera: Object.freeze({ rangeM: 46, pitchDeg: -22 }),
   // A light is a pole-top fixture: close enough to pick out the pole, as for a camera.
@@ -340,6 +355,25 @@ export function currentDateWindow({ months = DEFAULT_WINDOW_MONTHS, today = new 
   return { from: `${first.getFullYear()}-${pad(first.getMonth() + 1)}-01`, to: todayKey(today) };
 }
 
+/**
+ * The scenario state beside the baseline.
+ *
+ * "NORMAL" alone would read as the asset's condition; while a scenario is running this says which
+ * scenario put it in that state, so the two can never be confused for one another.
+ */
+const simulationLabel = state => {
+  const status = text(state?.status) ?? 'NORMAL';
+  if (status === 'NORMAL' || !state?.scenarioId) return status;
+  const mode = text(state?.failureType);
+  return `${status}${mode ? ` (${mode.toLowerCase().replace(/_/g, ' ')})` : ''} · ${state.scenarioId}`;
+};
+
+/** How a piece of gantry equipment was identified, in words an operator can act on. */
+const identificationLabel = identification => (
+  identification === 'NAMED' ? 'Named in the 3D model'
+    : identification === 'GROUP_UNKNOWN' ? 'Type named; equipment group not stated'
+      : 'Not identified in the 3D model');
+
 /** One entry per maintenance class; everything else about them is identical. */
 const MAINTENANCE_TYPE = ({ id, label, singular, title = singular, icon, statusTone, extraFilters = null,
   /** What "reported" means for this class — the column its own sheet opens a record with. */
@@ -460,6 +494,161 @@ export const ASSET_TYPES = Object.freeze({
       ['Heading', number(asset.source?.heading) == null ? null : `${Number(asset.source.heading).toFixed(1)}°`],
       ['Model', text(asset.source?.modelKey)],
       ['Layer', text(asset.source?.layerLabel)],
+    ],
+  }),
+
+  /**
+   * An OpenStreetMap toll gantry.
+   *
+   * Separate from `gantry` on purpose. That type is the placed 3D models — where a structure was
+   * put in the scene. This one is the published tolling record: who operates the gantry, what it
+   * charges and what it accepts. The two describe the same structures but answer different
+   * questions, and merging them would mean a model's placement standing in for a toll attribute.
+   */
+  tollGantry: Object.freeze({
+    id: 'tollGantry', label: 'Toll Gantries', singular: 'Toll gantry', detailsTitle: 'Toll Gantry',
+    icon: 'gantry',
+    emptyMessage: 'No toll gantries are published for this corridor.',
+    errorMessage: 'Unable to load toll gantries.',
+    getTitle: asset => asset.name,
+    getSubtitle: asset => text(asset.source?.operator) ?? positionLabel(asset),
+    // The charge is the record's own tag. A gantry that does not publish one says so.
+    getCardStatus: asset => (asset.source?.sunpassCharge
+      ? { label: `SunPass ${asset.source.sunpassCharge}`, tone: 'ok' }
+      : { label: 'No charge published', tone: 'muted' }),
+    getStatus: () => null,
+    details: asset => [
+      ['Operator', text(asset.source?.operator)],
+      ['SunPass charge', text(asset.source?.sunpassCharge)],
+      ['Accepted', asset.source?.payments?.length ? asset.source.payments.join(', ') : null],
+      ['Corridor position', asset.corridorMiles == null ? null : `${asset.corridorMiles.toFixed(2)} mi along corridor`],
+      ['Latitude', asset.coordinates ? asset.coordinates.latitude.toFixed(6) : null],
+      ['Longitude', asset.coordinates ? asset.coordinates.longitude.toFixed(6) : null],
+      ['OSM node', text(asset.id)],
+      // Named only where a model actually stands there, with the measured distance that says so.
+      ['3D model', asset.source?.modelId
+        ? `${asset.source.modelName ?? asset.source.modelId} · ${asset.source.modelDistanceM} m away`
+        : null],
+      ['Source', text(asset.source?.attribution)],
+    ],
+  }),
+
+  /**
+   * One piece of equipment on a toll gantry, as the 3D model names it.
+   *
+   * Everything here comes from the GLB: the model is the only source that says this gantry carries
+   * an RFID antenna on the near side of its second equipment group. Nothing operational is
+   * connected to these assets yet, and every row that would need such a feed says so rather than
+   * showing a plausible value.
+   */
+  gantryEquipment: Object.freeze({
+    id: 'gantryEquipment', label: 'Gantry Equipment', singular: 'Equipment',
+    detailsTitle: 'Gantry Equipment', icon: 'gantry',
+    // Every part of this class stands on one structure. A corridor mini-map of it is 15 miles of
+    // road with sixty-one dots in the same pixel, so this class does without one.
+    hideMiniMap: true,
+    // Selecting a piece of equipment is how a what-if starts, so the action is offered here rather
+    // than requiring the operator to find a card and select the same asset again.
+    primaryAction: Object.freeze({ id: 'simulateFailure', label: 'Simulate failure' }),
+    emptyMessage: 'No equipment is modelled on this gantry.',
+    errorMessage: 'Unable to read the gantry equipment manifest.',
+    getTitle: asset => asset.name,
+    getSubtitle: asset => asset.id,
+    // The synthetic baseline, in its own colour. A part the overlay does not cover says so rather
+    // than borrowing a status from one that is covered.
+    getCardStatus: asset => {
+      const status = statusPresentation(asset.source?.operationalStatus);
+      return status ? { label: status.label, tone: status.tone } : { label: NOT_CONNECTED, tone: 'muted' };
+    },
+    getStatus: () => null,
+    /**
+     * The block above the rows: the baseline condition, its health, and the standing reminder that
+     * all of it is demonstration data rather than anything this gantry reported.
+     */
+    detailsBanner: asset => {
+      const status = statusPresentation(asset.source?.operationalStatus);
+      const health = Number(asset.source?.health?.score);
+      return {
+        status: status ? { label: status.label, tone: status.tone } : { label: NOT_CONNECTED, tone: 'muted' },
+        meter: Number.isFinite(health) && healthLabel(asset.source?.health)
+          ? { value: health, label: healthLabel(asset.source.health), tone: status?.tone ?? 'muted' }
+          : null,
+        note: asset.source?.dataOrigin === 'SYNTHETIC_DEMO'
+          ? { label: SYNTHETIC_LABEL, tooltip: syntheticProvenance.explanation ?? SYNTHETIC_EXPLANATION }
+          : null,
+      };
+    },
+    getSearchText: asset => `${asset.id} ${asset.name} ${asset.source?.nodeName ?? ''}`.toLowerCase(),
+    /** Type, equipment group and side — the three ways an inventory of a gantry is read. */
+    getFilters: (assets, counted = assets) => [
+      ...valueFilters(assets, { group: 'Equipment type', prefix: 'equip-type', counted,
+        read: source => EQUIPMENT_TYPES[source?.type]?.label ?? null }),
+      ...valueFilters(assets, { group: 'Lane group', prefix: 'equip-lane', counted,
+        read: source => (source?.laneGroup == null ? null : `Lane ${source.laneGroup}`) }),
+      ...valueFilters(assets, { group: 'Side', prefix: 'equip-side', counted,
+        read: source => (source?.side ? sideLabel(source.side) : null) }),
+      // The baseline condition as a filter: "show me what is failed" is the first thing asked of
+      // an inventory. It narrows the list, never the model — all 61 parts stay drawn and pickable.
+      ...valueFilters(assets, { group: 'Status', prefix: 'equip-status', counted,
+        read: source => statusPresentation(source?.operationalStatus)?.label ?? null }),
+    ],
+    details: asset => [
+      ['Asset ID', text(asset.id)],
+      ['Asset type', EQUIPMENT_TYPES[asset.source?.type]?.singular ?? null],
+      ['Gantry', text(asset.source?.gantryId)],
+      // Named "provisional" wherever it appears: the modeller's grouping is not a surveyed lane.
+      ['Lane group', asset.source?.laneGroup == null ? 'Not identified' : `${asset.source.laneGroup} (provisional)`],
+      ['Side', asset.source?.side ? sideLabel(asset.source.side) : NOT_AVAILABLE],
+      ['Function', text(asset.source?.equipmentFunction) ?? NOT_AVAILABLE],
+      ['GLB node', text(asset.source?.nodeName)],
+      ['Identification', identificationLabel(asset.source?.identification)],
+      // Below here is the synthetic overlay. Each row falls back to the honest "nothing is
+      // connected" wording, so a part the overlay does not cover never borrows a neighbour's data.
+      ['Operational status', statusPresentation(asset.source?.operationalStatus)?.label ?? NOT_CONNECTED],
+      ['Health', healthLabel(asset.source?.health) ?? NOT_CONNECTED],
+      ['Manufacturer', text(asset.source?.manufacturer) ?? NOT_AVAILABLE],
+      ['Model number', text(asset.source?.modelNumber) ?? NOT_AVAILABLE],
+      ['Serial number', text(asset.source?.serialNumber) ?? NOT_AVAILABLE],
+      ['Last inspection', formatDate(asset.source?.lastInspection) ?? NOT_AVAILABLE],
+      ['Last maintenance', formatDate(asset.source?.lastMaintenance) ?? NOT_AVAILABLE],
+      // Reliability figures are the demo baseline a scenario will reason from, not a measurement.
+      ['Annual failure risk', asset.source?.baselineReliability?.annualFailureProbability == null ? null
+        : `${(asset.source.baselineReliability.annualFailureProbability * 100).toFixed(1)}% (modelled)`],
+      ['Repair estimate', asset.source?.baselineReliability?.estimatedRepairHours == null ? null
+        : `${asset.source.baselineReliability.estimatedRepairHours} h (modelled)`],
+      // Still genuinely unconnected: no work-order system is wired to these parts.
+      ['Related work orders', NOT_CONNECTED],
+      // The scenario state, kept apart from the baseline above: a what-if marking this FAILED does
+      // not change what the baseline says the part's condition is. Both are shown, side by side,
+      // so an operator reading the panel during a scenario can see which is which.
+      ['Simulation state', simulationLabel(asset.source?.simulationState)],
+      ['Data source', asset.source?.dataOrigin === 'SYNTHETIC_DEMO' ? SYNTHETIC_LABEL : null],
+    ],
+  }),
+
+  /** A 595 Express access node or ORT mainline gantry, from the corridor's own extract. */
+  expressGantry: Object.freeze({
+    id: 'expressGantry', label: 'Express Gantries', singular: 'Express gantry',
+    detailsTitle: 'Express Gantry', icon: 'gantry',
+    emptyMessage: 'No express gantries are published for this corridor.',
+    errorMessage: 'Unable to load express gantries.',
+    getTitle: asset => asset.name,
+    getSubtitle: asset => (asset.source?.milepost == null ? positionLabel(asset)
+      : `${asset.id} · MP ${Number(asset.source.milepost).toFixed(1)}`),
+    // Open or closed is the operational fact on these; a record without one claims neither.
+    getStatus: asset => (text(asset.source?.status)
+      ? { label: String(asset.source.status).toUpperCase(), tone: /open/i.test(asset.source.status) ? 'ok' : 'warn' }
+      : null),
+    details: asset => [
+      ['Gantry', text(asset.id)],
+      ['Type', asset.source?.gantryType === 'access_node' ? 'Express access node'
+        : asset.source?.gantryType === 'ort_mainline' ? 'Open road tolling — mainline' : null],
+      ['Milepost', asset.source?.milepost == null ? null : `MP ${Number(asset.source.milepost).toFixed(1)}`],
+      ['Direction', text(asset.source?.direction)],
+      ['Lanes', asset.source?.laneCount == null ? null : String(asset.source.laneCount)],
+      ['Status', text(asset.source?.status)],
+      ['DMS message', text(asset.source?.dmsText)],
+      ['Source', text(asset.source?.attribution)],
     ],
   }),
 

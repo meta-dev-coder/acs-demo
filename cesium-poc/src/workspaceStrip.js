@@ -24,6 +24,8 @@ export const WORKSPACE_ICONS = Object.freeze({
   inspection: '<rect x="4" y="3.5" width="12" height="13" rx="2"/><path d="M7.5 2.5h5v2.5h-5z"/><path d="M7.5 9h5M7.5 12h3"/>',
   // An asset the records show to be at risk: a shield with a warning stroke through it.
   assetRisk: '<path d="M10 2.6 4 5v4.4c0 3.5 2.5 6.6 6 7.9 3.5-1.3 6-4.4 6-7.9V5l-6-2.4Z"/><path d="M10 7.4v3.1M10 12.6v.4"/>',
+  // A gantry: the beam over the carriageway with its two uprights and the readers hanging off it.
+  gantry: '<path d="M3.5 16.5V6M16.5 16.5V6"/><path d="M2.5 6h15"/><path d="M7 6v2.6M10 6v2.6M13 6v2.6"/>',
   // Cleared: a clock, for something that was happening and is not any more.
   cleared: '<circle cx="10" cy="10" r="7"/><path d="M10 6v4.3l2.8 1.7"/>',
 });

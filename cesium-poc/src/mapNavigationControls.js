@@ -56,6 +56,16 @@ const PIVOT_RANGE_FACTOR = 4;
 const MIN_PIVOT_RANGE_M = 400;
 
 /**
+ * Range after one proportional zoom step.
+ *
+ * This is based on eye-to-target distance, not cartographic height. I-595 sits about 25 m below
+ * the ellipsoid, so a close oblique camera can have a negative "height" while it is still tens of
+ * metres from a gantry. Treating that height as range made zoom stop or reverse near the model.
+ */
+export const zoomRange = (range, factor, minimum, maximum) =>
+  Math.min(maximum, Math.max(minimum, range * factor));
+
+/**
  * The ground point the camera is looking at — the pivot every orbit turns around. Falls back
  * outward: the depth buffer (which includes photorealistic tiles), then the ellipsoid, then a point
  * straight ahead; whichever it finds is pulled in to a sensible range.

@@ -10,6 +10,9 @@ import { assetTypeConfig } from './assetExplorer/assetTypes.js';
 import { carriagewayLines, loadCorridorContext } from './assetExplorer/incidentContext.js';
 import { createRectangleSelection } from './spatial/rectangleSelection.js';
 import { buildSpatialContext } from './spatial/spatialQuery.js';
+import { answerSafetyQuestion, parseSafetyQuestion, SAFETY_SUGGESTIONS } from './safetyIntelligence/safetyAnswers.js';
+import { answerSimulationQuestion, parseSimulationQuestion,
+  SIMULATION_SUGGESTIONS } from './safetyIntelligence/simulationAnswers.js';
 import { AREA_SUGGESTIONS, answerAreaQuestion, areaIndicatorText, areaSummaryLines, filterAreaRecords, isMapInstruction, parseAreaQuestion } from './spatial/areaAnswers.js';
 import { geometryIntersectsBounds } from './spatial/areaGeometry.js';
 import { buildTwinContext, REFERENT_KINDS } from './spatial/twinContext.js';
@@ -78,7 +81,16 @@ export function describeAsset(asset) {
  */
 export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segments, layerStore, centerline = [],
   liveEvents = null, maintenanceRecords = null, assetIndex = null, tmc = null, crashRecords = null,
-  maintenanceView = null } = {}) {
+  maintenanceView = null,
+  /** The Safety Intelligence screen's own findings, caveats included. */
+  safetyIntelligence = null,
+  /**
+   * The Safety Intelligence screen's simulation session.
+   *
+   * A function, so the chat always reaches the session for whatever incident is open NOW, and so
+   * every number it quotes comes from the same engine the Simulation Lab is showing.
+   */
+  safetySimulation = null } = {}) {
   /**
    * What the last answer was about, so a follow-up can say "it".
    *
@@ -196,6 +208,13 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
           historical ? TMC_HISTORICAL_INCIDENT_SUGGESTIONS : TMC_INCIDENT_SUGGESTIONS);
       }
       return historical ? TMC_HISTORICAL_SUGGESTIONS : TMC_SUGGESTIONS;
+    }
+    // The Safety Intelligence screen asks its own questions, and they are about the record rather
+    // than about what is happening now.
+    if (safetyIntelligence && document.body.dataset.section === 'safetyIntel') {
+      // In the Lab the questions are about the simulation, not about the register.
+      const inLab = document.querySelector('[data-tab="lab"]')?.getAttribute('aria-selected') === 'true';
+      return inLab ? SIMULATION_SUGGESTIONS : SAFETY_SUGGESTIONS;
     }
     return SUGGESTIONS;
   }
@@ -734,6 +753,7 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
   /** The capabilities, built against the same services the screens use. */
   const capabilities = createCapabilityRegistry({
     tmc,
+    safetyIntelligence,
     maintenanceRecords,
     assetIndex: typeof assetIndex === 'function' ? assetIndex : () => assetIndex,
     centerline,
@@ -845,6 +865,41 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     return out.join('\n');
   }
 
+  /**
+   * Answer from the Safety Intelligence screen's own findings, while that screen is open.
+   *
+   * Every number here is one the screen is already showing, and each answer carries the caveat
+   * that belongs to it. Returns false when the question is not about safety.
+   */
+  /**
+   * Run a simulation and report what it returned.
+   *
+   * The assistant never calculates: every figure here comes from `simulationService`, the same
+   * engine and the same session the Simulation Lab renders.
+   */
+  function answerAboutSimulation(question) {
+    if (!safetySimulation || document.body.dataset.section !== 'safetyIntel') return false;
+    const intent = parseSimulationQuestion(question);
+    if (!intent) return false;
+    const session = typeof safetySimulation === 'function' ? safetySimulation() : safetySimulation;
+    const answer = answerSimulationQuestion(intent, session, question);
+    if (!answer) return false;
+    addMsg('assistant', answer.answer);
+    return true;
+  }
+
+  function answerAboutSafety(question) {
+    if (!safetyIntelligence || document.body.dataset.section !== 'safetyIntel') return false;
+    const context = typeof safetyIntelligence === 'function' ? safetyIntelligence() : safetyIntelligence;
+    if (!context) return false;
+    const intent = parseSafetyQuestion(question);
+    if (!intent) return false;
+    const answer = answerSafetyQuestion(intent, context);
+    if (!answer) return false;
+    addMsg('assistant', answer.answer);
+    return true;
+  }
+
   async function answerLocally(question) {
     // A compound question is investigated first, so its later clauses are not discarded by a
     // handler that recognises only the first.
@@ -854,6 +909,13 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     // raw incidents and deciding. The ranking an operator acts on must be the same one the screen
     // shows, every time it is asked.
     if (answerAboutTmc(question)) return true;
+    // The same rule for the Safety Intelligence screen: its numbers come from its own analysis, so
+    // a question about them is answered from that analysis — with the caveats attached — rather
+    // than by the model reading the register itself.
+    // The simulation comes before the register answers: on this screen "what if the tow were ten
+    // minutes earlier" is a request to run a model, not to describe what was recorded.
+    if (answerAboutSimulation(question)) return true;
+    if (answerAboutSafety(question)) return true;
     // The drawn area comes next: with one up, "any incidents here?" is a question about it, and
     // every other route below would answer about the corridor instead.
     if (answerAboutArea(question)) return true;

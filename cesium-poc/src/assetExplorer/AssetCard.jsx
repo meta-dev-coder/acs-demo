@@ -10,7 +10,10 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircleOutlined';
 import { assetTypeConfig } from './assetTypes.js';
 import { AssetTypeIcon } from './AssetTypeIcon.jsx';
 
-const TONE_COLOR = { ok: 'success.main', warn: 'warning.main', muted: 'text.secondary' };
+// `bad` and `info` were added for the gantry equipment's baseline conditions: a failed part is
+// not a warning, and "under maintenance" is neither good nor bad news.
+const TONE_COLOR = { ok: 'success.main', warn: 'warning.main', bad: 'error.main',
+  info: 'info.main', muted: 'text.secondary' };
 
 function AssetCardBase({ asset, selected, onSelect }) {
   const config = assetTypeConfig(asset.assetType);

@@ -4,7 +4,7 @@
     "name": "Gantry 1 — Toll Plaza",
     "type": "GLB_MODEL",
     "layer": "gantries",
-    "modelKey": "Gantry1_TollPlaza.glb",
+    "modelUrl": "models/i595/gantry-1-toll-plaza-v2.glb",
     "latitude": 26.1154084,
     "longitude": -80.3170918,
     "heightOffset": 1,

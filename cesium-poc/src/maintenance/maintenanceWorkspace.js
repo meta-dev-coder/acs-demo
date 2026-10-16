@@ -224,6 +224,8 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
   const datasets = new Map(classes.map(entry => [entry.key, { state: 'loading', records: [], summary: null }]));
   let assets = new Map();
   let activeKey = null, active = false, withLive = true;
+  /** The in-flight preload, so two callers share one set of reads. */
+  let preloading = null;
 
   // ── data ────────────────────────────────────────────────────────────────────────────────────
   const assetsReady = getCuratedData('assets')
@@ -689,6 +691,8 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
       await signIn(popup);
       // The cached rejections are what "failed" means to the service; drop them and ask again.
       clearCache();
+      // A re-read invalidates the memoised preload: its promise described the reads that just failed.
+      preloading = null;
       for (const entry of classes) if (!entry.derived) Object.assign(datasets.get(entry.key), { state: 'loading', error: null, note: null });
       renderStrip();
       await Promise.all(classes.map(entry => load(entry.key)));
@@ -762,9 +766,15 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
     pulseFeed,
     /** Put away whatever this workspace is drawing, without changing which tab is open. */
     hide() { if (activeKey) closeType(); },
-    /** Load every class without showing any of them, so a search can see records first. */
+    /**
+     * Load every class without showing any of them, so a search can see records first.
+     *
+     * Memoised. It is called at startup and awaited by other screens that need the records before
+     * Maintenance has ever been opened — without this, the second caller re-requested every class
+     * that was still in flight, which on a slow instance is seven duplicate reads of the same data.
+     */
     preload() {
-      return Promise.all([
+      preloading ??= Promise.all([
         // `classes`, not `cards`: the incident register has no card and is exactly what Live Ops
         // needs to resolve an event's Related records. Preloading only the carded classes left
         // every Related tab reading (0) until Maintenance happened to be opened.
@@ -775,6 +785,7 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
         // when this workspace does.
         liveFeed ? liveFeed.refresh().catch(onLiveError) : null,
       ].filter(Boolean));
+      return preloading;
     },
     activate() {
       if (active) return;

@@ -33,12 +33,16 @@ export function installAssetExplorer(container, viewer, {
   maintenanceRecords = null,
   /** Put one maintenance type on screen; these types have no layer of their own. */
   revealMaintenance = null,
+  /** The Tolling workspace, which owns the two gantry datasets the same way. */
+  tolling = null,
   bridges = null,
   signals = null,
   liveEvents = null,
   signStructures = null,
   modelConfigs = [],
   onViewCamera = null,
+  /** A type's own action from its details panel, e.g. the gantry equipment's what-if. */
+  onAssetAction = null,
   corridorStatus = null,
   roadShields = null,
   themeMode = null,
@@ -80,7 +84,7 @@ export function installAssetExplorer(container, viewer, {
   });
 
   const sources = createAssetSources({ corridorModels, cameras, bridges, signals, messageSigns, lighting, maintenance,
-    maintenanceRecords, revealMaintenance, liveEvents, signStructures, centerline, modelConfigs });
+    maintenanceRecords, revealMaintenance, liveEvents, signStructures, centerline, modelConfigs, tolling });
   /**
    * Every loaded record of one maintenance class, whether or not it is the class on screen.
    *
@@ -204,6 +208,7 @@ export function installAssetExplorer(container, viewer, {
         lookupRecords={lookupMaintenanceRecords}
         onOpenRecord={revealRecord}
         onHighlightCameras={highlightCameras}
+        onAssetAction={onAssetAction}
         operationalImpactOf={operationalImpactOf}
       />);
   }

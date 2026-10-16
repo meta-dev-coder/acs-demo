@@ -64,11 +64,20 @@ function DateBound({ label, value, min, max, onChange }) {
   );
 }
 
+/**
+ * The plural of a filter group's name, for its "All …" option.
+ *
+ * A bare "s" turned the Status filter into "All statuss". English only as far as these group names
+ * need: a sibilant ending takes "es", everything else takes "s".
+ */
+const plural = word => (/(?:s|x|z|ch|sh)$/.test(word) ? `${word}es` : `${word}s`);
+
 export function AssetExplorer({
   store, centerline, leftInset = 16, rightInset: detailsInset = 16, themeMode = 'dark',
   /** Where the details panel's top edge goes — measured, so it clears this workspace's own strip. */
   panelTop = 220,
   onInspect, onReturn, onViewCamera, lookupRecords = null, onOpenRecord = null, onHighlightCameras = null,
+  onAssetAction = null,
   operationalImpactOf = null,
 }) {
   const state = useAssetStore(store);
@@ -198,6 +207,7 @@ export function AssetExplorer({
             onViewCamera={onViewCamera}
             lookupRecords={lookupRecords}
             onOpenRecord={onOpenRecord}
+            onAssetAction={onAssetAction}
           />
         ))}
 
@@ -229,8 +239,10 @@ export function AssetExplorer({
             {/* Shown in every workspace. Live Ops used to give this corner back to the Cesium view,
                 on the grounds that a second map repeated its spatial context — but at corridor scale
                 the globe is zoomed too far in to show where along the 15 miles a card sits, which is
-                exactly what this strip answers. */}
-            {showMiniMap && explorerExpanded && (
+                exactly what this strip answers. A type may still opt out (`hideMiniMap`): the
+                gantry's equipment all sits within twenty metres, so a 15-mile map of it answers
+                nothing and the corner is better left to the view. */}
+            {showMiniMap && explorerExpanded && !config?.hideMiniMap && (
               <AssetMiniMap
                 centerline={centerline}
                 assets={assets}
@@ -323,7 +335,7 @@ export function AssetExplorer({
                       sx={{ height: 24, fontSize: 13, '& .MuiSelect-select': { py: 0, pl: 1 } }}
                     >
                       {/* Choosing nothing is choosing every type, and is named so rather than blank. */}
-                      <MenuItem value="">{`All ${group.toLowerCase()}s`}</MenuItem>
+                      <MenuItem value="">{`All ${plural(group.toLowerCase())}`}</MenuItem>
                       {entries.map(entry => (
                         <MenuItem key={entry.id} value={entry.id} sx={{ gap: 1 }}>
                           {/* The crash taxonomy carries its own colour and pictogram; every other

@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import { APP_ROLES, DEFAULT_SECTION, NAV_SECTIONS, resolveSection, sectionsForRole } from '../src/appNav.js';
 
 test('the bar offers the workspaces, in order, each with its own icon', () => {
-  assert.deepEqual(NAV_SECTIONS.map(section => section.id), ['traffic', 'maintenance', 'safety', 'liveOps', 'tmc']);
-  assert.deepEqual(NAV_SECTIONS.map(section => section.label), ['Traffic', 'Maintenance', 'Safety', 'Live Ops', 'TMC']);
+  assert.deepEqual(NAV_SECTIONS.map(section => section.id),
+    ['traffic', 'maintenance', 'safety', 'liveOps', 'tmc', 'tolling', 'safetyIntel']);
+  assert.deepEqual(NAV_SECTIONS.map(section => section.label),
+    ['Traffic', 'Maintenance', 'Safety', 'Live Ops', 'TMC', 'Tolling', 'Safety Intel']);
   assert.equal(new Set(NAV_SECTIONS.map(section => section.icon)).size, NAV_SECTIONS.length);
   assert.equal(DEFAULT_SECTION, 'liveOps');
 });
@@ -16,7 +18,8 @@ test('an unknown section falls back to the first rather than leaving nothing cho
 });
 
 test('each role exposes only its assigned workspaces and rejects disallowed navigation', () => {
-  for (const [role, expected] of Object.entries({ roadOperator: ['liveOps'], maintenanceTeam: ['maintenance'], agency: ['safety'] })) {
+  for (const [role, expected] of Object.entries({ roadOperator: ['liveOps'], maintenanceTeam: ['maintenance'],
+    agency: ['safety'], tmc: ['tmc'], tolling: ['tolling'] })) {
     const sections = sectionsForRole(role);
     assert.deepEqual(sections.map(s => s.id), expected);
     assert.equal(resolveSection('overview', sections), expected[0]);
@@ -63,4 +66,17 @@ test('switching to the TMC role resolves to the TMC section', () => {
   // The other roles are untouched by the addition.
   assert.deepEqual(sectionsForRole('roadOperator').map(s => s.id), ['liveOps']);
   assert.deepEqual(sectionsForRole('agency').map(s => s.id), ['safety']);
+});
+
+test('Tolling is its own role and its own workspace', () => {
+  // A new persona must not widen anyone else's access: each role still sees only its own screen.
+  const tolling = APP_ROLES.find(role => role.id === 'tolling');
+  assert.ok(tolling, 'the role exists');
+  assert.deepEqual(tolling.sections, ['tolling']);
+  for (const role of APP_ROLES) {
+    if (role.id === 'tolling') continue;
+    assert.ok(!role.sections.includes('tolling'), `${role.id} must not gain the tolling screen`);
+  }
+  // And a deep link to it from another role still falls back to that role's own section.
+  assert.equal(resolveSection('tolling', sectionsForRole('roadOperator')), 'liveOps');
 });

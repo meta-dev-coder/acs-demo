@@ -86,6 +86,11 @@ export function installCorridorModelLayers(container, viewer, service, configs) 
   const layerOf = new Map();          // entity  -> layer id
   const groups = new Map();           // layer id -> { parent, rows, status, configs }
   let markers = null, selected = null, hovered = null, disposed = false;
+  let placementPromise = null;
+  let resolvePlaced;
+  const placedPromise = new Promise(resolve => {
+    resolvePlaced = resolve;
+  });
 
   const panel = createMapDetailsPanel({
     title: 'Asset Details', className: 'model-details',
@@ -207,7 +212,7 @@ export function installCorridorModelLayers(container, viewer, service, configs) 
   viewer.canvas.addEventListener('mouseleave', leave);
 
   /** Place the models, then light up the controls. Called once the world they sit on is drawn. */
-  async function place() {
+  async function placeModels() {
     const entities = await service.loadModels(configs);
     if (disposed) return [];
     const placed = [];
@@ -244,6 +249,21 @@ export function installCorridorModelLayers(container, viewer, service, configs) 
     return entities;
   }
 
+  /**
+   * Place once and expose the same completion to screens that need a model on first entry.
+   *
+   * Tolling can activate before Google 3D has settled. A disabled checkbox only says "not yet";
+   * waiting for this promise ties that screen to the actual model load instead of a timeout.
+   */
+  function place() {
+    if (placementPromise) return placementPromise;
+    placementPromise = placeModels();
+    // Readiness is a status signal, so a failed model request resolves `false` instead of creating
+    // an unhandled rejection when no workspace is currently waiting for it.
+    placementPromise.then(() => resolvePlaced(true), () => resolvePlaced(false));
+    return placementPromise;
+  }
+
   return {
     records,
     highlightById,
@@ -255,6 +275,7 @@ export function installCorridorModelLayers(container, viewer, service, configs) 
       return () => selectionListeners.delete(callback);
     },
     place,
+    whenPlaced: () => placedPromise,
     entityById,
     /** Test/diagnostic hook: how many assets each layer owns. */
     countFor: layerId => groups.get(layerId)?.rows.size ?? 0,

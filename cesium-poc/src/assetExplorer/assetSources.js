@@ -21,7 +21,8 @@ const layerLabel = layerId => MODEL_LAYERS.find(layer => layer.id === layerId)?.
  *            listen: (report: (asset: object|null) => void) => void, own: (owned: boolean) => void}[]}
  */
 export function createAssetSources({ corridorModels, cameras, bridges, signals, messageSigns, lighting, maintenance,
-  maintenanceRecords = null, revealMaintenance = null, liveEvents, signStructures, centerline, modelConfigs = [] }) {
+  maintenanceRecords = null, revealMaintenance = null, liveEvents, signStructures, centerline, modelConfigs = [],
+  tolling = null }) {
   const distances = centerline?.length ? centerlineDistances(centerline) : null;
   const normalize = input => normalizeAsset(input, centerline, distances);
   const sources = [];
@@ -117,6 +118,34 @@ export function createAssetSources({ corridorModels, cameras, bridges, signals, 
       listen: report => maintenance.onSelection((type, id) => { if (type === assetType) report(id); }),
       own: () => {},
       silence: () => maintenance.onSelection(null),
+    });
+  }
+
+  // The two tolling datasets. Like the maintenance classes they have no Map Explorer layer of
+  // their own: the Tolling workspace draws them and is asked to reveal one.
+  for (const assetType of tolling ? ['tollGantry', 'expressGantry', 'gantryEquipment'] : []) {
+    const records = () => tolling.recordsForType(assetType) ?? [];
+    const asAsset = record => normalize({
+      id: record.id, assetType, name: record.name,
+      longitude: record.longitude, latitude: record.latitude,
+      // Equipment hangs several metres above the carriageway, so the close view is framed on the
+      // part's own position rather than on the ground under it.
+      geometry: record.position ? { positions: [record.position] } : null,
+      source: record,
+    });
+    sources.push({
+      assetType, group: 'tolling',
+      read: () => (tolling.shownType() === assetType ? records().map(asAsset) : []),
+      // Searchable whether or not the card is open, as the maintenance classes are.
+      readAll: () => records().map(asAsset),
+      reveal: tolling.reveal ? () => tolling.reveal(assetType) : null,
+      // The type travels with the id: one workspace drives two layers, and a marker id means
+      // nothing to the mesh layer.
+      highlight: id => tolling.highlightById(id, assetType),
+      // One layer draws both kinds; a pick belonging to the other kind is not this source's.
+      listen: report => tolling.onSelection((type, id) => { if (type === assetType) report(id); }),
+      own: () => {},
+      silence: () => tolling.onSelection(null),
     });
   }
 
