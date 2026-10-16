@@ -556,6 +556,9 @@ try {
   const safetyIntel = installSafetyIntelligenceWorkspace({
     viewer, host: document.body, maintenance, tmc, corridorStatus, layerStore,
     resetView: flyToOperationsView,
+    // The corridor centreline, so the Lab's simulated patrol fleet stands on the road rather than
+    // at invented coordinates. The same line the TMC's own patrol layer uses.
+    centerline: corridor,
     // The intro switches the corridor's road layers on as it runs, and it finishes after this
     // screen may already have hidden them.
     startupSettled,

@@ -6,7 +6,7 @@ page.on('pageerror', e => errors.push(String(e)));
 await page.goto('http://localhost:5188/?demo=i595', { waitUntil: 'load' });
 await page.waitForFunction(() => window.__safetyIntel, null, { timeout: 60000 });
 await page.selectOption('.app-role select', 'safetyIntel');
-await page.waitForFunction(() => window.__safetyIntel.analysis(), null, { timeout: 180000 });
+await page.waitForFunction(() => (window.__safetyIntel.analysis()?.hotspots.clusters.length ?? 0) > 0, null, { timeout: 180000 });
 await page.waitForTimeout(3000);
 await page.evaluate(() => {
   const si = window.__safetyIntel;

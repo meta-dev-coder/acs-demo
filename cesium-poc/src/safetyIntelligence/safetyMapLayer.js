@@ -50,6 +50,14 @@ const selectedRing = fill => `data:image/svg+xml;charset=utf-8,${encodeURICompon
     <circle cx="22" cy="22" r="5" fill="${fill}" stroke="#ffffff" stroke-width="1.6"/>
   </svg>`)}`;
 
+/** A patrol vehicle. Chevron in a disc, so it is not mistaken for a finding. */
+const patrolIcon = (fill, available) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="104" height="104" viewBox="0 0 26 26">
+    <circle cx="13" cy="13" r="11" fill="${fill}" stroke="#0b1729" stroke-width="2"
+      opacity="${available ? 1 : 0.55}"/>
+    <path d="M7 16.5 13 7l6 9.5-6-3z" fill="#0b1729" opacity="0.85"/>
+  </svg>`)}`;
+
 const dot = (fill, severe) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 16 16">
     <circle cx="8" cy="8" r="${severe ? 6 : 4.5}" fill="${fill}" stroke="#0b1729" stroke-width="1.4"/>
@@ -396,21 +404,82 @@ export function installSafetyMapLayer(viewer) {
         clampToGround: true,
       },
     });
-    source.entities.add({
-      id: 'queue:modelled:label',
-      position: Cartesian3.fromDegrees(coordinates[0][0], coordinates[0][1]),
-      label: {
-        text: `SIMULATED · ${label}`,
-        font: '600 11px Inter, system-ui, sans-serif',
-        fillColor: Color.fromCssColorString('#F4A725'),
-        outlineColor: Color.fromCssColorString('#0b1729'),
-        outlineWidth: 3, style: LabelStyle.FILL_AND_OUTLINE,
-        verticalOrigin: VerticalOrigin.BOTTOM,
-        pixelOffset: new Cartesian2(0, -10),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-      },
+    viewer?.scene?.requestRender?.();
+  }
+
+  /**
+   * The simulated patrol fleet, each one labelled with how long it would take to reach the incident.
+   *
+   * Drawn only while the Patrols tab is open — six more marks on a corridor that already carries
+   * badges would be clutter everywhere else — and every label carries SIM in its name, because a
+   * vehicle drawn on a map reads as a vehicle that is there.
+   */
+  function setPatrols(patrols, { incident = null, recommendedId = null } = {}) {
+    clear('patrol');
+    if (!patrols?.length) { viewer?.scene?.requestRender?.(); return; }
+    patrols.forEach((patrol, index) => {
+      if (!Number.isFinite(patrol.longitude)) return;
+      const recommended = patrol.id === recommendedId;
+      const id = `patrol:${patrol.id}`;
+      byId.set(id, { kind: 'patrol', patrol });
+      const position = Cartesian3.fromDegrees(patrol.longitude, patrol.latitude);
+      source.entities.add({
+        id,
+        name: `${patrol.id} · ${patrol.statusLabel} (simulated)`,
+        position,
+        billboard: {
+          image: patrolIcon(patrol.colour, patrol.dispatchable),
+          width: 26, height: 26, verticalOrigin: VerticalOrigin.CENTER,
+          heightReference: HeightReference.CLAMP_TO_GROUND,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          distanceDisplayCondition: new DistanceDisplayCondition(0, VISIBLE_TO_M),
+        },
+        label: {
+          // The travel time is the point of drawing them at all, so it is on the mark rather than
+          // only in the table.
+          text: patrol.dispatchable
+            ? `${recommended ? '\u2605 SEND ' : ''}${patrol.id} · ${patrol.travelMinutes} min`
+            : `${patrol.id} · ${patrol.statusLabel}`,
+          font: `${recommended ? '700 12px' : '600 11px'} Inter, system-ui, sans-serif`,
+          // Dark ink on a bright plate for the recommended one. A dark green plate with white text
+          // was the same reading weight as the navy ones against photogrammetry — the plate has to
+          // invert to be seen as different at a glance, not just be a different dark colour.
+          fillColor: Color.fromCssColorString(recommended ? '#042f14'
+            : patrol.dispatchable ? '#ffffff' : '#c3ccd8'),
+          // A filled plate, not an outline. White text outlined in navy still disappeared into
+          // bright photogrammetry, and two labels crossing each other were unreadable at any size.
+          showBackground: true,
+          backgroundColor: Color.fromCssColorString(recommended ? '#22c55e' : '#0b1729')
+            .withAlpha(recommended ? 0.96 : 0.88),
+          backgroundPadding: new Cartesian2(7, 5),
+          style: LabelStyle.FILL,
+          verticalOrigin: VerticalOrigin.BOTTOM,
+          // Staggered by index: six plates along one corridor otherwise land on top of each
+          // other. The recommended one always takes the nearest tier, so the plate that matters is
+          // never the one another plate covers.
+          pixelOffset: new Cartesian2(0, recommended ? -18 : -18 - (index % 3) * 17),
+          // Above its neighbours where they still overlap.
+          eyeOffset: recommended ? new Cartesian3(0, 0, -12) : Cartesian3.ZERO,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          distanceDisplayCondition: new DistanceDisplayCondition(0, 40_000),
+        },
+      });
+      // A line from each available patrol to the incident: the travel time is about THIS distance,
+      // and a number on a vehicle with no line to anywhere does not say what it is a time to.
+      if (patrol.dispatchable && incident && Number.isFinite(incident.longitude)) {
+        const lineId = `patrol:${patrol.id}:line`;
+        byId.set(lineId, { kind: 'patrol', patrol });
+        source.entities.add({
+          id: lineId,
+          polyline: {
+            positions: [position, Cartesian3.fromDegrees(incident.longitude, incident.latitude)],
+            width: 2,
+            material: Color.fromCssColorString(patrol.colour).withAlpha(0.45),
+            clampToGround: true,
+          },
+        });
+      }
     });
-    byId.set('queue:modelled:label', { kind: 'queue' });
     viewer?.scene?.requestRender?.();
   }
 
@@ -427,6 +496,7 @@ export function installSafetyMapLayer(viewer) {
   return {
     whenReady: () => added,
     setPlaces,
+    setPatrols,
     setSection,
     setSimulatedQueue,
     setSelectedRecord,

@@ -41,18 +41,21 @@ import { EMPTY_SELECTION, SELECTION_TYPES, isEmpty, sameSelection, scopedFacts, 
 import { buildPlaces, placeTotals } from './analytics/mapPlaces.js';
 import { openSimulation, runSimulation } from './simulation/simulationService.js';
 import { provenanceSummary } from './simulation/incidentBaseline.js';
-import { assumptionBlock, baselineBlock, comparisonTable, configPanel, criticalPathBlock,
-  economicsBlock, explainBlock, exposureBlock, queueChart, recommendationBlock, sensitivityBlock,
-  timelineChart } from './simulationPanels.js';
+import { economicsTab, labTabs, LAB_TABS, overviewTab, patrolsTab, responseInputsPanel, responseTab,
+  trafficInputsPanel, trafficTab } from './simulationPanels.js';
+import { comparePatrols, patrolOptionsFor } from './simulation/patrolOptions.js';
 import { assumptionSensitivity, criticalPath, sensitivity } from './simulation/criticalPath.js';
 import { calibration } from './simulation/incidentBaseline.js';
 import { loadRepairTargets } from './repairTargetsSource.js';
 import { installSafetyMapLayer } from './safetyMapLayer.js';
 import { escape as escapeText } from './safetyPanels.js';
-import { accidentPanel, assetPanel, coveragePanel, detailPanel, investigationPanel, kpiRow,
+import { accidentPanel, assetPanel, coveragePanel, investigationPanel, kpiRow,
   outcomesPanel, OUTCOME_REQUIREMENTS, patrolPanel, queuePanel, replayBar, secondaryPanel,
   sectionComparison } from './safetyPanels.js';
 import { framedDestination } from '../cameraFraming.js';
+
+/** Minutes, for the one-line summaries beside the Lab. */
+const minutesText = value => `${Math.round(value)} min`;
 
 /** The analysis tabs, in the order the screen offers them. */
 const TABS = Object.freeze([
@@ -62,7 +65,11 @@ const TABS = Object.freeze([
   // Named for what the records ARE. The dataset is inspection observations; calling the tab "Road
   // Rangers" invited a reader to see completed patrol responses in it, which do not exist here.
   { id: 'patrol', label: 'Hazards' },
-  { id: 'outcomes', label: 'Outcomes' },
+  // Outcomes is hidden rather than deleted: every one of its KPIs is unavailable on this instance,
+  // because measuring whether an intervention worked needs a record of the intervention and nothing
+  // in the twin has one. `outcomesPanel`, its KPI row and its answers all still build — put the
+  // entry back here the day an intervention log exists.
+  // { id: 'outcomes', label: 'Outcomes' },
   // The Lab is a tab on this screen rather than a screen of its own: it simulates a response to an
   // incident the operator has already selected here, and it reads the same records.
   { id: 'lab', label: 'Simulation Lab' },
@@ -103,6 +110,8 @@ const CORRIDOR_ROAD_LAYERS = Object.freeze(['mainline-eb', 'mainline-wb', 'expre
 export function installSafetyIntelligenceWorkspace({
   viewer = null, host = document.body, maintenance = null, tmc = null, layerStore = null,
   corridorStatus = null, resetView = null, onContextChange = null,
+  /** The corridor centreline, so the simulated patrol fleet stands on the road. */
+  centerline = [],
   /** Resolves when the intro has finished with the map. See `hideCorridorRoads`. */
   startupSettled = null,
 } = {}) {
@@ -134,6 +143,8 @@ export function installSafetyIntelligenceWorkspace({
       <nav class="si-tabs" role="tablist">
         ${TABS.map((tab, index) => `<button role="tab" type="button" data-tab="${tab.id}"
           aria-selected="${index === 0}">${tab.label}</button>`).join('')}
+        <button class="si-collapse" type="button" data-wide aria-pressed="false"
+          title="Widen the panel">⤢</button>
         <button class="si-collapse" type="button" data-collapse="analysis" aria-expanded="true"
           title="Hide the analysis">‹</button>
       </nav>
@@ -149,7 +160,6 @@ export function installSafetyIntelligenceWorkspace({
       <button class="si-reopen" type="button" data-collapse="side"
         aria-label="Show the priority queue"><span data-region="reopen-side">Priority queue</span></button>
       <div class="si-side-queue" data-region="queue"></div>
-      <div class="si-side-detail" data-region="detail"></div>
       <!-- Mode 2. One region, shown instead of the queue, so the selected place is never buried
            under a list of everything else on the corridor. -->
       <div class="si-side-investigation" data-region="investigation" hidden></div>
@@ -165,7 +175,22 @@ export function installSafetyIntelligenceWorkspace({
         <div data-region="coverage"></div></details>
       <button class="si-collapse si-collapse-foot" type="button" data-collapse="foot"
         aria-expanded="true" title="Hide the replay and sources">⌄</button>
-    </footer>`;
+    </footer>
+    <!-- Over everything until the screen is complete. Four classes are read before any panel is
+         honest: a half-loaded Safety Intelligence screen shows real headings over absent numbers,
+         which reads as "nothing found" rather than "not read yet". The steps are named because the
+         wait is about twenty-five seconds and an unexplained spinner that long reads as a hang. -->
+    <div class="si-loader" data-region="loader" role="status" aria-live="polite">
+      <div class="si-loader-card">
+        <div class="si-loader-spin" aria-hidden="true"></div>
+        <p class="si-loader-title">Reading the corridor's safety record</p>
+        <p class="si-loader-step" data-region="loader-step">Starting…</p>
+        <ol class="si-loader-steps" data-region="loader-list"></ol>
+        <p class="si-loader-note">Four DataConnect classes, read once and shared with the
+          Maintenance screen. The asset registry pages 5,015 rows, and a record's position is its
+          damaged asset's — so the map cannot be drawn before it lands.</p>
+      </div>
+    </div>`;
   host.append(root);
 
   const region = name => root.querySelector(`[data-region="${name}"]`);
@@ -222,7 +247,14 @@ export function installSafetyIntelligenceWorkspace({
     facts: [],
     tab: 'accidents',
     /** Which panels are folded away. Reopening restores exactly what was there. */
-    collapsed: { analysis: false, side: false, foot: true },
+    /**
+     * The priority queue starts folded, like the footer.
+     *
+     * The screen opens as a corridor to read — the badges and the analysis — rather than as a list
+     * of 191 findings over the map. The strip on the right edge opens it, and selecting anything
+     * opens it too, because an investigation nobody can see is not an investigation.
+     */
+    collapsed: { analysis: false, side: true, foot: true },
     domain: null,
     /**
      * ONE selection, replacing the two that used to disagree.
@@ -254,8 +286,42 @@ export function installSafetyIntelligenceWorkspace({
     simulation: null,
     simulationFor: null,
     simPreset: 'standard',
+    /** Which simulated patrol the operator has chosen to model, if any. */
+    simPatrolId: null,
+    /** The cover stays on until every class is in: a half-read screen reads as an empty corridor. */
+    ready: false,
+    steps: new Set(),
+    /**
+     * Whether the analysis panel is in its wider mode.
+     *
+     * The Lab's tables carry five and six columns and read as abbreviations at the ordinary width.
+     * Wide mode takes the room from the map, which is idle while a table is being read.
+     *
+     * Initialised explicitly: left undefined, `classList.toggle(name, undefined)` is a plain
+     * toggle rather than a set, so the very first render turned the mode ON by itself.
+     */
+    wide: false,
+    /**
+     * Fixed, not chosen.
+     *
+     * The objective control was removed because in this model it barely is one: exposure IS
+     * vehicle-hours queued and both follow clearance, so three of the five objectives always return
+     * the same strategy and the other two differ by tens of dollars. The engine still supports all
+     * five — a test pins the finding — so a measure that genuinely differs can bring the control
+     * back.
+     */
     simObjective: 'BALANCED',
     optimisation: null,
+    /** Which of the Lab's five views is open. Changing it re-renders one region, nothing more. */
+    simTab: 'overview',
+    /**
+     * Scenario inputs, held HERE rather than read from the form.
+     *
+     * The form is rebuilt on every render and only the open tab's fields exist in the DOM, so
+     * reading the inputs off the page would have lost everything typed on another tab the moment
+     * the reader moved. Kept in state, they survive both.
+     */
+    simInputs: { response: {}, traffic: {} },
     replay: { timeline: null, step: 0, playing: false, speedId: 'week' },
     analysis: null,
     targets: { records: [], available: false, note: 'Repair-time targets not read yet.' },
@@ -272,14 +338,18 @@ export function installSafetyIntelligenceWorkspace({
    * Returns whether it came true, so the caller can report the shortfall rather than render zeros
    * that look like findings.
    */
-  const waitFor = (ready, { timeoutMs = 25_000, everyMs = 250 } = {}) => new Promise(resolve => {
-    if (ready()) { resolve(true); return; }
-    const started = Date.now();
-    const timer = setInterval(() => {
-      if (ready()) { clearInterval(timer); resolve(true); }
-      else if (Date.now() - started > timeoutMs) { clearInterval(timer); resolve(false); }
-    }, everyMs);
-  });
+  const waitFor = (ready, { timeoutMs = 25_000, everyMs = 250, whileWaiting = null } = {}) =>
+    new Promise(resolve => {
+      if (ready()) { resolve(true); return; }
+      const started = Date.now();
+      const timer = setInterval(() => {
+        if (ready()) { clearInterval(timer); resolve(true); }
+        else if (Date.now() - started > timeoutMs) { clearInterval(timer); resolve(false); }
+        // Something has to move on screen during a twenty-second read, and the only honest thing
+        // to show is what has actually arrived so far.
+        else whileWaiting?.(Date.now() - started);
+      }, everyMs);
+    });
 
   /**
    * Read every source the screen needs.
@@ -289,11 +359,49 @@ export function installSafetyIntelligenceWorkspace({
    * here would mean two different answers to "how many records are there". The repair-time targets
    * are this screen's own, because no other screen needs them.
    */
+  /**
+   * The loading steps, in the order they complete.
+   *
+   * Named rather than a bare percentage: each one is a class this screen cannot do without, and
+   * saying which is outstanding is the difference between a wait and a hang.
+   */
+  const LOAD_STEPS = Object.freeze([
+    { id: 'records', label: 'Incident register' },
+    { id: 'positions', label: 'Asset registry — positions every record' },
+    { id: 'maintenance', label: 'Work orders and inspections' },
+    { id: 'analysis', label: 'Building the analysis' },
+  ]);
+
   /** What the screen is waiting for, so 25 seconds of loading does not look like a hang. */
-  function reportProgress(message) {
-    if (state.analysis || !message) return;
-    const body = region('analysis');
-    if (body) body.innerHTML = `<p class="si-loading">${escapeText(message)}</p>`;
+  function reportProgress(message, { done = [] } = {}) {
+    if (state.ready) return;
+    for (const id of done) state.steps.add(id);
+    const step = region('loader-step');
+    if (step && message) step.textContent = message;
+    const list = region('loader-list');
+    if (list) {
+      list.innerHTML = LOAD_STEPS.map(entry => {
+        const complete = state.steps.has(entry.id);
+        // The first step not yet done is the one being waited on.
+        const current = !complete && LOAD_STEPS.every(other =>
+          state.steps.has(other.id) || LOAD_STEPS.indexOf(other) >= LOAD_STEPS.indexOf(entry));
+        return `<li class="${complete ? 'is-done' : current ? 'is-now' : ''}">
+          <span class="si-loader-mark" aria-hidden="true">${complete ? '&#10003;' : ''}</span>
+          ${escapeText(entry.label)}</li>`;
+      }).join('');
+    }
+  }
+
+  /** Take the cover off. Only called when every step is in and an analysis exists. */
+  function finishLoading() {
+    if (state.ready) return;
+    state.ready = true;
+    const loader = region('loader');
+    if (!loader) return;
+    loader.classList.add('is-going');
+    // Hidden first, THEN the fade class is dropped. The other order restores full opacity on an
+    // element that is still displayed if `hidden` fails to take, which puts the cover back.
+    setTimeout(() => { loader.hidden = true; }, 420);
   }
 
   /** The records this screen reads, as they stand right now. */
@@ -316,7 +424,7 @@ export function installSafetyIntelligenceWorkspace({
    * and the asset and hazard panels fill in when their classes land.
    */
   async function load() {
-    reportProgress('Reading the incident register and the asset registry…');
+    reportProgress('Reading the incident register…');
 
     // Nothing here depends on anything else here, so none of it waits in line.
     const preloading = Promise.resolve(maintenance?.preload?.()).catch(() => {});
@@ -339,31 +447,45 @@ export function installSafetyIntelligenceWorkspace({
      * and `positionsAvailable` says so on screen until the registry arrives. */
     const haveRecords = await waitFor(() =>
       (maintenance?.recordsForType?.('incidentRecord', { live: false })?.length ?? 0) > 0,
-    { timeoutMs: 40_000 });
+    { timeoutMs: 40_000,
+      // The register and the registry are paged by the same preload, so the registry's row count
+      // is what is visibly moving while the register is outstanding. Saying "reading the incident
+      // register" for nineteen silent seconds is the hang this cover exists to avoid.
+      whileWaiting: elapsed => {
+        const assets = maintenance?.assetIndex?.()?.size ?? 0;
+        reportProgress(assets > 0
+          ? `${assets.toLocaleString('en-US')} assets indexed so far…`
+          : `Opening the DataConnect classes… ${Math.round(elapsed / 1000)}s`);
+      } });
     state.sectionGeometry = await geometry;
     state.records = readRecords();
     state.assetIndex = maintenance?.assetIndex?.() ?? new Map();
     state.positionsAvailable = state.assetIndex.size > 0;
     state.facts = incidentFacts(state.records.incidents, state.assetIndex);
     state.loaded = true;
-    if (haveRecords) recompute();
-    else reportProgress('The incident register is still loading…');
+    if (haveRecords) {
+      reportProgress(`${state.facts.length} incident records read.`, { done: ['records'] });
+      recompute();
+    } else reportProgress('The incident register is still loading…');
 
     /* --- stage two: positions ---------------------------------------------------------------- */
     if (!state.positionsAvailable) {
-      reportProgress(`${state.facts.length} records read. Waiting for the asset registry that `
-        + 'positions them…');
-      await waitFor(() => (maintenance?.assetIndex?.()?.size ?? 0) > 0, { timeoutMs: 60_000 });
+      reportProgress('Paging the asset registry that positions those records…');
+      await waitFor(() => (maintenance?.assetIndex?.()?.size ?? 0) > 0, { timeoutMs: 60_000,
+        whileWaiting: elapsed => reportProgress('Paging the asset registry that positions those '
+          + `records… ${Math.round(elapsed / 1000)}s`) });
       state.assetIndex = maintenance?.assetIndex?.() ?? new Map();
       state.positionsAvailable = state.assetIndex.size > 0;
       state.facts = incidentFacts(state.records.incidents, state.assetIndex);
       state.targets = await targets;
+      reportProgress(`${state.assetIndex.size} assets indexed.`, { done: ['positions'] });
       recompute();
     }
 
     /* --- stage three: the classes the asset and hazard panels need ---------------------------- */
     // The screen is already usable. These arrive on their own schedule, and when they do the
     // analysis is rebuilt rather than the operator being made to wait for them up front.
+    reportProgress('Reading work orders and inspections…', { done: ['positions'] });
     await preloading;
     state.targets = await targets;
     const later = readRecords();
@@ -372,10 +494,15 @@ export function installSafetyIntelligenceWorkspace({
       || later.incidents.length !== state.records.incidents.length;
     state.assetIndex = maintenance?.assetIndex?.() ?? state.assetIndex;
     state.positionsAvailable = state.assetIndex.size > 0;
-    if (!changed) return;
-    state.records = later;
-    state.facts = incidentFacts(later.incidents, state.assetIndex);
-    recompute();
+    reportProgress(`${later.workOrders.length} work orders, ${later.inspections.length} `
+      + 'inspections.', { done: ['maintenance'] });
+    if (changed) {
+      state.records = later;
+      state.facts = incidentFacts(later.incidents, state.assetIndex);
+      recompute();
+    }
+    reportProgress('Ready.', { done: ['analysis'] });
+    finishLoading();
   }
 
   /* ------------------------------------------------------------------------------------------
@@ -534,26 +661,37 @@ export function installSafetyIntelligenceWorkspace({
     // something is — so the details of the selected place are never at the bottom of a 190-row list.
     const investigating = state.rightMode === 'selected' && analysis.investigation;
     region('queue').hidden = Boolean(investigating);
-    region('detail').hidden = Boolean(investigating);
     region('investigation').hidden = !investigating;
     if (state.tab === 'lab' && state.simulation?.active) {
       // In the Lab the right panel carries the recommendation: it is the answer to the question the
       // left panel is configuring, and it should not be below a scroll.
       region('queue').hidden = true;
-      region('detail').hidden = true;
       region('investigation').hidden = false;
+      // The recommendation itself lives under "Finding a better response" on Response Analysis,
+      // beside the timeline it would change. Repeating it here in full would be the same content
+      // twice; this is the one-line version with a way back to the corridor.
       const session = state.simulation;
-      const standard = session.all.find(run => run.presetId === 'standard');
       const best = state.optimisation?.best?.result;
       region('investigation').innerHTML = `
         <header class="si-inv-head">
           <button class="si-action si-action-quiet" type="button" data-mode="priorities">‹ Corridor priorities</button>
+          <button class="si-action si-action-quiet" type="button" data-clear-selection>Clear selection</button>
         </header>
-        ${state.optimisation
-          ? recommendationBlock(state.optimisation, standard && best
-            ? session.compare(standard.id, session.all.find(run => run.optimised)?.id ?? standard.id) : null)
-          : `<p class="si-empty">Run the optimisation to see the best feasible strategy for the
-             objective you chose, and what it would take.</p>`}`;
+        <h3>${escapeText(session.baseline.fact.type)}</h3>
+        <p class="si-note">${escapeText(session.baseline.observed.segment.value ?? '')} ·
+          ${escapeText(session.baseline.fact.when.dayKey)}</p>
+        <h4>Scenarios run</h4>
+        <ul class="si-facts">${session.all.map(entry => `<li>${escapeText(entry.label)} —
+          ${entry.headline.roadwayClearanceMinutes} min,
+          $${entry.headline.totalModelledCostUSD.toLocaleString('en-US')}</li>`).join('')}</ul>
+        ${best
+          ? `<h4>Optimised</h4>
+             <p class="si-lede">${minutesText(best.headline.roadwayClearanceMinutes)} to lanes open,
+               $${best.headline.totalModelledCostUSD.toLocaleString('en-US')} total modelled cost.</p>
+             <p class="si-note">The full strategy and what was excluded are under “Finding a better
+               response” on the Response Analysis tab.</p>`
+          : '<p class="si-note">Run the optimisation under “Finding a better response” on the '
+            + 'Response Analysis tab to search the feasible strategies.</p>'}`;
     } else if (investigating) {
       region('investigation').innerHTML = investigationPanel(analysis.investigation);
     } else {
@@ -562,7 +700,6 @@ export function installSafetyIntelligenceWorkspace({
         sectionId: state.selection.sectionId, sectionOnly: state.sectionOnly,
         sectionLabel: analysis.sections.byId.get(state.selection.sectionId)?.section.label ?? null,
       });
-      region('detail').innerHTML = detailPanel(entryById(state.selection.fromPriority));
     }
     const frame = frameAt(state.facts, analysis.timeline, state.replay.step);
     region('replay').innerHTML = replayBar(analysis.timeline, frame, { playing: state.replay.playing });
@@ -595,6 +732,17 @@ export function installSafetyIntelligenceWorkspace({
     map?.setSection(sectionRow?.section ?? null, {
       stretch: sectionRow ? highlightStretch(sectionRow.section, points) : null,
     });
+    // The simulated fleet, only while the Patrols tab is open.
+    const patrolTab = state.tab === 'lab' && state.simTab === 'patrols';
+    const patrolFleet = patrolTab && state.simulation?.active
+      ? derivedFor(state.simulation, state.simulation.active).patrols : null;
+    map?.setPatrols(patrolFleet?.patrols ?? null, {
+      incident: state.simulation?.baseline.fact ?? null,
+      // The one the comparison puts first, so the map and the table agree about which to send.
+      recommendedId: patrolTab && state.simulation?.active
+        ? derivedFor(state.simulation, state.simulation.active).patrolComparison?.best?.patrol.id ?? null
+        : null,
+    });
     // The Lab's modelled queue, on the road behind the incident, labelled as simulated.
     const run = state.tab === 'lab' ? state.simulation?.active : null;
     const fact = run && state.facts.find(entry => entry.id === state.selection.incidentId);
@@ -617,19 +765,30 @@ export function installSafetyIntelligenceWorkspace({
     foot: { selector: '.si-foot', label: 'replay and sources' },
   });
 
-  /** The Lab's own headline row: the active run's figures, not the register's. */
+  /**
+   * The Lab's figures, in the screen-level KPI row where every other tab's figures go.
+   *
+   * Built as ordinary KPI objects and handed to the same `kpiRow` the register tabs use, so the
+   * cards are the same cards — a second style of headline figure on one screen is one too many.
+   */
   function simulationKpis() {
     const run = state.simulation?.active;
     if (!run) return '';
-    const tile = (label, value, unit) => `<div class="si-kpi"><span class="si-kpi-label">${label}</span>
-      <span class="si-kpi-value">${value}</span><span class="si-kpi-unit">${unit}</span></div>`;
-    return `<div class="si-kpi-strip" role="group" aria-label="Simulation">
-      ${tile('Lanes reopened', run.headline.roadwayClearanceMinutes, 'min after the incident')}
-      ${tile('Queue dissipation', run.headline.queueDissipationMinutes ?? '—', 'min after reopening')}
-      ${tile('Vehicle-hours of delay', run.headline.vehicleHoursOfDelay.toLocaleString('en-US'), 'modelled')}
-      ${tile('Total modelled cost', `$${run.headline.totalModelledCostUSD.toLocaleString('en-US')}`, 'delay + response + lost toll')}
-      ${tile('Exposure', run.headline.exposureVehicleHours.toLocaleString('en-US'), 'vehicle-hours queued')}
-    </div>`;
+    const tile = (id, label, value, unit, basis) => Object.freeze({
+      id, label, status: KPI_STATUS.AVAILABLE, value, unit, basis, records: null, period: null,
+    });
+    return kpiRow([
+      tile('reopen', 'Lanes reopened', run.headline.roadwayClearanceMinutes, 'min after the incident',
+        'Modelled: incident to all lanes open.'),
+      tile('dissipation', 'Queue dissipation', run.headline.queueDissipationMinutes ?? 0,
+        'min after reopening', 'From the last lane reopening to the queue clearing.'),
+      tile('delay', 'Vehicle-hours of delay', run.headline.vehicleHoursOfDelay, 'modelled',
+        'The queue standing through each five-minute bucket, summed.'),
+      tile('cost', 'Total modelled cost', run.headline.totalModelledCostUSD,
+        'delay + response + lost toll', 'Road-user delay, agency response and unrecovered toll.'),
+      tile('exposure', 'Exposure', run.headline.exposureVehicleHours, 'vehicle-hours queued',
+        'Vehicle-hours spent stationary in a queue on a live carriageway.'),
+    ], { title: 'Simulation' });
   }
 
   function renderCollapse() {
@@ -645,6 +804,16 @@ export function installSafetyIntelligenceWorkspace({
     root.classList.toggle('is-analysis-collapsed', state.collapsed.analysis);
     root.classList.toggle('is-side-collapsed', state.collapsed.side);
     root.classList.toggle('is-foot-collapsed', state.collapsed.foot);
+    // The Lab's five sub-tabs need more room than the register panels: at the narrower width the
+    // tab strip scrolled sideways and Optimization was cut off.
+    root.classList.toggle('is-lab', state.tab === 'lab');
+    root.classList.toggle('is-analysis-wide', state.wide);
+    const wideButton = root.querySelector('[data-wide]');
+    if (wideButton) {
+      wideButton.setAttribute('aria-pressed', String(state.wide));
+      wideButton.title = state.wide ? 'Back to the normal width' : 'Widen the panel';
+      wideButton.textContent = state.wide ? '⤡' : '⤢';
+    }
   }
 
   /**
@@ -679,6 +848,36 @@ export function installSafetyIntelligenceWorkspace({
     return session;
   }
 
+  /**
+   * The critical path, the sensitivity sweep and the assumption sweep for one run.
+   *
+   * Cached by run id. They are deterministic functions of the run, so recomputing them because a
+   * reader moved between tabs would be waste — and the brief is explicit that changing tab must not
+   * recompute anything.
+   */
+  const derived = new Map();
+  function derivedFor(session, run) {
+    if (!run) return { path: null, sweep: null, assumptions: null };
+    const cached = derived.get(run.id);
+    if (cached) return cached;
+    const value = {
+      path: criticalPath(run),
+      // The fleet is seeded by the incident, so it is the same for every run on it — but the
+      // comparison re-runs the engine per patrol, so it is cached with the run like the rest.
+      patrols: patrolOptionsFor(session.baseline.fact, { centerline }),
+      sweep: sensitivity(response => runSimulation(session.baseline, { response }), run),
+      assumptions: assumptionSensitivity(overrides => runSimulation(session.baseline, {
+        response: run.inputs.response,
+        traffic: { ...overrides.traffic },
+        economics: { ...overrides.economics },
+      })),
+    };
+    value.patrolComparison = comparePatrols(value.patrols,
+      response => runSimulation(session.baseline, { response }), run);
+    derived.set(run.id, value);
+    return value;
+  }
+
   /** The Lab, rendered from whichever run is active. */
   function labBody() {
     const session = ensureSimulation();
@@ -691,38 +890,40 @@ export function installSafetyIntelligenceWorkspace({
     const standard = runs.find(entry => entry.presetId === 'standard') ?? runs[0];
     const comparison = run && standard && run.id !== standard.id
       ? session.compare(standard.id, run.id) : null;
-    // Computed from the engine on every render — a full sensitivity sweep is about 5 ms, which is
-    // cheaper than keeping a stale copy of it in state.
-    const path = run ? criticalPath(run) : null;
-    const sweep = run
-      ? sensitivity(response => runSimulation(session.baseline, { response }), run) : null;
-    const assumptions = run ? assumptionSensitivity(overrides => runSimulation(session.baseline, {
-      response: run.inputs.response,
-      traffic: { ...overrides.traffic },
-      economics: { ...overrides.economics },
-    })) : null;
-    return [
-      baselineBlock(session.baseline, provenanceSummary(session.baseline),
-        run ? calibration(session.baseline, run) : null),
-      run?.saturation?.warning ? `<p class="si-warn">${run.saturation.warning}</p>` : '',
-      configPanel(run, { presetId: state.simPreset, objective: state.simObjective }),
-      run ? timelineChart(run) : '',
-      run ? criticalPathBlock(path) : '',
-      run ? queueChart(run) : '',
-      run ? explainBlock(run, path) : '',
-      run ? sensitivityBlock(sweep) : '',
-      run ? exposureBlock(run) : '',
-      run ? economicsBlock(run) : '',
-      run ? assumptionBlock(assumptions) : '',
-      comparison ? `<h4>Against the standard response</h4>
-        <ul class="si-facts">
-          <li>Lanes open ${comparison.timeline.roadwayClearanceChange > 0 ? '+' : ''}${comparison.timeline.roadwayClearanceChange} min</li>
-          <li>Delay ${comparison.delay.percentChange}% (${comparison.delay.vehicleHoursChange} vehicle-hours)</li>
-          <li>Net benefit $${Math.round(comparison.economics.netBenefitUSD).toLocaleString('en-US')}</li>
-        </ul>
-        <p class="si-warn">${comparison.economics.note}</p>` : '',
-      comparisonTable(runs, { activeId: run?.id ?? null }),
-    ].join('');
+    const { path, sweep, assumptions, patrols, patrolComparison } = derivedFor(session, run);
+
+    const panel = () => {
+      switch (state.simTab) {
+        case 'traffic': return trafficTab({ run,
+          trafficInputs: trafficInputsPanel(run, state.simInputs.traffic) });
+        case 'response': return responseTab({
+          run, path, sweep, presetId: state.simPreset,
+          responseInputs: responseInputsPanel(run, state.simInputs.response),
+          // The optimiser's search, comparison and recommendation are a section of this tab now.
+          runs, activeId: run?.id ?? null, optimisation: state.optimisation,
+          // What the search moved is read against the standard response, not against whatever run
+          // happens to be loaded — otherwise the diff changes meaning with the active scenario.
+          baselineResponse: standard?.inputs.response ?? null,
+          comparison: state.optimisation?.best && standard
+            ? session.compare(standard.id, runs.find(entry => entry.optimised)?.id ?? standard.id)
+            : null,
+        });
+        case 'patrols': return patrolsTab({ options: patrols, comparison: patrolComparison,
+          selectedPatrolId: state.simPatrolId });
+        case 'economics': return economicsTab({ run, assumptions });
+        default: return overviewTab({
+          baseline: session.baseline, provenance: provenanceSummary(session.baseline),
+          calibration: run ? calibration(session.baseline, run) : null,
+          run, path, sweep, comparison, optimisation: state.optimisation,
+        });
+      }
+    };
+
+    return `<div class="lab">
+      ${labTabs(state.simTab)}
+      <div class="lab-panel" id="lab-panel" role="tabpanel"
+        aria-labelledby="lab-tab-${state.simTab}">${panel()}</div>
+    </div>`;
   }
 
   function analysisBody() {
@@ -812,6 +1013,9 @@ export function installSafetyIntelligenceWorkspace({
     state.selection = selection;
     // A place stays open while its own findings are being read; anything else closes it.
     if (!keepOpenPlace) state.openedPlaceId = selection.placeId ?? null;
+    // The right panel starts folded; choosing something unfolds it, or the investigation would be
+    // written into a panel the operator cannot see.
+    if (!isEmpty(selection)) state.collapsed.side = false;
     state.rightMode = isEmpty(selection) ? 'priorities' : 'selected';
     recompute();
     if (locate && !isEmpty(selection)) focusSelection();
@@ -854,6 +1058,29 @@ export function installSafetyIntelligenceWorkspace({
     focusOn(place, { height: Math.max(FOCUS_HEIGHT_M, place.spreadMeters * 2.4) });
   }
 
+  /**
+   * Pull back far enough to show the incident and the patrols that could reach it.
+   *
+   * Only the dispatchable ones: framing for a patrol that cannot be sent would push the view out
+   * for a vehicle the comparison does not even include.
+   */
+  function framePatrols() {
+    const session = state.simulation;
+    const run = session?.active;
+    if (!viewer || !run) return;
+    const fleet = derivedFor(session, run).patrols;
+    const incident = session.baseline.fact;
+    if (!fleet?.candidates.length || !Number.isFinite(incident?.longitude)) return;
+    map?.parkCamera();
+    const points = [incident, ...fleet.candidates];
+    const centre = {
+      longitude: points.reduce((sum, point) => sum + point.longitude, 0) / points.length,
+      latitude: points.reduce((sum, point) => sum + point.latitude, 0) / points.length,
+    };
+    const spread = Math.max(...fleet.candidates.map(patrol => patrol.distanceMetres), 500);
+    focusOn(centre, { height: Math.max(FOCUS_HEIGHT_M, spread * 1.8) });
+  }
+
   /** Frame whatever is selected, remembering where the camera was first. */
   function focusSelection() {
     const investigation = state.analysis?.investigation;
@@ -892,6 +1119,27 @@ export function installSafetyIntelligenceWorkspace({
     const row = state.analysis?.sections.byId.get(id);
     if (row) select(selectSection(row.section));
   };
+  /**
+   * The open place's anchor, when a selection is being made from inside it.
+   *
+   * Without this, choosing a record in an opened place widened every panel from the place's few
+   * records to the whole milepost range, while the map carried on showing the place open — the
+   * screen said two different things about what it was describing.
+   */
+  function openPlaceAnchor() {
+    if (!state.openedPlaceId) return {};
+    const place = state.analysis?.places.find(entry => entry.id === state.openedPlaceId);
+    if (!place) return {};
+    return {
+      anchor: Object.freeze({
+        longitude: place.longitude,
+        latitude: place.latitude,
+        radiusMeters: Math.max(250, Math.round((place.spreadMeters ?? 0) / 2)),
+      }),
+      anchorLabel: place.label,
+    };
+  }
+
   const selectIncidentById = (id, { fromPriority = null, keepOpenPlace = false } = {}) => {
     const fact = state.facts.find(entry => entry.id === id);
     if (!fact) return;
@@ -900,18 +1148,26 @@ export function installSafetyIntelligenceWorkspace({
     state.tab = 'lab';
     state.collapsed.analysis = false;
     // The record's SECTION comes with it and the section stays the scope: opening one record is a
-    // question about that record, not an instruction to throw away the stretch it sits in.
-    select(selectIncident(fact, { sectionId: sectionIdFor(fact), fromPriority }), { keepOpenPlace });
+    // question about that record, not an instruction to throw away the stretch it sits in. Chosen
+    // from inside an OPEN place, though, the place's anchor comes too — otherwise the panels widen
+    // from the place's handful of records to the whole milepost range while the map still shows the
+    // place open.
+    select(selectIncident(fact, { sectionId: sectionIdFor(fact), fromPriority,
+      ...(keepOpenPlace ? openPlaceAnchor() : {}) }), { keepOpenPlace });
   };
   const selectAssetById = (id, { fromPriority = null, keepOpenPlace = false } = {}) => {
     const defect = state.analysis?.defects.find(entry => entry.assetId === id || entry.id === id);
     if (defect) {
-      select(selectAsset(defect, { sectionId: sectionIdFor(defect), fromPriority }), { keepOpenPlace });
+      select(selectAsset(defect, { sectionId: sectionIdFor(defect), fromPriority,
+        ...(keepOpenPlace ? openPlaceAnchor() : {}) }), { keepOpenPlace });
     }
   };
   const selectHazardById = (key, { fromPriority = null, keepOpenPlace = false } = {}) => {
     const place = state.analysis?.hazards.places.find(entry => entry.key === key);
-    if (place) select(selectHazard(place, { fromPriority }), { keepOpenPlace });
+    if (place) {
+      select(selectHazard(place, { fromPriority, ...(keepOpenPlace ? openPlaceAnchor() : {}) }),
+        { keepOpenPlace });
+    }
   };
 
   /**
@@ -946,9 +1202,15 @@ export function installSafetyIntelligenceWorkspace({
     const target = event.target.closest('[data-tab],[data-entry],[data-domain],[data-hotspot],'
       + '[data-locate],[data-clear-selection],[data-replay],[data-hint],[data-defect],[data-collapse],'
       + '[data-section],[data-incident],[data-asset],[data-hazard],[data-mode],[data-source-id],'
-      + '[data-action],[data-section-only],[data-sim],[data-sim-select]');
+      + '[data-action],[data-section-only],[data-sim],[data-sim-select],[data-lab-tab],[data-patrol],'
+      + '[data-wide]');
     if (!target) return;
     const data = target.dataset;
+    if (data.wide !== undefined) {
+      state.wide = !state.wide;
+      renderCollapse();
+      return;
+    }
     if (data.collapse) {
       state.collapsed[data.collapse] = !state.collapsed[data.collapse];
       renderCollapse();
@@ -957,7 +1219,16 @@ export function installSafetyIntelligenceWorkspace({
     // Choosing a tab opens the panel: picking an analysis you cannot see would do nothing.
     // A tab change changes what the map is counting, so the places are rebuilt rather than the
     // panel merely redrawn.
-    if (data.tab) { state.tab = data.tab; state.collapsed.analysis = false; recompute(); return; }
+    if (data.tab) {
+      state.tab = data.tab;
+      // Choosing a tab opens the panel: picking an analysis you cannot see would do nothing.
+      state.collapsed.analysis = false;
+      // The Lab with nothing selected has only a prompt to show, and at the widened width that
+      // prompt covers the records the operator has to pick one from. Back to the ordinary width.
+      if (data.tab === 'lab' && !state.selection.incidentId) state.wide = false;
+      recompute();
+      return;
+    }
     if (data.clearSelection !== undefined) { clearSelection(); return; }
     // Back to the corridor list WITHOUT dropping the selection or the filters on it.
     if (data.mode) { state.rightMode = data.mode === 'selected' ? 'selected' : 'priorities'; render(); return; }
@@ -985,35 +1256,64 @@ export function installSafetyIntelligenceWorkspace({
     }
     if (data.defect) { selectAssetById(data.defect); return; }
     // --- the Simulation Lab ---------------------------------------------------------------
+    // A sub-tab change re-renders one region. It does not touch the run, the inputs, the optimiser's
+    // results or the map.
+    // The map carries the fleet only while Patrols is open, so a sub-tab change redraws it. The
+    // analysis itself is untouched — `render()` re-reads the cached run rather than recomputing.
+    if (data.labTab) {
+      const wasPatrols = state.simTab === 'patrols';
+      state.simTab = data.labTab;
+      if (data.labTab === 'patrols' || wasPatrols) {
+        render();
+        // The fleet spans the whole corridor while the camera is framed on the incident, so most
+        // of it was off screen. Opening the tab pulls back far enough to see the patrols the table
+        // is comparing; leaving it puts the incident back in frame.
+        if (data.labTab === 'patrols') framePatrols();
+        else focusSelection();
+      } else renderLab();
+      return;
+    }
     if (data.sim) { runLabAction(data.sim); return; }
     if (data.simSelect) { state.simulation?.select(data.simSelect); render(); return; }
+    // An empty value is the card's close button, so presence rather than truth. Clicking the
+    // patrol that is already open closes it, the way a second click on a marker does.
+    if (data.patrol !== undefined) {
+      state.simPatrolId = !data.patrol || data.patrol === state.simPatrolId ? null : data.patrol;
+      renderLab();
+      map?.highlight(state.simPatrolId ? `patrol:${state.simPatrolId}` : null);
+      return;
+    }
     if (data.replay === 'play') { setPlaying(true); return; }
     if (data.replay === 'pause') { setPlaying(false); return; }
     if (data.replay === 'reset') { setPlaying(false); state.replay.step = 0; render(); }
   });
 
-  /** Read whatever the operator has typed into the Lab's form. */
-  function labInputs() {
-    const response = {};
-    for (const input of root.querySelectorAll('[data-sim-input]')) {
-      const value = Number(input.value);
-      if (Number.isFinite(value)) response[input.dataset.simInput] = value;
-    }
-    const traffic = {};
-    for (const input of root.querySelectorAll('[data-sim-traffic]')) {
-      const value = Number(input.value);
-      if (Number.isFinite(value)) traffic[input.dataset.simTraffic] = value;
-    }
-    return { response, traffic };
+  /**
+   * Whatever the operator has typed, from STATE.
+   *
+   * Reading the DOM only ever saw the open tab's fields, so a travel time typed on Response
+   * Analysis was lost the moment the reader looked at Traffic Impact. The inputs are recorded as
+   * they are typed and merged here.
+   */
+  const labInputs = () => ({
+    response: { ...state.simInputs.response },
+    traffic: { ...state.simInputs.traffic },
+  });
+
+  /** Re-render only the Lab, for a sub-tab change: nothing is recomputed and the map is untouched. */
+  function renderLab() {
+    const body = region('analysis');
+    if (!body || state.tab !== 'lab') return;
+    body.innerHTML = labBody();
   }
 
   function runLabAction(action) {
     const session = ensureSimulation();
     if (!session) return;
-    const preset = root.querySelector('[data-sim="preset"]')?.value ?? state.simPreset;
-    const objective = root.querySelector('[data-sim="objective"]')?.value ?? state.simObjective;
-    state.simPreset = preset;
-    state.simObjective = objective;
+    // From state, not the DOM: the scenario select lives on Response Analysis and the optimise
+    // button on Optimization, so neither is guaranteed to be on screen when the other is used.
+    const preset = state.simPreset;
+    const objective = state.simObjective;
     const { response, traffic } = labInputs();
 
     if (action === 'reset') {
@@ -1029,7 +1329,23 @@ export function installSafetyIntelligenceWorkspace({
       // be used as a starting point rather than only as a whole answer.
       const changedFromPreset = state.simPreset !== session.active?.presetId;
       session.run({ presetId: preset, response: changedFromPreset ? {} : response, traffic });
+      // The optimiser's results belong to the previous run, so they are cleared rather than left
+      // to be read against numbers they were not computed from.
       state.optimisation = null;
+      render();
+      return;
+    }
+    if (action === 'patrol') {
+      // The nearest AVAILABLE patrol, and the engine re-run with its travel time. Not a dispatch:
+      // the fleet is simulated, and the panel says so beside every figure it produces.
+      const { patrols } = derivedFor(session, session.active);
+      const nearest = patrols?.nearest;
+      if (!nearest) return;
+      state.simPatrolId = nearest.id;
+      session.clone(session.active?.id, {
+        response: { rangerTravelMinutes: nearest.travelMinutes },
+        label: `Nearest patrol (${nearest.id}, ${nearest.travelMinutes} min)`,
+      });
       render();
       return;
     }
@@ -1040,13 +1356,43 @@ export function installSafetyIntelligenceWorkspace({
   }
 
   root.addEventListener('input', event => {
+    // Kept in state so a value typed on one sub-tab survives a visit to another.
+    const response = event.target.dataset?.simInput;
+    const traffic = event.target.dataset?.simTraffic;
+    if (response || traffic) {
+      const value = Number(event.target.value);
+      if (Number.isFinite(value)) {
+        if (response) state.simInputs.response[response] = value;
+        else state.simInputs.traffic[traffic] = value;
+      }
+      return;
+    }
     if (!event.target.classList.contains('si-scrub')) return;
     setPlaying(false);
     state.replay.step = Number(event.target.value);
     render();
   });
 
+  // Arrow keys move between the Lab's sub-tabs, as a tablist should.
+  root.addEventListener('keydown', event => {
+    const tab = event.target.closest?.('[data-lab-tab]');
+    if (!tab) return;
+    const keys = { ArrowRight: 1, ArrowLeft: -1, Home: 'first', End: 'last' };
+    const move = keys[event.key];
+    if (move === undefined) return;
+    event.preventDefault();
+    const index = LAB_TABS.findIndex(entry => entry.id === tab.dataset.labTab);
+    const next = move === 'first' ? 0 : move === 'last' ? LAB_TABS.length - 1
+      : (index + move + LAB_TABS.length) % LAB_TABS.length;
+    state.simTab = LAB_TABS[next].id;
+    renderLab();
+    root.querySelector(`[data-lab-tab="${state.simTab}"]`)?.focus();
+  });
+
   root.addEventListener('change', event => {
+    // Remembered, but not acted on: choosing a scenario or an objective does not run anything
+    // until the reader asks for it.
+    if (event.target.dataset?.sim === 'preset') { state.simPreset = event.target.value; return; }
     const select = event.target.closest('.si-speed select');
     if (!select) return;
     state.replay.speedId = SPEEDS.some(speed => speed.id === select.value) ? select.value : 'week';
@@ -1078,6 +1424,15 @@ export function installSafetyIntelligenceWorkspace({
       if (mark.member.kind === 'incident') selectIncidentById(mark.member.id, inPlace);
       else if (mark.member.kind === 'defect') selectAssetById(mark.member.item.assetId ?? mark.member.id, inPlace);
       else selectHazardById(mark.member.id, inPlace);
+      return;
+    }
+    // A vehicle on the map is the most natural thing to click, and until now it did nothing.
+    if (mark.kind === 'patrol') {
+      state.tab = 'lab';
+      state.simTab = 'patrols';
+      state.simPatrolId = state.simPatrolId === mark.patrol.id ? null : mark.patrol.id;
+      render();
+      map?.highlight(state.simPatrolId ? `patrol:${state.simPatrolId}` : null);
       return;
     }
     if (mark.kind === 'section') { selectSectionById(mark.section.id); return; }
@@ -1189,6 +1544,8 @@ export function installSafetyIntelligenceWorkspace({
         state.error = `The safety record could not be read: ${error?.message ?? error}. `
           + 'Nothing on this screen is estimated, so no numbers are shown.';
         loading = null;
+        // The cover comes off on failure too, or the error it is covering is never read.
+        finishLoading();
         render();
       });
       void map?.whenReady?.();

@@ -18,15 +18,20 @@ import { answerSafetyQuestion, parseSafetyQuestion,
   SAFETY_SUGGESTIONS } from '../src/safetyIntelligence/safetyAnswers.js';
 import { parseSimulationQuestion,
   SIMULATION_SUGGESTIONS } from '../src/safetyIntelligence/simulationAnswers.js';
-import { accidentPanel, kpiRow, queuePanel, detailPanel, replayBar, coveragePanel, outcomesPanel,
+import { accidentPanel, kpiRow, queuePanel, replayBar, coveragePanel, outcomesPanel,
   investigationPanel, sectionComparison, OUTCOME_REQUIREMENTS } from '../src/safetyIntelligence/safetyPanels.js';
 import { SCOPES, SELECTION_TYPES, scopedFacts, selectHotspot, selectIncident, selectNothing,
-  selectPlace, selectSection } from '../src/safetyIntelligence/selection.js';
+  selectAsset, selectPlace, selectSection } from '../src/safetyIntelligence/selection.js';
 import { buildPlaces, membersOf, placeTotals } from '../src/safetyIntelligence/analytics/mapPlaces.js';
 import { buildSections, clipLineToPoints, exposureOf, highlightStretch, sectionFor,
   sectionProfiles } from '../src/safetyIntelligence/analytics/corridorSections.js';
 import { OWNERS, recommendationsFor, STALE_DEFECT_DAYS } from '../src/safetyIntelligence/analytics/recommendations.js';
 import { incidentAssessment, investigate } from '../src/safetyIntelligence/analytics/investigation.js';
+
+/** Escape a literal for a RegExp, after the same escaping the panels apply to it. */
+const escapeHtmlRe = value => String(value)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /* ============================================================================================
    Fixtures — shaped like the real classes: `attributes` with the instance's own field names.
@@ -639,13 +644,29 @@ test('the queue panel offers agreement as a filter and prints the ordering metho
   if (queue.agreeing) assert.match(html, /two domains/);
 });
 
-test('the detail panel prints the rule, the evidence and the ranking basis', () => {
+test('the investigation answers what the removed detail pane used to', () => {
+  // The queue's detail pane is gone: it only ever showed an empty prompt, because choosing an entry
+  // switches the panel to the investigation. The investigation must still say what is here, what it
+  // rests on and what to do — in more depth than the pane did.
+  const read = facts();
+  const sections = sectionProfiles({ sections: buildSections(FDOT), facts: read, days: 730 });
+  const selection = selectSection(sections.rows[0].section);
+  const scoped = scopedFacts(selection, { facts: read, sections });
+  const html = investigationPanel(investigate(selection, { scoped, sections, allFacts: read }));
+  assert.match(html, /What the records show here/);
+  assert.match(html, /Related safety concerns/);
+  assert.match(html, /What to investigate next/);
+  assert.match(html, /Evidence/);
+  assert.match(html, /asset-derived/);
+});
+
+test('a queue row carries its own reason, so the removed pane is not needed to read the list', () => {
   const queue = buildPriorityQueue(queueInput());
-  const html = detailPanel(queue.entries[0]);
-  assert.match(html, /Why it is here/);
-  assert.match(html, /What that rests on/);
-  assert.match(html, /No cross-domain numeric score/);
-  assert.match(detailPanel(null), /Choose an entry/);
+  const html = queuePanel(queue, {});
+  // Each row prints the rule that put it there and what it counts.
+  assert.match(html, /si-queue-rule/);
+  assert.match(html, new RegExp(escapeHtmlRe(queue.entries[0].rule.slice(0, 30))));
+  assert.match(html, /How this list is ordered/);
 });
 
 test('the replay bar is controls only; the dwell is explained in the disclosure', () => {
@@ -1087,4 +1108,43 @@ test('every question the screen suggests is answered deterministically, never by
     assert.ok(parseSimulationQuestion(question) || parseSafetyQuestion(question),
       `"${question}" is offered to the operator but has no handler`);
   }
+});
+
+test('a record chosen inside an open place keeps that place’s scope, not the section’s', () => {
+  // Opening a place scoped the panels to its handful of records; choosing one of those records then
+  // widened them to the whole milepost range, while the map carried on showing the place open. The
+  // screen said two different things about what it was describing.
+  const read = facts();
+  const places = buildPlaces({ facts: read, tab: 'accidents' });
+  const place = places.find(entry => entry.records > 1) ?? places[0];
+  const sections = { byId: new Map([['S1', { section: { label: 'MP 0–4' }, facts: read }]]) };
+
+  const placeSelection = selectPlace(place, { sectionId: 'S1' });
+  const placeScope = scopedFacts(placeSelection, { facts: read, places, sections });
+
+  const member = place.facts[0];
+  const withAnchor = scopedFacts(selectIncident(member, { sectionId: 'S1',
+    anchor: placeSelection.anchor, anchorLabel: place.label }), { facts: read, places, sections });
+  assert.equal(withAnchor.facts.length, placeScope.facts.length,
+    'selecting a record inside the place changed how many records the panels describe');
+  assert.equal(withAnchor.label, place.label, 'the scope is still named after the place');
+
+  // Without an open place, a record still keeps its SECTION context — that part was always right.
+  const withoutAnchor = scopedFacts(selectIncident(member, { sectionId: 'S1' }),
+    { facts: read, places, sections });
+  assert.equal(withoutAnchor.facts.length, read.length);
+  assert.equal(withoutAnchor.scope, SCOPES.SECTION);
+});
+
+test('an asset or hazard inside an open place keeps the place’s scope too', () => {
+  const read = facts();
+  const places = buildPlaces({ facts: read, tab: 'accidents' });
+  const place = places.find(entry => entry.records > 1) ?? places[0];
+  const anchor = selectPlace(place).anchor;
+  const defects = safetyDefects({ workOrders: [workOrder('WO-1')], assetIndex: index,
+    now: Date.UTC(2025, 5, 1) });
+  const scoped = scopedFacts(selectAsset(defects[0], { anchor, anchorLabel: place.label }),
+    { facts: read, places });
+  assert.equal(scoped.scope, SCOPES.PLACE);
+  assert.equal(scoped.label, place.label);
 });

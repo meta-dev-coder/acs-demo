@@ -238,3 +238,73 @@ export function assumptionSensitivity(runWith, { demandFactors = [0.7, 0.85, 1, 
     method: 'Each assumption is varied alone, with the response strategy held constant.',
   });
 }
+
+/**
+ * The shortlist: which single changes would open the lanes soonest, ranked.
+ *
+ * Read straight off the one-at-a-time sweep, so it needs no scenario to have been run — the
+ * baseline exists as soon as an incident is chosen. Each row is the best point that lever reaches
+ * on its own, measured against where the lever sits now, which is the number a reader is actually
+ * asking for ("how much sooner, if we changed this one thing?").
+ *
+ * One-at-a-time, so these are NOT additive. Two levers that both relieve the same gate largely
+ * overlap; the optimiser's joint search is what settles that, and this is the pointer to it.
+ */
+export function quickWins(sweep, { limit = 5 } = {}) {
+  if (!sweep?.rows?.length) return Object.freeze([]);
+  const baselineReopening = sweep.baseline.reopening;
+  const baselineCost = sweep.baseline.cost;
+
+  const rows = sweep.rows.map(row => {
+    // The point that reaches the best reopening; cheapest first where several tie.
+    const best = row.points.reduce((pick, point) => {
+      if (!pick) return point;
+      if (point.measures.reopening < pick.measures.reopening) return point;
+      if (point.measures.reopening === pick.measures.reopening
+        && point.measures.cost < pick.measures.cost) return point;
+      return pick;
+    }, null);
+    if (!best) return null;
+    const savedMinutes = Number((baselineReopening - best.measures.reopening).toFixed(0));
+    return Object.freeze({
+      key: row.key,
+      label: row.label,
+      unit: row.unit,
+      fromValue: row.baselineValue,
+      toValue: best.value,
+      savedMinutes,
+      reopeningMinutes: Number(best.measures.reopening.toFixed(0)),
+      costDeltaUSD: Math.round(best.measures.cost - baselineCost),
+      delayDeltaVehicleHours: Number((best.measures.delay - sweep.baseline.delay).toFixed(0)),
+    });
+  }).filter(row => row && row.savedMinutes > 0);
+
+  return Object.freeze(rows
+    .sort((a, b) => b.savedMinutes - a.savedMinutes || a.costDeltaUSD - b.costDeltaUSD)
+    .slice(0, limit));
+}
+
+/**
+ * What the optimiser actually changed: the levers whose value differs from the run it is measured
+ * against, with the two values side by side.
+ *
+ * "What it would take" listed the chosen settings absolutely, which does not say which of them the
+ * search moved and which it simply left alone.
+ */
+export function settingChanges(baselineResponse, settings, { levers = SENSITIVITY_LEVERS } = {}) {
+  if (!baselineResponse || !settings) return Object.freeze([]);
+  return Object.freeze(levers
+    .map(lever => {
+      const from = baselineResponse[lever.key] ?? DEFAULT_RESPONSE[lever.key];
+      const to = settings[lever.key];
+      if (to == null || from == null || to === from) return null;
+      return Object.freeze({
+        key: lever.key, label: lever.label, unit: lever.unit, from, to,
+        delta: Number((to - from).toFixed(1)),
+        // `direction` is which way the measure improves, so this says whether the search asked for
+        // more of this lever or less of it — not whether that is good.
+        tightened: lever.direction === -1 ? to < from : to > from,
+      });
+    })
+    .filter(Boolean));
+}

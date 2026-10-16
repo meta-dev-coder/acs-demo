@@ -2009,6 +2009,14 @@ body[data-section="safetyIntel"] .app-nav { display: none; }
   transition: grid-template-columns 0.18s ease;
 }
 /* Folded away, a panel keeps a 34px strip carrying its own name: the map takes the rest. */
+/* The Simulation Lab's tab strip needs the width, or the last tab falls off the end of it. */
+.si-workspace.is-lab { grid-template-columns: minmax(560px, 38vw) 1fr minmax(300px, 22vw); }
+/* The queue starts folded, so this is the Lab's ordinary state — and without it the single-class
+   `.is-side-collapsed` rule below wins on source order and the tab strip loses its width again. */
+.si-workspace.is-lab.is-side-collapsed { grid-template-columns: minmax(560px, 42vw) 1fr 80px; }
+/* Wide mode: the tables get the room, taken from the map, which is idle while one is being read. */
+.si-workspace.is-analysis-wide { grid-template-columns: minmax(700px, 62vw) 1fr minmax(260px, 20vw); }
+.si-workspace.is-analysis-wide.is-side-collapsed { grid-template-columns: minmax(700px, 68vw) 1fr 80px; }
 .si-workspace.is-analysis-collapsed { grid-template-columns: 34px 1fr minmax(320px, 24vw); }
 /* 80px, not 34: folding the queue away uncovers the map's own navigation rail on the right edge,
    and the strip would have sat on top of its buttons. The strip keeps 34px and stands clear. */
@@ -2051,6 +2059,12 @@ body[data-section="safetyIntel"] .app-nav { display: none; }
   box-shadow: var(--ui-shadow-soft); overflow: hidden;
 }
 .si-tabs { flex: none; display: flex; gap: 2px; padding: 8px 8px 0; border-bottom: 1px solid var(--ui-border-soft); }
+/* The two panel controls sit together at the end of the tab row.
+   `.si-tabs button` is `flex: 1 1 auto`, which stretched these two as if they were tabs — the
+   widen control came out as a wide empty box beside the last tab. */
+.si-tabs .si-collapse { flex: 0 0 auto; width: 26px; }
+.si-tabs [data-wide] { margin-left: auto; }
+.si-tabs [data-wide][aria-pressed="true"] { color: var(--ui-accent); background: var(--ui-accent-soft); }
 .si-tabs button {
   /* No wrapping: with the collapse handle on the row, "Road Rangers" broke over two lines and
      pushed the tab row taller than the others. */
@@ -2120,12 +2134,12 @@ body[data-section="safetyIntel"] .app-nav { display: none; }
 .si-side {
   grid-area: side; position: relative; display: flex; flex-direction: column; gap: 12px; min-height: 0;
 }
-.si-side-queue, .si-side-detail {
+.si-side-queue {
   background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 14px;
   box-shadow: var(--ui-shadow-soft); overflow-y: auto; padding: 12px 14px 14px;
 }
-.si-side-queue { flex: 1 1 58%; min-height: 0; }
-.si-side-detail { flex: 1 1 42%; min-height: 0; }
+/* The whole column: the detail pane beneath it only ever showed an empty prompt. */
+.si-side-queue { flex: 1; min-height: 0; }
 .si-queue-head h3 { margin: 0; font-size: 14px; font-weight: 600; }
 .si-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 6px; }
 .si-chip {
@@ -2161,8 +2175,7 @@ body[data-section="safetyIntel"] .app-nav { display: none; }
 .si-method { margin: 10px 0 0; font-size: 10.5px; }
 .si-method summary { cursor: pointer; color: var(--ui-text-secondary); }
 .si-method p { margin: 6px 0 0; line-height: 1.5; color: var(--ui-text-muted); }
-.si-side-detail h3 { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
-.si-side-detail h4 { margin: 12px 0 5px; font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ui-text-secondary); }
+
 .si-badges { display: flex; gap: 5px; margin: 0 0 8px; }
 .si-detail { margin: 0; display: grid; grid-template-columns: 1fr; gap: 2px; }
 .si-detail dt { font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ui-text-muted); margin-top: 7px; }
@@ -2213,7 +2226,7 @@ body[data-section="safetyIntel"] .app-nav { display: none; }
 
 /* ---- Collapsing the two side panels ------------------------------------------------------ */
 .si-collapse {
-  flex: none; width: 24px; height: 24px; margin-left: auto; align-self: center; cursor: pointer;
+  flex: none; width: 24px; height: 24px; align-self: center; cursor: pointer;
   background: transparent; border: 0; border-radius: 7px; font: inherit; font-size: 15px;
   line-height: 1; color: var(--ui-text-muted);
 }
@@ -2238,7 +2251,7 @@ body[data-section="safetyIntel"] .app-nav { display: none; }
 .si-analysis[data-collapsed="true"] > .si-tabs,
 .si-analysis[data-collapsed="true"] > .si-analysis-body,
 .si-side[data-collapsed="true"] > .si-side-queue,
-.si-side[data-collapsed="true"] > .si-side-detail,
+.si-side[data-collapsed="true"] > .si-side-investigation,
 .si-side[data-collapsed="true"] > .si-collapse { display: none; }
 
 /* The footer folds the same way, to a pill in the bottom-left corner. It starts folded. */
@@ -2398,7 +2411,15 @@ body[data-section="safetyIntel"] .app-nav { display: none; }
   background: var(--ui-surface-raised); color: var(--ui-text); border: 1px solid var(--ui-border-soft);
 }
 .sim-field em { font-style: normal; font-size: 9.5px; color: var(--ui-text-muted); white-space: nowrap; }
-.sim-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+/* One line, one height.
+   `.si-action` carries a 10px top margin for use on its own, and the quiet variant zeroes it — so
+   side by side the primary sat lower than its neighbour and, with the quiet one's border adding to
+   its box, shorter too. Both are given the same height and no margin here. */
+.sim-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 2px; }
+.sim-actions .si-action {
+  margin: 0; height: 32px; padding: 0 16px; display: inline-flex; align-items: center;
+  justify-content: center; line-height: 1;
+}
 
 .sim-timeline { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 2px; }
 .sim-timeline li {
@@ -2466,3 +2487,222 @@ body[data-section="safetyIntel"] .app-nav { display: none; }
   margin: 10px 0 4px; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase;
   color: var(--ui-text-secondary);
 }
+
+/* ==========================================================================================
+   Simulation Lab — five sub-tabs under one sticky header
+   ------------------------------------------------------------------------------------------
+   The Lab had every section stacked in one column, which meant scrolling back up to remember
+   what a chart was about. The header stays put; the views are peers.
+   ========================================================================================== */
+.lab { display: flex; flex-direction: column; margin: -12px -14px -18px; }
+/* The compact fact grid, now used by Overview. */
+.lab-incident-title { margin: 0 0 8px; font-size: 13px; font-weight: 600; text-transform: none;
+  letter-spacing: 0; color: var(--ui-text); }
+.lab-facts {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 6px 16px; margin-bottom: 10px;
+}
+.lab-fact { display: grid; gap: 1px; font-size: 11px; min-width: 0; }
+.lab-fact em {
+  font-style: normal; font-size: 9px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--ui-text-muted);
+}
+
+/* The scenario and the button that runs it, at the head of Response Analysis. */
+.lab-run { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 14px; }
+/* Its own field, so the row's alignment does not depend on the shared label styling. Two auto
+   rows means the field's bottom edge IS the select's bottom edge, which is what the flex row
+   lines the button up with. */
+.lab-run-field { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.lab-run-label {
+  font-size: 10.5px; line-height: 1.3; color: var(--ui-text-secondary);
+  letter-spacing: 0; text-transform: none;
+}
+.lab-run select {
+  width: 100%; height: 32px; font: inherit; font-size: 11.5px; padding: 0 8px; border-radius: 7px;
+  background: var(--ui-surface-raised); color: var(--ui-text); border: 1px solid var(--ui-border-soft);
+}
+.lab-run .si-action { margin: 0; height: 32px; padding: 0 16px; white-space: nowrap; }
+
+.lab-tabs {
+  position: sticky; top: 0; z-index: 2; display: flex; gap: 2px; padding: 0 10px;
+  /* Opaque, and painted a block above itself.
+     The scroll container has 12px of padding that `.lab`'s negative margin sits over, so content
+     scrolling past showed in that sliver above the strip — and the surface token is 96% opaque, so
+     it ghosted through the tabs as well. The box-shadow fills the sliver with the same solid. */
+  background: var(--ui-surface-solid);
+  box-shadow: 0 -14px 0 var(--ui-surface-solid);
+  border-bottom: 1px solid var(--ui-border-soft);
+}
+.lab-tabs button {
+  padding: 8px 10px 9px; font: inherit; font-size: 11px; white-space: nowrap; cursor: pointer;
+  background: transparent; border: 0; border-bottom: 2px solid transparent;
+  color: var(--ui-text-secondary);
+}
+.lab-tabs button:hover { color: var(--ui-text); background: var(--ui-hover); }
+.lab-tabs button[aria-selected="true"] { color: var(--ui-text); border-bottom-color: var(--ui-accent-strong); }
+.lab-tabs button:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: -2px; }
+.lab-panel { padding: 12px 14px 18px; }
+.lab-panel > h4:first-child { margin-top: 0; }
+.lab-optimise { display: grid; gap: 8px; margin-bottom: 12px; }
+
+/* Narrow: the four figures wrap to two rows rather than squeezing to nothing. */
+@media (max-width: 1180px) {
+    .lab-tabs { overflow-x: auto; }
+}
+
+/* The sensitivity table: fixed columns so the three measure headings keep one line each. */
+.sim-sensitivity-block > summary {
+  cursor: pointer; color: var(--ui-accent); font-size: 11px; margin: 14px 0 6px;
+}
+.sim-sensitivity { table-layout: fixed; }
+.sim-sensitivity th:first-child { width: 33%; }
+.sim-sensitivity th:nth-child(2) { width: 13%; }
+.sim-sensitivity th:nth-child(3),
+.sim-sensitivity th:nth-child(4),
+.sim-sensitivity th:nth-child(5) { width: 18%; }
+.sim-sensitivity thead th { line-height: 1.25; vertical-align: bottom; }
+.sim-sensitivity td { word-break: normal; }
+
+/* The patrol tables. Fixed columns, as the sensitivity table needs for the same reason: the
+   measure headings are short phrases and wrap into nonsense at an auto width. */
+.sim-patrols, .sim-patrol-compare { table-layout: fixed; }
+.sim-patrols th:first-child { width: 26%; }
+.sim-patrols th:nth-child(2) { width: 34%; }
+.sim-patrols th:nth-child(3), .sim-patrols th:nth-child(4) { width: 20%; }
+.sim-patrol-compare th:first-child { width: 19%; }
+.sim-patrol-compare th:nth-child(2) { width: 12%; }
+.sim-patrol-compare th:nth-child(3) { width: 15%; }
+.sim-patrol-compare th:nth-child(4) { width: 14%; }
+.sim-patrol-compare th:nth-child(5) { width: 16%; }
+/* Widest of the six: "−75.1k · −9.1 min" is one value and wrapped onto two lines at 16%. */
+.sim-patrol-compare th:nth-child(6) { width: 24%; }
+.sim-patrols thead th, .sim-patrol-compare thead th { white-space: nowrap; }
+
+/* The patrol tables. Everything here rests on a simulated fleet, so the panel leads with that. */
+.sim-patrols th:first-child, .sim-patrol-compare th:first-child { font-weight: 600; }
+.sim-patrols tr.is-out { opacity: 0.55; }
+.sim-patrols tr.is-on, .sim-patrol-compare tr.is-on { background: var(--ui-accent-soft); }
+.sim-patrol-compare tbody tr { cursor: pointer; }
+.sim-patrol-compare tbody tr:hover { background: var(--ui-hover); }
+.sim-patrol-compare tr.is-best th { color: #86efac; }
+.sim-patrol-compare .is-better { color: #86efac; }
+.sim-patrol-compare .is-worse { color: #ff9a8b; }
+
+/* Rows that become columns when the panel is widened.
+   At the ordinary width they stack, as they always did; widened, the three time profiles sit side
+   by side and the four breakdowns pair off — the point of the extra width is to see more at once,
+   not to stretch one chart across it. */
+.si-row { display: grid; gap: 0 18px; }
+.si-row > section { min-width: 0; }
+.si-row > section > h4:first-child { margin-top: 14px; }
+.si-workspace.is-analysis-wide .si-row-3 { grid-template-columns: repeat(3, 1fr); }
+.si-workspace.is-analysis-wide .si-row-2 { grid-template-columns: repeat(2, 1fr); }
+/* Widened, a chart gets a column rather than the whole panel. */
+.si-workspace.is-analysis-wide .si-chart { height: 92px; }
+
+/* Which patrol the comparison picks, and why — stated rather than left to the row colour. */
+.sim-recommend-line {
+  margin: 8px 0 10px; padding: 8px 10px; border-radius: 9px; font-size: 11.5px; line-height: 1.5;
+  background: var(--ui-surface-raised); border-left: 3px solid #86efac;
+}
+.sim-pick {
+  display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 999px;
+  font-size: 9.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  background: #4ade8029; color: #86efac;
+}
+.sim-pick-tag {
+  margin-left: 6px; padding: 0 5px; border-radius: 4px; font-style: normal; font-size: 8.5px;
+  letter-spacing: 0.05em; text-transform: uppercase; background: #4ade8029; color: #86efac;
+}
+.sim-floored {
+  margin-left: 5px; font-style: normal; font-size: 8.5px; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--ui-text-muted);
+}
+/* The delta reads as one value, so it stays on one line and the column is sized for it. */
+.sim-delta { white-space: nowrap; }
+
+/* The shortlist above the scenario control: five rows, each one input moved alone. The gain column
+   is the reason the panel exists, so it is the only coloured thing in the row. */
+.sim-quick { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px;
+  background: var(--ui-surface-raised); border: 1px solid var(--ui-border); }
+.sim-quick h4 { margin: 0 0 2px; }
+.sim-quick-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 4px; counter-reset: none; }
+.sim-quick-list li {
+  display: grid; grid-template-columns: 20px minmax(0, 1fr) 104px 96px; gap: 8px;
+  align-items: center; padding: 6px 8px; border-radius: 8px; background: var(--ui-surface);
+  font-size: 11.5px;
+}
+.sim-quick-rank {
+  width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center;
+  justify-content: center; font-size: 10px; font-weight: 700; color: var(--ui-text-muted);
+  background: var(--ui-surface-raised);
+}
+.sim-quick-main { display: flex; flex-direction: column; min-width: 0; }
+.sim-quick-main strong { font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sim-quick-main em { font-style: normal; font-size: 10.5px; color: var(--ui-text-muted); }
+.sim-quick-gain {
+  display: flex; flex-direction: column; font-size: 12.5px; font-weight: 700; color: #4ade80;
+  white-space: nowrap;
+}
+.sim-quick-gain small { font-size: 10px; font-weight: 500; color: var(--ui-text-muted); }
+.sim-quick-cost { font-size: 11px; color: var(--ui-text-secondary); text-align: right; white-space: nowrap; }
+
+/* The optimiser's diff: only the inputs the search actually moved. */
+.sim-changes td:last-child { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sim-changes td.is-better { color: #4ade80; }
+
+/* One patrol's own facts, opened from the map or either table. */
+.sim-patrol-card { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px;
+  background: var(--ui-surface-raised); border: 1px solid var(--ui-border); }
+.sim-patrol-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sim-patrol-head h4 { margin: 0; display: flex; align-items: center; gap: 6px; }
+.sim-patrol-facts { margin: 8px 0; padding: 0;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; }
+.sim-patrol-facts div { min-width: 0; }
+.sim-patrol-facts dt { margin: 0; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--ui-text-muted); }
+.sim-patrol-facts dd { margin: 1px 0 0; font-size: 11.5px; font-weight: 600; color: var(--ui-text); }
+.sim-patrols tbody tr, .sim-patrol-compare tbody tr { cursor: pointer; }
+.sim-patrols tbody tr:hover, .sim-patrol-compare tbody tr:hover { background: var(--ui-surface-raised); }
+
+/* The first-load cover. The screen reads four DataConnect classes before any panel is honest, so
+   it is covered rather than shown half-filled — real headings over absent numbers read as an empty
+   corridor, not as an unfinished read. */
+.si-loader {
+  position: absolute; inset: 0; z-index: 40; display: grid; place-items: center;
+  background: var(--ui-surface-solid, #0b1220); transition: opacity 0.4s ease;
+}
+.si-loader.is-going { opacity: 0; pointer-events: none; }
+/* `display: grid` above is an author rule and beats the UA's `[hidden] { display: none }`, so
+   setting `hidden` alone left the cover on screen — it faded out and then came back opaque when
+   the fade class was removed. */
+.si-loader[hidden] { display: none; }
+.si-loader-card { width: min(420px, calc(100% - 48px)); text-align: left; }
+.si-loader-spin {
+  width: 26px; height: 26px; border-radius: 50%; margin: 0 0 14px;
+  border: 2px solid var(--ui-border); border-top-color: var(--ui-accent);
+  animation: si-loader-turn 0.9s linear infinite;
+}
+@keyframes si-loader-turn { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .si-loader-spin { animation-duration: 3s; }
+}
+.si-loader-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--ui-text); }
+.si-loader-step { margin: 4px 0 14px; font-size: 12px; color: var(--ui-accent); min-height: 16px; }
+.si-loader-steps { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 6px; }
+.si-loader-steps li {
+  display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: center;
+  font-size: 12px; color: var(--ui-text-muted);
+}
+.si-loader-mark {
+  width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--ui-border);
+  display: inline-flex; align-items: center; justify-content: center; font-size: 9px;
+}
+.si-loader-steps li.is-now { color: var(--ui-text); }
+.si-loader-steps li.is-now .si-loader-mark { border-color: var(--ui-accent); }
+.si-loader-steps li.is-done { color: var(--ui-text-secondary); }
+.si-loader-steps li.is-done .si-loader-mark {
+  border-color: #4ade80; color: #4ade80;
+}
+.si-loader-note { margin: 0; font-size: 11px; line-height: 1.5; color: var(--ui-text-muted); }

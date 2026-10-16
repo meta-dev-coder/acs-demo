@@ -6,30 +6,22 @@ page.on('pageerror', e => errors.push(String(e)));
 await page.goto('http://localhost:5188/?demo=i595', { waitUntil: 'load' });
 await page.waitForFunction(() => window.__safetyIntel, null, { timeout: 60000 });
 await page.selectOption('.app-role select', 'safetyIntel');
-await page.waitForFunction(() => window.__safetyIntel.analysis(), null, { timeout: 120000 });
-await page.waitForTimeout(5000);
-
-const check = async tab => {
-  await page.click(`[data-tab="${tab}"]`);
-  await page.waitForTimeout(1600);
-  return page.evaluate(label => {
-    const si = window.__safetyIntel; const a = si.analysis(); const v = window.__viewer;
-    let badges = 0;
-    for (let i = 0; i < v.dataSources.length; i++) {
-      const s = v.dataSources.get(i);
-      if (s.name === 'I-595 Safety Intelligence') {
-        badges = s.entities.values.filter(e => String(e.id).startsWith('place:')).length;
-      }
-    }
-    const kpi = [...document.querySelectorAll('.si-kpi')][0];
-    return { tab: label, badges, totals: a.placeTotals,
-      firstKpi: kpi ? `${kpi.querySelector('.si-kpi-label').textContent.trim()} = ${kpi.querySelector('.si-kpi-value').textContent.trim()}` : null,
-      matches: a.placeTotals.counted === Number(kpi?.querySelector('.si-kpi-value').textContent.replace(/,/g, '')) };
-  }, tab);
-};
-for (const tab of ['accidents', 'secondary', 'assets', 'patrol']) {
-  console.log(JSON.stringify(await check(tab)));
-  await page.screenshot({ path: `scratchpad/tab-${tab}.png` });
+await page.waitForFunction(() => document.querySelector('.si-loader')?.hidden === true,
+  null, { timeout: 120000 });
+await page.waitForTimeout(1500);
+console.log(JSON.stringify(await page.evaluate(() => ({
+  tabs: [...document.querySelectorAll('.si-tabs [role="tab"]')].map(b => b.textContent.trim()),
+  kpis: [...document.querySelectorAll('[data-region="kpis"] *')]
+    .filter(n => n.children.length === 0 && n.textContent.trim()).length > 0,
+})), null, 1));
+// Each remaining tab still opens its panel.
+for (const id of ['secondary', 'assets', 'patrol', 'lab', 'accidents']) {
+  await page.click(`[data-tab="${id}"]`);
+  await page.waitForTimeout(900);
+  const text = await page.evaluate(() =>
+    document.querySelector('[data-region="analysis"]')?.textContent.replace(/\s+/g, ' ').trim().slice(0, 60));
+  console.log(`${id.padEnd(10)} -> ${text}`);
 }
-console.log(errors.length ? 'ERRORS\n' + errors.slice(0, 5).join('\n') : 'no page errors');
+await page.screenshot({ path: 'scratchpad/tabs.png' });
+console.log(errors.length ? 'ERRORS\n' + errors.slice(0, 4).join('\n') : 'no page errors');
 await browser.close();

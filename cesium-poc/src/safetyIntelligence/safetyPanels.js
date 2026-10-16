@@ -126,12 +126,14 @@ export const provenanceBlock = provenance => `
 export function accidentPanel({ provenance, trend, hourly, weekday, severity, types, conditions, hotspots }) {
   return `
   ${provenanceBlock(provenance)}
-  <h4>Records by month</h4>
-  ${barChart(trend, { label: 'Records per month', every: 3, tone: '#F4A725' })}
-  <h4>Records by hour of day</h4>
-  ${barChart(hourly, { label: 'Records per hour (register’s own incident_time)', every: 3, tone: '#38BDF8' })}
-  <h4>Records by day of week</h4>
-  ${barChart(weekday, { label: 'Records per weekday', tone: '#A78BFA', tick: 'head' })}
+  <div class="si-row si-row-3">
+    <section><h4>Records by month</h4>
+      ${barChart(trend, { label: 'Records per month', every: 3, tone: '#F4A725' })}</section>
+    <section><h4>Records by hour of day</h4>
+      ${barChart(hourly, { label: 'Records per hour (register’s own incident_time)', every: 3, tone: '#38BDF8' })}</section>
+    <section><h4>Records by day of week</h4>
+      ${barChart(weekday, { label: 'Records per weekday', tone: '#A78BFA', tick: 'head' })}</section>
+  </div>
   <h4>How badly they went</h4>
   <ul class="si-facts">
     <li><strong>${severity.fatal}</strong> record${severity.fatal === 1 ? '' : 's'} with a fatality recorded</li>
@@ -141,14 +143,18 @@ export function accidentPanel({ provenance, trend, hourly, weekday, severity, ty
   <p class="si-note">The register’s own <code>injuries_y_n</code> and <code>fatalities</code> fields.
     Severity index ${severity.index ?? '—'} is a local weighting of these records (fatal 3, injury 2,
     otherwise 1), not a published index.</p>
-  <h4>Incident type</h4>
-  ${shareList(types, { tone: '#F4A725', total: provenance.records })}
-  <h4>Weather written on the record</h4>
-  ${shareList(conditions.weather, { tone: '#38BDF8', lift: true })}
-  <h4>Traffic conditions written on the record</h4>
-  ${shareList(conditions.traffic, { tone: '#38BDF8', lift: true })}
-  <h4>Assigned root-cause category</h4>
-  ${shareList(conditions.rootCauseCategory, { tone: '#A78BFA', lift: true })}
+  <div class="si-row si-row-2">
+    <section><h4>Incident type</h4>
+      ${shareList(types, { tone: '#F4A725', total: provenance.records })}</section>
+    <section><h4>Weather written on the record</h4>
+      ${shareList(conditions.weather, { tone: '#38BDF8', lift: true })}</section>
+  </div>
+  <div class="si-row si-row-2">
+    <section><h4>Traffic conditions written on the record</h4>
+      ${shareList(conditions.traffic, { tone: '#38BDF8', lift: true })}</section>
+    <section><h4>Assigned root-cause category</h4>
+      ${shareList(conditions.rootCauseCategory, { tone: '#A78BFA', lift: true })}</section>
+  </div>
   <p class="si-warn">${escape(conditions.caveat)}</p>
   <h4>Where records concentrate</h4>
   ${hotspotList(hotspots)}`;
@@ -329,35 +335,13 @@ export function queuePanel(queue, { domain = null, selectedId = null, action = n
   </details>`;
 }
 
-/** The selected entry, in full. */
-export function detailPanel(entry) {
-  if (!entry) return '<p class="si-empty">Choose an entry to see what it rests on.</p>';
-  return `
-  <h3>${escape(entry.title)}</h3>
-  <p class="si-badges">
-    <span class="si-band-${escape(entry.urgency.id)}">${escape(entry.urgency.label)}</span>
-    <span class="si-badge" style="--tone:${DOMAIN_TONES[entry.domain.id] ?? '#94A3B8'}">${escape(entry.domain.label)}</span>
-  </p>
-  <dl class="si-detail">
-    <dt>Why it is here</dt><dd>${escape(entry.rule)}</dd>
-    <dt>What that rests on</dt><dd>${escape(entry.evidence)}</dd>
-    <dt>Counted</dt><dd>${number(entry.quantity)} ${escape(entry.quantityLabel)}</dd>
-    ${entry.caveat ? `<dt>Read with care</dt><dd class="si-warn">${escape(entry.caveat)}</dd>` : ''}
-    ${entry.agrees ? `<dt>Another domain points here too</dt>
-      <dd>${escape(entry.agreementNote)}</dd>` : ''}
-    <dt>Ranking</dt><dd>${escape(entry.scoreBasis)}</dd>
-  </dl>
-  ${entry.facts?.length ? `<h4>The records behind it</h4>
-    <ul class="si-list si-list-plain">${entry.facts.slice(0, 10).map(fact => `
-      <li><span class="si-list-title">${escape(fact.type)} · ${escape(fact.severity.label)}</span>
-        <span class="si-list-meta">${escape(fact.when.dayKey)}
-          ${fact.when.hour != null ? `${String(fact.when.hour).padStart(2, '0')}:00` : ''}
-          ${fact.confirmed ? '· police report on file' : '· no police report number'}
-          ${fact.laneClosure ? `· lane closed${fact.laneClosureHours != null ? ` ${fact.laneClosureHours} h` : ''}` : ''}</span>
-      </li>`).join('')}</ul>` : ''}
-  ${Number.isFinite(entry.longitude) ? `<button class="si-action" type="button" data-locate="${escape(entry.id)}">
-    Show on the map</button>` : '<p class="si-note">This entry has no position to show.</p>'}`;
-}
+/*
+ * The queue's detail pane is gone.
+ *
+ * It sat under the priority list and, in practice, only ever said "Choose an entry to see what it
+ * rests on" — because choosing an entry switches the panel to the investigation, which answers the
+ * same questions in more depth. A permanent empty box costing half the column's height.
+ */
 
 /* ============================================================================================
    Region 5 — replay and coverage

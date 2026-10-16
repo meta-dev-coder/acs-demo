@@ -16,11 +16,23 @@ import { createSimulationSession, MODEL_VERSION, openSimulation,
   runSimulation } from '../src/safetyIntelligence/simulation/simulationService.js';
 import { answerSimulationQuestion, parseModification,
   parseSimulationQuestion } from '../src/safetyIntelligence/simulationAnswers.js';
+import { economicsTab, labHeader, labTabs, LAB_TABS, optimizationSection, overviewTab, patrolsTab,
+  responseInputsPanel, responseTab, trafficInputsPanel, trafficTab } from '../src/safetyIntelligence/simulationPanels.js';
+import { ARRIVAL_FLOOR_MINUTES, comparePatrols, MINIMUM_CANDIDATES,
+  patrolOptionsFor } from '../src/safetyIntelligence/simulation/patrolOptions.js';
 import { assumptionBlock, baselineBlock, calibrationBlock, comparisonTable, criticalPathBlock,
   economicsBlock, explainBlock, exposureBlock, queueChart, recommendationBlock, sensitivityBlock,
   timelineChart } from '../src/safetyIntelligence/simulationPanels.js';
-import { assumptionSensitivity, criticalPath, MEASURES, sensitivity,
-  SENSITIVITY_LEVERS } from '../src/safetyIntelligence/simulation/criticalPath.js';
+import { assumptionSensitivity, criticalPath, MEASURES, quickWins, sensitivity,
+  SENSITIVITY_LEVERS, settingChanges } from '../src/safetyIntelligence/simulation/criticalPath.js';
+
+/** Escape a literal for use in a RegExp, so section names with punctuation still match. */
+const escapeRe = value => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/**
+ * Markup wraps, so assertions run against whitespace-collapsed HTML. Otherwise a template that
+ * happens to break a line mid-sentence fails a test about content.
+ */
+const flat = html => String(html).replace(/\s+/g, ' ');
 
 /* ============================================================================================
    Fixtures
@@ -775,11 +787,492 @@ test('the panels state the critical path, the inert levers and the calibration g
   const sweep = sensitivity(response => runFor(baseline, response), run);
   assert.match(criticalPathBlock(path), /what is controlling\s+reopening/i);
   assert.match(criticalPathBlock(path), /binding/);
-  assert.match(sensitivityBlock(sweep), /which inputs actually matter/i);
+  // Collapsible now: the heading moved into the disclosure summary with the finding in it.
+  assert.match(flat(sensitivityBlock(sweep)), /<summary>Sensitivity — /);
   // The markup wraps, so the assertion tolerates the line break rather than the product changing.
   assert.match(sensitivityBlock(sweep), /without moving\s+the reopening time/);
   assert.match(explainBlock(run, path), /Why is queue recovery later than reopening/);
   assert.match(calibrationBlock(calibration(baseline, run)), /not the same measurement/i);
   assert.equal(criticalPathBlock(null), '');
   assert.equal(sensitivityBlock(null), '');
+});
+
+/* ============================================================================================
+   12. The Lab's five sub-tabs
+   --------------------------------------------------------------------------------------------
+   These are regression tests for the restructuring: the Lab was one long column, and splitting it
+   into tabs must not lose a section, must not change a number, and must not make a tab change
+   expensive.
+   ============================================================================================ */
+
+const labFixture = () => {
+  const baseline = baselineFor({ laneClosureHours: 2 });
+  const session = createSimulationSession({ baseline });
+  const standard = session.run({ presetId: 'standard' });
+  const run = session.run({ presetId: 'coordinated' });
+  const path = criticalPath(run);
+  const sweep = sensitivity(response => runSimulation(baseline, { response }), run);
+  const assumptions = assumptionSensitivity(overrides => runSimulation(baseline, {
+    response: run.inputs.response, traffic: overrides.traffic ?? {},
+    economics: overrides.economics ?? {},
+  }));
+  return { baseline, session, standard, run, path, sweep, assumptions,
+    comparison: session.compare(standard.id, run.id) };
+};
+
+test('the Lab offers its views in order', () => {
+  // Optimization was a tab of its own; its search, comparison and recommendation are now a section
+  // of Response Analysis, beside the timeline they change. Patrols was added after it.
+  assert.deepEqual(LAB_TABS.map(tab => tab.label),
+    ['Overview', 'Traffic Impact', 'Response Analysis', 'Patrols', 'Economics']);
+});
+
+test('the Lab has no header of its own — Overview owns the incident’s facts', () => {
+  // It used to carry the same seven fields as Overview, on every tab.
+  assert.equal(labHeader(), '');
+});
+
+test('Overview states every fact about the incident, compactly and in one place', () => {
+  const { baseline } = labFixture();
+  const html = flat(baselineBlock(baseline, provenanceSummary(baseline), null));
+  assert.match(html, new RegExp(escapeRe(baseline.fact.type)));
+  for (const label of ['Severity', 'When', 'Where', 'Carriageway', 'Lane closure',
+    'Weather on the record', 'Traffic on the record', 'Police report', 'Demand modelled']) {
+    assert.match(html, new RegExp(escapeRe(label)), `${label} is missing from Overview`);
+  }
+  assert.match(html, new RegExp(escapeRe(baseline.observed.weather.value)));
+});
+
+test('a record with no weather says so rather than leaving the field out', () => {
+  const baseline = baselineFor({ weather: null, trafficConditions: null });
+  const html = flat(baselineBlock(baseline, null, null));
+  assert.match(html, /Weather on the record<\/em>Not recorded/);
+  assert.match(html, /Traffic on the record<\/em>Not recorded/);
+  assert.match(html, /Police report<\/em>/);
+});
+
+test('the scenario select and Run live on Response Analysis, with the inputs they act on', () => {
+  const { run, path, sweep } = labFixture();
+  const html = flat(responseTab({ run, path, sweep, responseInputs: '', presetId: 'coordinated',
+    runs: [], activeId: null }));
+  assert.match(html, /data-sim="preset"/);
+  assert.match(html, /data-sim="run"/);
+  assert.match(html, /value="coordinated" selected/, 'the chosen scenario survives a tab change');
+  // And nowhere else.
+  for (const other of [trafficTab({ run, trafficInputs: '' }),
+    economicsTab({ run, assumptions: null })]) {
+    assert.doesNotMatch(flat(other), /data-sim="run"/);
+  }
+});
+
+test('the tab strip marks the open view and is keyboard-navigable', () => {
+  const html = labTabs('response');
+  assert.match(html, /role="tablist"/);
+  assert.equal((html.match(/role="tab"/g) ?? []).length, LAB_TABS.length);
+  assert.match(html, /data-lab-tab="response"[^>]*aria-selected="true"[^>]*tabindex="0"/s);
+  // Roving tabindex: only the selected tab is in the tab order.
+  assert.equal((html.match(/tabindex="-1"/g) ?? []).length, LAB_TABS.length - 1);
+  assert.match(html, /aria-controls="lab-panel"/);
+});
+
+test('every section of the old single column lands in exactly one tab', () => {
+  const fixture = labFixture();
+  const panels = {
+    overview: overviewTab({ baseline: fixture.baseline, provenance: provenanceSummary(fixture.baseline),
+      calibration: calibration(fixture.baseline, fixture.run), run: fixture.run, path: fixture.path,
+      sweep: fixture.sweep, comparison: fixture.comparison, optimisation: null }),
+    traffic: trafficTab({ run: fixture.run, trafficInputs: trafficInputsPanel(fixture.run, {}) }),
+    response: responseTab({ run: fixture.run, path: fixture.path, sweep: fixture.sweep,
+      responseInputs: responseInputsPanel(fixture.run, {}),
+      runs: fixture.session.all, activeId: fixture.run.id }),
+    economics: economicsTab({ run: fixture.run, assumptions: fixture.assumptions }),
+  };
+
+  /**
+   * Each section that existed before, and the one tab it must now appear in.
+   *
+   * Matched on the HEADING, not on the phrase anywhere in the markup: "secondary-incident exposure"
+   * is also the name of an optimiser objective in a dropdown, which is a different thing entirely.
+   */
+  const SECTIONS = [
+    ['Data quality', 'overview'],
+    ['Recorded closure', 'overview'],
+    ['Demand and capacity', 'traffic'],
+    // The queue and the exposure are RESULTS of the response, so they sit with it. Measured: they
+    // change with every scenario while the demand/capacity table does not change at all.
+    ['Queue over time', 'response'],
+    ['Secondary-incident exposure', 'response'],
+    ['Response timeline', 'response'],
+    ['Critical path', 'response'],
+    ['Sensitivity', 'response'],
+    ['Explain these numbers', 'response'],
+    ['Economic impact', 'economics'],
+    ['How much rests on the assumptions', 'economics'],
+    ['Scenario comparison', 'response'],
+    ['Finding a better response', 'response'],
+  ];
+  for (const [section, tab] of SECTIONS) {
+    // A heading or a disclosure summary opens the section; both start right after a '>'.
+    const pattern = new RegExp(`>\\s*${escapeRe(section)}`, 'i');
+    assert.match(flat(panels[tab]), pattern, `"${section}" is missing from ${tab}`);
+    const elsewhere = Object.entries(panels)
+      .filter(([id, html]) => id !== tab && pattern.test(flat(html))).map(([id]) => id);
+    assert.deepEqual(elsewhere, [], `"${section}" also appears in ${elsewhere.join(', ')}`);
+  }
+});
+
+test('the scenario inputs render from stored state, not from whatever is on screen', () => {
+  const { run } = labFixture();
+  // A value typed on another tab is still in state, and must be what the field shows.
+  const response = flat(responseInputsPanel(run, { towTravelMinutes: 9 }));
+  assert.match(response, /data-sim-input="towTravelMinutes" value="9"/);
+  const traffic = flat(trafficInputsPanel(run, { blockedLanes: 3 }));
+  assert.match(traffic, /data-sim-traffic="blockedLanes" value="3"/);
+  // With nothing stored it falls back to the run's own inputs rather than to a blank.
+  assert.match(flat(responseInputsPanel(run, {})),
+    new RegExp(`data-sim-input="towTravelMinutes" value="${run.inputs.response.towTravelMinutes}"`));
+});
+
+test('rendering a tab does not run a simulation or change the session', () => {
+  const fixture = labFixture();
+  const before = fixture.session.all.map(run => run.id);
+  const headline = JSON.stringify(fixture.run.headline);
+  for (let i = 0; i < 3; i += 1) {
+    overviewTab({ baseline: fixture.baseline, provenance: provenanceSummary(fixture.baseline),
+      calibration: null, run: fixture.run, path: fixture.path, sweep: fixture.sweep,
+      comparison: fixture.comparison, optimisation: null });
+    trafficTab({ run: fixture.run, trafficInputs: '' });
+    responseTab({ run: fixture.run, path: fixture.path, sweep: fixture.sweep, responseInputs: '',
+      runs: fixture.session.all, activeId: fixture.run.id });
+    economicsTab({ run: fixture.run, assumptions: fixture.assumptions });
+    optimizationSection({ runs: fixture.session.all, activeId: fixture.run.id, optimisation: null,
+      comparison: null });
+  }
+  assert.deepEqual(fixture.session.all.map(run => run.id), before, 'a render created a run');
+  assert.equal(JSON.stringify(fixture.run.headline), headline, 'a render changed the numbers');
+});
+
+test('the optimizer’s results are shown when present and prompted for when not', () => {
+  const fixture = labFixture();
+  const empty = flat(optimizationSection({ runs: fixture.session.all, activeId: fixture.run.id,
+    optimisation: null, comparison: null }));
+  assert.match(empty, /Run the optimisation/);
+  // The objective control is gone: three of the five objectives are the same objective in this
+  // model, and the other two differ by tens of dollars. The panel says so.
+  assert.doesNotMatch(empty, /data-sim="objective"/);
+  assert.match(empty, /secondary exposure IS vehicle-hours queued/);
+
+  const found = fixture.session.optimise({ objective: 'ECONOMIC',
+    grid: { rangers: [1, 2], towTravelMinutes: [10, 22] } });
+  const filled = optimizationSection({ runs: fixture.session.all, activeId: fixture.run.id,
+    optimisation: found, comparison: null });
+  assert.match(filled, /What it would take/);
+  assert.match(filled, /feasible strategies evaluated|excluded as unavailable/);
+});
+
+test('each tab still prints the warnings that belong to it', () => {
+  const fixture = labFixture();
+  // Progressive disclosure must not have hidden the caveats.
+  const traffic = flat(trafficTab({ run: fixture.run, trafficInputs: '' }));
+  assert.match(traffic, /is measured on this corridor/);
+  assert.match(traffic, /not yet modelled/);
+  assert.match(traffic, /do not change\s*when a scenario is run/);
+  assert.match(flat(economicsTab({ run: fixture.run, assumptions: fixture.assumptions })),
+    /Paid later by the same vehicle/);
+  assert.match(flat(overviewTab({ baseline: fixture.baseline,
+    provenance: provenanceSummary(fixture.baseline), calibration: null, run: fixture.run,
+    path: fixture.path, sweep: fixture.sweep, comparison: fixture.comparison, optimisation: null })),
+  /not a record of how the incident was actually handled/);
+});
+
+test('economics reconciles on screen, and says so if it ever stops', () => {
+  const fixture = labFixture();
+  const html = economicsTab({ run: fixture.run, assumptions: null });
+  assert.match(html, /Reconciliation/);
+  assert.match(flat(html), /which is the total shown above/);
+  assert.doesNotMatch(html, /do not use these figures/);
+});
+
+test('the five objectives collapse to the same recommendation, which is why the control went', () => {
+  // Measured, not asserted from the UI: exposure IS vehicle-hours queued and both follow clearance,
+  // so three of the five objectives are one objective. This test exists so that if a future measure
+  // makes them genuinely different, it fails and the control can come back.
+  const baseline = baselineFor();
+  const session = createSimulationSession({ baseline });
+  const grid = { rangers: [1, 2], towTravelMinutes: [10, 22], detectionMinutes: [2, 6] };
+  const best = {};
+  for (const objective of ['CLEARANCE', 'DELAY', 'EXPOSURE', 'ECONOMIC', 'BALANCED']) {
+    best[objective] = session.optimise({ objective, grid }).best;
+  }
+  const clearanceOf = entry => entry.result.timeline.roadwayClearanceMinutes;
+  assert.equal(clearanceOf(best.CLEARANCE), clearanceOf(best.DELAY));
+  assert.equal(clearanceOf(best.CLEARANCE), clearanceOf(best.EXPOSURE));
+  assert.equal(best.DELAY.result.queue.vehicleHoursOfDelay,
+    best.EXPOSURE.result.exposure.vehicleHoursExposed,
+    'exposure and delay are the same quantity, so they cannot be different objectives');
+  // The cost-led answer differs only marginally, and never on clearance.
+  assert.equal(clearanceOf(best.ECONOMIC), clearanceOf(best.CLEARANCE));
+});
+
+test('nothing still points at the Optimization tab, which no longer exists', () => {
+  const fixture = labFixture();
+  const panels = [
+    overviewTab({ baseline: fixture.baseline, provenance: provenanceSummary(fixture.baseline),
+      calibration: null, run: fixture.run, path: fixture.path, sweep: fixture.sweep,
+      comparison: fixture.comparison, optimisation: null }),
+    overviewTab({ baseline: fixture.baseline, provenance: provenanceSummary(fixture.baseline),
+      calibration: null, run: fixture.run, path: fixture.path, sweep: fixture.sweep,
+      comparison: fixture.comparison,
+      optimisation: fixture.session.optimise({ grid: { rangers: [1, 2] } }) }),
+    responseTab({ run: fixture.run, path: fixture.path, sweep: fixture.sweep, responseInputs: '',
+      runs: fixture.session.all, activeId: fixture.run.id }),
+    trafficTab({ run: fixture.run, trafficInputs: '' }),
+    economicsTab({ run: fixture.run, assumptions: null }),
+  ];
+  for (const html of panels) assert.doesNotMatch(flat(html), /Optimization tab/i);
+});
+
+test('one inert lever reads as singular, several as plural', () => {
+  const fixture = labFixture();
+  const one = { movers: [], inert: [{ verdict: 'COSTS_WITHOUT_REOPENING', label: 'Tow travel' }],
+    rows: [], method: '' };
+  const two = { movers: [], rows: [], method: '',
+    inert: [{ verdict: 'COSTS_WITHOUT_REOPENING', label: 'Tow travel' },
+      { verdict: 'COSTS_WITHOUT_REOPENING', label: 'Tow rolled early' }] };
+  const render = sweep => flat(overviewTab({ baseline: fixture.baseline, provenance: null,
+    calibration: null, run: fixture.run, path: fixture.path, sweep, comparison: null,
+    optimisation: null }));
+  assert.match(render(one), /tow travel changes what the response costs/);
+  assert.match(render(two), /tow travel and tow rolled early change what the response costs/);
+});
+
+test('Traffic Impact holds only what does NOT change when a scenario is run', () => {
+  // The split is justified by measurement, so the measurement is the test: inputs are stable
+  // across scenarios, results are not, and each belongs with its own kind.
+  const baseline = baselineFor();
+  const session = createSimulationSession({ baseline });
+  const standard = session.run({ presetId: 'standard' });
+  const coordinated = session.run({ presetId: 'coordinated' });
+
+  const traffic = run => flat(trafficTab({ run, trafficInputs: '' }));
+  assert.equal(traffic(standard), traffic(coordinated),
+    'Traffic Impact changed between scenarios — a result has leaked back into it');
+
+  const response = run => flat(responseTab({ run, path: criticalPath(run),
+    sweep: sensitivity(r => runSimulation(baseline, { response: r }), run),
+    responseInputs: '', runs: session.all, activeId: run.id }));
+  assert.notEqual(response(standard), response(coordinated),
+    'Response Analysis did not change between scenarios');
+  // And the numbers that moved are the ones that should have.
+  assert.notEqual(standard.queue.vehicleHoursOfDelay, coordinated.queue.vehicleHoursOfDelay);
+  assert.equal(JSON.stringify(standard.inputs.traffic), JSON.stringify(coordinated.inputs.traffic));
+});
+
+test('the queue chart sits on Response Analysis, below the timeline, and not in two places', () => {
+  const fixture = labFixture();
+  const response = flat(responseTab({ run: fixture.run, path: fixture.path, sweep: fixture.sweep,
+    responseInputs: '', runs: fixture.session.all, activeId: fixture.run.id }));
+  const timelineAt = response.indexOf('Response timeline');
+  const queueAt = response.indexOf('Queue over time');
+  assert.ok(timelineAt >= 0 && queueAt > timelineAt, 'the queue must follow the timeline');
+  assert.doesNotMatch(flat(trafficTab({ run: fixture.run, trafficInputs: '' })), />\s*Queue over time/);
+});
+
+/* ============================================================================================
+   13. Patrols
+   ============================================================================================ */
+
+/** A short stretch of centreline, enough for the fleet to stand on. */
+const CENTERLINE = Array.from({ length: 60 }, (_, index) => ({
+  lon: -80.34 + index * 0.0015, lat: 26.1,
+}));
+
+const patrolFixture = () => {
+  const fact = factWith({ longitude: -80.30, latitude: 26.1002 });
+  const baseline = buildIncidentBaseline(fact, { sectionProfile });
+  const session = createSimulationSession({ baseline });
+  const run = session.run({ presetId: 'standard' });
+  const options = patrolOptionsFor(fact, { centerline: CENTERLINE });
+  const comparison = comparePatrols(options,
+    response => runSimulation(baseline, { response }), run);
+  return { fact, baseline, session, run, options, comparison };
+};
+
+test('the fleet comes from the TMC, and always leaves enough patrols to compare', () => {
+  const { options } = patrolFixture();
+  assert.equal(options.available, true);
+  assert.equal(options.fleetSize, 6);
+  assert.ok(options.candidates.length >= MINIMUM_CANDIDATES,
+    `only ${options.candidates.length} dispatchable — a comparison needs at least ${MINIMUM_CANDIDATES}`);
+  // Ineligible ones are kept, with the reason, rather than filtered out of sight.
+  const ineligible = options.patrols.filter(patrol => !patrol.dispatchable);
+  assert.ok(ineligible.length >= 1);
+  assert.ok(ineligible.every(patrol => patrol.ineligibleReason));
+});
+
+test('the same incident always produces the same fleet', () => {
+  const { fact } = patrolFixture();
+  const first = patrolOptionsFor(fact, { centerline: CENTERLINE });
+  const second = patrolOptionsFor(fact, { centerline: CENTERLINE });
+  assert.deepEqual(first.patrols.map(patrol => [patrol.id, patrol.status, patrol.distanceMetres]),
+    second.patrols.map(patrol => [patrol.id, patrol.status, patrol.distanceMetres]));
+});
+
+test('candidates are ordered by travel time, and the nearest is the nearest', () => {
+  const { options } = patrolFixture();
+  const times = options.candidates.map(patrol => patrol.travelMinutes);
+  assert.deepEqual(times, [...times].sort((a, b) => a - b));
+  assert.equal(options.nearest.id, options.candidates[0].id);
+  assert.ok(options.nearest.travelMinutes <= options.furthest.travelMinutes);
+});
+
+test('each patrol is a full re-run, so the comparison is in minutes and dollars', () => {
+  const { options, comparison, run } = patrolFixture();
+  assert.equal(comparison.rows.length, options.candidates.length);
+  for (const row of comparison.rows) {
+    assert.ok(Number.isFinite(row.roadwayClearanceMinutes));
+    assert.ok(Number.isFinite(row.totalModelledCostUSD));
+    // The change is measured against the run on screen, not against the best candidate.
+    assert.equal(row.costChange, row.totalModelledCostUSD - run.headline.totalModelledCostUSD);
+  }
+  // Ranked by cost, so the cheapest is first.
+  const costs = comparison.rows.map(row => row.totalModelledCostUSD);
+  assert.deepEqual(costs, [...costs].sort((a, b) => a - b));
+});
+
+test('a closer patrol does not automatically open the lanes sooner — the binding gate decides', () => {
+  const { options, comparison } = patrolFixture();
+  // Whatever the result, it must be the ENGINE's: clearance can only improve while the patrol is
+  // what the incident is waiting on.
+  const nearest = comparison.rows.find(row => row.patrol.id === options.nearest.id);
+  const furthest = comparison.rows.find(row => row.patrol.id === options.furthest.id);
+  assert.ok(nearest.roadwayClearanceMinutes <= furthest.roadwayClearanceMinutes);
+  if (!comparison.choiceMatters) {
+    assert.equal(comparison.clearanceSpreadMinutes, 0,
+      'if the choice does not matter the spread must be zero, not merely small');
+  }
+});
+
+test('nothing about the patrols is presented as observed', () => {
+  const { options, comparison } = patrolFixture();
+  assert.match(options.standing, /No Road Ranger dataset exists/);
+  assert.match(options.basis, /not a routed path/);
+  assert.match(options.disclaimer, /Not actual FDOT or ACS dispatch data/);
+  const html = flat(patrolsTab({ options, comparison }));
+  assert.match(html, /SIMULATED/);
+  assert.match(html, /No Road Ranger dataset exists/);
+  assert.match(html, /not a dispatch recommendation/);
+  // The carriageway caveat: the TMC filters by direction, this screen cannot.
+  assert.match(html, /direction it was travelling cannot be established/);
+});
+
+test('with no centreline there is no fleet, and the panel says why', () => {
+  const { fact } = patrolFixture();
+  const options = patrolOptionsFor(fact, { centerline: [] });
+  assert.equal(options.available, false);
+  assert.match(options.reason, /centreline is not loaded/);
+  assert.match(flat(patrolsTab({ options, comparison: null })), /centreline is not loaded/);
+  assert.equal(comparePatrols(options, () => null, null), null);
+});
+
+test('the Lab offers five views, with Patrols between Response Analysis and Economics', () => {
+  assert.deepEqual(LAB_TABS.map(tab => tab.id),
+    ['overview', 'traffic', 'response', 'patrols', 'economics']);
+});
+
+test('a patrol closer than the model’s arrival floor is reported, not silently clamped', () => {
+  // Patrols within about 2.5 km all drive it in under two minutes, which is below the response
+  // model's minimum arrival time. They were all floored to the same value and the comparison
+  // showed four identical rows that looked like a coincidence.
+  const near = { lon: -80.3001, lat: 26.1 };
+  const centerline = Array.from({ length: 40 }, (_, index) => ({ lon: -80.31 + index * 0.0005, lat: 26.1 }));
+  const options = patrolOptionsFor(factWith({ longitude: near.lon, latitude: near.lat }), { centerline });
+  const floored = options.candidates.filter(patrol => patrol.floored);
+  for (const patrol of floored) {
+    assert.ok(patrol.driveMinutes < ARRIVAL_FLOOR_MINUTES);
+    assert.equal(patrol.travelMinutes, ARRIVAL_FLOOR_MINUTES, 'the floor still applies');
+  }
+  assert.equal(options.flooredCandidates, floored.length);
+  assert.equal(options.arrivalFloorMinutes, ARRIVAL_FLOOR_MINUTES);
+});
+
+test('clearance is compared to a tenth of a minute, so near patrols are told apart', () => {
+  const { comparison } = patrolFixture();
+  // Whole minutes rounded two patrols thirty seconds apart into the same number.
+  for (const row of comparison.rows) {
+    assert.equal(row.roadwayClearanceMinutes,
+      Number(row.result.timeline.roadwayClearanceMinutes.toFixed(1)));
+  }
+  const distinct = new Set(comparison.rows.map(row => row.patrol.travelMinutes));
+  if (distinct.size > 1) {
+    const clearances = new Set(comparison.rows.map(row => row.roadwayClearanceMinutes));
+    assert.ok(clearances.size > 1,
+      'patrols with different travel times produced identical clearance times');
+  }
+});
+
+test('each patrol carries what the map needs to draw and label it', () => {
+  const { options } = patrolFixture();
+  for (const patrol of options.patrols) {
+    assert.ok(Number.isFinite(patrol.longitude) && Number.isFinite(patrol.latitude));
+    assert.ok(patrol.colour.startsWith('#'), 'a status colour for the marker');
+    // The label says the travel time for a patrol that could come, and the status for one that
+    // could not — a number on an unavailable vehicle would read as a promise.
+    assert.ok(patrol.dispatchable ? Number.isFinite(patrol.travelMinutes) : patrol.ineligibleReason);
+  }
+});
+
+test('quickWins ranks single changes by the minutes they take off reopening', () => {
+  const baseline = baselineFor();
+  const base = runFor(baseline);
+  const sweep = sensitivity(response => runFor(baseline, response), base);
+  const wins = quickWins(sweep);
+
+  assert.ok(wins.length > 0 && wins.length <= 5, 'at most five, and not empty for this incident');
+  // Ranked, and every row is a real saving measured against where the lever sits now.
+  for (let index = 1; index < wins.length; index += 1) {
+    assert.ok(wins[index - 1].savedMinutes >= wins[index].savedMinutes, 'ordered by minutes saved');
+  }
+  assert.ok(wins.every(win => win.savedMinutes > 0), 'a row that saves nothing is not a win');
+  assert.ok(wins.every(win => win.reopeningMinutes < sweep.baseline.reopening));
+  // It is a shortlist of the sweep, so it may never contain a lever the sweep calls inert.
+  const inert = new Set(sweep.inert.map(row => row.key));
+  assert.ok(wins.every(win => !inert.has(win.key)), 'no lever that cannot move reopening');
+  // Deterministic.
+  assert.deepEqual(quickWins(sweep), wins);
+  assert.deepEqual(quickWins(null), []);
+});
+
+test('settingChanges reports only the inputs the optimiser moved, with both values', () => {
+  const from = { ...DEFAULT_RESPONSE };
+  const to = { ...DEFAULT_RESPONSE, rangers: DEFAULT_RESPONSE.rangers + 1,
+    detectionMinutes: DEFAULT_RESPONSE.detectionMinutes - 2 };
+  const changes = settingChanges(from, to);
+
+  assert.deepEqual(changes.map(change => change.key).sort(), ['detectionMinutes', 'rangers']);
+  const detection = changes.find(change => change.key === 'detectionMinutes');
+  assert.equal(detection.from, DEFAULT_RESPONSE.detectionMinutes);
+  assert.equal(detection.to, DEFAULT_RESPONSE.detectionMinutes - 2);
+  assert.equal(detection.delta, -2);
+  assert.equal(detection.tightened, true, 'less detection time is the improving direction');
+  assert.equal(changes.find(change => change.key === 'rangers').tightened, true,
+    'more rangers is the improving direction for a units lever');
+
+  assert.deepEqual(settingChanges(from, from), [], 'nothing moved, nothing reported');
+  assert.deepEqual(settingChanges(null, to), []);
+});
+
+test('the recommendation names what the search changed when a baseline is given', () => {
+  const baseline = baselineFor();
+  const best = runFor(baseline, { ...DEFAULT_RESPONSE, rangers: DEFAULT_RESPONSE.rangers + 1 });
+  const optimisation = { best: { result: best, settings: best.inputs.response },
+    objectiveLabel: 'Balanced', evaluated: 12, rejected: 3, rejectedExamples: [], pareto: [],
+    method: 'test' };
+
+  const withBase = recommendationBlock(optimisation, null, DEFAULT_RESPONSE);
+  assert.match(withBase, /What the search changed/);
+  assert.match(withBase, /Road Rangers on scene/);
+  // Without one it must not invent a comparison.
+  const without = recommendationBlock(optimisation, null, null);
+  assert.ok(!/<table class="sim-table sim-changes">/.test(without));
 });

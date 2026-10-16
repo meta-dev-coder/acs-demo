@@ -58,8 +58,10 @@ export const EMPTY_SELECTION = Object.freeze({
   hazardId: null,
   hotspotId: null,
   placeId: null,
-  /** For a place: where it is and how far it reaches, so its scope survives a change of tab. */
+  /** Where the scope is centred and how far it reaches, when something narrower than a section. */
   anchor: null,
+  /** What to call that scope on screen — the place's name, not the record's. */
+  anchorLabel: null,
   priorityId: null,
   /** Where the analyses should speak for. */
   scope: SCOPES.CORRIDOR,
@@ -99,31 +101,51 @@ export const selectHotspot = (cluster, { sectionId = null, fromPriority = null }
  * The section comes with it and the scope stays SECTION: opening a record is a question about that
  * record, not an instruction to throw away the context it sits in.
  */
-export const selectIncident = (fact, { sectionId = null, fromPriority = null } = {}) => withDefaults({
+/**
+ * One record.
+ *
+ * The section comes with it and the scope stays SECTION: opening a record is a question about that
+ * record, not an instruction to throw away the context it sits in.
+ *
+ * `anchor` narrows that context. Choosing a record from INSIDE an opened place used to widen the
+ * analyses from the place's handful of records to the whole milepost range — the map still showed
+ * the place open while every panel beside it had quietly switched to a bigger stretch of road. With
+ * the place's anchor carried through, reading one of its records keeps the place's scope.
+ */
+export const selectIncident = (fact, { sectionId = null, fromPriority = null, anchor = null,
+  anchorLabel = null } = {}) => withDefaults({
   selectionType: SELECTION_TYPES.INCIDENT,
   selectedId: fact.id,
   incidentId: fact.id,
   sectionId,
-  scope: SCOPES.RECORD,
+  anchor,
+  anchorLabel,
+  scope: anchor ? SCOPES.PLACE : SCOPES.RECORD,
   fromPriority,
   label: `${fact.type} · ${fact.when?.dayKey ?? ''}`.trim(),
 });
 
-export const selectAsset = (defect, { sectionId = null, fromPriority = null } = {}) => withDefaults({
+export const selectAsset = (defect, { sectionId = null, fromPriority = null, anchor = null,
+  anchorLabel = null } = {}) => withDefaults({
   selectionType: SELECTION_TYPES.ASSET,
   selectedId: defect.assetId ?? defect.id,
   assetId: defect.assetId ?? null,
   sectionId,
+  anchor,
+  anchorLabel,
   scope: SCOPES.PLACE,
   fromPriority,
   label: `${defect.assetType ?? 'Asset'} ${defect.assetId ?? ''}`.trim(),
 });
 
-export const selectHazard = (place, { sectionId = null, fromPriority = null } = {}) => withDefaults({
+export const selectHazard = (place, { sectionId = null, fromPriority = null, anchor = null,
+  anchorLabel = null } = {}) => withDefaults({
   selectionType: SELECTION_TYPES.HAZARD,
   selectedId: place.key,
   hazardId: place.key,
   sectionId,
+  anchor,
+  anchorLabel,
   scope: SCOPES.PLACE,
   fromPriority,
   label: place.label ?? 'Hazard location',
@@ -177,16 +199,24 @@ export function scopedFacts(selection, { facts = [], sections = null, hotspots =
   });
   if (isEmpty(selection)) return corridor();
 
-  if (selection.selectionType === SELECTION_TYPES.PLACE) {
+  /**
+   * Anything carrying an anchor scopes to it, whatever kind of thing is selected.
+   *
+   * A place sets one when it is opened; a record, asset or hazard chosen from inside that place
+   * inherits it. That is what keeps the analyses on the place the operator is looking at instead of
+   * silently widening to the milepost range the moment they open one of its records.
+   */
+  if (selection.anchor) {
     const anchor = selection.anchor;
-    if (!anchor) return corridor();
     const within = facts.filter(fact => Number.isFinite(fact.longitude)
       && metresBetween(anchor, fact) <= anchor.radiusMeters);
     return Object.freeze({
-      facts: within, scope: SCOPES.PLACE, label: selection.label,
+      facts: within, scope: SCOPES.PLACE,
+      label: selection.anchorLabel ?? selection.label,
       basis: `Records within ${anchor.radiusMeters} m of this place. Positions are asset-derived.`,
     });
   }
+  if (selection.selectionType === SELECTION_TYPES.PLACE) return corridor();
   // A record keeps its section's scope: a single incident never becomes the corpus.
   if (selection.selectionType === SELECTION_TYPES.HOTSPOT) {
     const cluster = hotspots?.clusters?.find(entry => entry.id === selection.hotspotId);
