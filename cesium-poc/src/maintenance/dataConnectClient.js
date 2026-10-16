@@ -108,21 +108,58 @@ export const listClasses = async () => (await request('/classes', { method: 'GET
  *          onPage?: (info: {page: number, received: number, totalCount: number}) => void}} [options]
  * @returns {Promise<{records: object[], totalCount: number}>}
  */
-export async function getCuratedData(classId, { pageSize = 500, filters = [], maxPages = 100, onPage } = {}) {
-  const records = [];
-  let page = 0, totalCount = 0;
-  for (; page < maxPages; page++) {
-    const payload = await request(`/class/${encodeURIComponent(classId)}/curated-data`, {
+/** How many pages are asked for at once once the total is known. */
+export const PAGE_CONCURRENCY = 6;
+
+/**
+ * Every row of a curated class.
+ *
+ * The first page is fetched alone, because its `totalCount` says how many more there are. The rest
+ * are then asked for together rather than one after another: the asset registry is 5,015 rows at
+ * 500 a page, which is eleven round trips, and measured against the live instance that was 24
+ * seconds of the Safety Intelligence screen's 27-second load — the requests are independent and
+ * were simply queued behind each other.
+ *
+ * Rows keep page order regardless of which response arrives first, so two reads of the same class
+ * return the same sequence.
+ */
+export async function getCuratedData(classId, { pageSize = 500, filters = [], maxPages = 100,
+  onPage, concurrency = PAGE_CONCURRENCY } = {}) {
+  const path = `/class/${encodeURIComponent(classId)}/curated-data`;
+  const fetchPage = async page => {
+    const payload = await request(path, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ page, pageSize, filters }),
     });
     const batch = payload?.data ?? [];
-    totalCount = Number(payload?.totalCount ?? batch.length);
-    records.push(...batch);
-    onPage?.({ page, received: batch.length, totalCount });
-    // A short page or a satisfied total means there is nothing more to ask for.
-    if (!batch.length || records.length >= totalCount || batch.length < pageSize) break;
+    onPage?.({ page, received: batch.length, totalCount: Number(payload?.totalCount ?? batch.length) });
+    return { batch, totalCount: Number(payload?.totalCount ?? batch.length) };
+  };
+
+  const first = await fetchPage(0);
+  const totalCount = first.totalCount;
+  // A short first page, or one that already satisfies the total, is the whole class.
+  if (!first.batch.length || first.batch.length < pageSize || first.batch.length >= totalCount) {
+    return { records: first.batch, totalCount: totalCount || first.batch.length };
   }
+
+  const lastPage = Math.min(Math.ceil(totalCount / pageSize), maxPages) - 1;
+  const pages = new Array(lastPage + 1);
+  pages[0] = first.batch;
+
+  // A fixed number of workers walking a shared cursor: a plain Promise.all over eleven pages would
+  // open eleven connections at once, which is a burst the proxy does not need to absorb.
+  let next = 1;
+  await Promise.all(Array.from({ length: Math.min(concurrency, lastPage) }, async () => {
+    for (;;) {
+      const page = next;
+      next += 1;
+      if (page > lastPage) return;
+      pages[page] = (await fetchPage(page)).batch;
+    }
+  }));
+
+  const records = pages.flatMap(batch => batch ?? []);
   return { records, totalCount: totalCount || records.length };
 }
