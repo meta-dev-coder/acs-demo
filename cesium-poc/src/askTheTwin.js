@@ -23,7 +23,7 @@ import { createEvidenceChips } from './askTwinEvidence.js';
 import { loadSources, normalizeSources, presetFor, saveSources, scopeLine, SOURCES, sourcesForScreen, toggleSource } from './askTwinSources.js';
 import { buildTwinContext, REFERENT_KINDS } from './spatial/twinContext.js';
 import { createCapabilityRegistry, PROVENANCE } from './twin/capabilities.js';
-import { isCompoundQuestion, planFor, runInvestigation } from './twin/orchestrator.js';
+import { isCompoundQuestion, planFor, runInvestigation, runnablePlan } from './twin/orchestrator.js';
 
 // `npm run dev` serves the orchestrator itself (server/ask/localAsk.mjs), so a dev build asks it
 // same-origin; a build without VITE_ASK_THE_TWIN_API keeps the deployed service.
@@ -1168,7 +1168,9 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
   async function answerByInvestigation(question) {
     if (!isCompoundQuestion(question)) return false;
     const context = twinContext();
-    const plan = planFor(question);
+    // Only what can run on this screen counts: a question that is compound only because a clause
+    // names a TMC check ("camera", "warning") goes to the model instead.
+    const plan = runnablePlan(planFor(question), capabilities, context);
     if (plan.length < 2) return false;
 
     const traces = [];

@@ -85,6 +85,18 @@ export function planFor(question) {
   return steps.slice(0, ORCHESTRATION_LIMITS.maxSteps);
 }
 
+/**
+ * The part of a plan that can run where the operator is.
+ *
+ * The clause rules are vocabulary only: "camera" plans the TMC's upstream-protection check on every
+ * screen. A plan that is compound only because of steps unavailable here must not be answered
+ * locally, or a Maintenance question gets a TMC "only on the tmc screen" report and a bare count
+ * instead of reaching the model, which has the tools for it.
+ */
+export function runnablePlan(plan, registry, context) {
+  return plan.filter(name => capabilityAvailable(registry?.[name], context).available);
+}
+
 const withTimeout = (work, ms) => new Promise(resolve => {
   let settled = false;
   const finish = value => { if (!settled) { settled = true; resolve(value); } };
