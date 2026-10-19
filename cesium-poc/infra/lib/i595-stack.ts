@@ -10,6 +10,7 @@ import * as eventsTargets from 'aws-cdk-lib/aws-events-targets'
 import * as iam from 'aws-cdk-lib/aws-iam'
 import * as scheduler from 'aws-cdk-lib/aws-scheduler'
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager'
+import * as ssm from 'aws-cdk-lib/aws-ssm'
 import * as apigw from 'aws-cdk-lib/aws-apigatewayv2'
 import * as path from 'path'
 import { Construct } from 'constructs'
@@ -299,31 +300,119 @@ export class I595Stack extends cdk.Stack {
     })
 
     // ── 12. Lambda: Ask the Twin ────────────────────────────────────────────────
-    const askTheTwinFn = new NodejsFunction(this, 'AskTheTwinFn', {
-      entry: path.join(__dirname, '../lambdas/ask-the-twin/index.mjs'),
-      runtime: lambda.Runtime.NODEJS_22_X,
-      timeout: cdk.Duration.seconds(30),
-      bundling: {
-        format: OutputFormat.ESM,
-        externalModules: ['@aws-sdk/*'],
-      },
-      environment: {
-        LIVE_EVENTS_TABLE: liveEventsTable.tableName,
-        ANTHROPIC_SECRET_ARN: 'arn:aws:secretsmanager:us-east-1:589391957147:secret:i595/anthropic-key-YFA1UV',
-        ANTHROPIC_SECRET_REGION: 'us-east-1',
-      },
-    })
+    // Opt-in EC2 route for Ask the Twin (section 12b); every flag unset = today's Lambda-only stack.
+    const askEc2 = readAskEc2Context(this)
+    // Retiring the Lambda drops the function, its URL, its IAM grants and its output.
+    let askTheTwinFnUrl: lambda.FunctionUrl | undefined
+    if (!askEc2?.retireAskLambda) {
+      const askTheTwinFn = new NodejsFunction(this, 'AskTheTwinFn', {
+        entry: path.join(__dirname, '../lambdas/ask-the-twin/index.mjs'),
+        runtime: lambda.Runtime.NODEJS_22_X,
+        timeout: cdk.Duration.seconds(30),
+        bundling: {
+          format: OutputFormat.ESM,
+          externalModules: ['@aws-sdk/*'],
+        },
+        environment: {
+          LIVE_EVENTS_TABLE: liveEventsTable.tableName,
+          ANTHROPIC_SECRET_ARN: 'arn:aws:secretsmanager:us-east-1:589391957147:secret:i595/anthropic-key-YFA1UV',
+          ANTHROPIC_SECRET_REGION: 'us-east-1',
+        },
+      })
 
-    liveEventsTable.grantReadData(askTheTwinFn)
+      liveEventsTable.grantReadData(askTheTwinFn)
 
-    askTheTwinFn.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['secretsmanager:GetSecretValue'],
-      resources: ['arn:aws:secretsmanager:us-east-1:589391957147:secret:i595/anthropic-key-YFA1UV'],
-    }))
+      askTheTwinFn.addToRolePolicy(new iam.PolicyStatement({
+        actions: ['secretsmanager:GetSecretValue'],
+        resources: ['arn:aws:secretsmanager:us-east-1:589391957147:secret:i595/anthropic-key-YFA1UV'],
+      }))
 
-    const askTheTwinFnUrl = askTheTwinFn.addFunctionUrl({
-      authType: lambda.FunctionUrlAuthType.NONE,
-    })
+      askTheTwinFnUrl = askTheTwinFn.addFunctionUrl({
+        authType: lambda.FunctionUrlAuthType.NONE,
+      })
+    }
+
+    // ── 12b. Ask the Twin on the EC2 demo host (opt-in: cdk deploy -c askOrigin=...) ──
+    // The GitHub Pages /demo/ site is HTTPS and cannot call the host's plain-HTTP :8095, so CloudFront
+    // terminates TLS at the edge and forwards /api/i595/ask* to the host. The host's password gate is a
+    // session cookie that Pages visitors never have, so CloudFront proves itself with a shared header
+    // (x-ask-edge-key) instead; the value lives in SSM and is resolved at deploy time, never in git.
+    // Contract for the host: deploy/ec2/ASK_THE_TWIN.md section 5.1.
+    const askBehaviors: Record<string, cloudfront.BehaviorOptions> = {}
+    const askLambdaBehavior: cloudfront.BehaviorOptions | undefined = askTheTwinFnUrl && {
+      origin: new origins.FunctionUrlOrigin(askTheTwinFnUrl),
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+      allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+    }
+    if (askEc2) {
+      const askEdgeKey = ssm.StringParameter.valueForStringParameter(this, askEc2.edgeKeyParam)
+      const askEc2Origin = new origins.HttpOrigin(askEc2.host, {
+        protocolPolicy: askEc2.protocol,
+        httpPort: askEc2.protocol === cloudfront.OriginProtocolPolicy.HTTP_ONLY ? askEc2.port : undefined,
+        httpsPort: askEc2.protocol === cloudfront.OriginProtocolPolicy.HTTPS_ONLY ? askEc2.port : undefined,
+        // 60 s is CloudFront's ceiling without a quota increase. It is the wait for the first byte and
+        // then between bytes, so a streamed answer can run longer as long as events (or SSE comment
+        // pings) keep arriving; a buffered JSON answer must finish inside it.
+        readTimeout: cdk.Duration.seconds(60),
+        // CloudFront must drop an idle connection before the origin does, or it reuses a socket the host
+        // already closed and the viewer gets a 502. Node's http server closes idle sockets after 5 s by
+        // default, hence 4 s; raise askOriginKeepaliveSeconds (max 60) once the host sets
+        // server.keepAliveTimeout above it.
+        keepaliveTimeout: cdk.Duration.seconds(askEc2.keepaliveSeconds),
+        // A stopped host should fail fast (2 x 5 s) rather than hold the chat for 30 s.
+        connectionTimeout: cdk.Duration.seconds(5),
+        connectionAttempts: 2,
+        customHeaders: { 'x-ask-edge-key': askEdgeKey },
+      })
+      const askOriginRequestPolicy = new cloudfront.OriginRequestPolicy(this, 'AskEc2OriginRequestPolicy', {
+        comment: 'Ask the Twin to the EC2 demo host: body headers, the viewer address for rate limits, no cookies',
+        // Accept selects SSE vs JSON; CloudFront-Viewer-Address carries the viewer IP:port for the host's
+        // per-IP rate limit (it only sees CloudFront's addresses otherwise). No cookies: the Pages page
+        // sends none, and the host's session cookie must not be usable through this path.
+        headerBehavior: cloudfront.OriginRequestHeaderBehavior.allowList(
+          'Accept', 'Content-Type', 'Origin', 'CloudFront-Viewer-Address',
+        ),
+        cookieBehavior: cloudfront.OriginRequestCookieBehavior.none(),
+        queryStringBehavior: cloudfront.OriginRequestQueryStringBehavior.none(),
+      })
+      // The Lambda answered CORS itself with '*'; here CloudFront adds it (originOverride) so the host
+      // only has to return 2xx to the OPTIONS preflight. Limited to the Pages origin(s).
+      const askCorsPolicy = new cloudfront.ResponseHeadersPolicy(this, 'AskEc2CorsPolicy', {
+        comment: 'Ask the Twin (EC2 origin): CORS for the GitHub Pages demo',
+        corsBehavior: {
+          accessControlAllowOrigins: askEc2.corsOrigins,
+          accessControlAllowMethods: ['GET', 'HEAD', 'POST', 'OPTIONS'],
+          accessControlAllowHeaders: ['content-type', 'accept'],
+          accessControlAllowCredentials: false,
+          accessControlMaxAge: cdk.Duration.seconds(600),
+          originOverride: true,
+        },
+      })
+      if (askLambdaBehavior) {
+        // Kept for rollback without a redeploy (point VITE_ASK_THE_TWIN_API here). It must come before
+        // '/api/i595/ask*', which also matches it: CloudFront takes the first matching behaviour in order.
+        // The Lambda ignores the request path, so the different path needs no Lambda change.
+        askBehaviors['/api/i595/ask-lambda*'] = askLambdaBehavior
+      }
+      // Same pattern as the Lambda had, so the Pages build's URL (and /api/i595/ask/status) keep working.
+      askBehaviors['/api/i595/ask*'] = {
+        origin: askEc2Origin,
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+        originRequestPolicy: askOriginRequestPolicy,
+        responseHeadersPolicy: askCorsPolicy,
+        allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+        // CloudFront would gzip a text response and buffer the stream while doing it; SSE must flow as
+        // the host writes it. Chunked origin responses are passed through as they arrive.
+        compress: false,
+      }
+      new cdk.CfnOutput(this, 'AskEc2Origin', {
+        value: `${askEc2.host}:${askEc2.port} (${askEc2.protocol})`,
+      })
+    } else if (askLambdaBehavior) {
+      askBehaviors['/api/i595/ask*'] = askLambdaBehavior
+    }
 
     // ── 13. CloudFront Distribution ───────────────────────────────────────────
     const oac = new cloudfront.CfnOriginAccessControl(this, 'DataBucketOAC', {
@@ -372,12 +461,7 @@ export class I595Stack extends cdk.Stack {
           cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
           allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
         },
-        '/api/i595/ask*': {
-          origin: new origins.FunctionUrlOrigin(askTheTwinFnUrl),
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-        },
+        ...askBehaviors,
         // Non-secret poller status (status/live-dc-status.json), read cross-origin by the page.
         '/status/*': {
           origin: s3Origin,
@@ -439,12 +523,77 @@ export class I595Stack extends cdk.Stack {
       value: liveEventsRestFnUrl.url,
     })
 
-    new cdk.CfnOutput(this, 'AskTheTwinFunctionUrl', {
-      value: askTheTwinFnUrl.url,
-    })
+    if (askTheTwinFnUrl) {
+      new cdk.CfnOutput(this, 'AskTheTwinFunctionUrl', {
+        value: askTheTwinFnUrl.url,
+      })
+    }
 
     new cdk.CfnOutput(this, 'LiveDcStatusUrl', {
       value: `https://${distribution.distributionDomainName}/status/live-dc-status.json`,
     })
   }
+}
+
+export interface AskEc2Context {
+  host: string
+  port: number
+  protocol: cloudfront.OriginProtocolPolicy
+  keepaliveSeconds: number
+  edgeKeyParam: string
+  corsOrigins: string[]
+  retireAskLambda: boolean
+}
+
+// The GitHub Pages site that calls Ask the Twin (owner of meta-dev-coder/acs-demo).
+const DEFAULT_ASK_CORS_ORIGINS = ['https://meta-dev-coder.github.io']
+
+/**
+ * Reads the Ask the Twin EC2 flags from CDK context (-c key=value, so every value may arrive as a string).
+ * Returns undefined when askOrigin is unset: the stack is then exactly the Lambda-only one. Throws on a
+ * combination that would deploy something unsafe or broken rather than guessing.
+ */
+export function readAskEc2Context(scope: Construct): AskEc2Context | undefined {
+  const raw = (key: string): string => String(scope.node.tryGetContext(key) ?? '').trim()
+  const flag = (key: string): boolean => {
+    const v = raw(key).toLowerCase()
+    if (v === '' || v === 'false' || v === '0') return false
+    if (v === 'true' || v === '1') return true
+    throw new Error(`context ${key} must be true or false, got "${raw(key)}"`)
+  }
+  const host = raw('askOrigin')
+  const retireAskLambda = flag('retireAskLambda')
+  if (!host) {
+    // Retiring the Lambda with nothing in its place would leave /api/i595/ask* on the S3 default behaviour.
+    if (retireAskLambda) throw new Error('retireAskLambda=true needs askOrigin: there would be no Ask the Twin route')
+    return undefined
+  }
+  // CloudFront custom origins take a DNS name only: no scheme, port, path or bare IP address.
+  if (!/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(host)) {
+    throw new Error(`askOrigin must be a DNS name like ec2-34-237-187-140.compute-1.amazonaws.com, got "${host}"`)
+  }
+  const port = Number(raw('askOriginPort') || 8095)
+  if (!Number.isInteger(port) || !(port === 80 || port === 443 || (port >= 1024 && port <= 65535))) {
+    throw new Error(`askOriginPort must be 80, 443 or 1024-65535 (CloudFront's allowed origin ports), got "${raw('askOriginPort')}"`)
+  }
+  const protocolName = raw('askOriginProtocol') || 'http-only'
+  const protocols: Record<string, cloudfront.OriginProtocolPolicy> = {
+    'http-only': cloudfront.OriginProtocolPolicy.HTTP_ONLY, // the host serves plain HTTP today
+    'https-only': cloudfront.OriginProtocolPolicy.HTTPS_ONLY, // only once the host has a valid certificate
+  }
+  const protocol = protocols[protocolName]
+  if (!protocol) throw new Error(`askOriginProtocol must be http-only or https-only, got "${protocolName}"`)
+  const keepaliveSeconds = Number(raw('askOriginKeepaliveSeconds') || 4)
+  if (!Number.isInteger(keepaliveSeconds) || keepaliveSeconds < 1 || keepaliveSeconds > 60) {
+    throw new Error(`askOriginKeepaliveSeconds must be 1-60, got "${raw('askOriginKeepaliveSeconds')}"`)
+  }
+  // Without the edge key the host could not tell CloudFront from anyone else, so this would be an open,
+  // unauthenticated proxy to a paid model. Refuse rather than deploy that.
+  const edgeKeyParam = raw('askEdgeKeyParam')
+  if (!edgeKeyParam) throw new Error('askOrigin needs askEdgeKeyParam: the SSM String parameter name holding the x-ask-edge-key value')
+  if (!/^[a-zA-Z0-9_.\-/]+$/.test(edgeKeyParam)) {
+    throw new Error(`askEdgeKeyParam must be an SSM parameter name (not the key itself), got an invalid name`)
+  }
+  const corsOrigins = raw('askCorsOrigins') ? raw('askCorsOrigins').split(',').map(o => o.trim()).filter(Boolean) : DEFAULT_ASK_CORS_ORIGINS
+  return { host, port, protocol, keepaliveSeconds, edgeKeyParam, corsOrigins, retireAskLambda }
 }

@@ -1,0 +1,18 @@
+{
+  "_comment": "Interchanges Ask the Twin recognises in a question, for the records_near prefetch. 'match' is tested against the lower-cased question; 'text' is searched in the ramps layer (from_road / to_road), so it must be a substring of those names.",
+  "layer": "i595_ramps_connectors_classified.geojson",
+  "radiusM": 800,
+  "places": [
+    { "name": "Florida's Turnpike", "match": "\\bturnpike\\b", "text": "Turnpike" },
+    { "name": "I-95", "match": "\\bi-?95\\b", "text": "I-95" },
+    { "name": "I-75 / Sawgrass Expressway", "match": "\\bi-?75\\b|\\bsawgrass\\b", "text": "I-75" },
+    { "name": "US-441 / SR-7", "match": "\\bus-?441\\b|\\bsr-?7\\b|\\bstate road 7\\b", "text": "US-441" },
+    { "name": "Davie Road", "match": "\\bdavie (road|rd|blvd)\\b", "text": "Davie Road" },
+    { "name": "University Drive", "match": "\\buniversity (drive|dr)\\b", "text": "University Drive" },
+    { "name": "SW 136th Avenue", "match": "\\b136th\\b", "text": "136th" },
+    { "name": "Nob Hill Road", "match": "\\bnob hill\\b", "text": "Nob Hill" },
+    { "name": "Hiatus Road", "match": "\\bhiatus\\b", "text": "Hiatus" },
+    { "name": "Flamingo Road", "match": "\\bflamingo\\b", "text": "Flamingo" },
+    { "name": "Pine Island Road", "match": "\\bpine island\\b", "text": "Pine Island" }
+  ]
+}

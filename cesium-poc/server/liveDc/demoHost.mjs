@@ -74,7 +74,7 @@ function readBody(req, limit) {
 }
 
 export function createDemoHost({
-  passwordHash, webDir, apiHandlers = [], ask = null, status = {}, logger = console, now = Date.now, sessionKey,
+  passwordHash, webDir, apiHandlers = [], ask = null, status = {}, logger = console, now = Date.now, sessionKey, edgeGate = null,
   sessionTtlMs = 8 * 3600_000, maxFailures = 5, lockoutMs = 15 * 60_000, home = '/?demo=i595',
 }) {
   if (!passwordHash) throw new Error('LIVE_DEMO_PASSWORD_HASH is required for the HTTP host');
@@ -160,6 +160,24 @@ export function createDemoHost({
     }
     if (pathname === '/api/login') return method === 'POST' ? login(req, res) : send(req, res, 405, { error: 'Use POST.' });
     if (pathname === '/api/logout' && method === 'POST') return send(req, res, 200, { ok: true }, { 'set-cookie': cookie('', 0) });
+
+    // GitHub Pages through CloudFront: a valid edge key stands in for the session on the ask route
+    // only, under per-IP and global limits. CloudFront answers CORS itself; the preflight needs a 2xx.
+    if (edgeGate?.enabled && pathname.startsWith(ASK) && req.headers['x-ask-edge-key'] !== undefined) {
+      if (!edgeGate.matches(req)) return send(req, res, 401, { error: 'Not allowed.' });
+      if (method === 'OPTIONS') { res.writeHead(204, { 'cache-control': 'no-store' }); return res.end(); }
+      if (pathname !== ASK || method !== 'POST' || !ask) return send(req, res, 404, { error: 'Not found.' });
+      const ip = edgeGate.viewerIp(req);
+      const admitted = edgeGate.admit(ip);
+      if (!admitted.ok) {
+        logger.log?.(`live-dc ask edge: 429 (${admitted.reason}) for ${ip}`);
+        return send(req, res, 429, { error: `Too many questions — try again in ${admitted.retryAfter} s.` }, { 'retry-after': String(admitted.retryAfter) });
+      }
+      res.on('close', admitted.release);
+      // Downstream limits key on this, not on CloudFront's address, which every edge request shares.
+      req.askClient = `edge:${ip}`;
+      return ask.handle(req, res);
+    }
 
     if (!signer.verify(parseCookies(req.headers.cookie)[SESSION_COOKIE])) {
       if (!pathname.startsWith('/api/') && read) {

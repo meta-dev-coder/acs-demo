@@ -1,0 +1,38 @@
+{
+  "$comment": "Ask the Twin data sources, toggled per question like map layers (deploy/ec2/ASK_THE_TWIN.md, 'Data sources'). A source groups record classes and the insight tools that read them. Toggling a source off is a focus choice, not access control: the server refuses its classes and tools for that question and the answer says what was left out. Classes not listed here (and the corridor layers, weather and the generic lookups) are always available. Persona presets set the default selection when a persona is picked; the user can change it.",
+  "sources": {
+    "maintenance": {
+      "label": "Maintenance & assets",
+      "short": "Maintenance",
+      "classes": ["Florida I595 Assets", "Florida I595 Tickets", "Florida I595 Tasks", "Florida I595 Work Orders",
+        "Florida I595 ITS Inspections", "Florida I595 Roadway Inspections", "Florida i595 Roadway Segments",
+        "SDNA Florida I595 Live Tickets", "SDNA Florida I595 Live Tasks", "SDNA Florida I595 Live Work Orders",
+        "SDNA Florida I595 Live Inspections", "SDNA Florida I595 Live Asset Status"],
+      "tools": ["prioritize_sites"]
+    },
+    "safety": {
+      "label": "Safety & crash history",
+      "short": "Safety",
+      "classes": ["Florida I595 Incidents", "Florida I595 Safety Inspections"],
+      "tools": ["crash_hotspots", "weather_risk_forecast"]
+    },
+    "traffic": {
+      "label": "Traffic & live operations",
+      "short": "Traffic",
+      "classes": ["SDNA Florida I595 Live Events"],
+      "tools": ["list_live_events", "explain_incident", "rank_incidents"]
+    },
+    "finance": {
+      "label": "Tolling & revenue",
+      "short": "Tolling",
+      "classes": ["I595 Toll Transactions"],
+      "tools": []
+    }
+  },
+  "personaPresets": {
+    "tmc_operator": ["traffic", "safety", "maintenance"],
+    "maintenance_manager": ["maintenance"],
+    "safety_engineer": ["safety", "traffic"],
+    "executive": ["maintenance", "safety", "traffic", "finance"]
+  }
+}

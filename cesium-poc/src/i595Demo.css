@@ -595,6 +595,12 @@ body:has(.street-view[data-state="active"]) :is(.ramp-details, .road-details, .s
 .ask-twin-confidence--medium { background: #2e2408; color: #fbbf24; border: 1px solid #fbbf2433; }
 .ask-twin-confidence--low    { background: #2e0f0f; color: #f87171; border: 1px solid #f8717133; }
 
+/* Activity trace: what ran to produce an answer, one line until opened */
+.ask-twin-trace { font-size: 10.5px; color: var(--ui-text-muted); max-width: 92%; }
+.ask-twin-trace summary { cursor: pointer; list-style: revert; }
+.ask-twin-trace ul { margin: 4px 0 0; padding-left: 16px; line-height: 1.5; }
+.ask-twin-followups { display: flex; flex-wrap: wrap; gap: 5px; max-width: 92%; }
+
 /* Fly-to button */
 .ask-twin-fly-btn { display: inline-flex; align-items: center; gap: 5px; background: #0a2535; border: 1px solid var(--ui-accent-line); border-radius: 8px; color: var(--ui-accent-strong); font-size: 11px; padding: 4px 10px; cursor: pointer; transition: background 0.12s; }
 .ask-twin-fly-btn:hover:not(:disabled) { background: #0f3a4e; border-color: var(--ui-accent-line); }
@@ -664,6 +670,286 @@ body:has(.street-view[data-state="active"]) :is(.ramp-details, .road-details, .s
 :root[data-theme="light"] .ask-twin-confidence--medium { background: #fffbeb; color: #92400e; border-color: #fde68a; }
 :root[data-theme="light"] .ask-twin-confidence--low { background: #fff1f2; color: #be123c; border-color: #fecdd3; }
 :root[data-theme="light"] .ask-twin-panel button:focus-visible { outline: 2px solid #80aaff; outline-offset: 2px; }
+
+/* ── Ask the Twin, docked ─────────────────────────────────────────────────
+   A full-height column on the right of the whole application. Docking narrows <body> and makes it
+   the containing block of the map and its absolutely positioned overlays, so all of them move left
+   with the map instead of sitting under the panel (askTwinDock.js). */
+:root { --ask-twin-dock: 0px; }
+body.ask-twin-docked { position: relative; width: calc(100% - var(--ask-twin-dock)); }
+.ask-twin-panel.ask-twin-dock { position: fixed; top: 0; right: 0; bottom: 0; left: auto; width: var(--ask-twin-dock); max-height: none;
+  border-radius: 0; border-width: 0 0 0 1px; box-shadow: -12px 0 32px var(--ui-shadow-color); z-index: 60; }
+.ask-twin-dock .ask-twin-header { cursor: default; padding: 12px 12px 12px 18px; }
+.ask-twin-dock .ask-twin-header:active { cursor: default; }
+.ask-twin-dock .ask-twin-title { font-size: 13px; }
+.ask-twin-dock .ask-twin-title > span:first-of-type ~ .ask-twin-subtitle { display: inline; }
+.ask-twin-dock .ask-twin-body { flex: 1; min-height: 0; }
+.ask-twin-dock .ask-twin-messages { max-height: none; padding: 14px 16px 10px; gap: 14px; }
+.ask-twin-dock .ask-twin-bubble { font-size: 13px; max-width: 100%; }
+.ask-twin-dock .ask-twin-icon-btn { font-size: 15px; padding: 4px 8px; }
+.ask-twin-dock .ask-twin-icon-btn:hover, .ask-twin-dock .ask-twin-icon-btn[aria-pressed="true"], .ask-twin-dock .ask-twin-icon-btn[aria-expanded="true"] { color: var(--ui-text); background: var(--ui-surface-raised); }
+.ask-twin-resize { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; z-index: 2; touch-action: none; }
+.ask-twin-resize:hover, .ask-twin-resize:focus-visible { background: linear-gradient(90deg, transparent 3px, var(--ui-accent-line) 3px, var(--ui-accent-line) 5px, transparent 5px); outline: none; }
+.ask-twin-panel--expanded .ask-twin-resize { display: none; }
+.ask-twin-panel--expanded .ask-twin-messages { padding: 20px max(24px, calc((100% - 860px) / 2)); }
+@media (max-width: 700px) {
+  body.ask-twin-docked { width: 100%; }
+  .ask-twin-panel.ask-twin-dock { width: 100%; }
+}
+.ask-twin-area-btn[hidden] { display: none; }
+/* `display: flex` on the launch button would otherwise keep it on screen beside the open panel. */
+.ask-twin-btn[hidden] { display: none; }
+.ask-twin-dock .ask-twin-title { white-space: nowrap; min-width: 0; overflow: hidden; }
+
+/* ── Docked panel typography and rhythm ──────────────────────────────────
+   One type scale (13.5 body, 12 secondary, 11 meta), answers as plain text rather than boxed
+   bubbles, and every button a compact pill on one wrapping row. The `.ask-twin-panel.ask-twin-dock`
+   prefix is deliberate: it outranks the floating-panel and light-theme rules above. */
+.ask-twin-panel.ask-twin-dock { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 13px;
+  -webkit-font-smoothing: antialiased; font-feature-settings: "cv11", "ss01"; }
+.ask-twin-panel.ask-twin-dock .ask-twin-messages { gap: 18px; padding: 16px 18px 12px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-msg { gap: 6px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-msg--user { align-items: flex-end; }
+.ask-twin-panel.ask-twin-dock .ask-twin-msg--user .ask-twin-bubble { font-size: 13px; font-weight: 500; line-height: 1.45; padding: 7px 12px;
+  border-radius: 14px 14px 4px 14px; max-width: 88%; }
+.ask-twin-panel.ask-twin-dock .ask-twin-msg--assistant .ask-twin-bubble { background: transparent; border: 0; padding: 0; border-radius: 0;
+  font-size: 13.5px; line-height: 1.6; color: var(--ui-text); max-width: 100%; letter-spacing: -0.003em; }
+.ask-twin-panel.ask-twin-dock .ask-twin-meta { gap: 8px; font-size: 11px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-sources { font-size: 11px; color: var(--ui-text-muted); }
+.ask-twin-panel.ask-twin-dock .ask-twin-confidence { font-size: 9.5px; padding: 1px 6px; }
+.ask-twin-action-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-fly-btn { font-size: 12px; font-weight: 500; padding: 4px 11px; border-radius: 999px; gap: 5px;
+  background: transparent; border: 1px solid var(--ui-border); color: var(--ui-text-secondary); line-height: 1.4; }
+.ask-twin-panel.ask-twin-dock .ask-twin-fly-btn:hover:not(:disabled) { border-color: var(--ui-accent-line); color: var(--ui-accent-strong); background: var(--ui-accent-tint); }
+.ask-twin-panel.ask-twin-dock .ask-twin-fly-btn:disabled { color: var(--ui-text-muted); border-color: var(--ui-border-soft); }
+.ask-twin-panel.ask-twin-dock .ask-twin-fly-btn svg { width: 12px; height: 12px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-chip { font-size: 12px; padding: 5px 11px; border-radius: 999px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-suggestions { padding: 10px 18px; gap: 6px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-form { padding: 10px 14px 12px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-input { font-size: 13px; padding: 9px 12px; border-radius: 10px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-area-bar { padding: 8px 18px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-turn + .ask-twin-turn, .ask-twin-panel.ask-twin-dock .ask-twin-msg--user { margin-top: 2px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-turn { padding-bottom: 16px; border-bottom: 1px solid var(--ui-border-soft); }
+.ask-twin-panel.ask-twin-dock .ask-twin-activity { font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.ask-twin-panel.ask-twin-dock .ask-twin-basis { font-size: 12px; line-height: 1.5; }
+:root[data-theme="light"] .ask-twin-panel.ask-twin-dock .ask-twin-msg--assistant .ask-twin-bubble { background: transparent; border: 0; color: #182b49; }
+:root[data-theme="light"] .ask-twin-panel.ask-twin-dock .ask-twin-fly-btn { background: transparent; border-color: #c9d9f5; color: #24406b; }
+:root[data-theme="light"] .ask-twin-panel.ask-twin-dock .ask-twin-fly-btn:hover:not(:disabled) { background: #eaf1ff; border-color: #80aaff; color: #003da8; }
+
+/* Settings, under the header */
+.ask-twin-settings { display: flex; flex-direction: column; gap: 6px; padding: 10px 18px; border-bottom: 1px solid var(--ui-border-soft); font-size: 12px; color: var(--ui-text-secondary); }
+.ask-twin-settings[hidden] { display: none; }
+.ask-twin-settings label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.ask-twin-persona-select { margin-left: auto; background: var(--ui-surface); color: var(--ui-text); border: 1px solid var(--ui-border); border-radius: 6px; padding: 3px 6px; font: inherit; }
+.ask-twin-persona-note { margin: 0; font-size: 10.5px; color: var(--ui-text-muted); }
+.ask-twin-rec-commit:disabled { opacity: .55; cursor: not-allowed; }
+
+/* One section per remote turn: activity log, then the answer under it */
+.ask-twin-turn { display: flex; flex-direction: column; gap: 8px; }
+/* The activity log reads like a chat assistant's "thinking" line: one quiet row (pulsing dots, what
+   it is doing now, a timer, a chevron) that opens into a timeline. The row keeps one fixed height in
+   every state, so the answer landing under it never shifts it. Amber, not red, for problems: a lookup
+   that found nothing is normal and should not look like an alarm. */
+.ask-twin-activity { --act-warn: #d9a441; font-size: 11.5px; color: var(--ui-text-muted); font-variant-numeric: tabular-nums; min-width: 0; }
+.ask-twin-activity-head { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 26px; padding: 3px 6px 3px 2px; margin: 0;
+  background: none; border: 0; border-radius: 7px; color: var(--ui-text-secondary); font: inherit; text-align: left; cursor: pointer; }
+.ask-twin-activity-head:hover { background: var(--ui-hover); }
+.ask-twin-activity-head:focus-visible { outline: 2px solid var(--ui-accent-line); outline-offset: 1px; }
+.ask-twin-activity-indicator { display: inline-flex; align-items: center; justify-content: center; gap: 3px; width: 22px; flex-shrink: 0; color: var(--ui-accent); }
+.ask-twin-activity-indicator > span { width: 4.5px; height: 4.5px; border-radius: 50%; background: var(--ui-accent-strong); animation: ask-dot 1.2s infinite ease-in-out; }
+.ask-twin-activity-indicator > span:nth-child(2) { animation-delay: .16s; }
+.ask-twin-activity-indicator > span:nth-child(3) { animation-delay: .32s; }
+.ask-twin-activity[data-state="done"] .ask-twin-activity-indicator { color: var(--ui-status-live); }
+.ask-twin-activity[data-state="error"] .ask-twin-activity-indicator { color: var(--act-warn); }
+/* The label clips to one line; the old text and the new one share the box while they cross over. */
+.ask-twin-activity-label { position: relative; flex: 1 1 auto; min-width: 0; height: 18px; overflow: hidden; }
+.ask-twin-activity-label-text { position: absolute; inset: 0; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ask-twin-activity[data-state="running"] .ask-twin-activity-label-text { color: var(--ui-text); }
+.ask-twin-activity-label-text.is-entering { animation: ask-act-in 260ms ease-out both; }
+.ask-twin-activity-label-text.is-leaving { animation: ask-act-out 220ms ease-in both; }
+@keyframes ask-act-in { from { opacity: 0; transform: translateY(55%); } to { opacity: 1; transform: none; } }
+@keyframes ask-act-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-55%); } }
+.ask-twin-activity-time { flex-shrink: 0; color: var(--ui-text-muted); font-size: 11px; }
+.ask-twin-activity-time:empty { display: none; }
+.ask-twin-activity-chevron { display: inline-flex; flex-shrink: 0; color: var(--ui-text-muted); transition: transform 180ms ease; }
+.ask-twin-activity.is-open .ask-twin-activity-chevron { transform: rotate(90deg); }
+
+/* Opens with a 0fr → 1fr grid row, so nothing needs measuring; `visibility` keeps the closed
+   timeline out of the tab order and away from screen readers. */
+.ask-twin-activity-body { display: grid; grid-template-rows: 0fr; visibility: hidden; transition: grid-template-rows 220ms ease, visibility 0s linear 220ms; }
+.ask-twin-activity.is-open .ask-twin-activity-body { grid-template-rows: 1fr; visibility: visible; transition: grid-template-rows 220ms ease; }
+.ask-twin-activity-inner { min-height: 0; overflow: hidden; }
+
+/* Timeline: a thin line through small dots; plain title, then muted detail. */
+.ask-twin-activity-timeline, .ask-twin-step-sub { list-style: none; margin: 0; padding: 0; }
+.ask-twin-activity-timeline { position: relative; padding: 6px 0 2px 2px; display: flex; flex-direction: column; gap: 9px; }
+.ask-twin-step { position: relative; display: flex; gap: 10px; min-width: 0; line-height: 1.4; }
+/* The connector runs from each dot down to the next one; the last step has none. */
+.ask-twin-activity-timeline > .ask-twin-step:not(:last-child)::after { content: ''; position: absolute; left: 10px; top: 14px; bottom: -11px; width: 1px; background: var(--ui-border-strong); }
+.ask-twin-step-dot { position: relative; z-index: 1; flex: 0 0 21px; display: flex; justify-content: center; padding-top: 5px; }
+.ask-twin-step-dot::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--ui-text-muted); }
+.ask-twin-step--model > .ask-twin-step-dot::before { background: var(--ui-accent-strong); }
+.ask-twin-step--context > .ask-twin-step-dot::before { width: 5px; height: 5px; margin-top: 1px; }
+.ask-twin-step--tool > .ask-twin-step-dot::before { width: 5px; height: 5px; border-radius: 1.5px; margin-top: 1px; transform: rotate(45deg); }
+.ask-twin-step--checks > .ask-twin-step-dot::before, .ask-twin-step--done > .ask-twin-step-dot::before { background: var(--ui-status-live); }
+.ask-twin-step.is-running > .ask-twin-step-dot::before { background: var(--ui-accent-strong); animation: ask-act-pulse 1.2s ease-in-out infinite; }
+:is(.ask-twin-step.is-gap, .ask-twin-step.is-timeout, .ask-twin-step.is-error) > .ask-twin-step-dot::before { background: var(--act-warn); }
+.ask-twin-step.is-skipped > .ask-twin-step-dot::before { background: transparent; box-shadow: inset 0 0 0 1px var(--ui-text-muted); }
+@keyframes ask-act-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
+.ask-twin-step--tool.is-running > .ask-twin-step-dot::before { animation-name: ask-act-pulse-tool; }
+@keyframes ask-act-pulse-tool { 0%, 100% { opacity: 1; transform: rotate(45deg) scale(1); } 50% { opacity: .35; transform: rotate(45deg) scale(.7); } }
+.ask-twin-step-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.ask-twin-step-title { color: var(--ui-text-secondary); font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+.ask-twin-step.is-running > .ask-twin-step-text > .ask-twin-step-title { color: var(--ui-text); }
+.ask-twin-step.is-skipped > .ask-twin-step-text > .ask-twin-step-title { color: var(--ui-text-muted); font-weight: 400; }
+.ask-twin-step-detail { color: var(--ui-text-muted); font-size: 10.5px; overflow-wrap: anywhere; }
+.ask-twin-step-detail:empty { display: none; }
+.ask-twin-step-warning { display: flex; align-items: flex-start; gap: 5px; color: var(--act-warn); font-size: 10.5px; overflow-wrap: anywhere; opacity: .9; }
+.ask-twin-step-warning svg { flex-shrink: 0; margin-top: 1px; width: 11px; height: 11px; }
+/* The model's own words between lookups: a thought, not a step. */
+.ask-twin-step-notes:empty { display: none; }
+.ask-twin-step-thought { margin: 3px 0 1px; padding-left: 8px; border-left: 2px solid var(--ui-border-soft); font-style: italic; font-size: 11.5px; line-height: 1.45; color: var(--ui-text-secondary); overflow-wrap: anywhere; }
+/* A round's lookups sit under it, a step in, without their own connector. */
+.ask-twin-step-sub { display: flex; flex-direction: column; gap: 6px; margin-top: 5px; }
+.ask-twin-step-sub:empty { display: none; }
+.ask-twin-step-sub .ask-twin-step { gap: 6px; }
+.ask-twin-step-sub .ask-twin-step-dot { flex-basis: 11px; justify-content: flex-start; }
+.ask-twin-step-sub .ask-twin-step-title { font-size: 11.5px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ask-twin-activity-indicator > span, .ask-twin-step.is-running > .ask-twin-step-dot::before,
+  .ask-twin-activity-label-text.is-entering, .ask-twin-activity-label-text.is-leaving { animation: none; }
+  .ask-twin-activity-label-text.is-leaving { display: none; }
+  .ask-twin-activity-indicator > span { opacity: .8; }
+  .ask-twin-activity-body, .ask-twin-activity.is-open .ask-twin-activity-body, .ask-twin-activity-chevron { transition: none; }
+}
+
+/* Answer extras: why the twin is sure, the claims and what each cites, what the twin does not have */
+.ask-twin-confidence-reason { font-size: 10.5px; color: var(--ui-text-muted); }
+.ask-twin-basis { margin: 0; padding-left: 18px; font-size: 12px; color: var(--ui-text-secondary); display: flex; flex-direction: column; gap: 3px; }
+.ask-twin-refs { margin-left: 6px; font-size: 10.5px; color: var(--ui-accent-strong); }
+.ask-twin-refs.is-uncited { color: #fbbf24; }
+.ask-twin-gaps { font-size: 11.5px; color: #fbbf24; }
+.ask-twin-recommendation { border: 1px solid var(--ui-accent-line); border-radius: 10px; padding: 10px 12px; background: var(--ui-surface); display: flex; flex-direction: column; gap: 4px; }
+.ask-twin-rec-head { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ui-accent-strong); }
+.ask-twin-rec-action { margin: 0; font-size: 13px; color: var(--ui-text); }
+.ask-twin-rec-basis { margin: 0; font-size: 11px; color: var(--ui-text-muted); }
+.ask-twin-rec-buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.ask-twin-rec-decided { font-size: 11px; color: var(--ui-text-secondary); }
+.ask-twin-autorun-note { margin: 0; font-size: 11px; color: var(--ui-text-muted); }
+
+/* Context chips: what the next question is about */
+.ask-twin-context { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 12px 0; }
+.ask-twin-context:empty { display: none; }
+.ask-twin-context-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--ui-border-soft); font-size: 10.5px; color: var(--ui-text-secondary); background: var(--ui-surface); }
+.ask-twin-context-remove { border: 0; background: none; color: var(--ui-text-muted); padding: 0 0 0 2px; font-size: 12px; line-height: 1; cursor: pointer; }
+.ask-twin-context-remove:hover { color: var(--ui-text); }
+/* Data-source toggles (askTwinSources.js): like layer switches, on = filled accent, off = outline. */
+.ask-twin-sources-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding: 0 12px 4px; }
+.ask-twin-sources-bar::before { content: 'Sources'; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ui-text-muted); margin-right: 2px; }
+.ask-twin-source-toggle { padding: 2px 9px; border-radius: 10px; border: 1px solid var(--ui-border-soft); background: transparent; color: var(--ui-text-muted); font-size: 10.5px; cursor: pointer; text-decoration: line-through; text-decoration-color: color-mix(in srgb, currentColor 45%, transparent); }
+.ask-twin-source-toggle.is-on { background: var(--ui-accent-soft, var(--ui-surface)); border-color: var(--ui-accent-line); color: var(--ui-text); text-decoration: none; }
+.ask-twin-source-toggle:focus-visible { outline: 2px solid var(--ui-accent-strong); outline-offset: 1px; }
+.ask-twin-scope { font-size: 10.5px; color: var(--ui-text-muted); }
+.ask-twin-scope.is-narrowed { color: var(--ui-text-secondary); }
+:root[data-theme="light"] .ask-twin-activity { --act-warn: #a16207; }
+:root[data-theme="light"] .ask-twin-gaps, :root[data-theme="light"] .ask-twin-refs.is-uncited { color: #92400e; }
+
+/* Answer blocks (askTwinBlocks.js): KPI tiles, tables, bars and trends the server built from cited
+   lookups. Quiet surfaces on the panel's own tokens, so they read in the dark and light themes alike
+   and never outshout the answer text above them. Numbers are tabular so columns line up. */
+.ask-twin-blocks { align-self: stretch; display: flex; flex-direction: column; gap: 8px; min-width: 0; font-variant-numeric: tabular-nums; }
+.ask-twin-block { margin: 0; min-width: 0; padding: 8px 10px; border: 1px solid var(--ui-border-soft); border-radius: 10px; background: var(--ui-surface-sunken); display: flex; flex-direction: column; gap: 6px; }
+.ask-twin-block-title { font-size: 11.5px; font-weight: 600; color: var(--ui-text-secondary); }
+.ask-twin-block-caption { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; font-size: 10px; color: var(--ui-text-muted); min-width: 0; }
+.ask-twin-block-source { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.ask-twin-block-ref { font-weight: 600; }
+.ask-twin-kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; }
+.ask-twin-kpi { gap: 2px; padding: 8px 10px 7px; }
+.ask-twin-kpi-value { font-size: 18px; font-weight: 650; line-height: 1.2; color: var(--ui-text); overflow-wrap: anywhere; }
+.ask-twin-kpi-label { font-size: 11px; color: var(--ui-text-secondary); line-height: 1.3; }
+.ask-twin-kpi-note { font-size: 10.5px; color: var(--ui-text-muted); line-height: 1.3; }
+.ask-twin-kpi .ask-twin-block-caption { margin-top: 3px; }
+/* Bars: label, track, value on one line; a long label is clipped with its full text in the tooltip. */
+.ask-twin-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.ask-twin-bar { display: grid; grid-template-columns: minmax(64px, 38%) 1fr auto; align-items: center; gap: 8px; font-size: 11.5px; }
+.ask-twin-bar-label { color: var(--ui-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ask-twin-bar-track { height: 8px; border-radius: 4px; background: var(--ui-hover); overflow: hidden; }
+.ask-twin-bar-fill { display: block; height: 100%; border-radius: 4px; background: var(--ui-accent-strong); opacity: .85; }
+.ask-twin-bar-value { color: var(--ui-text); text-align: right; min-width: 2.5em; }
+/* Trend: the polyline stretches to the block's width; min/max sit on the right, dates under it. */
+.ask-twin-trend { display: flex; align-items: stretch; gap: 6px; }
+.ask-twin-trend-plot { position: relative; flex: 1 1 auto; min-width: 0; height: 48px; }
+.ask-twin-trend-svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ask-twin-trend-line { fill: none; stroke: var(--ui-accent-strong); stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round; }
+.ask-twin-trend-dot { position: absolute; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: var(--ui-accent-strong); box-shadow: 0 0 0 2px var(--ui-surface-solid); }
+.ask-twin-trend-scale { display: flex; flex-direction: column; justify-content: space-between; font-size: 10px; color: var(--ui-text-muted); text-align: right; white-space: nowrap; }
+.ask-twin-trend-axis { display: flex; justify-content: space-between; gap: 8px; font-size: 10px; color: var(--ui-text-muted); }
+.ask-twin-trend-last { color: var(--ui-text-secondary); }
+/* Table: scrolls sideways inside its block on a narrow dock rather than widening the panel. */
+.ask-twin-table-scroll { overflow-x: auto; margin: 0 -2px; }
+.ask-twin-table { width: 100%; border-collapse: collapse; font-size: 11.5px; line-height: 1.35; }
+.ask-twin-table th { text-align: left; font-weight: 600; font-size: 10.5px; color: var(--ui-text-muted); padding: 3px 6px; border-bottom: 1px solid var(--ui-border); white-space: nowrap; }
+.ask-twin-table td { padding: 4px 6px; color: var(--ui-text); border-bottom: 1px solid var(--ui-border-soft); vertical-align: top; }
+.ask-twin-table tr:last-child td { border-bottom: 0; }
+.ask-twin-table .is-num { text-align: right; white-space: nowrap; }
+.ask-twin-table tr.is-locatable { cursor: pointer; }
+.ask-twin-table tr.is-locatable:hover td { background: var(--ui-hover); }
+.ask-twin-table-go-col { width: 1%; padding-left: 0; padding-right: 2px; }
+.ask-twin-table-go, .ask-twin-table-more, .ask-twin-evidence-go, .ask-twin-evidence-close { font: inherit; cursor: pointer; background: none; border: 1px solid transparent; color: var(--ui-accent-strong); border-radius: 6px; }
+.ask-twin-table-go { font-size: 13px; line-height: 1; padding: 1px 4px; }
+.ask-twin-table-go:hover, .ask-twin-table-go.is-flown { border-color: var(--ui-accent-line); background: var(--ui-accent-tint); }
+.ask-twin-table-more { align-self: flex-start; font-size: 11px; padding: 2px 4px; margin-top: 2px; }
+.ask-twin-table-more:hover { text-decoration: underline; }
+
+/* Evidence chips (askTwinEvidence.js): a ref as a small pill that opens the records behind it. */
+.ask-twin-ref-chips { display: inline-flex; flex-wrap: wrap; gap: 3px; vertical-align: baseline; }
+.ask-twin-ref-chip { display: inline-flex; align-items: center; font: inherit; font-size: 10px; font-weight: 650; line-height: 1; letter-spacing: .02em; padding: 2px 5px; border-radius: 5px;
+  border: 1px solid var(--ui-accent-line); background: var(--ui-accent-tint); color: var(--ui-accent-strong); cursor: pointer; vertical-align: 1px; }
+.ask-twin-ref-chip:hover, .ask-twin-ref-chip.is-open { background: var(--ui-accent-strong); color: var(--ui-accent-contrast); border-color: var(--ui-accent-strong); }
+.ask-twin-ref-chip.is-static { cursor: default; background: transparent; border-color: var(--ui-border); color: var(--ui-text-muted); }
+.ask-twin-ref-chip:focus-visible, .ask-twin-table-go:focus-visible, .ask-twin-table-more:focus-visible, .ask-twin-evidence-go:focus-visible, .ask-twin-evidence-close:focus-visible { outline: 2px solid var(--ui-accent-line); outline-offset: 1px; }
+.ask-twin-evidence { align-self: stretch; margin: 2px 0; padding: 8px 10px; border: 1px solid var(--ui-accent-line); border-left-width: 3px; border-radius: 8px; background: var(--ui-surface-raised); font-size: 11.5px; color: var(--ui-text-secondary); display: flex; flex-direction: column; gap: 6px; }
+.ask-twin-evidence:focus { outline: none; }
+.ask-twin-evidence-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ask-twin-evidence-ref { font-weight: 700; color: var(--ui-accent-strong); }
+.ask-twin-evidence-source { flex: 1 1 auto; min-width: 0; color: var(--ui-text-muted); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ask-twin-evidence-close { margin-left: auto; color: var(--ui-text-muted); padding: 1px 5px; }
+.ask-twin-evidence-close:hover { color: var(--ui-text); background: var(--ui-hover); }
+.ask-twin-evidence-summary, .ask-twin-evidence-empty, .ask-twin-evidence-more { margin: 0; }
+.ask-twin-evidence-more, .ask-twin-evidence-empty { color: var(--ui-text-muted); font-size: 10.5px; }
+.ask-twin-evidence-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ask-twin-evidence-record { padding-top: 6px; border-top: 1px solid var(--ui-border-soft); }
+.ask-twin-evidence-record:first-child { padding-top: 0; border-top: 0; }
+.ask-twin-evidence-record-head { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.ask-twin-evidence-id { font-weight: 600; color: var(--ui-text); font-variant-numeric: tabular-nums; }
+.ask-twin-evidence-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ask-twin-evidence-go { margin-left: auto; flex-shrink: 0; font-size: 10.5px; padding: 1px 7px; border-color: var(--ui-accent-line); border-radius: 999px; }
+.ask-twin-evidence-go:hover, .ask-twin-evidence-go.is-flown { background: var(--ui-accent-tint); }
+.ask-twin-evidence-fields { display: grid; grid-template-columns: max-content 1fr; gap: 1px 8px; margin: 3px 0 0; font-size: 10.5px; }
+.ask-twin-evidence-fields dt { color: var(--ui-text-muted); }
+.ask-twin-evidence-fields dd { margin: 0; color: var(--ui-text-secondary); overflow-wrap: anywhere; }
+
+/* Twin UI actions (twinUiApi.js): the confirm step for a change, and the line saying what ran. */
+.ask-twin-confirm { align-self: stretch; display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--ui-accent-line); border-radius: 8px; background: var(--ui-accent-tint); }
+.ask-twin-confirm-text { margin: 0; font-size: 12px; font-weight: 600; color: var(--ui-text); }
+.ask-twin-confirm-note { margin: 0; font-size: 10.5px; color: var(--ui-text-muted); }
+.ask-twin-confirm-buttons { display: flex; gap: 6px; margin-top: 2px; }
+.ask-twin-panel.ask-twin-dock .ask-twin-confirm .ask-twin-fly-btn.ask-twin-confirm-yes, .ask-twin-panel.ask-twin-dock .ask-twin-confirm .ask-twin-fly-btn.ask-twin-confirm-yes:hover { background: var(--ui-accent-strong); border-color: var(--ui-accent-strong); color: var(--ui-accent-contrast); }
+.ask-twin-ran { margin: 0; font-size: 10.5px; color: var(--ui-text-muted); }
+.ask-twin-ran::before { content: '✓ '; color: var(--ui-status-live); }
+.ask-twin-ran.is-problem::before { content: '! '; color: var(--act-warn, #d9a441); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .ask-twin-evidence, .ask-twin-confirm { animation: ask-twin-reveal 160ms ease-out both; }
+  .ask-twin-bar-fill { animation: ask-twin-grow 380ms ease-out both; transform-origin: left center; }
+}
+@keyframes ask-twin-reveal { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+@keyframes ask-twin-grow { from { transform: scaleX(0); } to { transform: none; } }
+:root[data-theme="light"] .ask-twin-block { background: #fff; border-color: #dce6f5; }
+:root[data-theme="light"] .ask-twin-evidence { background: #fff; }
+:root[data-theme="light"] .ask-twin-trend-dot { box-shadow: 0 0 0 2px #fff; }
+:root[data-theme="light"] .ask-twin-bar-track { background: #eaf1ff; }
 
 /* Floating panels: the heading is the grab handle, and a dragged panel lifts above its neighbours. */
 .panel-drag-handle { cursor: grab; user-select: none; touch-action: none; }

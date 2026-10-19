@@ -31,16 +31,22 @@ try {
     return { dx: Math.round(after.x - before.x), dy: Math.round(after.y - before.y), after };
   }
 
-  // ---- 1. Ask the Twin opens, moves, and actually closes ----------------------------------------
+  // ---- 1. Ask the Twin docks on the right, the map makes room, and closing gives it back ---------
+  const viewport = page.viewportSize();
   await page.locator('.ask-twin-btn').click();
   await page.locator('.ask-twin-panel').waitFor({ state: 'visible', timeout: 20000 });
-  const twin = await dragBy('.ask-twin-panel', '.ask-twin-header', -300, -180);
-  assert.deepEqual([twin.dx, twin.dy], [-300, -180], 'the Ask the Twin panel follows the pointer');
+  const docked = await page.locator('.ask-twin-panel').boundingBox();
+  assert.equal(Math.round(docked.x + docked.width), viewport.width, 'the panel is docked to the right edge');
+  assert.equal(Math.round(docked.height), viewport.height, 'the panel is full height');
+  const mapWidth = await page.evaluate(() => document.body.getBoundingClientRect().width);
+  assert.equal(Math.round(mapWidth + docked.width), viewport.width, 'the map narrows by the panel width instead of sitting under it');
+  assert.equal(await page.locator('.ask-twin-btn').isHidden(), true, 'the launch button steps aside while the panel is open');
 
   await page.locator('.ask-twin-close').click();
   await page.locator('.ask-twin-panel').waitFor({ state: 'hidden', timeout: 15000 });
   assert.equal(await page.locator('.ask-twin-panel').isHidden(), true,
     'closing must hide the panel — a display rule must not defeat the hidden attribute');
+  assert.equal(Math.round(await page.evaluate(() => document.body.getBoundingClientRect().width)), viewport.width, 'closing gives the map its width back');
 
   // ---- 2. A details panel drags by its heading, and its Close still works afterwards ------------
   await revealLayerGroup(page, '#bridges-all');
@@ -60,14 +66,14 @@ try {
   assert.equal(await page.locator('.bridge-details').isHidden(), true, 'Close still works from a dragged position');
 
   // ---- 3. A panel cannot be thrown somewhere it cannot be grabbed again -------------------------
-  await page.locator('.ask-twin-btn').click();
-  await page.locator('.ask-twin-panel').waitFor({ state: 'visible', timeout: 20000 });
-  await dragBy('.ask-twin-panel', '.ask-twin-header', -4000, -4000);
-  const stranded = await page.locator('.ask-twin-panel').boundingBox();
+  await page.locator('.bridge-list .segment-select').first().click();
+  await page.locator('.bridge-details:not([hidden])').waitFor({ timeout: 30000 });
+  await dragBy('.bridge-details', '.bridge-details .ramp-details-heading', -4000, -4000);
+  const stranded = await page.locator('.bridge-details').boundingBox();
   assert.ok(stranded.x + stranded.width > 0 && stranded.y + stranded.height > 0 && stranded.y >= 0,
     `a dragged panel stays reachable, was at ${Math.round(stranded.x)},${Math.round(stranded.y)}`);
-  await dragBy('.ask-twin-panel', '.ask-twin-header', 9000, 9000);
-  const other = await page.locator('.ask-twin-panel').boundingBox();
+  await dragBy('.bridge-details', '.bridge-details .ramp-details-heading', 9000, 9000);
+  const other = await page.locator('.bridge-details').boundingBox();
   assert.ok(other.x < 1500 && other.y < 950, 'and cannot be pushed past the far edge either');
 
   assert.deepEqual(errors, [], 'dragging must not throw');

@@ -100,6 +100,8 @@ export function createLiveEventsApi({ config = loadConfig(), dataDir = DEFAULT_D
       const { status, payload } = await fromDataConnect(parseEventWindow(eventWindow));
       return status === 200 ? payload : null;
     },
+    /** The direct FL511 payload (what the live layer shows without DataConnect). */
+    async fl511Events() { return (await start()).getI595LiveEvents(); },
     /** Express-style adapter for Vite's middleware stack. */
     middleware: (request, response, next) => { handle(request, response).then(handled => { if (!handled) next(); }, next); },
     async stop() { if (ready) (await ready).stop(); },
