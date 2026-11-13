@@ -1,0 +1,6 @@
+node_modules/
+dist/
+# Local env files hold the Google Maps browser key and the Cesium ion token; never commit them.
+.env
+.env.local
+.env.*.local
