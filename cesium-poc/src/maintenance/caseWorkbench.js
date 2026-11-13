@@ -103,6 +103,9 @@ function queueMarkup(rows, filters, facets, counts, selectedId) {
       : '<p class="cw-empty">No case matches these filters.</p>'}`;
 }
 
+/** A little air above a heading scrolled to the top, so it does not sit flush under the header. */
+const BREATHING_ROOM = 10;
+
 /* ── workbench sections ──────────────────────────────────────────────────────────────────────── */
 
 function headerMarkup(header) {
@@ -267,11 +270,51 @@ function contextMarkup(context) {
       <p class="cw-note">${escape(context?.reason ?? 'No incident context is available for this case.')}</p></section>`;
   }
   const data = context.value;
-  const row = entry => `<tr><th>${escape(entry.label)}</th>
+  const row = entry => `<tr><th>${escape(entry.label)}
+    ${/*
+        A BLANK ROW EXPLAINS ITSELF.
+        Every observation carries a `note` saying where it came from, and the table rendered none
+        of them — so a row with no value was a dash with no reason, which reads as "this feature
+        is broken". Shown only where the value is missing: on a row that HAS a figure the source
+        and quality columns already say what it is, and a note on all seven would be noise.
+      */''}
+    ${entry.value == null && entry.note ? `<small>${escape(entry.note)}</small>` : ''}</th>
     <td>${entry.value == null ? '—' : escape(`${entry.value}${entry.unit ? ` ${entry.unit}` : ''}`)}</td>
     <td>${escape(entry.source ?? '—')}</td>
     <td>${escape(entry.observedAt ? dayOnly(entry.observedAt) : '—')}</td>
     <td>${escape(entry.quality ?? '—')}${entry.synthetic ? ' <em>synthetic</em>' : ''}</td></tr>`;
+/**
+ * The rows of the traffic table.
+ *
+ * `incidentContext` returns the three modelled values under their own names — `speed`,
+ * `congestion`, `volume` — and never as an `observations` array. This markup asked for
+ * `traffic.observations`, got `undefined`, and quietly fell back to `[]`: the section rendered
+ * the AADT and the register flags only, so the panel looked as though no traffic information
+ * existed at all. Named explicitly here, which is also how the evidence tabs read them.
+ */
+function trafficRows(traffic) {
+  return [traffic?.speed, traffic?.congestion, traffic?.volume, traffic?.annualAverage,
+    ...(traffic?.register ?? [])].filter(Boolean);
+}
+
+/**
+ * The summary beside the heading: what the section actually holds.
+ *
+ * It used to read "Synthetic — no feed exists", which was true of three of the rows and wrong
+ * about the rest — the lane-closure, injury and fatality flags are real register facts and the
+ * AADT is a published average — and it read as "there is nothing in here", so nobody opened it.
+ * Counted from the rows, so it cannot drift from what is shown.
+ */
+function trafficCount(rows) {
+  const synthetic = rows.filter(row => row?.synthetic).length;
+  const real = rows.length - synthetic;
+  if (!rows.length) return 'No readings';
+  const parts = [];
+  if (real) parts.push(`${real} measured or published`);
+  if (synthetic) parts.push(`${synthetic} synthetic`);
+  return parts.join(' · ');
+}
+
   const table = rows => `<table class="cw-table">
     <thead><tr><th>Reading</th><th>Value</th><th>Source</th><th>Observed</th><th>Quality</th></tr></thead>
     <tbody>${rows.map(row).join('')}</tbody></table>`;
@@ -283,10 +326,10 @@ function contextMarkup(context) {
         : `<p class="cw-note">${escape(data.weather.unavailableReason)}</p>`}
       ${data.weather.provenance ? `<p class="cw-note">${escape(data.weather.provenance)}</p>` : ''}
     </details>
-    <details><summary><span class="cw-tl-name">Traffic and operational impact</span>
-      <span class="cw-tl-counts">Synthetic — no feed exists</span></summary>
+    <details open><summary><span class="cw-tl-name">Traffic and operational impact</span>
+      <span class="cw-tl-counts">${escape(trafficCount(trafficRows(data.traffic)))}</span></summary>
       <p class="cw-note">${escape(data.traffic.availability.note)}</p>
-      ${table([...(data.traffic.observations ?? []), data.traffic.annualAverage, ...data.traffic.register])}
+      ${table(trafficRows(data.traffic))}
       ${data.implications?.length ? `<ul class="cw-list">${data.implications.map(entry =>
         `<li><span class="cw-list-note">${escape(typeof entry === 'string' ? entry : entry.text ?? '')}</span></li>`).join('')}</ul>` : ''}
     </details>
@@ -489,15 +532,36 @@ export function installCaseWorkbench(host, {
       other.classList.toggle('is-targeted', other === details);
     }
     if (selectedId) stagesOpenFor(selectedId, []).add(String(key));
-    details.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    bringIntoView(details);
     return true;
+  }
+
+  /**
+   * Scroll something to the top of the pane, CLEAR OF THE STICKY HEADER.
+   *
+   * `scrollIntoView({ block: 'start' })` aligns an element with the top of the scroll container,
+   * and the top of this container is underneath `.cw-head` — which is sticky and, with the case
+   * title, the location line, the map button and the four stage tiles, roughly 300px tall. So
+   * clicking "Repair" put the Repair heading and its first several rows behind the header and
+   * landed the reader in the middle of the list, every time.
+   *
+   * Measured at the moment of the scroll rather than assumed: the header's height changes with
+   * the title's wrapping and with the viewport.
+   */
+  function bringIntoView(element) {
+    const head = mainHost.querySelector('.cw-head');
+    const headHeight = head ? head.getBoundingClientRect().height : 0;
+    // Rect-based, so it does not depend on which ancestor happens to be the offset parent.
+    const delta = element.getBoundingClientRect().top - mainHost.getBoundingClientRect().top;
+    const top = mainHost.scrollTop + delta - headHeight - BREATHING_ROOM;
+    mainHost.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
   }
 
   /** Scroll one of the five sections into view. Nothing else changes. */
   function openSection(id) {
     const section = mainHost.querySelector(`section[data-section="${CSS.escape(String(id))}"]`);
     if (!section) return false;
-    section.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    bringIntoView(section);
     return true;
   }
 

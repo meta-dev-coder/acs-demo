@@ -35,16 +35,15 @@ const ICONS = {
   overlane: '<path d="M2.5 17V5h15v12"/><path d="M2.5 7.5h15"/><rect x="6" y="9.5" width="8" height="5" rx="1"/><path d="M1 17h3M16 17h3"/>',
   cantilever: '<path d="M4 17V4"/><path d="M2 17h4"/><path d="M4 6.5h13"/><path d="M4 4h11"/><rect x="8" y="8.5" width="8" height="5" rx="1"/>',
   unclassified: '<path d="M10 17v-4"/><path d="M7 17h6"/><rect x="3" y="4" width="14" height="9" rx="1.5"/>',
-  weather: '<circle cx="10" cy="10" r="3.4"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.5 4.5l1.5 1.5M14 14l1.5 1.5M15.5 4.5 14 6M6 14l-1.5 1.5"/>',
 };
 const icon = name => `<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">${ICONS[name] ?? ICONS.road}</svg>`;
 
 /**
  * @param {HTMLElement} panel  the existing `.layers` aside
  * @param {ReturnType<import('./mapLayerStore.js').createMapLayerStore>} store
- * @param {{onOpenWeather?: () => void, isExpanded?: () => boolean, onTogglePanel?: () => void}} [hooks]
+ * @param {{isExpanded?: () => boolean, onTogglePanel?: () => void}} [hooks]
  */
-export function installMapExplorer(panel, store, { onOpenWeather, onTogglePanel } = {}) {
+export function installMapExplorer(panel, store, { onTogglePanel } = {}) {
   const rail = document.createElement('div');
   rail.className = 'quick-rail';
   rail.setAttribute('role', 'toolbar');
@@ -56,7 +55,6 @@ export function installMapExplorer(panel, store, { onOpenWeather, onTogglePanel 
     '<div class="quick-rail-divider" role="separator"></div>',
     ...railLayers.map(layer =>
       `<button class="quick-rail-button" type="button" data-layer="${layer.id}" aria-pressed="false" title="${layer.label}">${icon(layer.icon)}<span class="quick-rail-tip">${layer.label}</span></button>`),
-    onOpenWeather ? `<div class="quick-rail-divider" role="separator"></div><button class="quick-rail-button" type="button" data-action="weather" title="Weather">${icon('weather')}<span class="quick-rail-tip">Weather</span></button>` : '',
   ].join('');
   panel.prepend(rail);
 
@@ -118,7 +116,6 @@ export function installMapExplorer(panel, store, { onOpenWeather, onTogglePanel 
   for (const button of [...railButtons, ...layerButtons]) {
     button.onclick = async () => { await store.toggle(button.dataset.layer); render(); };
   }
-  rail.querySelector('[data-action="weather"]')?.addEventListener('click', () => onOpenWeather?.());
   rail.querySelector('#menu-toggle').addEventListener('click', () => onTogglePanel?.());
 
   const unsubscribe = store.subscribe(render);

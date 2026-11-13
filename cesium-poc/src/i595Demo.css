@@ -220,6 +220,9 @@ body:has(.twin-hud) .map-nav { top: 172px; }
 .map-nav .map-nav-theme { grid-column: 1 / -1; margin-top: 4px; border-top: 1px solid var(--ui-border-strong); border-radius: 0; }
 .map-nav .map-nav-theme svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .map-nav .map-nav-theme[aria-pressed="true"] { color: var(--ui-accent); }
+/* Weather closes the column, under Reset view, drawn to the same weight as the theme glyph. */
+.map-nav .map-nav-weather { grid-column: 1 / -1; }
+.map-nav .map-nav-weather svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 /* With the stack on the right edge, details panels sit clear of it rather than under it. */
 body:has(.map-nav) :is(.ramp-details, .road-details, .segment-details, .express-details, .bridge-details, .signal-details, .camera-details, .live-event-details, .model-details, .structure-details) { right: 106px; }
 @media (max-width: 720px) {
@@ -3214,6 +3217,9 @@ li[data-status="PASS"] .cw-check-status { color: #9ad97f; }
 .cw-table { width: 100%; border-collapse: collapse; font-size: 11px; margin: 4px 0 8px; }
 .cw-table th, .cw-table td { padding: 4px 8px; text-align: left; border-bottom: 1px solid var(--ui-border-soft); }
 .cw-table thead th { font-size: 9.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ui-text-muted); }
+/* The reason a row has no value, under its label. Wraps rather than widening the column. */
+.cw-table tbody th small { display: block; max-width: 34ch; margin-top: 2px; font-weight: 400;
+  font-size: 10px; line-height: 1.45; color: var(--ui-text-dim); white-space: normal; }
 .cw-table tbody th { font-weight: 500; }
 .cw-table em { font-style: normal; color: #a855f7; }
 
@@ -3238,3 +3244,64 @@ li[data-status="PASS"] .cw-check-status { color: #9ad97f; }
 @media (max-width: 1040px) {
   .case-workbench { grid-template-columns: 1fr; grid-template-rows: minmax(140px, 32%) 1fr; }
 }
+
+/* ── Accident history at the focused case's location ──────────────────────────────────────────
+   Collapsed to one button until asked for: the operator opened a case, and sixty other incidents
+   unfurling beside it answer a question they have not asked yet. The list scrolls inside the card
+   so the card itself never outgrows the viewport. */
+.cw-focus-history { border-top: 1px solid var(--ui-border-soft); padding-top: 10px; }
+.cw-focus-history-toggle { width: 100%; text-align: left; }
+.cw-focus-history-toggle::before { content: "▸ "; }
+.cw-focus-history-toggle[aria-expanded="true"]::before { content: "▾ "; }
+.cw-focus-radii { display: flex; gap: 5px; margin: 9px 0 2px; }
+.cw-focus-radii button {
+  flex: 1; padding: 4px 0; font: inherit; font-size: 11px; cursor: pointer;
+  color: var(--ui-text-secondary); background: transparent;
+  border: 1px solid var(--ui-border); border-radius: 7px;
+}
+.cw-focus-radii button[aria-pressed="true"] {
+  color: var(--ui-accent); border-color: var(--ui-accent-line); background: var(--ui-accent-soft);
+}
+.cw-focus-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0 0; }
+.cw-focus-stats > div { padding: 6px 7px; border-radius: 7px; background: var(--ui-surface-raised); }
+.cw-focus-stats dt { font-size: 9.5px; line-height: 1.3; color: var(--ui-text-dim); }
+.cw-focus-stats dd {
+  margin: 2px 0 0; font-size: 16px; font-weight: 650; font-variant-numeric: tabular-nums;
+}
+.cw-focus-stats dd[data-tone="warn"] { color: var(--ui-tone-warn, #e5bc57); }
+.cw-focus-stats dd[data-tone="bad"] { color: var(--ui-tone-bad, #e66259); }
+.cw-focus-span { margin: 8px 0 0; font-size: 10.5px; color: var(--ui-text-dim); }
+.cw-focus-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 0; padding: 0; list-style: none; }
+.cw-focus-chips li {
+  display: flex; align-items: baseline; gap: 5px; padding: 2px 7px; border-radius: 999px;
+  background: var(--ui-surface-raised); font-size: 10.5px; color: var(--ui-text-secondary);
+}
+.cw-focus-chips b { font-variant-numeric: tabular-nums; color: var(--ui-text); }
+/* Capped and scrolled: the register can hold sixty incidents within a kilometre, and the card is
+   an instrument over the map, not a second workbench. */
+.cw-focus-crashes {
+  margin: 10px 0 0; padding: 0 2px 0 0; list-style: none; display: grid; gap: 7px;
+  max-height: 300px; overflow-y: auto;
+}
+.cw-focus-crashes li {
+  padding: 7px 9px; border-radius: 8px; background: var(--ui-surface-raised);
+  border-left: 2px solid var(--ui-border-strong);
+}
+.cw-focus-crashes li:has([data-tone="bad"]) { border-left-color: var(--ui-tone-bad, #e66259); }
+.cw-focus-crashes li:has([data-tone="warn"]):not(:has([data-tone="bad"])) {
+  border-left-color: var(--ui-tone-warn, #e5bc57);
+}
+.cw-focus-crash-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0;
+  font-size: 11.5px;
+}
+.cw-focus-crash-head span { flex: none; font-size: 10.5px; color: var(--ui-text-dim); }
+.cw-focus-crash-meta { margin: 2px 0 0; font-size: 10.5px; color: var(--ui-text-muted); }
+.cw-focus-crash-src { margin: 3px 0 0; font-size: 9.5px; color: var(--ui-text-dim); }
+.cw-focus-crash-flags { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 0; }
+.cw-focus-crash-flags span {
+  padding: 1px 6px; border-radius: 999px; font-size: 9.5px; font-weight: 600;
+  background: var(--ui-hover); color: var(--ui-text-secondary);
+}
+.cw-focus-crash-flags span[data-tone="warn"] { color: var(--ui-tone-warn, #e5bc57); }
+.cw-focus-crash-flags span[data-tone="bad"] { color: var(--ui-tone-bad, #e66259); }

@@ -21,6 +21,8 @@ import { DC_NOT_CONNECTED } from '../liveEventsData.js';
 import { DEMO_FLAG_PARAM, buildDemoCases, demoCasesEnabled, kpiBreakdown, loadDemoCases } from '../acs/acsDemoCases.js';
 import { installAssetOpsTabs, ASSET_OPS_TABS, DEFAULT_TAB } from './assetOpsTabs.js';
 import { caseFocusCard } from './assetOpsPanels.js';
+import { DEFAULT_RADIUS_M, crashesNear } from '../acs/nearbyCrashes.js';
+import { installCrashHistoryLayer } from './crashHistoryLayer.js';
 import { claimRecords, PRODUCTION_CLAIMS } from './claimsIntelligence.js';
 import { assetOpsContextOf, caseContextOf, caseSuggestionsFor, contextIndicatorOf } from './assetOpsContext.js';
 import { centerlineDistances, corridorPositionOf } from '../assetExplorer/corridorPosition.js';
@@ -210,7 +212,8 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
     Object.freeze({ key: '2y', label: '2 Years', months: 24 }),
     Object.freeze({ key: 'all', label: 'All', months: null }),
   ]);
-  const DEFAULT_WINDOW_KEY = '6m';
+  /** The period Operations Overview opens on. One month, so the first view is current work. */
+  const DEFAULT_WINDOW_KEY = '1m';
   let windowKey = DEFAULT_WINDOW_KEY;
   // `?? 6` would be wrong here: "All" carries months: null on purpose, and a nullish fallback
   // turned it straight back into six months. Not-found and no-window are different answers.
@@ -300,12 +303,14 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
   let enrichment = null;
   async function enrichmentServices() {
     enrichment ??= (async () => {
-      const [{ createDemoConnectors }, { createCaseEnrichmentOrchestrator }, acs, { createIncidentContextService }] =
+      const [{ createDemoConnectors }, { createCaseEnrichmentOrchestrator }, acs,
+        { createIncidentContextService }, { createSegmentLookup }] =
         await Promise.all([
           import('../acs/evidence/connectors.js'),
           import('../acs/evidence/orchestrator.js'),
           import('../acs/acsDemoCases.js'),
           import('../acs/incidentContext.js'),
+          import('../acs/segmentLookup.js'),
         ]);
       return {
         orchestrator: createCaseEnrichmentOrchestrator({
@@ -314,7 +319,11 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
           connectors: createDemoConnectors({ maintenance: { recordsOf: key => datasets.get(key)?.records ?? [] } }),
           evaluate: acs.evaluateDemoCase,
         }),
-        context: createIncidentContextService(),
+        // The FDOT segment layer resolves the one REAL traffic figure the corridor publishes —
+        // the segment's annual average. Without it `annualAverage()` reported "no FDOT segment
+        // matched" on every case, which read as "there is no traffic data" when in fact nobody
+        // had ever asked the layer.
+        context: createIncidentContextService({ segmentFor: createSegmentLookup().segmentFor }),
       };
     })();
     return enrichment;
@@ -356,8 +365,105 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
   focusCard.hidden = true;
   focusCard.setAttribute('aria-label', 'Focused ACS case');
   focusCard.onclick = event => {
-    if (event.target.closest('[data-action="return-to-case"]')) exitCaseFocus({ toCase: true });
+    if (event.target.closest('[data-action="return-to-case"]')) { exitCaseFocus({ toCase: true }); return; }
+    if (event.target.closest('[data-action="toggle-crash-history"]')) {
+      crashHistory.open = !crashHistory.open;
+      if (crashHistory.open) {
+        loadCrashHistory();
+      } else {
+        historyLayer().clear();
+        // Back to the case's own framing: closing the history should undo what opening it did.
+        const spot = caseFocus?.record?.evaluation?.location;
+        if (spot) flyToPoint(spot.longitude, spot.latitude);
+      }
+      renderFocusCard();
+      return;
+    }
+    const radius = event.target.closest('[data-action="crash-radius"]')?.dataset.radius;
+    if (radius) {
+      crashHistory.radiusM = Number(radius);
+      loadCrashHistory();
+      renderFocusCard();
+    }
   };
+
+  /**
+   * The accident history beside the focused case, read from the corridor's OWN incident register.
+   *
+   * Nothing is fetched for this: the register is the `incidentRecord` class the workspace already
+   * loads for its Incidents card, so asking "what else happened here" costs a distance filter
+   * over records that are already in memory. It is computed only once the operator asks, because
+   * a case is about one event and the history is a second question.
+   */
+  const crashHistory = { open: false, loading: false, radiusM: DEFAULT_RADIUS_M, found: null,
+    error: null, forCaseId: null };
+
+  /**
+   * The map pins for the history. Built on first use: a session that never opens a case's
+   * history never adds a data source to the scene.
+   */
+  let crashHistoryLayer = null;
+  const historyLayer = () => (crashHistoryLayer ??= installCrashHistoryLayer(viewer));
+
+  function resetCrashHistory() {
+    crashHistoryLayer?.clear();
+    crashHistory.open = false;
+    crashHistory.loading = false;
+    crashHistory.radiusM = DEFAULT_RADIUS_M;
+    crashHistory.found = null;
+    crashHistory.error = null;
+    crashHistory.forCaseId = null;
+  }
+
+  function loadCrashHistory() {
+    const location = caseFocus?.record?.evaluation?.location;
+    crashHistory.forCaseId = caseFocus?.caseId ?? null;
+    crashHistory.error = null;
+    const entry = classes.find(item => item.assetType === 'incidentRecord');
+    const dataset = entry ? datasets.get(entry.key) : null;
+    if (!dataset || dataset.state !== 'ready') {
+      // The class loads with the screen; if it has not arrived the card says so rather than
+      // reporting "no previous incidents", which is a different and much stronger claim.
+      crashHistory.loading = dataset?.state === 'loading';
+      crashHistory.found = null;
+      crashHistory.error = dataset?.state === 'loading' ? null
+        : 'The corridor incident register has not loaded, so the history cannot be read yet.';
+      return;
+    }
+    crashHistory.loading = false;
+    crashHistory.found = crashesNear(location, dataset.records, {
+      radiusM: crashHistory.radiusM,
+      // The case borrows this incident's coordinates; it is not part of the case's own history.
+      excludeIds: [location?.sourceIncidentId].filter(Boolean),
+    });
+    // The list says how many; only the map says WHERE. Drawn from the same records, so a pin
+    // and a row can never disagree about what is in the radius.
+    historyLayer().show(crashHistory.found.records, { anchor: location });
+    /*
+     * PULL BACK FAR ENOUGH TO SEE THEM.
+     *
+     * The camera is framed on the case at the Asset Explorer's inspection range, which is tight
+     * enough that an incident 900 m up the carriageway is off-screen. Drawing ten pins that
+     * cannot be seen is the same as drawing none, so opening the history widens the view to the
+     * radius being asked about — and "Return to <case>" puts the original framing back.
+     */
+    if (crashHistory.found.records.length) frameRadius(location, crashHistory.radiusM);
+  }
+
+  /** Frame a circle of this radius around the case, keeping the operator's own heading. */
+  function frameRadius(location, radiusM) {
+    if (!Number.isFinite(location?.longitude) || !Number.isFinite(location?.latitude)) return;
+    const { pitchDeg } = ASSET_CAMERA_PRESETS.incidentRecord;
+    viewer.camera.cancelFlight();
+    viewer.camera.flyToBoundingSphere(
+      new BoundingSphere(
+        Cartesian3.fromDegrees(location.longitude, location.latitude, CORRIDOR_GROUND_HEIGHT_M),
+        radiusM),
+      { duration: FLIGHT_SECONDS.inspect,
+        offset: new HeadingPitchRange(viewer.camera.heading, CesiumMath.toRadians(pitchDeg),
+          // Clear of the sphere, so the whole radius is inside the frustum rather than filling it.
+          radiusM * 2.6) });
+  }
 
   const workbench = installCaseWorkbench(root, {
     positionOf,
@@ -905,6 +1011,7 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
     const location = record?.evaluation?.location;
     if (!record) return;
     caseFocus = { caseId: record.id, record, snapshot: workbench.snapshot(), error: null };
+    resetCrashHistory();
     if (!location?.sourceIncidentId || !Number.isFinite(location.longitude) || !Number.isFinite(location.latitude)) {
       // No coordinate, so no flight. The card says so rather than the camera moving somewhere
       // arbitrary and implying the case is there.
@@ -963,6 +1070,7 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
     if (!caseFocus) return;
     const snapshot = caseFocus.snapshot;
     caseFocus = null;
+    resetCrashHistory();
     maintenanceLayer.highlight?.(null, null);
     if (activeKey) applyRecords(); else pushAllToMap();
     renderFocusCard();
@@ -979,8 +1087,11 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
     const location = caseFocus.record.evaluation.location;
     const position = positionOf && Number.isFinite(location.longitude)
       ? positionOf(location.longitude, location.latitude) : null;
+    // A different case is a different history; never show one case's under another's heading.
+    if (crashHistory.open && crashHistory.forCaseId !== caseFocus.caseId) loadCrashHistory();
     focusCard.innerHTML = caseFocusCard({ record: caseFocus.record, location,
-      corridorMile: position?.milepost ?? null, error: caseFocus.error });
+      corridorMile: position?.milepost ?? null, error: caseFocus.error,
+      history: crashHistory });
   }
 
   /* ── the demo cases, read once ───────────────────────────────────────────────────────────── */
@@ -1505,6 +1616,7 @@ export function installMaintenanceWorkspace(viewer, { assetExplorer, maintenance
     destroy() {
       stopPicks(); legendPosition.disconnect();
       liveFeed?.stop(); unsubscribe(); tabs.destroy(); workbench.destroy(); claimsWorkbench.destroy();
+      void crashHistoryLayer?.destroy();
       strip.destroy(); root.remove();
       // Never leave the corridor without its roads, its shields or its status strip because this
       // workspace went away.

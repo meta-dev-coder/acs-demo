@@ -33,6 +33,9 @@ export const THEME_ICONS = Object.freeze({
   dark: '<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M16 11.4A6.4 6.4 0 0 1 8.6 4a6.4 6.4 0 1 0 7.4 7.4Z"/></svg>',
 });
 
+/** A cloud with the sun behind it, on the same 20x20 grid as the theme and Street View glyphs. */
+const WEATHER_ICON = '<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M7.2 8.1a4 4 0 0 1 5.6-4.4"/><path d="M13.3 3.1v1.3M16.9 6.7h-1.3M16.2 4.1l-.9.9M16.2 9.3l-.9-.9"/><path d="M6.4 16.4a3 3 0 0 1-.3-6 4.1 4.1 0 0 1 7.7 1 2.5 2.5 0 0 1-.4 5h-7Z"/></svg>';
+
 const BUTTONS = [
   { id: 'zoom-in', label: 'Zoom in', text: '+', group: 'zoom' },
   { id: 'zoom-out', label: 'Zoom out', text: '−', group: 'zoom' },
@@ -88,7 +91,7 @@ export function cameraPivot(viewer) {
  * @param {import('cesium').Viewer} viewer
  * @param {{zoom?: (factor: number) => void}} [hooks]  reuses the map's own proportional zoom
  */
-export function installMapNavigationControls(container, viewer, { zoom, onStreetView, themeMode, onToggleTheme } = {}) {
+export function installMapNavigationControls(container, viewer, { zoom, onStreetView, themeMode, onToggleTheme, onOpenWeather } = {}) {
   const group = document.createElement('div');
   group.className = 'map-nav';
   group.setAttribute('role', 'group');
@@ -115,6 +118,21 @@ export function installMapNavigationControls(container, viewer, { zoom, onStreet
     reset.setAttribute('aria-label', 'Reset view');
     group.append(reset);
   }
+  // Weather sits with the view controls, under Reset view: it changes what the scene looks like,
+  // not which data is on the map. A cloud, not a sun — the sun glyph already means "light theme"
+  // one button above.
+  if (onOpenWeather) {
+    const weather = document.createElement('button');
+    weather.id = 'weather-toggle';
+    weather.className = 'map-nav-weather';
+    weather.type = 'button';
+    weather.title = 'Weather';
+    weather.setAttribute('aria-label', weather.title);
+    weather.innerHTML = WEATHER_ICON;
+    weather.onclick = () => onOpenWeather();
+    group.append(weather);
+  }
+
   const toggle = document.createElement('button');
   toggle.className = 'map-nav-toggle';
   toggle.type = 'button';

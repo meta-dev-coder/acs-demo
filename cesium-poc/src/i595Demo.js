@@ -159,6 +159,7 @@ try {
   const navigation = installMapNavigationControls(document.body, viewer, {
     zoom, onStreetView: streetViewEnabled ? (() => streetViewPlacement?.toggle()) : undefined,
     themeMode, onToggleTheme: () => themeMode.toggle(),
+    onOpenWeather: () => document.querySelector(".weather-launch")?.click(),
   });
   navigation.setEnabled(true);
   const lons = corridor.map(p => p.lon), lats = corridor.map(p => p.lat);
@@ -399,7 +400,6 @@ try {
     },
   });
   const explorer = installMapExplorer(panel, layerStore, {
-    onOpenWeather: () => document.querySelector(".weather-launch")?.click(),
     onTogglePanel: () => setExplorerCollapsed(!panel.classList.contains("collapsed")),
   });
   // Operational strip: corridor facts and the live-event feed, with gaps stated rather than filled.

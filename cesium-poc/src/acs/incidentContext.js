@@ -225,8 +225,12 @@ export function registerFacts(sourceIncident) {
  */
 export function annualAverage(segment) {
   if (!segment || !Number.isFinite(segment.aadt)) {
+    // The lookup says WHY when it can — "the nearest segment is 998 m away" is a fact about this
+    // incident's coordinate, and a far more useful answer than "no segment was matched", which
+    // reads as though the road layer were missing.
     return unavailable('Annual average daily traffic',
-      'No FDOT segment with a published AADT was matched to this location.');
+      segment?.unmatchedReason
+        ?? 'No FDOT segment with a published AADT was matched to this location.');
   }
   return observation({
     label: 'Annual average daily traffic',
@@ -357,7 +361,10 @@ export function createIncidentContextService({
       ? { latitude: incident.latitude, longitude: incident.longitude, timestampMs } : null;
 
     const reading = point ? await weatherService.weatherAt(point).catch(() => null) : null;
-    const segment = segmentFor && incident ? segmentFor(incident) : null;
+    // Awaited: the segment layer is fetched once and the lookup is a promise until it lands.
+    // A resolver that throws must leave the AADT unavailable, not fail the whole context.
+    const segment = segmentFor && incident
+      ? await Promise.resolve(segmentFor(incident)).catch(() => null) : null;
     const traffic = syntheticTraffic(demoCase);
     const register = registerFacts(incident);
 
