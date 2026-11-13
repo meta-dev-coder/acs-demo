@@ -6,7 +6,7 @@ test('the bar offers the workspaces, in order, each with its own icon', () => {
   assert.deepEqual(NAV_SECTIONS.map(section => section.id),
     ['traffic', 'maintenance', 'safety', 'liveOps', 'tmc', 'tolling', 'safetyIntel']);
   assert.deepEqual(NAV_SECTIONS.map(section => section.label),
-    ['Traffic', 'Maintenance', 'Safety', 'Live Ops', 'TMC', 'Tolling', 'Safety Intel']);
+    ['Traffic', 'Asset Operations & Maintenance', 'Safety', 'Live Ops', 'TMC', 'Tolling', 'Safety Intel']);
   assert.equal(new Set(NAV_SECTIONS.map(section => section.icon)).size, NAV_SECTIONS.length);
   assert.equal(DEFAULT_SECTION, 'liveOps');
 });

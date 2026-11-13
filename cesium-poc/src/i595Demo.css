@@ -1,110 +1,7 @@
-/* ==========================================================================================
-   Theme tokens — the single source of truth for application chrome in both modes.
-
-   Dark is the base (the values below are exactly what the app shipped with); light overrides
-   only what changes. The Asset Explorer's MUI theme is built from the same roles, so the React
-   island and the plain-DOM panels cannot drift apart.
-
-   What is deliberately NOT here: route, traffic, severity and weather colours, Cesium entity
-   colours and anything drawn onto the map. Those carry meaning rather than style, and they read
-   the same in both modes.
-   ========================================================================================== */
-:root {
-  /* Surfaces */
-  --ui-surface: #0d1829f5;          /* floating panels over the map */
-  --ui-surface-solid: #0b1729;      /* bars and rails */
-  --ui-surface-raised: #17293d;     /* nested rows and inputs */
-  --ui-surface-sunken: #0b172980;
-
-  /* Text */
-  --ui-text: #e8eef6;
-  --ui-text-secondary: #92a8c3;
-  --ui-text-muted: #7f93ac;
-  /* Used in thirteen places and never defined until now. On HTML that silently inherited and looked
-     fine; on SVG `fill` an invalid value falls back to the initial value, so every chart tick and
-     axis label rendered BLACK on a dark panel. */
-  --ui-text-dim: #92a8c3;
-
-  /* Lines and states */
-  --ui-border: #ffffff1f;
-  --ui-border-soft: #ffffff14;
-  --ui-border-strong: #ffffff24;
-  --ui-hover: #ffffff0d;
-  --ui-active: #ffffff14;
-  --ui-shadow: 0 16px 48px #0005;
-  --ui-shadow-soft: 0 12px 32px #0006;
-
-  /* Accent — the corridor teal, in three strengths */
-  --ui-accent: #67f4e2;             /* text and icons on dark */
-  --ui-accent-strong: #38c9bf;      /* fills */
-  --ui-accent-soft: #17383f;        /* tonal selected background */
-  --ui-accent-contrast: #0b1729;    /* text on an accent fill */
-
-  /* The left navigation bar's width — everything anchored to the left edge clears it. */
-  /* Wide enough for the longest workspace name. At 76px "Maintenance" ran the full width of its
-     button with nothing either side of it, which read as overflow rather than a label. */
-  --app-nav-w: 92px;
-
-  /* Scrollbars */
-  --ui-surface-translucent: #0b1729d9;   /* rail and floating bars, over the map */
-  --ui-accent-tint: #67f4e229;           /* selected tint */
-  --ui-accent-line: #67f4e26b;           /* accent border */
-  /* Status colours as *label text*. The map's own geometry colours are untouched by these — a
-     closure is the same red on the map in both modes; only the words on a panel change weight. */
-  --ui-status-express: #fcd970;
-  --ui-status-live: #4ade80;
-  --ui-status-alert: #ff9a8b;
-  --ui-shadow-color: #0005;
-  --ui-scroll-track: transparent;
-  --ui-scroll-thumb: #ffffff24;
-}
-
-:root[data-theme="light"] {
-  /* Pure white throughout: a translucent or tinted white reads grey over photogrammetry, and the
-     panels are meant to be white. Separation comes from the borders and the shadow, not from a
-     tint. `sunken` keeps the faintest wash so an inset area is still distinguishable. */
-  --ui-surface: #ffffff;
-  --ui-surface-solid: #ffffff;
-  --ui-surface-raised: #ffffff;
-  --ui-surface-sunken: #f4f7fa;
-
-  --ui-text: #172033;
-  --ui-text-secondary: #5f6b7a;
-  --ui-text-dim: #5f6b7a;
-  --ui-text-muted: #8a96a6;
-
-  --ui-border: #d8dee6;
-  --ui-border-soft: #e4e9ef;
-  --ui-border-strong: #c7d0da;
-  --ui-hover: #1720330f;
-  --ui-active: #17203317;
-  /* Restrained, because a white panel over photogrammetry separates with a border, not a halo. */
-  --ui-shadow: 0 6px 18px #17203322;
-  --ui-shadow-soft: 0 4px 12px #1720331a;
-
-  /* Darkened so teal text and icons stay legible on white; the fill keeps the brand strength. */
-  --ui-accent: #0b6f66;
-  --ui-accent-strong: #14a89b;
-  --ui-accent-soft: #e6f6f4;
-  --ui-accent-contrast: #ffffff;
-
-  --ui-surface-translucent: #ffffff;
-  --ui-accent-tint: #0f8d8214;
-  --ui-accent-line: #0f8d8266;
-  --ui-status-express: #8a5a10;
-  --ui-status-live: #1f7a4d;
-  --ui-status-alert: #b03b2c;
-  --ui-shadow-color: #17203320;
-  --ui-scroll-track: #eef2f7;
-  --ui-scroll-thumb: #c7d0da;
-}
-
-/* Scrollbars follow the mode instead of staying dark on a white panel. */
-* { scrollbar-color: var(--ui-scroll-thumb) var(--ui-scroll-track); }
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: var(--ui-scroll-track); }
-::-webkit-scrollbar-thumb { background: var(--ui-scroll-thumb); border-radius: 6px; }
-
+/* The application chrome tokens, shared with every project in this repository. They used to
+   live at the top of this file; nothing about their values or their order has changed. */
+@import './theme.css';
+@import './appNav.css';
 /* A short colour-only transition; nothing that moves, resizes or touches the canvas. */
 @media (prefers-reduced-motion: no-preference) {
   body, .layers, .quick-rail, .map-nav, .clip-editor, .corridor-status, .ask-twin-btn,
@@ -528,7 +425,12 @@ body:has(.street-view[data-state="active"]) :is(.ramp-details, .road-details, .s
    button and the panel: an open conversation is the thing in front, and a zoom control drawn across
    its text is not a layering nicety but an unreadable answer. The panel outranks the button so
    opening it never leaves the button sitting on top of what it opened. */
-.ask-twin-btn { position: absolute; bottom: 56px; right: 120px; display: flex; align-items: center; gap: 7px; padding: 9px 16px; background: var(--ui-surface-solid); border: 1px solid var(--ui-accent-line); border-radius: 22px; color: var(--ui-accent); font-size: 12px; font-weight: 600; letter-spacing: 0.03em; box-shadow: 0 4px 16px var(--ui-shadow-color); cursor: pointer; z-index: 44; transition: background 0.15s, border-color 0.15s, box-shadow 0.15s; }
+/* The launcher sits over the MAP, not over the workspaces.
+   It used to be z-index 44 — above every panel — so on a full-width workspace such as the Case
+   Workbench it floated across the case detail. It now sits below the panel layer (13, 15, 22),
+   which leaves it visible on the map and covered by a workspace that owns the screen. The panel
+   itself stays at 45: once opened, the assistant is still in front of everything. */
+.ask-twin-btn { position: absolute; bottom: 56px; right: 120px; display: flex; align-items: center; gap: 7px; padding: 9px 16px; background: var(--ui-surface-solid); border: 1px solid var(--ui-accent-line); border-radius: 22px; color: var(--ui-accent); font-size: 12px; font-weight: 600; letter-spacing: 0.03em; box-shadow: 0 4px 16px var(--ui-shadow-color); cursor: pointer; z-index: 11; transition: background 0.15s, border-color 0.15s, box-shadow 0.15s; }
 .ask-twin-btn:hover { background: var(--ui-surface-raised); border-color: var(--ui-accent-line); box-shadow: 0 4px 20px var(--ui-accent-tint); }
 .ask-twin-btn.active { background: var(--ui-accent-soft); border-color: var(--ui-accent-strong); }
 .ask-twin-sparkle-icon { display: none; }
@@ -545,6 +447,18 @@ body:has(.street-view[data-state="active"]) :is(.ramp-details, .road-details, .s
 /* `display: flex` above defeats the hidden attribute, so closing the panel left it on screen. */
 .ask-twin-panel[hidden] { display: none; }
 @media (max-width: 700px) { .ask-twin-panel { left: 16px; right: 16px; bottom: 160px; width: auto; } }
+
+/* The compact context indicator: what the assistant is investigating, in three facts. It is a
+   reminder, not a second case dashboard — the workbench beside it owns the case's detail. */
+.ask-twin-context {
+  margin: 0; padding: 7px 12px; border-bottom: 1px solid var(--ui-border-soft);
+  background: var(--ui-surface-raised); color: var(--ui-text-secondary);
+  font-size: 11px; font-weight: 600; letter-spacing: .01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* `display` is not set above, so the hidden attribute works — but stated anyway, because every
+   other panel in this file that forgot it stayed on screen. */
+.ask-twin-context[hidden] { display: none; }
 
 /* Header — drag handle */
 .ask-twin-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 10px 14px; border-bottom: 1px solid var(--ui-border-soft); flex-shrink: 0; cursor: grab; user-select: none; background: var(--ui-surface-solid); }
@@ -1088,33 +1002,10 @@ body:has(.clip-editor) .base-environment--bar { left: calc(var(--app-nav-w) + 38
    Left navigation — the four workspaces, with Layers kept apart at the foot of the bar.
    Colours come entirely from the theme tokens, so light and dark need nothing of their own.
    ========================================================================================== */
-.app-nav { position: absolute; top: 0; left: 0; bottom: 0; z-index: 40; width: var(--app-nav-w);
-  display: flex; flex-direction: column; justify-content: space-between; gap: 8px; padding: 12px 8px;
-  background: var(--ui-surface-solid); border-right: 1px solid var(--ui-border-soft); box-shadow: var(--ui-shadow-soft); }
-.app-nav-sections, .app-nav-foot { display: flex; flex-direction: column; gap: 4px; }
-.app-nav-foot { border-top: 1px solid var(--ui-border-soft); padding-top: 10px; }
-.app-nav-item { display: flex; flex-direction: column; align-items: center; gap: 5px; width: 100%;
-  padding: 9px 2px; border: 0; border-radius: 12px; background: transparent; color: var(--ui-text-secondary);
-  font: inherit; font-size: 10px; letter-spacing: .01em; text-align: center; cursor: pointer;
-  transition: background .15s ease, color .15s ease; }
-.app-nav-item svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-.app-nav-item:hover { background: var(--ui-hover); color: var(--ui-text); }
-.app-nav-item:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: -2px; }
-/* The chosen workspace and an open Layers panel read the same: tinted, accented, never colour alone. */
-.app-nav-item[aria-current="page"], .app-nav-item[aria-pressed="true"] { background: var(--ui-accent-tint); color: var(--ui-accent); }
-.app-nav-label { line-height: 1.2; }
-/* A long name stays on one line and keeps a margin either side rather than touching the corners. */
-.app-nav-item { padding-inline: 6px; }
 
 /* The Map Explorer belongs to the Layers button now, and waits until it is asked for. */
 body[data-layers-open="false"] .layers { display: none; }
 
-@media (max-width: 700px) {
-  :root { --app-nav-w: 56px; }
-  .app-nav { padding: 8px 6px; }
-  .app-nav-item { font-size: 0; gap: 0; padding: 10px 2px; }
-  .app-nav-item svg { width: 20px; height: 20px; }
-}
 
 /* ==========================================================================================
    Workspace KPI strip — shared by Maintenance and Safety. Deliberately plain: the map is the
@@ -1203,7 +1094,14 @@ body[data-layers-open="false"] .layers { display: none; }
 }
 .safety-hotspots input { width: 15px; height: 15px; margin: 0; accent-color: var(--ui-accent); }
 .safety-period {
-  display: inline-flex; flex-direction: column; align-items: stretch; gap: 4px; flex: none; align-self: center;
+  /* Top-aligned with the cards rather than centred on them: once the strip wraps to two rows a
+     centred control floats between them, level with neither. Aligning to the start keeps it on
+     the same line as the first row of cards at every width. */
+  display: inline-flex; flex-direction: column; align-items: stretch; gap: 4px; flex: none; align-self: flex-start;
+  /* This control is a <label>, so the panel-wide `label` rule above lands on it and brought a
+     4px vertical margin and a 48px min-height with it. Both are for the layer checkboxes and
+     neither belongs here: the margin is what left the control sitting 4px below the card row. */
+  margin: 0; min-height: 0;
   padding: 6px 10px; border: 1px solid var(--ui-border); border-radius: 8px;
   background: var(--ui-surface-translucent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   color: var(--ui-text); font-size: 11px; pointer-events: auto;
@@ -1284,7 +1182,14 @@ body:has(.layers:not(.collapsed)) .safety-trend { left: calc(var(--app-nav-w) + 
 
 /* The maintenance lookback control, beside the cards it decides the counts for. */
 .maintenance-window {
-  display: inline-flex; flex-direction: column; align-items: stretch; gap: 4px; flex: none; align-self: center;
+  /* Top-aligned with the cards rather than centred on them: once the strip wraps to two rows a
+     centred control floats between them, level with neither. Aligning to the start keeps it on
+     the same line as the first row of cards at every width. */
+  display: inline-flex; flex-direction: column; align-items: stretch; gap: 4px; flex: none; align-self: flex-start;
+  /* This control is a <label>, so the panel-wide `label` rule above lands on it and brought a
+     4px vertical margin and a 48px min-height with it. Both are for the layer checkboxes and
+     neither belongs here: the margin is what left the control sitting 4px below the card row. */
+  margin: 0; min-height: 0;
   padding: 6px 10px; border: 1px solid var(--ui-border); border-radius: 8px;
   background: var(--ui-surface-translucent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   color: var(--ui-text); font-size: 11px; pointer-events: auto;
@@ -1313,7 +1218,14 @@ body:has(.layers:not(.collapsed)) .safety-trend { left: calc(var(--app-nav-w) + 
 /* The Live Ops history window, riding with the KPI cards because it changes what they show. */
 .liveops-history {
   /* Label stacked above its control, the way the KPI cards stack their own label over their value. */
-  display: inline-flex; flex-direction: column; align-items: stretch; gap: 4px; flex: none; align-self: center;
+  /* Top-aligned with the cards rather than centred on them: once the strip wraps to two rows a
+     centred control floats between them, level with neither. Aligning to the start keeps it on
+     the same line as the first row of cards at every width. */
+  display: inline-flex; flex-direction: column; align-items: stretch; gap: 4px; flex: none; align-self: flex-start;
+  /* This control is a <label>, so the panel-wide `label` rule above lands on it and brought a
+     4px vertical margin and a 48px min-height with it. Both are for the layer checkboxes and
+     neither belongs here: the margin is what left the control sitting 4px below the card row. */
+  margin: 0; min-height: 0;
   padding: 6px 10px; border: 1px solid var(--ui-border); border-radius: 8px;
   background: var(--ui-surface-translucent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   color: var(--ui-text); font-size: 11px; pointer-events: auto;
@@ -1338,6 +1250,14 @@ body:has(.layers:not(.collapsed)) .safety-trend { left: calc(var(--app-nav-w) + 
 /* The cards are the part that scrolls when the strip runs out of room; the source pills stay put. */
 .ws-kpi-cards { display: flex; align-items: stretch; gap: 8px; min-width: 0;
   overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+/* Maintenance wraps instead of scrolling.
+ *
+ * Its seven cards need about 1,250px and the strip is never given that much — at 1440 it has
+ * 1,014 — so the last card sat beyond the right edge of a scroller with no visible affordance,
+ * and an operator had no way to know it was there. Wrapping costs a second row only on the widths
+ * where the row genuinely does not fit, and nothing is ever hidden. The workspace already measures
+ * the strip's height for the legend and the details panel, so a taller strip needs no other change. */
+.maintenance-workspace .ws-kpi-cards { flex-wrap: wrap; overflow-x: visible; }
 /* A figure with a heading: tinted icon chip, then label, value and note. The tone comes from the
    card when it names one, so an operational category keeps its colour here too. */
 /* Cards never shrink: a flex item with a min-width is still squeezed by a capped strip, which is
@@ -1347,6 +1267,9 @@ body:has(.layers:not(.collapsed)) .safety-trend { left: calc(var(--app-nav-w) + 
   border: 1px solid var(--ui-border); border-radius: 12px; background: var(--ui-surface-translucent);
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); color: var(--ui-text); font: inherit; text-align: left; cursor: pointer;
   transition: border-color .15s ease, background .15s ease; }
+/* `display: flex` above beats the UA rule for [hidden], so a card a subtab switched off stayed
+   on screen. Stated here rather than relying on the attribute alone. */
+.ws-kpi[hidden], .maintenance-window[hidden] { display: none; }
 .ws-kpi:hover { border-color: var(--ui-border-strong); }
 .ws-kpi:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: -2px; }
 .ws-kpi[aria-pressed="true"] { background: var(--ui-surface-solid); }
@@ -1356,6 +1279,12 @@ body:has(.layers:not(.collapsed)) .safety-trend { left: calc(var(--app-nav-w) + 
 .ws-kpi-icon svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .ws-kpi-count { font-size: 22px; font-weight: 650; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .ws-kpi-note { font-size: 10.5px; color: var(--ui-text-muted); white-space: nowrap; }
+/* The DEMO badge beside a card's label. Only the demo-case card carries one, and it is the one
+   thing on the KPI strip that must never be mistaken for an operational count. */
+.ws-kpi-label { display: inline-flex; align-items: center; gap: 5px; }
+.ws-kpi-badge { font-style: normal; font-size: 8.5px; font-weight: 800; letter-spacing: 0.08em;
+  padding: 1px 4px; border-radius: 3px; line-height: 1.3;
+  color: var(--kpi-tone); border: 1px solid var(--kpi-tone); background: color-mix(in srgb, var(--kpi-tone) 14%, transparent); }
 .ws-kpi[data-state="error"] .ws-kpi-count, .ws-kpi[data-state="unavailable"] .ws-kpi-count { color: var(--ui-text-muted); font-weight: 500; }
 /* The pill gives way before the cards do, and says so with an ellipsis rather than a hard cut —
    its full text is always on the element's title. */
@@ -1422,10 +1351,6 @@ body .map-nav button:focus-visible, body .map-nav label:has(input:focus-visible)
 .liveops-layers { right: 78px; top: 16px; }
 
 /* Role-scoped workspace navigation. */
-.app-role { position: absolute; top: 16px; right: 16px; z-index: 40; display: flex; align-items: center; padding: 0; border: 0; background: transparent; box-shadow: none; font-size: 12px; color: var(--ui-text-secondary); }
-.app-role select { width: 170px; min-width: 0; padding: 6px 8px; border: 1px solid var(--ui-border); border-radius: 7px; background: var(--ui-surface-solid); color: var(--ui-text); font: inherit; }
-.app-role select:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
-.app-nav-item[hidden] { display: none; }
 
 body:has(.app-role) .map-nav { top: 76px; max-height: calc(100dvh - 110px); }
 body:has(.app-role) .liveops-layers { top: 76px; }
@@ -2992,3 +2917,324 @@ body[data-section="safetyIntel"] .app-nav { display: none; }
   border-color: #4ade80; color: #4ade80;
 }
 .si-loader-note { margin: 0; font-size: 11px; line-height: 1.5; color: var(--ui-text-muted); }
+
+/* ==========================================================================================
+   Asset Operations & Maintenance — three subtabs, one map
+   ------------------------------------------------------------------------------------------
+   The tab strip sits where the KPI strip used to start, and the strip moves down to make room.
+   The analysis panel is docked right, at the same size and in the same ink as the TMC's, so the
+   two screens read as one application rather than as two dashboards.
+   ========================================================================================== */
+.aom-tabs {
+  position: absolute; top: 16px; left: calc(var(--app-nav-w) + 16px); z-index: 14;
+  /* The workspace root is `pointer-events: none` so Cesium keeps the map; every control inside it
+     has to take its own clicks back, exactly as .ws-kpis does. */
+  pointer-events: auto;
+  display: flex; gap: 2px; padding: 2px; border-radius: 10px;
+  background: var(--ui-surface-solid); border: 1px solid var(--ui-border-soft);
+  box-shadow: var(--ui-shadow-soft);
+}
+.aom-tabs button {
+  padding: 6px 12px; font: inherit; font-size: 11.5px; white-space: nowrap; cursor: pointer;
+  background: transparent; border: 0; border-radius: 8px; color: var(--ui-text-secondary);
+}
+.aom-tabs button:hover { color: var(--ui-text); background: var(--ui-hover); }
+.aom-tabs button[aria-selected="true"] { color: var(--ui-accent); background: var(--ui-accent-tint); }
+.aom-tabs button:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: -2px; }
+/* The KPI strip clears the tab bar above it. The legend follows the strip on its own observer. */
+.maintenance-workspace .ws-kpis { top: 58px; }
+
+/* ==========================================================================================
+   Case Workbench — the Case Management subtab
+   ------------------------------------------------------------------------------------------
+   A queue on the left and one case on the right, over the map rather than floating on it. The
+   map stays mounted underneath (there is still exactly one Cesium viewer); this covers it,
+   because a case file is reading work and a 3D corridor behind it is noise. "View on map" takes
+   the operator back to the map, and a return chip brings them back here.
+   ========================================================================================== */
+.case-workbench {
+  position: absolute; top: 58px; left: calc(var(--app-nav-w) + 16px);
+  /* Clear of the map-nav column (42px at right: 16px).
+     The workbench used to run to `right: 16px`, which put it exactly over those controls — and
+     since it sits at z-index 15 and they sit at 10, it covered them completely. The casualty was
+     the light/dark toggle, which lives in that column and is a global preference: there was no
+     way to change the theme at all from this screen. */
+  right: calc(16px + 42px + 10px); bottom: 16px;
+  z-index: 15; display: grid; grid-template-columns: minmax(260px, 30%) 1fr; gap: 1px;
+  pointer-events: auto; overflow: hidden; border-radius: 12px;
+  border: 1px solid var(--ui-border); background: var(--ui-border-soft);
+  box-shadow: 0 12px 32px var(--ui-shadow-color); color: var(--ui-text); font-size: 12px;
+}
+body:has(.app-role) .case-workbench { top: 76px; }
+/* With the assistant open, the workbench gives up the strip the panel sits on rather than being
+   covered by it: the queue filters and the stage tiles on the right edge are controls, not decoration.
+   The panel is draggable, so this reserves the space it opens in and nothing more. */
+body.ask-twin-open .case-workbench { right: calc(380px + 28px); }
+/* The map controls are only worth the space while the workbench is open over the map: zoom and
+   orbit still act on what is behind it, and the theme toggle has to stay reachable. */
+body:has(.case-workbench:not([hidden])) .map-nav { max-height: calc(100dvh - 92px); }
+@media (max-width: 1100px) { body.ask-twin-open .case-workbench { right: 16px; } }
+.case-workbench[hidden] { display: none; }
+.cw-queue, .cw-main { background: var(--ui-surface-solid); overflow-y: auto; min-width: 0; }
+.cw-main { padding: 0 0 20px; }
+
+/* ── queue ───────────────────────────────────────────────────────────────────────────────── */
+.cw-queue-head {
+  position: sticky; top: 0; z-index: 2; display: grid; gap: 8px; padding: 12px 12px 10px;
+  background: var(--ui-surface-solid); border-bottom: 1px solid var(--ui-border-soft);
+}
+.cw-queue-title { margin: 0; font-size: 10.5px; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ui-text-dim); }
+.cw-search {
+  width: 100%; height: 30px; font: inherit; font-size: 12px; padding: 0 9px; border-radius: 7px;
+  background: var(--ui-surface-raised); color: var(--ui-text); border: 1px solid var(--ui-border-soft);
+}
+.cw-buckets { display: flex; flex-wrap: wrap; gap: 4px; }
+.cw-bucket {
+  appearance: none; cursor: pointer; font: inherit; font-size: 11px; padding: 3px 9px;
+  border-radius: 999px; border: 1px solid var(--ui-border-soft); background: var(--ui-surface);
+  color: var(--ui-text-secondary); display: inline-flex; align-items: center; gap: 5px;
+}
+.cw-bucket i { font-style: normal; font-size: 10px; color: var(--ui-text-dim); font-variant-numeric: tabular-nums; }
+.cw-bucket[aria-pressed="true"] { border-color: var(--ui-accent); background: var(--ui-accent-tint); color: var(--ui-accent); }
+.cw-bucket[aria-pressed="true"] i { color: inherit; }
+.cw-more > summary { cursor: pointer; font-size: 11px; color: var(--ui-text-dim); list-style-position: inside; }
+.cw-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 6px; margin-top: 7px; }
+.cw-filter { display: grid; gap: 2px; font-size: 10px; margin: 0; min-height: 0; color: var(--ui-text-dim); }
+.cw-filter select, .cw-filter input {
+  height: 26px; font: inherit; font-size: 11px; padding: 0 6px; border-radius: 6px; min-width: 0;
+  background: var(--ui-surface-raised); color: var(--ui-text); border: 1px solid var(--ui-border-soft);
+}
+
+.cw-rows { margin: 0; padding: 6px; list-style: none; display: grid; gap: 3px; }
+.cw-row {
+  display: grid; grid-template-columns: 1fr auto; gap: 1px 8px; width: 100%; text-align: left;
+  padding: 8px 9px; border-radius: 8px; border: 1px solid transparent; background: transparent;
+  color: inherit; font: inherit; font-size: 11.5px; cursor: pointer; border-left: 3px solid transparent;
+}
+.cw-row:hover { background: var(--ui-surface-raised); }
+.cw-row[aria-current="true"] { background: var(--ui-surface-raised); border-color: var(--ui-border); }
+.cw-row[data-tone="bad"] { border-left-color: #e66259; }
+.cw-row[data-tone="warn"] { border-left-color: #e5bc57; }
+.cw-row[data-tone="ok"] { border-left-color: #9ad97f; }
+.cw-row-id { font-weight: 600; }
+.cw-row-status { justify-self: end; font-size: 10.5px; color: var(--ui-text-dim); white-space: nowrap; }
+.cw-row-asset, .cw-row-where, .cw-row-stage { grid-column: 1 / -1; font-size: 10px; color: var(--ui-text-dim); }
+.cw-row-when { grid-column: 1 / -1; justify-self: end; font-size: 9.5px; color: var(--ui-text-muted); }
+.cw-empty { margin: 20px; font-size: 12px; color: var(--ui-text-dim); }
+
+/* ── workbench ───────────────────────────────────────────────────────────────────────────── */
+.cw-head {
+  position: sticky; top: 0; z-index: 2; padding: 12px 16px 10px;
+  background: var(--ui-surface-solid); border-bottom: 1px solid var(--ui-border-soft);
+}
+.cw-head-id { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cw-head-id h2 { margin: 0; font-size: 17px; }
+/* `.cw-demo` was the "SYNTHETIC DEMO DATA" chip. Its markup is gone from every workbench header;
+   the rule is kept so a reinstated chip would still look right, and because nothing else uses it. */
+.cw-status { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--ui-border); }
+.cw-status[data-tone="bad"] { color: #e66259; border-color: #e66259; }
+.cw-status[data-tone="warn"] { color: #e5bc57; border-color: #e5bc57; }
+.cw-status[data-tone="ok"] { color: #9ad97f; border-color: #9ad97f; }
+.cw-head-sum { margin: 5px 0 0; font-size: 12.5px; }
+.cw-head-where { margin: 2px 0 0; font-size: 11px; color: var(--ui-text-dim); }
+.cw-head-actions { margin-top: 8px; }
+.cw-action, .cw-return {
+  appearance: none; cursor: pointer; font: inherit; font-size: 11.5px; padding: 5px 13px;
+  border-radius: 7px; border: 1px solid var(--ui-accent); background: var(--ui-accent-tint); color: var(--ui-accent);
+}
+.cw-action[disabled] { cursor: default; opacity: .5; border-color: var(--ui-border); color: var(--ui-text-dim); background: none; }
+/* Case Map Focus Mode: one card over the operational map, and nothing else of this workspace. */
+.cw-focus {
+  position: absolute; top: 16px; right: 16px; width: 330px; z-index: 16; pointer-events: auto;
+  padding: 13px 15px 15px; border-radius: 10px; border: 1px solid var(--ui-border);
+  background: var(--ui-surface-solid); box-shadow: 0 12px 32px var(--ui-shadow-color);
+  color: var(--ui-text); font-size: 12px; max-height: calc(100dvh - 120px); overflow-y: auto;
+}
+body:has(.app-role) .cw-focus { top: 76px; }
+/* The assistant's panel opens over this corner, and the card's own "Return to the case" button is
+   the way back out of focus mode. It steps aside rather than being covered. */
+body.ask-twin-open .cw-focus { right: calc(380px + 28px); }
+@media (max-width: 1100px) { body.ask-twin-open .cw-focus { right: 16px; } }
+.cw-focus[hidden] { display: none; }
+.cw-focus-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.cw-focus-kicker {
+  flex: 1 0 100%; font-size: 9.5px; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ui-text-dim);
+}
+.cw-focus-head h2 { margin: 2px 0 0; font-size: 16px; }
+.cw-focus-asset { margin: 6px 0 0; font-size: 11.5px; color: var(--ui-text-secondary); }
+.cw-focus-status {
+  margin: 7px 0 0; display: inline-block; font-size: 11px; font-weight: 600;
+  padding: 2px 8px; border-radius: 999px; border: 1px solid var(--ui-border);
+}
+.cw-focus-status[data-tone="bad"] { color: #e66259; border-color: #e66259; }
+.cw-focus-status[data-tone="warn"] { color: #e5bc57; border-color: #e5bc57; }
+.cw-focus-status[data-tone="ok"] { color: #9ad97f; border-color: #9ad97f; }
+.cw-focus-block { margin-top: 11px; }
+.cw-focus-block em {
+  display: block; font-style: normal; font-size: 9px; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--ui-text-muted); margin-bottom: 2px;
+}
+.cw-focus-block p { margin: 0; font-size: 11.5px; line-height: 1.5; }
+/* The real incident under the camera, kept visually apart from the case above it. */
+.cw-focus-source {
+  padding: 9px 10px; border-radius: 8px; background: var(--ui-surface);
+  border-left: 3px solid var(--ui-text-muted);
+}
+.cw-focus-warn { margin-top: 5px !important; font-size: 10.5px; color: var(--ui-text-dim); }
+.cw-focus-error {
+  margin: 11px 0 0; padding: 8px 10px; border-radius: 8px; font-size: 11px; line-height: 1.5;
+  border: 1px solid #e66259; color: #e66259; background: color-mix(in srgb, #e66259 10%, transparent);
+}
+.cw-focus .cw-action { margin-top: 13px; width: 100%; }
+
+/* Claims Intelligence reuses the workbench shell: a list on the left, one claim on the right. */
+.cw-head-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.cw-action-quiet {
+  border-color: var(--ui-border); background: var(--ui-surface-raised); color: var(--ui-text-secondary);
+}
+.cw-action-quiet:hover:not([disabled]) { color: var(--ui-text); border-color: var(--ui-border-strong); }
+.cw-filter-wide { max-width: 260px; }
+.cw-table em { font-style: normal; font-size: 9.5px; letter-spacing: .04em; text-transform: uppercase; color: #a855f7; }
+.cw-table tbody th { width: 150px; color: var(--ui-text-dim); font-weight: 500; }
+
+.cw-stages { display: flex; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+.cw-stages li {
+  flex: 1; display: flex; min-width: 0; border-radius: 7px;
+  background: var(--ui-surface); border: 1px solid var(--ui-border-soft); border-top: 2px solid var(--ui-border);
+}
+/* Every stage opens, passed ones included: "what passed" is as much a question as "what failed". */
+.cw-stages button {
+  flex: 1; display: grid; gap: 1px; padding: 6px 8px; min-width: 0; text-align: left;
+  appearance: none; background: none; border: 0; border-radius: 6px; color: inherit; font: inherit; cursor: pointer;
+}
+.cw-stages button:hover { background: var(--ui-hover); }
+.cw-stages button:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: -2px; }
+.cw-stage-counts { font-size: 9.5px; color: var(--ui-text-dim); font-variant-numeric: tabular-nums; }
+.cw-stages li[data-tone="bad"] { border-top-color: #e66259; }
+.cw-stages li[data-tone="warn"] { border-top-color: #e5bc57; }
+.cw-stages li[data-tone="ok"] { border-top-color: #9ad97f; }
+/* Blocked is not failed: nothing is wrong with this stage, an earlier one holds it. Drawn muted
+   and dashed rather than red, so the eye goes to the stage that actually failed. */
+.cw-stages li[data-status="BLOCKED"] { border-top-style: dashed; border-top-color: var(--ui-border-strong); }
+.cw-stages li[data-status="BLOCKED"] .cw-stage-state { color: var(--ui-text-dim); font-weight: 500; }
+.cw-timeline > li[data-status="BLOCKED"] { border-left-style: dashed; border-left-color: var(--ui-border-strong); }
+.cw-timeline > li[data-status="BLOCKED"] .cw-tl-state { color: var(--ui-text-dim); }
+.cw-stages li[aria-current="true"] { background: var(--ui-surface-raised); border-color: var(--ui-border-strong); }
+.cw-stage-name { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--ui-text-muted); }
+.cw-stage-state { font-size: 11.5px; font-weight: 600; }
+
+.cw-section { padding: 11px 16px 0; }
+.cw-section h3 {
+  margin: 0 0 6px; font-size: 10.5px; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ui-text-dim);
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+}
+/* The evidence tally, compact and beside the heading rather than a block of its own. */
+.cw-section-counts {
+  margin-left: auto; letter-spacing: 0; text-transform: none; font-weight: 500; font-size: 10px;
+  color: var(--ui-text-muted); font-variant-numeric: tabular-nums;
+}
+.cw-section h4 { margin: 12px 0 5px; font-size: 11px; font-weight: 600; color: var(--ui-text-secondary); }
+.cw-section-action {
+  margin: 11px 16px 0; padding: 11px 14px; border-radius: 10px;
+  border: 1px solid var(--ui-border); background: var(--ui-surface); border-left: 3px solid var(--ui-border);
+}
+.cw-section-action[data-tone="warn"] { border-left-color: #e5bc57; }
+.cw-section-action[data-tone="ok"] { border-left-color: #9ad97f; }
+.cw-action-lead { margin: 0 0 9px; font-size: 13px; font-weight: 500; line-height: 1.5; }
+.cw-prose { margin: 0 0 6px; font-size: 11.5px; line-height: 1.55; color: var(--ui-text-secondary); }
+.cw-why { display: grid; grid-template-columns: 132px 1fr; gap: 4px 12px; margin: 0; font-size: 11.5px; }
+.cw-why dt { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--ui-text-muted); }
+.cw-why dd { margin: 0; line-height: 1.5; color: var(--ui-text-secondary); }
+.cw-note { margin: 5px 0; font-size: 10.5px; line-height: 1.5; color: var(--ui-text-dim); }
+
+.cw-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.cw-list > li { display: grid; gap: 2px; padding: 6px 8px; border-radius: 7px; background: var(--ui-surface); }
+.cw-list-main { font-size: 11.5px; font-weight: 500; }
+.cw-list-note { font-size: 10.5px; line-height: 1.45; color: var(--ui-text-dim); }
+.cw-pill {
+  justify-self: start; font-size: 9.5px; padding: 1px 7px; border-radius: 999px;
+  border: 1px solid var(--ui-border); color: var(--ui-text-dim);
+}
+.cw-pill[data-state="CANDIDATE"] { color: #9ad97f; border-color: color-mix(in srgb, #9ad97f 55%, transparent); }
+.cw-pill[data-state="NEEDS_REVIEW"] { color: #e5bc57; border-color: color-mix(in srgb, #e5bc57 55%, transparent); }
+.cw-pill[data-state="NOT_FOUND"], .cw-pill[data-state="HUMAN_ONLY"] { color: #e66259; border-color: color-mix(in srgb, #e66259 55%, transparent); }
+
+.cw-timeline { margin: 0; padding: 0; list-style: none; display: grid; gap: 5px; }
+.cw-timeline > li { border: 1px solid var(--ui-border-soft); border-radius: 9px; overflow: hidden;
+  border-left: 3px solid var(--ui-border); }
+.cw-timeline > li[data-tone="bad"] { border-left-color: #e66259; }
+.cw-timeline > li[data-tone="warn"] { border-left-color: #e5bc57; }
+.cw-timeline > li[data-tone="ok"] { border-left-color: #9ad97f; }
+.cw-timeline summary, .cw-section > details > summary {
+  cursor: pointer; padding: 8px 11px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  background: var(--ui-surface);
+}
+.cw-timeline summary:hover, .cw-section > details > summary:hover { background: var(--ui-surface-raised); }
+.cw-tl-name { font-size: 12px; font-weight: 600; }
+.cw-tl-state { font-size: 11px; color: var(--ui-text-secondary); }
+.cw-tl-counts { margin-left: auto; font-size: 10px; color: var(--ui-text-dim); font-variant-numeric: tabular-nums; }
+.cw-section > details { border: 1px solid var(--ui-border-soft); border-radius: 9px; overflow: hidden; margin-bottom: 5px; }
+/* Where the header tile just sent the reader. Fades rather than persists, so it marks the jump
+   without becoming a second kind of selection. */
+.cw-timeline details.is-targeted > summary { animation: cw-target 1.4s ease-out; }
+@keyframes cw-target {
+  0%, 40% { background: var(--ui-accent-tint); box-shadow: inset 2px 0 0 var(--ui-accent); }
+  100% { background: var(--ui-surface); box-shadow: none; }
+}
+
+.cw-checks { margin: 0; padding: 4px 11px 11px; list-style: none; display: grid; gap: 3px; }
+.cw-checks > li {
+  display: grid; grid-template-columns: 74px 1fr auto; gap: 2px 10px; align-items: baseline;
+  padding: 6px 8px; border-radius: 7px; background: var(--ui-surface);
+}
+.cw-check-status {
+  font-size: 9.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--ui-text-dim); align-self: start;
+}
+li[data-status="FAIL"] .cw-check-status { color: #e66259; }
+li[data-status="MISSING"] .cw-check-status { color: #e5bc57; }
+li[data-status="PASS"] .cw-check-status { color: #9ad97f; }
+.cw-check-label { font-size: 11.5px; }
+.cw-check-label i { font-style: normal; color: var(--ui-text-muted); font-size: 10px; }
+.cw-check-value { justify-self: end; font-size: 11px; color: var(--ui-text-secondary); text-align: right; }
+.cw-check-note { grid-column: 2 / -1; font-size: 10.5px; line-height: 1.45; color: var(--ui-text-dim); }
+.cw-evidence {
+  grid-column: 2 / -1; margin: 4px 0 0; padding: 6px 8px; border-radius: 6px;
+  background: var(--ui-surface-raised); font-size: 10.5px; line-height: 1.5;
+}
+.cw-evidence p { margin: 0 0 2px; }
+.cw-evidence[data-state="NEEDS_REVIEW"] { box-shadow: inset 2px 0 0 #e5bc57; }
+.cw-evidence[data-state="CANDIDATE"] { box-shadow: inset 2px 0 0 #9ad97f; }
+.cw-evidence[data-state="NOT_FOUND"], .cw-evidence[data-state="HUMAN_ONLY"] { box-shadow: inset 2px 0 0 #e66259; }
+.cw-evidence em { color: #a855f7; font-style: normal; }
+
+.cw-table { width: 100%; border-collapse: collapse; font-size: 11px; margin: 4px 0 8px; }
+.cw-table th, .cw-table td { padding: 4px 8px; text-align: left; border-bottom: 1px solid var(--ui-border-soft); }
+.cw-table thead th { font-size: 9.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--ui-text-muted); }
+.cw-table tbody th { font-weight: 500; }
+.cw-table em { font-style: normal; color: #a855f7; }
+
+.cw-money { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 8px; }
+.cw-money > div { display: grid; gap: 1px; padding: 7px 9px; border-radius: 7px; background: var(--ui-surface); }
+.cw-money em { font-style: normal; font-size: 9px; letter-spacing: .05em; text-transform: uppercase; color: var(--ui-text-muted); }
+.cw-money span { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cw-link { appearance: none; background: none; border: 0; padding: 0; font: inherit; font-size: inherit;
+  color: var(--ui-accent); cursor: pointer; }
+.cw-link:hover { text-decoration: underline; }
+
+.cw-trail { margin: 0; padding: 4px 11px 11px; list-style: none; display: grid; gap: 4px; }
+.cw-trail > li { display: grid; grid-template-columns: 148px 1fr; gap: 1px 10px; padding: 5px 0;
+  border-top: 1px solid var(--ui-border-soft); }
+.cw-trail > li:first-child { border-top: 0; }
+.cw-trail-when { font-size: 10px; color: var(--ui-text-muted); }
+.cw-trail-what { font-size: 11.5px; font-weight: 500; }
+.cw-trail-who { grid-column: 2; font-size: 10px; color: var(--ui-text-dim); }
+.cw-trail > li .cw-list-note { grid-column: 2; }
+
+/* One column on a narrow screen: the queue above, the case below. */
+@media (max-width: 1040px) {
+  .case-workbench { grid-template-columns: 1fr; grid-template-rows: minmax(140px, 32%) 1fr; }
+}

@@ -12,9 +12,49 @@ import CloseIcon from '@mui/icons-material/Close';
 import MyLocationOutlinedIcon from '@mui/icons-material/MyLocationOutlined';
 import ArrowBackOutlinedIcon from '@mui/icons-material/ArrowBackOutlined';
 import VideocamOutlinedIcon from '@mui/icons-material/VideocamOutlined';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { assetTypeConfig, detailRows } from './assetTypes.js';
 import { makeDraggable } from '../draggablePanel.js';
 import { RelatedRecords, relatedRecordCount, useRelatedGroups } from './RelatedRecords.jsx';
+import { AcsCaseDialog } from './AcsCaseDialog.jsx';
+/**
+ * Run the ACS QC/QA validation for the open case.
+ *
+ * Only while the dialog is open: the engine is cheap but there is no reason to evaluate 75 checks
+ * for a record nobody has asked about.
+ */
+function useQcQaReview(record, acsCase, open) {
+  const [state, setState] = useState({ review: null, loading: false });
+  useEffect(() => {
+    if (!open || !record) { setState({ review: null, loading: false }); return undefined; }
+    let live = true;
+    setState({ review: null, loading: true });
+    (async () => {
+      const [{ createLocalProvider }, { reviewRecord }] = await Promise.all([
+        import('../qcqa/providers/localProvider.js'),
+        import('../qcqa/qcqaService.js'),
+      ]);
+      const maintenance = window.__maintenance ?? null;
+      if (!maintenance) { if (live) setState({ review: null, loading: false }); return; }
+      const provider = createLocalProvider({ maintenance });
+      const review = await reviewRecord(record, { provider, acsCase }).catch(() => null);
+      if (live) setState({ review, loading: false });
+    })();
+    return () => { live = false; };
+  }, [open, record?.id, acsCase?.caseId]);
+  return state;
+}
+
+import { caseForIncident, loadAcsTasks } from '../acs/acsCases.js';
+
+/**
+ * Record types that carry an ACS repair case.
+ *
+ * The ACS form is an inspection-and-repair record, so the maintenance classes that follow a crash
+ * are the ones it belongs to. An asset or a camera is a thing, not a piece of work, and gets no
+ * case.
+ */
+const ACS_CASE_TYPES = new Set(['ticket', 'workOrder', 'inspection', 'task']);
 
 export const DETAILS_WIDTH = 310;
 
@@ -30,6 +70,16 @@ export function AssetDetailsPanel({
   const panelRef = useRef(null);
   const headingRef = useRef(null);
   const [tab, setTab] = useState(0);
+  const [acsTasks, setAcsTasks] = useState(null);
+  const [acsOpen, setAcsOpen] = useState(false);
+  useEffect(() => {
+    let live = true;
+    loadAcsTasks().then(payload => { if (live) setAcsTasks(payload); });
+    return () => { live = false; };
+  }, []);
+  const acsCase = ACS_CASE_TYPES.has(asset?.assetType) && asset?.source && acsTasks
+    ? caseForIncident(asset.source, acsTasks) : null;
+  const qcReview = useQcQaReview(asset?.source ?? null, acsCase, acsOpen);
   // A maintenance record is one class's view of something the other classes also wrote about; every
   // other asset type stands alone, so only these are offered the Related tab.
   const related = useRelatedGroups(asset?.source?.type ? asset.source : null, lookupRecords);
@@ -46,7 +96,7 @@ export function AssetDetailsPanel({
   }, [Boolean(asset)]);
 
   // Moving to another asset must not leave the panel on a tab about the previous one.
-  useEffect(() => { setTab(0); }, [asset?.assetType, asset?.id]);
+  useEffect(() => { setTab(0); setAcsOpen(false); }, [asset?.assetType, asset?.id]);
 
   if (!asset) return null;
   const config = assetTypeConfig(asset.assetType);
@@ -185,6 +235,13 @@ export function AssetDetailsPanel({
       <Stack spacing={1}>
         {/* A type may offer one action of its own — the gantry equipment offers a what-if — so the
             thing an operator wants to do next is where they are already looking. */}
+        {acsCase && (
+          <Button variant="contained" color="primary" endIcon={<ChevronRightIcon />}
+            onClick={() => setAcsOpen(true)}
+            aria-label={`Open ACS case ${acsCase.caseId} for ${asset.name ?? asset.id}`}>
+            Open ACS Case
+          </Button>
+        )}
         {config?.primaryAction && onAssetAction && (
           <Button
             variant="contained"
@@ -196,7 +253,7 @@ export function AssetDetailsPanel({
           </Button>
         )}
         <Button
-          variant={config?.primaryAction ? 'outlined' : 'contained'}
+          variant={config?.primaryAction || acsCase ? 'outlined' : 'contained'}
           startIcon={<MyLocationOutlinedIcon />}
           onClick={() => onInspect(asset)}
           disabled={!asset.coordinates}
@@ -218,6 +275,9 @@ export function AssetDetailsPanel({
         )}
       </Stack>
       </Box>
+      <AcsCaseDialog open={acsOpen} onClose={() => setAcsOpen(false)}
+        acsCase={acsCase} incident={asset?.source ?? null}
+        review={qcReview.review} reviewLoading={qcReview.loading} />
     </Paper>
   );
 }

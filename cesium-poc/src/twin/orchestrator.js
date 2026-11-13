@@ -193,7 +193,11 @@ function dedupeActions(actions) {
   const seen = new Set();
   const out = [];
   for (const action of actions) {
-    const key = JSON.stringify([action.type, action.incidentId ?? action.patrolId ?? action.assetId ?? null]);
+    // The subject AND the stage: two OPEN_VALIDATION_STAGE actions for different stages are two
+    // different actions, and keying on the type alone silently dropped one of them.
+    const key = JSON.stringify([action.type,
+      action.incidentId ?? action.patrolId ?? action.assetId ?? action.caseId ?? null,
+      action.stage ?? null]);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(action);

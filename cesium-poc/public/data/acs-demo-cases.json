@@ -1,0 +1,3599 @@
+{
+  "schemaVersion": "1.0",
+  "generatedFor": "ACS I-595 Safety Twin — Demo Case Validation",
+  "note": "Every record in this file is SYNTHETIC. It exists to demonstrate how the incident → inspection → repair → QC/QA → claim lifecycle is validated when a complete record set exists, which the real ACS and DataConnect exports do not yet provide. No inspection, repair, QC/QA or claim in this file happened. Personnel, work orders, claim references and photographs are invented and prefixed DEMO- so they cannot be mistaken for production records. Only the LOCATION of each case is real: it is taken from an existing I-595 incident in the corridor's own register at runtime, and the synthetic damage described here did not occur at that location.",
+  "assumptions": [
+    "Stage statuses shown in the application are DERIVED from the field data below by the shared validation engine. The declaredStatus on each stage is the demo narrative's own claim and is asserted against the derived value by the unit tests; it is never what the screen displays.",
+    "Where an ACS QC/QA checklist states no numeric tolerance, no tolerance has been invented. Thresholds carried here are quoted from the checklist itself (and name the clause). The one demonstration-only threshold is marked `demonstrationOnly: true` and is labelled as an assumption on screen.",
+    "Each case declares the ACS QC/QA checklist it was inspected against. The existing selection engine is still run and its own choice is reported beside the declared one, so a disagreement is visible rather than hidden.",
+    "Evidence recovery: only the DataConnect connector queries real data. Office Track, MIMS and SunGuide have no endpoint or credentials in this deployment, so their responses are deterministic synthetic stand-ins answered from this file, stamped synthetic on every record and never presented as API results.",
+    "Incident context: weather is a real Open-Meteo historical reading. No timestamped speed, volume or congestion observation exists for this corridor in any connected system, so those are synthetic and labelled; the lane-closure, injury and fatality flags and the segment AADT are real and are attributed to the source incident and the FDOT network."
+  ],
+  "cases": [
+    {
+      "demoCaseId": "ACS-DEMO-001",
+      "isDemo": true,
+      "demoLabel": "SYNTHETIC DEMO DATA",
+      "sourceIncidentId": null,
+      "locationPreference": {
+        "order": 1,
+        "direction": "EB"
+      },
+      "incident": {
+        "incidentType": "Vehicle collision",
+        "reportedAt": "2026-10-15T09:35:00-04:00",
+        "severity": "MODERATE",
+        "description": "Synthetic scenario: a single vehicle leaves the travel lane and strikes the crash attenuator shielding a gore-point barrier end. The attenuator nose is displaced and two cartridges are crushed."
+      },
+      "asset": {
+        "assetId": "DEMO-ASSET-001",
+        "assetType": "crash attenuator",
+        "assetSubtype": "QuadGuard",
+        "assetName": "Roadside crash attenuator (synthetic)",
+        "sourceAssetId": null
+      },
+      "qcqa": {
+        "templateId": "ACS-531.1",
+        "workActivity": "repair"
+      },
+      "inspection": {
+        "submission": "SUBMITTED",
+        "declaredStatus": "FAILED",
+        "inspectionId": "DEMO-INSP-001",
+        "inspectedAt": "2026-10-15T11:00:00-04:00",
+        "inspector": "Demo Inspector A. Rivera (synthetic)",
+        "fields": [
+          {
+            "fieldId": "insp_arrival_time",
+            "label": "Inspector on site",
+            "required": true,
+            "dataType": "date",
+            "validationType": "REQUIRED_FIELD",
+            "value": "2026-10-15T11:00:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_asset_identified",
+            "label": "Damaged asset identified",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "DEMO-ASSET-001 — QuadGuard attenuator, gore point",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_damage_description",
+            "label": "Damage description",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Nose panel displaced; bays 1 and 2 cartridges crushed; monorail anchors intact on visual check.",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_lane_impact",
+            "label": "Lane or shoulder impact",
+            "required": true,
+            "dataType": "enum",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Shoulder closed, no travel lane taken",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_damage_photos",
+            "label": "Damage photographs",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": null,
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "The inspector recorded that photographs were taken but none were attached to the submission."
+          },
+          {
+            "fieldId": "insp_nose_offset_in",
+            "label": "Nose panel displacement",
+            "required": true,
+            "dataType": "number",
+            "unit": "in",
+            "validationType": "REQUIRED_FIELD",
+            "value": null,
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "Measurement field left blank. Needed to decide reset against replacement."
+          },
+          {
+            "fieldId": "insp_cartridge_count",
+            "label": "Cartridges requiring replacement",
+            "required": true,
+            "dataType": "number",
+            "validationType": "REQUIRED_FIELD",
+            "value": null,
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "Blank. The repair quantity cannot be authorised without it."
+          },
+          {
+            "fieldId": "insp_pad_condition",
+            "label": "Concrete pad condition",
+            "required": true,
+            "dataType": "enum",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Not assessed",
+            "acceptance": {
+              "oneOf": [
+                "Sound",
+                "Spalled",
+                "Cracked",
+                "Replace"
+              ]
+            },
+            "note": "\"Not assessed\" is not one of the form's answers."
+          },
+          {
+            "fieldId": "insp_traffic_control",
+            "label": "Traffic control in place during inspection",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Shoulder taper, 2 cones + arrow board",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_inspector_signature",
+            "label": "Inspector confirmation",
+            "required": true,
+            "dataType": "approval",
+            "validationType": "APPROVAL_COMPLETENESS",
+            "value": null,
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "Submitted without the inspector's confirmation, so no one has attested to the findings."
+          },
+          {
+            "fieldId": "insp_police_report",
+            "label": "Police case number",
+            "required": false,
+            "dataType": "text",
+            "validationType": "CROSS_RECORD_CONSISTENCY",
+            "value": null,
+            "note": "Optional on this form; recorded by the responding agency rather than by ACS."
+          },
+          {
+            "fieldId": "insp_third_party",
+            "label": "Third party identified",
+            "required": false,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Vehicle departed before arrival; not identified"
+          }
+        ]
+      },
+      "repair": {
+        "submission": "NOT_SUBMITTED",
+        "declaredStatus": "NOT_STARTED",
+        "workOrderId": null,
+        "fields": [],
+        "note": "No repair record exists. Repair authorisation is held because the inspection is incomplete: the damage measurements and cartridge count that size the work were never recorded, and no one has confirmed the inspection."
+      },
+      "qualityAssurance": {
+        "submission": "NOT_SUBMITTED",
+        "declaredStatus": "PENDING",
+        "responses": {},
+        "approvals": {
+          "qc": null,
+          "qa": null
+        },
+        "nonConformances": [],
+        "reviewerNotes": null
+      },
+      "claim": {
+        "submission": "NOT_SUBMITTED",
+        "declaredStatus": "NOT_STARTED",
+        "claimReference": null,
+        "costs": {
+          "estimatedUSD": 8500,
+          "approvedUSD": null,
+          "claimedUSD": null,
+          "recoveredUSD": null
+        },
+        "costBasis": "Synthetic estimate for the demonstration. It is not an ACS rate and not a quotation.",
+        "fields": []
+      },
+      "evidenceRecovery": {
+        "outcome": "Two of the four missing inspection records are found in other systems. The cartridge count is nowhere — SunGuide did not answer — and the inspector confirmation is an act a person has to perform, so it can never be recovered. The inspection stays FAILED.",
+        "unavailableSystems": [
+          "SUNGUIDE"
+        ],
+        "notRecoverable": [
+          {
+            "fieldId": "insp_inspector_signature",
+            "reason": "An inspector's confirmation is an attestation, not a document. No record found in another system can stand in for a person signing that the findings are theirs.",
+            "requiresHuman": true
+          }
+        ],
+        "candidates": [
+          {
+            "recordId": "OT-FR-118244",
+            "system": "OFFICE_TRACK",
+            "recordType": "Field report attachment",
+            "resolves": "insp_damage_photos",
+            "enriches": false,
+            "summary": "Field report with 6 attached photographs of a damaged attenuator",
+            "value": "6 photographs (DEMO-OT-IMG-01 … 06), attached to Office Track field report OT-FR-118244",
+            "capturedAt": "2026-10-15T11:18:00-04:00",
+            "keys": {
+              "incidentId": null,
+              "workOrderId": null,
+              "assetId": "DEMO-ASSET-001",
+              "locationDistanceM": 12,
+              "minutesFromIncident": 103,
+              "direction": "EB"
+            },
+            "conflict": null
+          },
+          {
+            "recordId": "MIMS-PH-5521",
+            "system": "MIMS",
+            "recordType": "Photo set",
+            "resolves": "insp_damage_photos",
+            "enriches": false,
+            "summary": "Photo set filed against a neighbouring attenuator on the same shift",
+            "value": "4 photographs (DEMO-MIMS-IMG-11 … 14)",
+            "capturedAt": "2026-10-15T13:40:00-04:00",
+            "keys": {
+              "incidentId": null,
+              "workOrderId": null,
+              "assetId": "DEMO-ASSET-014",
+              "locationDistanceM": 240,
+              "minutesFromIncident": 245,
+              "direction": "EB"
+            },
+            "conflict": "This set shows an undamaged nose assembly, which contradicts the inspection's own damage description. Both sets cannot be of the same asset on the same day."
+          },
+          {
+            "recordId": "MIMS-MR-3098",
+            "system": "MIMS",
+            "recordType": "Measurement record",
+            "resolves": "insp_nose_offset_in",
+            "enriches": false,
+            "summary": "Attenuator displacement measurement taken during the follow-up site visit",
+            "value": "46",
+            "capturedAt": "2026-10-15T12:35:00-04:00",
+            "keys": {
+              "incidentId": null,
+              "workOrderId": null,
+              "assetId": "DEMO-ASSET-001",
+              "locationDistanceM": 9,
+              "minutesFromIncident": 180,
+              "direction": "EB"
+            },
+            "conflict": null
+          }
+        ]
+      },
+      "workflow": {
+        "currentStage": "INSPECTION",
+        "assignedRole": "INSPECTOR",
+        "assignedTeam": "ACS Field Inspection"
+      },
+      "auditTrail": [
+        {
+          "at": "2026-10-15T09:35:00-04:00",
+          "actor": "SunGuide (synthetic)",
+          "role": "SYSTEM",
+          "event": "Incident reported",
+          "detail": "Collision reported on the corridor; attenuator damage suspected."
+        },
+        {
+          "at": "2026-10-15T09:58:00-04:00",
+          "actor": "Demo Dispatcher K. Osei (synthetic)",
+          "role": "DISPATCHER",
+          "event": "Inspection assigned",
+          "detail": "Assigned to Demo Inspector A. Rivera."
+        },
+        {
+          "at": "2026-10-15T11:00:00-04:00",
+          "actor": "Demo Inspector A. Rivera (synthetic)",
+          "role": "INSPECTOR",
+          "event": "Inspection submitted",
+          "detail": "Submitted with 12 of 12 fields attempted; 4 mandatory fields unusable."
+        },
+        {
+          "at": "2026-10-15T11:04:00-04:00",
+          "actor": "Validation engine",
+          "role": "SYSTEM",
+          "event": "Inspection validation failed",
+          "detail": "Damage photographs, nose displacement, cartridge count and inspector confirmation are absent; pad condition is not an answer the form offers."
+        },
+        {
+          "at": "2026-10-15T11:04:00-04:00",
+          "actor": "Validation engine",
+          "role": "SYSTEM",
+          "event": "Repair authorisation held",
+          "detail": "Repair cannot be authorised from an inspection that does not size the work."
+        }
+      ]
+    },
+    {
+      "demoCaseId": "ACS-DEMO-002",
+      "isDemo": true,
+      "demoLabel": "SYNTHETIC DEMO DATA",
+      "sourceIncidentId": null,
+      "locationPreference": {
+        "order": 2,
+        "direction": "WB"
+      },
+      "incident": {
+        "incidentType": "Vehicle collision with fixed object",
+        "reportedAt": "2026-09-22T21:10:00-04:00",
+        "severity": "MODERATE",
+        "description": "Synthetic scenario: a vehicle strikes a highway lighting pole on the outside shoulder. The pole shears at the T-base and the luminaire is destroyed."
+      },
+      "asset": {
+        "assetId": "DEMO-ASSET-002",
+        "assetType": "lighting - street light",
+        "assetSubtype": "pole",
+        "assetName": "Highway lighting pole (synthetic)",
+        "sourceAssetId": null
+      },
+      "qcqa": {
+        "templateId": "ACS-787.1",
+        "workActivity": "repair"
+      },
+      "inspection": {
+        "submission": "SUBMITTED",
+        "declaredStatus": "PASSED",
+        "inspectionId": "DEMO-INSP-002",
+        "inspectedAt": "2026-09-22T22:40:00-04:00",
+        "inspector": "Demo Inspector L. Haddad (synthetic)",
+        "fields": [
+          {
+            "fieldId": "insp_arrival_time",
+            "label": "Inspector on site",
+            "required": true,
+            "dataType": "date",
+            "validationType": "REQUIRED_FIELD",
+            "value": "2026-09-22T22:40:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_asset_identified",
+            "label": "Damaged asset identified",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "DEMO-ASSET-002 — 40 ft aluminium pole, outside shoulder",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_damage_description",
+            "label": "Damage description",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Pole sheared at T-base; luminaire destroyed; break-away fuses parted as designed; no exposed live conductor found.",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_circuit_isolated",
+            "label": "Circuit isolated before inspection",
+            "required": true,
+            "dataType": "enum",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Yes — load centre LC-07 opened",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_damage_photos",
+            "label": "Damage photographs",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": "DEMO-PHOTO-002-A … DEMO-PHOTO-002-F (6 placeholder references)",
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "Placeholder references. No photographic file is shipped with this demonstration."
+          },
+          {
+            "fieldId": "insp_pole_id_badge",
+            "label": "Pole identification badge read",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Badge legible: SYN-LP-0417",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_foundation_condition",
+            "label": "Foundation condition",
+            "required": true,
+            "dataType": "enum",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Sound",
+            "acceptance": {
+              "oneOf": [
+                "Sound",
+                "Spalled",
+                "Cracked",
+                "Replace"
+              ]
+            }
+          },
+          {
+            "fieldId": "insp_anchor_bolts",
+            "label": "Anchor bolts serviceable",
+            "required": true,
+            "dataType": "enum",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Yes",
+            "acceptance": {
+              "oneOf": [
+                "Yes",
+                "No"
+              ]
+            }
+          },
+          {
+            "fieldId": "insp_hazard_cleared",
+            "label": "Immediate hazard cleared",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Debris removed from shoulder; opening barricaded",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_traffic_control",
+            "label": "Traffic control in place during inspection",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Shoulder closure, arrow board",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_inspector_signature",
+            "label": "Inspector confirmation",
+            "required": true,
+            "dataType": "approval",
+            "validationType": "APPROVAL_COMPLETENESS",
+            "value": "L. Haddad, 2026-09-22T23:05:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_police_report",
+            "label": "Police case number",
+            "required": false,
+            "dataType": "text",
+            "validationType": "CROSS_RECORD_CONSISTENCY",
+            "value": "DEMO-PD-2026-004471"
+          }
+        ]
+      },
+      "repair": {
+        "submission": "SUBMITTED",
+        "declaredStatus": "FAILED",
+        "workOrderId": "DEMO-WO-000212",
+        "completedAt": "2026-09-25T16:20:00-04:00",
+        "crew": "Demo Electrical Crew 3 (synthetic)",
+        "physicalWorkComplete": true,
+        "fields": [
+          {
+            "fieldId": "rep_work_order_reference",
+            "label": "Work order reference",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "DEMO-WO-000212",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_activity",
+            "label": "Repair activity",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Pole and luminaire replaced; T-base reused; break-away fuses renewed",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_start",
+            "label": "Work started",
+            "required": true,
+            "dataType": "date",
+            "validationType": "REQUIRED_FIELD",
+            "value": "2026-09-25T08:05:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_complete",
+            "label": "Work completed",
+            "required": true,
+            "dataType": "date",
+            "validationType": "REQUIRED_FIELD",
+            "value": "2026-09-25T16:20:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_crew",
+            "label": "Crew on site",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Demo Electrical Crew 3 (synthetic), 3 technicians",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_labour_hours",
+            "label": "Labour hours",
+            "required": true,
+            "dataType": "number",
+            "unit": "h",
+            "validationType": "REQUIRED_FIELD",
+            "value": 24.5,
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_traffic_control",
+            "label": "Traffic control / MOT record",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Shoulder closure 08:00–17:00, MOT plan DEMO-MOT-11",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_materials_record",
+            "label": "Materials used, with quantities",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": null,
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "The materials sub-table was never completed. Nothing records which pole, luminaire or fuse part numbers were fitted."
+          },
+          {
+            "fieldId": "rep_material_certificates",
+            "label": "Material conformance certificates",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": null,
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "No certificate attached, so the fitted pole cannot be shown to be an approved product."
+          },
+          {
+            "fieldId": "rep_completion_photos",
+            "label": "Work completion photographs",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": null,
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "Absent. The crew's own closing note says the light burns, but nothing shows the finished installation."
+          },
+          {
+            "fieldId": "rep_technician_signoff",
+            "label": "Technician sign-off",
+            "required": true,
+            "dataType": "approval",
+            "validationType": "APPROVAL_COMPLETENESS",
+            "value": null,
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "No technician has attested that the work was completed as recorded."
+          },
+          {
+            "fieldId": "rep_circuit_restored",
+            "label": "Circuit restored and tested",
+            "required": true,
+            "dataType": "enum",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Yes — LC-07 closed, fixture burns",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_site_cleared",
+            "label": "Work area cleaned",
+            "required": true,
+            "dataType": "enum",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Yes",
+            "acceptance": {
+              "oneOf": [
+                "Yes",
+                "No"
+              ]
+            }
+          }
+        ]
+      },
+      "qualityAssurance": {
+        "submission": "NOT_SUBMITTED",
+        "declaredStatus": "BLOCKED",
+        "responses": {},
+        "approvals": {
+          "qc": null,
+          "qa": null
+        },
+        "nonConformances": [],
+        "reviewerNotes": "QC cannot be carried out against ACS-787.1: the checklist asks whether the fitted pole, fuses and fixture match specification, and the repair record does not say what was fitted."
+      },
+      "claim": {
+        "submission": "NOT_SUBMITTED",
+        "declaredStatus": "NOT_STARTED",
+        "claimReference": null,
+        "costs": {
+          "estimatedUSD": 14200,
+          "approvedUSD": null,
+          "claimedUSD": null,
+          "recoveredUSD": null
+        },
+        "costBasis": "Synthetic estimate for the demonstration. Labour hours are recorded but no material cost exists, so no total is derivable.",
+        "fields": []
+      },
+      "evidenceRecovery": {
+        "outcome": "All three missing repair documents are recovered against the work order. The technician sign-off is not a document and cannot be recovered, so the repair stays FAILED even though the paperwork gap has closed.",
+        "unavailableSystems": [],
+        "notRecoverable": [
+          {
+            "fieldId": "rep_technician_signoff",
+            "reason": "A technician's sign-off attests that the work was done as recorded. Recovering the materials list proves what was fitted; it does not prove anyone has confirmed it.",
+            "requiresHuman": true
+          }
+        ],
+        "candidates": [
+          {
+            "recordId": "OT-MAT-77310",
+            "system": "OFFICE_TRACK",
+            "recordType": "Materials issue note",
+            "resolves": "rep_materials_record",
+            "enriches": false,
+            "summary": "Stores issue note raised against the work order",
+            "value": "1 × 40 ft aluminium pole (DEMO-POLE-40A); 1 × LED luminaire (DEMO-LUM-150); 2 × break-away fuse; 1 × T-base access plate",
+            "capturedAt": "2026-09-25T08:40:00-04:00",
+            "keys": {
+              "incidentId": null,
+              "workOrderId": "DEMO-WO-000212",
+              "assetId": "DEMO-ASSET-002",
+              "locationDistanceM": 0,
+              "minutesFromIncident": 3690,
+              "direction": "WB"
+            },
+            "conflict": null
+          },
+          {
+            "recordId": "MIMS-CERT-8812",
+            "system": "MIMS",
+            "recordType": "Conformance certificate",
+            "resolves": "rep_material_certificates",
+            "enriches": false,
+            "summary": "Manufacturer conformance certificate for the pole and luminaire batch",
+            "value": "DEMO-CERT-002-POLE, DEMO-CERT-002-LUM",
+            "capturedAt": "2026-09-24T09:05:00-04:00",
+            "keys": {
+              "incidentId": null,
+              "workOrderId": "DEMO-WO-000212",
+              "assetId": "DEMO-ASSET-002",
+              "locationDistanceM": 0,
+              "minutesFromIncident": 3625,
+              "direction": "WB"
+            },
+            "conflict": null
+          },
+          {
+            "recordId": "OT-FR-118902",
+            "system": "OFFICE_TRACK",
+            "recordType": "Field report attachment",
+            "resolves": "rep_completion_photos",
+            "enriches": false,
+            "summary": "Closing field report with photographs of the finished installation",
+            "value": "7 photographs (DEMO-OT-IMG-21 … 27)",
+            "capturedAt": "2026-09-25T16:05:00-04:00",
+            "keys": {
+              "incidentId": null,
+              "workOrderId": "DEMO-WO-000212",
+              "assetId": "DEMO-ASSET-002",
+              "locationDistanceM": 6,
+              "minutesFromIncident": 4135,
+              "direction": "WB"
+            },
+            "conflict": null
+          }
+        ]
+      },
+      "workflow": {
+        "currentStage": "REPAIR",
+        "assignedRole": "MAINTENANCE_SUPERVISOR",
+        "assignedTeam": "ACS Electrical Maintenance"
+      },
+      "auditTrail": [
+        {
+          "at": "2026-09-22T21:10:00-04:00",
+          "actor": "SunGuide (synthetic)",
+          "role": "SYSTEM",
+          "event": "Incident reported",
+          "detail": "Vehicle into lighting pole; shoulder obstruction."
+        },
+        {
+          "at": "2026-09-22T22:40:00-04:00",
+          "actor": "Demo Inspector L. Haddad (synthetic)",
+          "role": "INSPECTOR",
+          "event": "Inspection submitted",
+          "detail": "12 fields recorded; circuit isolated before inspection."
+        },
+        {
+          "at": "2026-09-22T23:06:00-04:00",
+          "actor": "Validation engine",
+          "role": "SYSTEM",
+          "event": "Inspection validation passed",
+          "detail": "All 11 mandatory inspection fields satisfied."
+        },
+        {
+          "at": "2026-09-23T07:30:00-04:00",
+          "actor": "Demo Planner R. Nakamura (synthetic)",
+          "role": "PLANNER",
+          "event": "Work order raised",
+          "detail": "DEMO-WO-000212 — pole and luminaire replacement."
+        },
+        {
+          "at": "2026-09-25T16:20:00-04:00",
+          "actor": "Demo Electrical Crew 3 (synthetic)",
+          "role": "TECHNICIAN",
+          "event": "Physical work completed",
+          "detail": "Pole and luminaire replaced; fixture burns on restoration."
+        },
+        {
+          "at": "2026-09-25T16:48:00-04:00",
+          "actor": "Demo Electrical Crew 3 (synthetic)",
+          "role": "TECHNICIAN",
+          "event": "Repair record submitted",
+          "detail": "Submitted without the materials sub-table, certificates, completion photographs or sign-off."
+        },
+        {
+          "at": "2026-09-25T16:49:00-04:00",
+          "actor": "Validation engine",
+          "role": "SYSTEM",
+          "event": "Repair validation failed",
+          "detail": "Four mandatory administrative records are absent. The physical repair is recorded as complete; its documentation is not."
+        },
+        {
+          "at": "2026-09-25T16:49:00-04:00",
+          "actor": "Validation engine",
+          "role": "SYSTEM",
+          "event": "QC/QA blocked",
+          "detail": "ACS-787.1 cannot be answered without the material record."
+        }
+      ]
+    },
+    {
+      "demoCaseId": "ACS-DEMO-003",
+      "isDemo": true,
+      "demoLabel": "SYNTHETIC DEMO DATA",
+      "sourceIncidentId": null,
+      "locationPreference": {
+        "order": 3,
+        "direction": "EB"
+      },
+      "incident": {
+        "incidentType": "Debris / pavement damage",
+        "reportedAt": "2026-08-11T06:20:00-04:00",
+        "severity": "MINOR",
+        "description": "Synthetic scenario: a shed load scrapes a length of lane-line raised pavement markers from the carriageway. The markers are replaced over a 300 ft run."
+      },
+      "asset": {
+        "assetId": "DEMO-ASSET-003",
+        "assetType": "raised pavement marker",
+        "assetSubtype": null,
+        "assetName": "Lane-line raised pavement markers, 300 ft run (synthetic)",
+        "sourceAssetId": null
+      },
+      "qcqa": {
+        "templateId": "ACS-537.1",
+        "workActivity": "installation"
+      },
+      "inspection": {
+        "submission": "SUBMITTED",
+        "declaredStatus": "PASSED",
+        "inspectionId": "DEMO-INSP-003",
+        "inspectedAt": "2026-08-11T08:15:00-04:00",
+        "inspector": "Demo Inspector P. Okonkwo (synthetic)",
+        "fields": [
+          {
+            "fieldId": "insp_arrival_time",
+            "label": "Inspector on site",
+            "required": true,
+            "dataType": "date",
+            "validationType": "REQUIRED_FIELD",
+            "value": "2026-08-11T08:15:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_asset_identified",
+            "label": "Damaged asset identified",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "DEMO-ASSET-003 — lane-line RPMs, inside lane line",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_damage_description",
+            "label": "Damage description",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "27 markers detached or sheared over a 300 ft run; adhesive footprints remain on the pavement.",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_extent_ft",
+            "label": "Extent of damage",
+            "required": true,
+            "dataType": "number",
+            "unit": "ft",
+            "validationType": "REQUIRED_FIELD",
+            "value": 300,
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_marker_count",
+            "label": "Markers to be replaced",
+            "required": true,
+            "dataType": "number",
+            "validationType": "REQUIRED_FIELD",
+            "value": 27,
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_striping_type",
+            "label": "Adjacent traffic striping",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "White skip lane line — clear/clear markers required",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_pavement_condition",
+            "label": "Pavement condition at marker seats",
+            "required": true,
+            "dataType": "enum",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Sound",
+            "acceptance": {
+              "oneOf": [
+                "Sound",
+                "Spalled",
+                "Cracked",
+                "Replace"
+              ]
+            }
+          },
+          {
+            "fieldId": "insp_damage_photos",
+            "label": "Damage photographs",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": "DEMO-PHOTO-003-A … DEMO-PHOTO-003-D (4 placeholder references)",
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "Placeholder references."
+          },
+          {
+            "fieldId": "insp_traffic_control",
+            "label": "Traffic control in place during inspection",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Rolling lane closure with TMA",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_inspector_signature",
+            "label": "Inspector confirmation",
+            "required": true,
+            "dataType": "approval",
+            "validationType": "APPROVAL_COMPLETENESS",
+            "value": "P. Okonkwo, 2026-08-11T08:52:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          }
+        ]
+      },
+      "repair": {
+        "submission": "SUBMITTED",
+        "declaredStatus": "PASSED",
+        "workOrderId": "DEMO-WO-000198",
+        "completedAt": "2026-08-13T13:40:00-04:00",
+        "crew": "Demo Markings Crew 1 (synthetic)",
+        "physicalWorkComplete": true,
+        "fields": [
+          {
+            "fieldId": "rep_work_order_reference",
+            "label": "Work order reference",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "DEMO-WO-000198",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_activity",
+            "label": "Repair activity",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "27 clear/clear RPMs installed on bituminous adhesive over a 300 ft run",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_start",
+            "label": "Work started",
+            "required": true,
+            "dataType": "date",
+            "validationType": "REQUIRED_FIELD",
+            "value": "2026-08-13T09:00:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_complete",
+            "label": "Work completed",
+            "required": true,
+            "dataType": "date",
+            "validationType": "REQUIRED_FIELD",
+            "value": "2026-08-13T13:40:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_crew",
+            "label": "Crew on site",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Demo Markings Crew 1 (synthetic), 4 operatives",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_labour_hours",
+            "label": "Labour hours",
+            "required": true,
+            "dataType": "number",
+            "unit": "h",
+            "validationType": "REQUIRED_FIELD",
+            "value": 18,
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_materials_record",
+            "label": "Materials used, with quantities",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "27 × clear/clear RPM (QPL listed, synthetic part DEMO-RPM-CC); 1 × 5 gal bituminous adhesive (QPL listed)",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_material_certificates",
+            "label": "Material conformance certificates",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": "DEMO-CERT-003-RPM, DEMO-CERT-003-ADH",
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "Placeholder certificate references."
+          },
+          {
+            "fieldId": "rep_traffic_control",
+            "label": "Traffic control / MOT record",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Rolling lane closure 09:00–14:00, MOT plan DEMO-MOT-04",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_completion_photos",
+            "label": "Work completion photographs",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": "DEMO-PHOTO-003-E … DEMO-PHOTO-003-J (6 placeholder references)",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_technician_signoff",
+            "label": "Technician sign-off",
+            "required": true,
+            "dataType": "approval",
+            "validationType": "APPROVAL_COMPLETENESS",
+            "value": "Demo Foreman S. Petrov (synthetic), 2026-08-13T14:05:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_site_cleared",
+            "label": "Work area cleaned",
+            "required": true,
+            "dataType": "enum",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Yes",
+            "acceptance": {
+              "oneOf": [
+                "Yes",
+                "No"
+              ]
+            }
+          }
+        ]
+      },
+      "qualityAssurance": {
+        "submission": "SUBMITTED",
+        "declaredStatus": "FAILED",
+        "reviewedAt": "2026-08-15T10:30:00-04:00",
+        "reviewer": "Demo QC Reviewer M. Castellanos (synthetic)",
+        "responses": {
+          "ACS-537.1-Q01": "YES",
+          "ACS-537.1-Q02": "YES",
+          "ACS-537.1-Q03": "YES",
+          "ACS-537.1-Q04": "YES",
+          "ACS-537.1-Q05": "NO",
+          "ACS-537.1-Q06": "YES",
+          "ACS-537.1-Q07": "YES",
+          "ACS-537.1-Q08": "NO",
+          "ACS-537.1-Q09": "YES"
+        },
+        "approvals": {
+          "qc": null,
+          "qa": null
+        },
+        "measurements": [
+          {
+            "label": "RPM spacing, inside lane line",
+            "observed": 52,
+            "unit": "in",
+            "acceptance": "Correct spacing for the application (ACS-537.1 Q05); the drawing for a white skip lane line specifies 40 in centres on this run",
+            "demonstrationOnly": true,
+            "note": "The checklist itself states no figure. The 40 in centre quoted here is a demonstration-only assumption so the measurement can be compared with something; it is not an FDOT citation."
+          },
+          {
+            "label": "Markers set at striping centres",
+            "observed": "19 of 27 on centre",
+            "unit": null,
+            "acceptance": "All RPMs at the correct traffic striping centres (ACS-537.1 Q08)",
+            "demonstrationOnly": false
+          }
+        ],
+        "nonConformances": [
+          {
+            "id": "DEMO-NCR-003-01",
+            "question": "ACS-537.1-Q05",
+            "finding": "Installed spacing averages 52 in against a 40 in design centre on this run — 8 of 27 markers are outside the pattern.",
+            "severity": "CRITICAL",
+            "correctiveAction": "Lift and reset the 8 markers that are off pattern, then re-measure the full 300 ft run.",
+            "status": "OPEN",
+            "raisedAt": "2026-08-15T10:30:00-04:00"
+          },
+          {
+            "id": "DEMO-NCR-003-02",
+            "question": "ACS-537.1-Q08",
+            "finding": "Markers are not set at the traffic striping centres over the last 90 ft of the run.",
+            "severity": "CRITICAL",
+            "correctiveAction": "Reset the final 90 ft to the striping centres.",
+            "status": "OPEN",
+            "raisedAt": "2026-08-15T10:30:00-04:00"
+          },
+          {
+            "id": "DEMO-NCR-003-03",
+            "question": "ACS-537.1-ACCEPTANCE",
+            "finding": "No acceptance record was filed for the completed installation, so there is nothing to approve even once the resets are done.",
+            "severity": "WARNING",
+            "correctiveAction": "File the acceptance record with the re-measurement.",
+            "status": "OPEN",
+            "raisedAt": "2026-08-15T10:34:00-04:00"
+          }
+        ],
+        "reviewerNotes": "Materials and adhesive are in order and the certificates are on file. The installation geometry is not: two of the nine checklist items fail on measurement, and no acceptance record exists. Rework and a repeat QC are required before this can be approved."
+      },
+      "claim": {
+        "submission": "NOT_SUBMITTED",
+        "declaredStatus": "BLOCKED",
+        "claimReference": null,
+        "costs": {
+          "estimatedUSD": 4100,
+          "approvedUSD": null,
+          "claimedUSD": null,
+          "recoveredUSD": null
+        },
+        "costBasis": "Synthetic estimate. Rework cost is not included because the rework has not been scoped.",
+        "fields": [],
+        "note": "A claim cannot be advanced while the repair it would recover the cost of is non-conforming."
+      },
+      "evidenceRecovery": {
+        "outcome": "The two certificates of analysis the checklist asks for are recovered, so those items stop being MISSING. They become NEEDS VERIFICATION rather than PASS, because nobody has yet checked that the recovered files are the right ones. The two failed spacing measurements are untouched: no document overturns a measurement, and QC/QA stays FAILED.",
+        "unavailableSystems": [],
+        "notRecoverable": [
+          {
+            "fieldId": "ACS-537.1-APPROVAL-QC",
+            "reason": "A QC sign-off is a reviewer accepting the work. It cannot be recovered from another system, and it must not exist while two checklist items are failing.",
+            "requiresHuman": true
+          },
+          {
+            "fieldId": "ACS-537.1-APPROVAL-QA",
+            "reason": "A QA countersignature follows a QC approval that does not exist yet.",
+            "requiresHuman": true
+          }
+        ],
+        "candidates": [
+          {
+            "recordId": "MIMS-COA-4417",
+            "system": "MIMS",
+            "recordType": "Certificate of analysis",
+            "resolves": "ACS-537.1-Q01-EVIDENCE",
+            "enriches": false,
+            "summary": "Manufacturer certificate of analysis for the RPM batch",
+            "value": "DEMO-COA-RPM-4417 (clear/clear markers, QPL listed)",
+            "capturedAt": "2026-08-12T10:00:00-04:00",
+            "keys": {
+              "incidentId": null,
+              "workOrderId": "DEMO-WO-000198",
+              "assetId": "DEMO-ASSET-003",
+              "locationDistanceM": 0,
+              "minutesFromIncident": 1780,
+              "direction": "EB"
+            },
+            "conflict": null
+          },
+          {
+            "recordId": "MIMS-COA-4418",
+            "system": "MIMS",
+            "recordType": "Certificate of analysis",
+            "resolves": "ACS-537.1-Q02-EVIDENCE",
+            "enriches": false,
+            "summary": "Manufacturer certificate of analysis for the bituminous adhesive batch",
+            "value": "DEMO-COA-ADH-4418 (bituminous adhesive, QPL listed)",
+            "capturedAt": "2026-08-12T10:02:00-04:00",
+            "keys": {
+              "incidentId": null,
+              "workOrderId": "DEMO-WO-000198",
+              "assetId": "DEMO-ASSET-003",
+              "locationDistanceM": 0,
+              "minutesFromIncident": 1782,
+              "direction": "EB"
+            },
+            "conflict": null
+          }
+        ]
+      },
+      "workflow": {
+        "currentStage": "QCQA",
+        "assignedRole": "QC_REVIEWER",
+        "assignedTeam": "ACS Quality Control"
+      },
+      "auditTrail": [
+        {
+          "at": "2026-08-11T06:20:00-04:00",
+          "actor": "FL511 (synthetic)",
+          "role": "SYSTEM",
+          "event": "Incident reported",
+          "detail": "Debris in lane; pavement marker damage reported by patrol."
+        },
+        {
+          "at": "2026-08-11T08:52:00-04:00",
+          "actor": "Demo Inspector P. Okonkwo (synthetic)",
+          "role": "INSPECTOR",
+          "event": "Inspection submitted",
+          "detail": "27 markers over 300 ft; pavement sound."
+        },
+        {
+          "at": "2026-08-11T08:55:00-04:00",
+          "actor": "Validation engine",
+          "role": "SYSTEM",
+          "event": "Inspection validation passed",
+          "detail": "All 10 mandatory inspection fields satisfied."
+        },
+        {
+          "at": "2026-08-12T07:10:00-04:00",
+          "actor": "Demo Planner R. Nakamura (synthetic)",
+          "role": "PLANNER",
+          "event": "Work order raised",
+          "detail": "DEMO-WO-000198 — RPM replacement."
+        },
+        {
+          "at": "2026-08-13T14:05:00-04:00",
+          "actor": "Demo Markings Crew 1 (synthetic)",
+          "role": "TECHNICIAN",
+          "event": "Repair record submitted",
+          "detail": "Materials, certificates, photographs and sign-off all filed."
+        },
+        {
+          "at": "2026-08-13T14:06:00-04:00",
+          "actor": "Validation engine",
+          "role": "SYSTEM",
+          "event": "Repair validation passed",
+          "detail": "All 12 mandatory repair fields satisfied."
+        },
+        {
+          "at": "2026-08-15T10:30:00-04:00",
+          "actor": "Demo QC Reviewer M. Castellanos (synthetic)",
+          "role": "QC_REVIEWER",
+          "event": "QC/QA inspection submitted",
+          "detail": "ACS-537.1 answered; 2 items recorded NO on measurement."
+        },
+        {
+          "at": "2026-08-15T10:34:00-04:00",
+          "actor": "Demo QC Reviewer M. Castellanos (synthetic)",
+          "role": "QC_REVIEWER",
+          "event": "Non-conformances raised",
+          "detail": "DEMO-NCR-003-01, -02 and -03 opened."
+        },
+        {
+          "at": "2026-08-15T10:35:00-04:00",
+          "actor": "Validation engine",
+          "role": "SYSTEM",
+          "event": "QC/QA validation failed",
+          "detail": "Two checklist items fail against ACS-537.1 and neither sign-off exists."
+        },
+        {
+          "at": "2026-08-15T10:35:00-04:00",
+          "actor": "Validation engine",
+          "role": "SYSTEM",
+          "event": "Claim blocked",
+          "detail": "Rework is outstanding, so the repair cost is not final."
+        }
+      ]
+    },
+    {
+      "demoCaseId": "ACS-DEMO-004",
+      "isDemo": true,
+      "demoLabel": "SYNTHETIC DEMO DATA",
+      "sourceIncidentId": null,
+      "locationPreference": {
+        "order": 4,
+        "direction": "WB"
+      },
+      "incident": {
+        "incidentType": "Vehicle collision",
+        "reportedAt": "2026-07-03T17:45:00-04:00",
+        "severity": "MODERATE",
+        "description": "Synthetic scenario: a box truck strikes a QuadGuard crash attenuator at a ramp gore. The system absorbs the impact as designed and is rebuilt to specification."
+      },
+      "asset": {
+        "assetId": "DEMO-ASSET-004",
+        "assetType": "crash attenuator",
+        "assetSubtype": "QuadGuard",
+        "assetName": "QuadGuard crash attenuator, ramp gore (synthetic)",
+        "sourceAssetId": null
+      },
+      "qcqa": {
+        "templateId": "ACS-531.1",
+        "workActivity": "repair"
+      },
+      "inspection": {
+        "submission": "SUBMITTED",
+        "declaredStatus": "PASSED",
+        "inspectionId": "DEMO-INSP-004",
+        "inspectedAt": "2026-07-03T18:55:00-04:00",
+        "inspector": "Demo Inspector A. Rivera (synthetic)",
+        "fields": [
+          {
+            "fieldId": "insp_arrival_time",
+            "label": "Inspector on site",
+            "required": true,
+            "dataType": "date",
+            "validationType": "REQUIRED_FIELD",
+            "value": "2026-07-03T18:55:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_asset_identified",
+            "label": "Damaged asset identified",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "DEMO-ASSET-004 — QuadGuard, 6-bay narrow system",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_damage_description",
+            "label": "Damage description",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Full-stroke impact. Nose cartridge destroyed, bays 1–4 cartridges crushed, four fender panels deformed, monorail straight and anchors sound.",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_nose_offset_in",
+            "label": "Nose panel displacement",
+            "required": true,
+            "dataType": "number",
+            "unit": "in",
+            "validationType": "REQUIRED_FIELD",
+            "value": 46,
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_cartridge_count",
+            "label": "Cartridges requiring replacement",
+            "required": true,
+            "dataType": "number",
+            "validationType": "REQUIRED_FIELD",
+            "value": 5,
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_pad_condition",
+            "label": "Concrete pad condition",
+            "required": true,
+            "dataType": "enum",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Sound",
+            "acceptance": {
+              "oneOf": [
+                "Sound",
+                "Spalled",
+                "Cracked",
+                "Replace"
+              ]
+            }
+          },
+          {
+            "fieldId": "insp_damage_photos",
+            "label": "Damage photographs",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": "DEMO-PHOTO-004-A … DEMO-PHOTO-004-H (8 placeholder references)",
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "Placeholder references."
+          },
+          {
+            "fieldId": "insp_lane_impact",
+            "label": "Lane or shoulder impact",
+            "required": true,
+            "dataType": "enum",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Ramp gore closed; mainline unaffected",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_traffic_control",
+            "label": "Traffic control in place during inspection",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Gore closure with arrow board and TMA",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_inspector_signature",
+            "label": "Inspector confirmation",
+            "required": true,
+            "dataType": "approval",
+            "validationType": "APPROVAL_COMPLETENESS",
+            "value": "A. Rivera, 2026-07-03T19:30:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_police_report",
+            "label": "Police case number",
+            "required": false,
+            "dataType": "text",
+            "validationType": "CROSS_RECORD_CONSISTENCY",
+            "value": "DEMO-PD-2026-003118"
+          },
+          {
+            "fieldId": "insp_third_party",
+            "label": "Third party identified",
+            "required": false,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Commercial vehicle, operator details taken by responding agency"
+          }
+        ]
+      },
+      "repair": {
+        "submission": "SUBMITTED",
+        "declaredStatus": "PASSED",
+        "workOrderId": "DEMO-WO-000171",
+        "completedAt": "2026-07-08T15:10:00-04:00",
+        "crew": "Demo Roadside Crew 2 (synthetic)",
+        "physicalWorkComplete": true,
+        "fields": [
+          {
+            "fieldId": "rep_work_order_reference",
+            "label": "Work order reference",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "DEMO-WO-000171",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_activity",
+            "label": "Repair activity",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "System rebuilt: 5 cartridges, nose panel, 4 fender panels and 6 die springs replaced; anchors re-torqued to manufacturer specification",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_start",
+            "label": "Work started",
+            "required": true,
+            "dataType": "date",
+            "validationType": "REQUIRED_FIELD",
+            "value": "2026-07-08T07:30:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_complete",
+            "label": "Work completed",
+            "required": true,
+            "dataType": "date",
+            "validationType": "REQUIRED_FIELD",
+            "value": "2026-07-08T15:10:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_crew",
+            "label": "Crew on site",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Demo Roadside Crew 2 (synthetic), 4 operatives",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_labour_hours",
+            "label": "Labour hours",
+            "required": true,
+            "dataType": "number",
+            "unit": "h",
+            "validationType": "REQUIRED_FIELD",
+            "value": 30.5,
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_materials_record",
+            "label": "Materials used, with quantities",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "5 × QuadGuard cartridge (DEMO-QG-CART); 1 × nose panel; 4 × fender panel; 6 × tension die spring; 12 × anchor stud",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_material_certificates",
+            "label": "Material conformance certificates",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": "DEMO-CERT-004-QG",
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "Placeholder certificate reference."
+          },
+          {
+            "fieldId": "rep_torque_record",
+            "label": "Anchor torque record",
+            "required": true,
+            "dataType": "text",
+            "validationType": "TECHNICAL_THRESHOLD",
+            "value": "All 12 anchor nuts torqued to manufacturer specification; calibrated wrench DEMO-TW-02",
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "ACS-531.1 Q03 requires manufacturer specification and quotes no figure, so none is asserted here."
+          },
+          {
+            "fieldId": "rep_traffic_control",
+            "label": "Traffic control / MOT record",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Gore closure 07:00–16:00, MOT plan DEMO-MOT-07",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_completion_photos",
+            "label": "Work completion photographs",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": "DEMO-PHOTO-004-J … DEMO-PHOTO-004-R (9 placeholder references)",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_technician_signoff",
+            "label": "Technician sign-off",
+            "required": true,
+            "dataType": "approval",
+            "validationType": "APPROVAL_COMPLETENESS",
+            "value": "Demo Foreman S. Petrov (synthetic), 2026-07-08T15:35:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_site_cleared",
+            "label": "Work area cleaned",
+            "required": true,
+            "dataType": "enum",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Yes",
+            "acceptance": {
+              "oneOf": [
+                "Yes",
+                "No"
+              ]
+            }
+          }
+        ]
+      },
+      "qualityAssurance": {
+        "submission": "SUBMITTED",
+        "declaredStatus": "PASSED",
+        "reviewedAt": "2026-07-09T11:00:00-04:00",
+        "reviewer": "Demo QC Reviewer M. Castellanos (synthetic)",
+        "responses": {
+          "ACS-531.1-Q01": "YES",
+          "ACS-531.1-Q02": "YES",
+          "ACS-531.1-Q03": "YES",
+          "ACS-531.1-Q04": "YES",
+          "ACS-531.1-Q05": "YES",
+          "ACS-531.1-Q06": "YES",
+          "ACS-531.1-Q07": "YES",
+          "ACS-531.1-Q08": "YES",
+          "ACS-531.1-Q09": "NA",
+          "ACS-531.1-Q10": "YES",
+          "ACS-531.1-Q11": "YES",
+          "ACS-531.1-Q12": "YES",
+          "ACS-531.1-Q13": "YES",
+          "ACS-531.1-Q14": "YES",
+          "ACS-531.1-Q15": "YES",
+          "ACS-531.1-Q16": "YES",
+          "ACS-531.1-Q17": "YES",
+          "ACS-531.1-Q18": "YES",
+          "ACS-531.1-Q19": "YES"
+        },
+        "approvals": {
+          "qc": {
+            "signatory": "Demo QC Reviewer M. Castellanos (synthetic)",
+            "approvedAt": "2026-07-09T11:20:00-04:00"
+          },
+          "qa": {
+            "signatory": "Demo QA Manager T. Eriksen (synthetic)",
+            "approvedAt": "2026-07-09T16:05:00-04:00"
+          }
+        },
+        "measurements": [
+          {
+            "label": "Clearance behind rear fender panels",
+            "observed": 30,
+            "unit": "in",
+            "acceptance": "30 in (ACS-531.1 Q02)",
+            "demonstrationOnly": false
+          },
+          {
+            "label": "Nose panel height above pad",
+            "observed": 32.125,
+            "unit": "in",
+            "acceptance": "32 1/8 in (ACS-531.1 Q04)",
+            "demonstrationOnly": false
+          },
+          {
+            "label": "Anchor stud height above pad",
+            "observed": 1.25,
+            "unit": "in",
+            "acceptance": "1.5 in maximum (ACS-531.1 Q10)",
+            "demonstrationOnly": false
+          },
+          {
+            "label": "Fender panel gap, narrow system",
+            "observed": 0.78,
+            "unit": "in",
+            "acceptance": "0.78 in [20 mm] (ACS-531.1 Q17)",
+            "demonstrationOnly": false
+          }
+        ],
+        "nonConformances": [],
+        "reviewerNotes": "Rebuild inspected against ACS-531.1. Q09 is not applicable: a transition panel is fitted, so the narrow side panel check does not arise. All measured items are within the figures the checklist itself states."
+      },
+      "claim": {
+        "submission": "SUBMITTED",
+        "declaredStatus": "FAILED",
+        "claimReference": "DEMO-CLM-0004",
+        "submittedAt": "2026-07-14T09:20:00-04:00",
+        "preparedBy": "Demo Claims Officer J. Whitfield (synthetic)",
+        "insurerDecision": null,
+        "costs": {
+          "estimatedUSD": 31800,
+          "approvedUSD": 31800,
+          "claimedUSD": 34250,
+          "recoveredUSD": null
+        },
+        "costBasis": "Synthetic figures. The claimed total exceeds the approved repair cost by $2,450, which is the reconciliation failure this case demonstrates.",
+        "fields": [
+          {
+            "fieldId": "clm_incident_report",
+            "label": "Incident report reference",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Source incident record (resolved at runtime)",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "clm_police_report",
+            "label": "Police report",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": "DEMO-PD-2026-003118",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "clm_third_party_details",
+            "label": "Third party and insurer details",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": null,
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "The responding agency took the operator's details; they were never transcribed onto the claim. Without them there is no party to recover from."
+          },
+          {
+            "fieldId": "clm_inspection_package",
+            "label": "Inspection record and photographs",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": "DEMO-INSP-004 with 8 photograph references",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "clm_repair_package",
+            "label": "Repair record, materials and photographs",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": "DEMO-WO-000171 with 9 photograph references and material list",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "clm_qc_approval",
+            "label": "QC/QA approval",
+            "required": true,
+            "dataType": "approval",
+            "validationType": "APPROVAL_COMPLETENESS",
+            "value": "QC 2026-07-09, QA 2026-07-09",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "clm_cost_reconciliation",
+            "label": "Cost reconciliation against the approved repair cost",
+            "required": true,
+            "dataType": "currency",
+            "validationType": "CROSS_RECORD_CONSISTENCY",
+            "value": 34250,
+            "acceptance": {
+              "equalsField": "clm_approved_cost"
+            },
+            "note": "The claimed total must equal the approved repair cost, or carry a documented variation. Neither is true here."
+          },
+          {
+            "fieldId": "clm_approved_cost",
+            "label": "Approved repair cost",
+            "required": true,
+            "dataType": "currency",
+            "validationType": "REQUIRED_FIELD",
+            "value": 31800,
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "clm_variation_note",
+            "label": "Documented variation for the difference",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": null,
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "No variation explains the $2,450 difference between the claimed and approved totals."
+          },
+          {
+            "fieldId": "clm_officer_signoff",
+            "label": "Claims officer sign-off",
+            "required": true,
+            "dataType": "approval",
+            "validationType": "APPROVAL_COMPLETENESS",
+            "value": "J. Whitfield, 2026-07-14T09:20:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          }
+        ],
+        "note": "This case fails ACS's own pre-submission validation. No insurer has seen it and no insurer decision is recorded, so nothing here is a rejection by an insurer."
+      },
+      "evidenceRecovery": {
+        "outcome": "The third-party and insurer details are found in the traffic management centre's own incident record, but nothing there names this case's asset or work order, so the match is circumstantial and needs a reviewer. The $2,450 discrepancy between the claimed and approved totals is a failed reconciliation, not a missing document: no recovered record can close it.",
+        "unavailableSystems": [],
+        "notRecoverable": [],
+        "candidates": [
+          {
+            "recordId": "SG-INC-2026-18844",
+            "system": "SUNGUIDE",
+            "recordType": "Incident detail record",
+            "resolves": "clm_third_party_details",
+            "enriches": false,
+            "summary": "Traffic management centre incident record naming the responding agency and the vehicle operator",
+            "value": "Operator: Demo Freight Co. (synthetic); policy DEMO-POL-55120; agency reference DEMO-PD-2026-003118",
+            "capturedAt": "2026-07-03T18:02:00-04:00",
+            "keys": {
+              "incidentId": null,
+              "workOrderId": null,
+              "assetId": null,
+              "locationDistanceM": 8,
+              "minutesFromIncident": 17,
+              "direction": "WB"
+            },
+            "conflict": null
+          }
+        ]
+      },
+      "workflow": {
+        "currentStage": "CLAIM",
+        "assignedRole": "CLAIMS_OFFICER",
+        "assignedTeam": "ACS Claims"
+      },
+      "auditTrail": [
+        {
+          "at": "2026-07-03T17:45:00-04:00",
+          "actor": "SunGuide (synthetic)",
+          "role": "SYSTEM",
+          "event": "Incident reported",
+          "detail": "Box truck into ramp gore attenuator."
+        },
+        {
+          "at": "2026-07-03T19:30:00-04:00",
+          "actor": "Demo Inspector A. Rivera (synthetic)",
+          "role": "INSPECTOR",
+          "event": "Inspection submitted",
+          "detail": "Full-stroke impact recorded with measurements and 8 photograph references."
+        },
+        {
+          "at": "2026-07-03T19:31:00-04:00",
+          "actor": "Validation engine",
+          "role": "SYSTEM",
+          "event": "Inspection validation passed",
+          "detail": "All 10 mandatory inspection fields satisfied."
+        },
+        {
+          "at": "2026-07-04T08:00:00-04:00",
+          "actor": "Demo Planner R. Nakamura (synthetic)",
+          "role": "PLANNER",
+          "event": "Work order raised",
+          "detail": "DEMO-WO-000171 — attenuator rebuild; cartridges ordered."
+        },
+        {
+          "at": "2026-07-08T15:35:00-04:00",
+          "actor": "Demo Roadside Crew 2 (synthetic)",
+          "role": "TECHNICIAN",
+          "event": "Repair record submitted",
+          "detail": "Rebuild complete; materials, torque record, photographs and sign-off filed."
+        },
+        {
+          "at": "2026-07-08T15:36:00-04:00",
+          "actor": "Validation engine",
+          "role": "SYSTEM",
+          "event": "Repair validation passed",
+          "detail": "All 13 mandatory repair fields satisfied."
+        },
+        {
+          "at": "2026-07-09T11:20:00-04:00",
+          "actor": "Demo QC Reviewer M. Castellanos (synthetic)",
+          "role": "QC_REVIEWER",
+          "event": "QC approved",
+          "detail": "ACS-531.1: 18 items YES, 1 not applicable, 0 findings."
+        },
+        {
+          "at": "2026-07-09T16:05:00-04:00",
+          "actor": "Demo QA Manager T. Eriksen (synthetic)",
+          "role": "QA_MANAGER",
+          "event": "QA approved",
+          "detail": "QC pack reviewed and countersigned."
+        },
+        {
+          "at": "2026-07-14T09:20:00-04:00",
+          "actor": "Demo Claims Officer J. Whitfield (synthetic)",
+          "role": "CLAIMS_OFFICER",
+          "event": "Claim submitted for internal validation",
+          "detail": "DEMO-CLM-0004 raised against the third party."
+        },
+        {
+          "at": "2026-07-14T09:21:00-04:00",
+          "actor": "Validation engine",
+          "role": "SYSTEM",
+          "event": "Claim validation failed",
+          "detail": "Third-party and insurer details absent; claimed total $34,250 against an approved cost of $31,800 with no documented variation."
+        }
+      ]
+    },
+    {
+      "demoCaseId": "ACS-DEMO-005",
+      "isDemo": true,
+      "demoLabel": "SYNTHETIC DEMO DATA",
+      "sourceIncidentId": null,
+      "locationPreference": {
+        "order": 5,
+        "direction": "EB"
+      },
+      "incident": {
+        "incidentType": "Vehicle collision with fixed object",
+        "reportedAt": "2026-05-19T04:05:00-04:00",
+        "severity": "MINOR",
+        "description": "Synthetic scenario: a vehicle clips a lighting pole base on the outside shoulder. The pole stands but the fixture, fuses and access plate are damaged and replaced."
+      },
+      "asset": {
+        "assetId": "DEMO-ASSET-005",
+        "assetType": "lighting - street light",
+        "assetSubtype": "pole",
+        "assetName": "Highway lighting equipment, outside shoulder (synthetic)",
+        "sourceAssetId": null
+      },
+      "qcqa": {
+        "templateId": "ACS-787.1",
+        "workActivity": "repair"
+      },
+      "inspection": {
+        "submission": "SUBMITTED",
+        "declaredStatus": "PASSED",
+        "inspectionId": "DEMO-INSP-005",
+        "inspectedAt": "2026-05-19T05:20:00-04:00",
+        "inspector": "Demo Inspector L. Haddad (synthetic)",
+        "fields": [
+          {
+            "fieldId": "insp_arrival_time",
+            "label": "Inspector on site",
+            "required": true,
+            "dataType": "date",
+            "validationType": "REQUIRED_FIELD",
+            "value": "2026-05-19T05:20:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_asset_identified",
+            "label": "Damaged asset identified",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "DEMO-ASSET-005 — badge SYN-LP-0612",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_damage_description",
+            "label": "Damage description",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "T-base access plate torn away, break-away fuses parted, luminaire lens cracked. Pole plumb and foundation undisturbed.",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_circuit_isolated",
+            "label": "Circuit isolated before inspection",
+            "required": true,
+            "dataType": "enum",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Yes — load centre LC-12 opened",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_pole_plumb",
+            "label": "Pole vertical and plumb",
+            "required": true,
+            "dataType": "enum",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Yes",
+            "acceptance": {
+              "oneOf": [
+                "Yes",
+                "No"
+              ]
+            }
+          },
+          {
+            "fieldId": "insp_foundation_condition",
+            "label": "Foundation condition",
+            "required": true,
+            "dataType": "enum",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Sound",
+            "acceptance": {
+              "oneOf": [
+                "Sound",
+                "Spalled",
+                "Cracked",
+                "Replace"
+              ]
+            }
+          },
+          {
+            "fieldId": "insp_anchor_bolts",
+            "label": "Anchor bolts serviceable",
+            "required": true,
+            "dataType": "enum",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Yes",
+            "acceptance": {
+              "oneOf": [
+                "Yes",
+                "No"
+              ]
+            }
+          },
+          {
+            "fieldId": "insp_damage_photos",
+            "label": "Damage photographs",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": "DEMO-PHOTO-005-A … DEMO-PHOTO-005-E (5 placeholder references)",
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "Placeholder references."
+          },
+          {
+            "fieldId": "insp_hazard_cleared",
+            "label": "Immediate hazard cleared",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Open T-base covered and taped; circuit left isolated",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_traffic_control",
+            "label": "Traffic control in place during inspection",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Shoulder closure, cones and arrow board",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_inspector_signature",
+            "label": "Inspector confirmation",
+            "required": true,
+            "dataType": "approval",
+            "validationType": "APPROVAL_COMPLETENESS",
+            "value": "L. Haddad, 2026-05-19T05:55:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_police_report",
+            "label": "Police case number",
+            "required": false,
+            "dataType": "text",
+            "validationType": "CROSS_RECORD_CONSISTENCY",
+            "value": "DEMO-PD-2026-002204"
+          }
+        ]
+      },
+      "repair": {
+        "submission": "SUBMITTED",
+        "declaredStatus": "PASSED",
+        "workOrderId": "DEMO-WO-000140",
+        "completedAt": "2026-05-21T12:50:00-04:00",
+        "crew": "Demo Electrical Crew 1 (synthetic)",
+        "physicalWorkComplete": true,
+        "fields": [
+          {
+            "fieldId": "rep_work_order_reference",
+            "label": "Work order reference",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "DEMO-WO-000140",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_activity",
+            "label": "Repair activity",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Luminaire, lens, break-away fuses and T-base access plate replaced; earth bond verified; circuit restored",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_start",
+            "label": "Work started",
+            "required": true,
+            "dataType": "date",
+            "validationType": "REQUIRED_FIELD",
+            "value": "2026-05-21T08:15:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_complete",
+            "label": "Work completed",
+            "required": true,
+            "dataType": "date",
+            "validationType": "REQUIRED_FIELD",
+            "value": "2026-05-21T12:50:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_crew",
+            "label": "Crew on site",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Demo Electrical Crew 1 (synthetic), 2 technicians",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_labour_hours",
+            "label": "Labour hours",
+            "required": true,
+            "dataType": "number",
+            "unit": "h",
+            "validationType": "REQUIRED_FIELD",
+            "value": 9.5,
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_materials_record",
+            "label": "Materials used, with quantities",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "1 × LED luminaire (DEMO-LUM-150); 1 × lens cover; 2 × break-away fuse; 1 × T-base access plate; fasteners",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_material_certificates",
+            "label": "Material conformance certificates",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": "DEMO-CERT-005-LUM, DEMO-CERT-005-FUSE",
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "Placeholder certificate references."
+          },
+          {
+            "fieldId": "rep_electrical_test",
+            "label": "Electrical test record",
+            "required": true,
+            "dataType": "text",
+            "validationType": "TECHNICAL_THRESHOLD",
+            "value": "Continuity and earth bond verified; fixture burns and matches adjacent poles",
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "ACS-787.1 Q10/Q11 ask for consistency with adjacent poles and correct grounding; they quote no measured value, so none is asserted."
+          },
+          {
+            "fieldId": "rep_traffic_control",
+            "label": "Traffic control / MOT record",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Shoulder closure 08:00–13:00, MOT plan DEMO-MOT-02",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_completion_photos",
+            "label": "Work completion photographs",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": "DEMO-PHOTO-005-F … DEMO-PHOTO-005-L (7 placeholder references)",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_technician_signoff",
+            "label": "Technician sign-off",
+            "required": true,
+            "dataType": "approval",
+            "validationType": "APPROVAL_COMPLETENESS",
+            "value": "Demo Foreman D. Achebe (synthetic), 2026-05-21T13:10:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_site_cleared",
+            "label": "Work area cleaned",
+            "required": true,
+            "dataType": "enum",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Yes — tape, old fuses and packaging removed",
+            "acceptance": {
+              "notEmpty": true
+            }
+          }
+        ]
+      },
+      "qualityAssurance": {
+        "submission": "SUBMITTED",
+        "declaredStatus": "PASSED",
+        "reviewedAt": "2026-05-22T09:40:00-04:00",
+        "reviewer": "Demo QC Reviewer N. Bhatt (synthetic)",
+        "responses": {
+          "ACS-787.1-Q01": "YES",
+          "ACS-787.1-Q02": "YES",
+          "ACS-787.1-Q03": "YES",
+          "ACS-787.1-Q04": "YES",
+          "ACS-787.1-Q05": "YES",
+          "ACS-787.1-Q06": "YES",
+          "ACS-787.1-Q07": "YES",
+          "ACS-787.1-Q08": "YES",
+          "ACS-787.1-Q09": "YES",
+          "ACS-787.1-Q10": "YES",
+          "ACS-787.1-Q11": "YES",
+          "ACS-787.1-Q12": "YES"
+        },
+        "approvals": {
+          "qc": {
+            "signatory": "Demo QC Reviewer N. Bhatt (synthetic)",
+            "approvedAt": "2026-05-22T10:05:00-04:00"
+          },
+          "qa": {
+            "signatory": "Demo QA Manager T. Eriksen (synthetic)",
+            "approvedAt": "2026-05-22T15:30:00-04:00"
+          }
+        },
+        "measurements": [],
+        "nonConformances": [],
+        "reviewerNotes": "All twelve ACS-787.1 items answered YES on site. Badge legible, fuses correctly sized, pole plumb, grounding verified, work area clean."
+      },
+      "claim": {
+        "submission": "SUBMITTED",
+        "declaredStatus": "PASSED",
+        "claimReference": "DEMO-CLM-0005",
+        "submittedAt": "2026-05-26T10:00:00-04:00",
+        "preparedBy": "Demo Claims Officer J. Whitfield (synthetic)",
+        "insurerDecision": {
+          "outcome": "SETTLED",
+          "decidedAt": "2026-06-18T00:00:00-04:00",
+          "insurer": "Demo Mutual (synthetic insurer)",
+          "note": "Synthetic insurer decision, included so the closed case has an end. No real insurer was involved."
+        },
+        "costs": {
+          "estimatedUSD": 7400,
+          "approvedUSD": 7260,
+          "claimedUSD": 7260,
+          "recoveredUSD": 7260
+        },
+        "costBasis": "Synthetic figures. The claimed total equals the approved repair cost, which is why reconciliation passes.",
+        "fields": [
+          {
+            "fieldId": "clm_incident_report",
+            "label": "Incident report reference",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Source incident record (resolved at runtime)",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "clm_police_report",
+            "label": "Police report",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": "DEMO-PD-2026-002204",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "clm_third_party_details",
+            "label": "Third party and insurer details",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Operator and policy details recorded by the responding agency and transcribed 2026-05-25",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "clm_inspection_package",
+            "label": "Inspection record and photographs",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": "DEMO-INSP-005 with 5 photograph references",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "clm_repair_package",
+            "label": "Repair record, materials and photographs",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": "DEMO-WO-000140 with 7 photograph references and material list",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "clm_qc_approval",
+            "label": "QC/QA approval",
+            "required": true,
+            "dataType": "approval",
+            "validationType": "APPROVAL_COMPLETENESS",
+            "value": "QC 2026-05-22, QA 2026-05-22",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "clm_approved_cost",
+            "label": "Approved repair cost",
+            "required": true,
+            "dataType": "currency",
+            "validationType": "REQUIRED_FIELD",
+            "value": 7260,
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "clm_cost_reconciliation",
+            "label": "Cost reconciliation against the approved repair cost",
+            "required": true,
+            "dataType": "currency",
+            "validationType": "CROSS_RECORD_CONSISTENCY",
+            "value": 7260,
+            "acceptance": {
+              "equalsField": "clm_approved_cost"
+            }
+          },
+          {
+            "fieldId": "clm_officer_signoff",
+            "label": "Claims officer sign-off",
+            "required": true,
+            "dataType": "approval",
+            "validationType": "APPROVAL_COMPLETENESS",
+            "value": "J. Whitfield, 2026-05-26T10:00:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "clm_recovery_record",
+            "label": "Recovery received and reconciled",
+            "required": true,
+            "dataType": "currency",
+            "validationType": "CROSS_RECORD_CONSISTENCY",
+            "value": 7260,
+            "acceptance": {
+              "equalsField": "clm_approved_cost"
+            }
+          }
+        ]
+      },
+      "evidenceRecovery": {
+        "outcome": "Nothing is missing, so there is nothing to recover. What the search shows instead is the lineage: where every piece of evidence this closed case holds came from, and when it was filed.",
+        "unavailableSystems": [],
+        "notRecoverable": [],
+        "candidates": [],
+        "lineage": [
+          {
+            "fieldId": "insp_damage_photos",
+            "label": "Damage photographs",
+            "system": "OFFICE_TRACK",
+            "recordId": "OT-FR-110233",
+            "filedAt": "2026-05-19T05:48:00-04:00",
+            "filedBy": "Demo Inspector L. Haddad (synthetic)",
+            "note": "5 photographs attached at the time of inspection; never recovered, never missing."
+          },
+          {
+            "fieldId": "rep_materials_record",
+            "label": "Materials used",
+            "system": "OFFICE_TRACK",
+            "recordId": "OT-MAT-71044",
+            "filedAt": "2026-05-21T09:10:00-04:00",
+            "filedBy": "Demo Electrical Crew 1 (synthetic)",
+            "note": "Stores issue note raised against DEMO-WO-000140 before the work started."
+          },
+          {
+            "fieldId": "rep_material_certificates",
+            "label": "Conformance certificates",
+            "system": "MIMS",
+            "recordId": "MIMS-CERT-8004",
+            "filedAt": "2026-05-20T14:25:00-04:00",
+            "filedBy": "Demo Stores (synthetic)",
+            "note": "Batch certificates for the luminaire and the fuses."
+          },
+          {
+            "fieldId": "rep_completion_photos",
+            "label": "Completion photographs",
+            "system": "OFFICE_TRACK",
+            "recordId": "OT-FR-110571",
+            "filedAt": "2026-05-21T13:02:00-04:00",
+            "filedBy": "Demo Electrical Crew 1 (synthetic)",
+            "note": "7 photographs of the finished installation."
+          },
+          {
+            "fieldId": "ACS-787.1-APPROVAL-QC",
+            "label": "QC sign-off",
+            "system": "MIMS",
+            "recordId": "MIMS-QC-2291",
+            "filedAt": "2026-05-22T10:05:00-04:00",
+            "filedBy": "Demo QC Reviewer N. Bhatt (synthetic)",
+            "note": "Signed on site against all twelve ACS-787.1 items."
+          },
+          {
+            "fieldId": "clm_police_report",
+            "label": "Police report",
+            "system": "SUNGUIDE",
+            "recordId": "SG-INC-2026-12004",
+            "filedAt": "2026-05-19T04:40:00-04:00",
+            "filedBy": "Responding agency (synthetic)",
+            "note": "Agency reference DEMO-PD-2026-002204, carried into the claim pack."
+          }
+        ]
+      },
+      "workflow": {
+        "currentStage": "CLOSED",
+        "assignedRole": null,
+        "assignedTeam": null
+      },
+      "auditTrail": [
+        {
+          "at": "2026-05-19T04:05:00-04:00",
+          "actor": "FL511 (synthetic)",
+          "role": "SYSTEM",
+          "event": "Incident reported",
+          "detail": "Vehicle clipped lighting pole base; shoulder debris."
+        },
+        {
+          "at": "2026-05-19T05:55:00-04:00",
+          "actor": "Demo Inspector L. Haddad (synthetic)",
+          "role": "INSPECTOR",
+          "event": "Inspection submitted",
+          "detail": "Pole plumb, foundation sound; fixture and T-base plate damaged."
+        },
+        {
+          "at": "2026-05-19T05:56:00-04:00",
+          "actor": "Validation engine",
+          "role": "SYSTEM",
+          "event": "Inspection validation passed",
+          "detail": "All 11 mandatory inspection fields satisfied."
+        },
+        {
+          "at": "2026-05-20T07:45:00-04:00",
+          "actor": "Demo Planner R. Nakamura (synthetic)",
+          "role": "PLANNER",
+          "event": "Work order raised",
+          "detail": "DEMO-WO-000140 — luminaire and T-base plate replacement."
+        },
+        {
+          "at": "2026-05-21T13:10:00-04:00",
+          "actor": "Demo Electrical Crew 1 (synthetic)",
+          "role": "TECHNICIAN",
+          "event": "Repair record submitted",
+          "detail": "Work complete; materials, certificates, test record, photographs and sign-off filed."
+        },
+        {
+          "at": "2026-05-21T13:11:00-04:00",
+          "actor": "Validation engine",
+          "role": "SYSTEM",
+          "event": "Repair validation passed",
+          "detail": "All 13 mandatory repair fields satisfied."
+        },
+        {
+          "at": "2026-05-22T10:05:00-04:00",
+          "actor": "Demo QC Reviewer N. Bhatt (synthetic)",
+          "role": "QC_REVIEWER",
+          "event": "QC approved",
+          "detail": "ACS-787.1: 12 items YES, 0 findings."
+        },
+        {
+          "at": "2026-05-22T15:30:00-04:00",
+          "actor": "Demo QA Manager T. Eriksen (synthetic)",
+          "role": "QA_MANAGER",
+          "event": "QA approved",
+          "detail": "QC pack reviewed and countersigned."
+        },
+        {
+          "at": "2026-05-26T10:00:00-04:00",
+          "actor": "Demo Claims Officer J. Whitfield (synthetic)",
+          "role": "CLAIMS_OFFICER",
+          "event": "Claim submitted",
+          "detail": "DEMO-CLM-0005, $7,260 — equal to the approved repair cost."
+        },
+        {
+          "at": "2026-05-26T10:01:00-04:00",
+          "actor": "Validation engine",
+          "role": "SYSTEM",
+          "event": "Claim validation passed",
+          "detail": "All 10 mandatory claim fields satisfied; reconciliation balances."
+        },
+        {
+          "at": "2026-06-18T00:00:00-04:00",
+          "actor": "Demo Mutual (synthetic insurer)",
+          "role": "INSURER",
+          "event": "Claim settled",
+          "detail": "$7,260 recovered in full. Synthetic decision."
+        },
+        {
+          "at": "2026-06-18T09:00:00-04:00",
+          "actor": "Demo Claims Officer J. Whitfield (synthetic)",
+          "role": "CLAIMS_OFFICER",
+          "event": "Case closed",
+          "detail": "Recovery reconciled against the approved cost; case closed."
+        }
+      ]
+    },
+    {
+      "demoCaseId": "ACS-DEMO-006",
+      "isDemo": true,
+      "demoLabel": "SYNTHETIC DEMO DATA",
+      "sourceIncidentId": null,
+      "locationPreference": {
+        "order": 6,
+        "direction": "WB"
+      },
+      "incident": {
+        "incidentType": "Vehicle collision",
+        "reportedAt": "2026-10-28T14:12:00-04:00",
+        "severity": "MODERATE",
+        "description": "Synthetic scenario: a vehicle runs off the carriageway into guardrail, deforming four panels and three posts. Repair is under way at the time of the demonstration."
+      },
+      "asset": {
+        "assetId": "DEMO-ASSET-006",
+        "assetType": "guardrail",
+        "assetSubtype": null,
+        "assetName": "W-beam guardrail run, 75 ft (synthetic)",
+        "sourceAssetId": null
+      },
+      "qcqa": {
+        "templateId": "ACS-526.1",
+        "workActivity": "repair"
+      },
+      "inspection": {
+        "submission": "SUBMITTED",
+        "declaredStatus": "PASSED",
+        "inspectionId": "DEMO-INSP-006",
+        "inspectedAt": "2026-10-28T15:30:00-04:00",
+        "inspector": "Demo Inspector P. Okonkwo (synthetic)",
+        "fields": [
+          {
+            "fieldId": "insp_arrival_time",
+            "label": "Inspector on site",
+            "required": true,
+            "dataType": "date",
+            "validationType": "REQUIRED_FIELD",
+            "value": "2026-10-28T15:30:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_asset_identified",
+            "label": "Damaged asset identified",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "DEMO-ASSET-006 — W-beam run, outside shoulder",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_damage_description",
+            "label": "Damage description",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Four panels deformed and three posts bent over a 75 ft length; two offset blocks split; end treatment undamaged.",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_extent_ft",
+            "label": "Extent of damage",
+            "required": true,
+            "dataType": "number",
+            "unit": "ft",
+            "validationType": "REQUIRED_FIELD",
+            "value": 75,
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_panel_count",
+            "label": "Panels to be replaced",
+            "required": true,
+            "dataType": "number",
+            "validationType": "REQUIRED_FIELD",
+            "value": 4,
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_post_count",
+            "label": "Posts to be replaced",
+            "required": true,
+            "dataType": "number",
+            "validationType": "REQUIRED_FIELD",
+            "value": 3,
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_end_treatment",
+            "label": "End treatment condition",
+            "required": true,
+            "dataType": "enum",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Undamaged",
+            "acceptance": {
+              "oneOf": [
+                "Undamaged",
+                "Damaged",
+                "Replace"
+              ]
+            }
+          },
+          {
+            "fieldId": "insp_damage_photos",
+            "label": "Damage photographs",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": "DEMO-PHOTO-006-A … DEMO-PHOTO-006-G (7 placeholder references)",
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "Placeholder references."
+          },
+          {
+            "fieldId": "insp_temporary_measure",
+            "label": "Temporary protection in place",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Water-filled barrier across the damaged run pending repair",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_traffic_control",
+            "label": "Traffic control in place during inspection",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Shoulder closure with TMA",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_inspector_signature",
+            "label": "Inspector confirmation",
+            "required": true,
+            "dataType": "approval",
+            "validationType": "APPROVAL_COMPLETENESS",
+            "value": "P. Okonkwo, 2026-10-28T16:10:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_police_report",
+            "label": "Police case number",
+            "required": false,
+            "dataType": "text",
+            "validationType": "CROSS_RECORD_CONSISTENCY",
+            "value": "DEMO-PD-2026-004812"
+          }
+        ]
+      },
+      "repair": {
+        "submission": "IN_PROGRESS",
+        "declaredStatus": "IN_PROGRESS",
+        "workOrderId": "DEMO-WO-000231",
+        "startedAt": "2026-11-02T07:40:00-04:00",
+        "crew": "Demo Roadside Crew 2 (synthetic)",
+        "physicalWorkComplete": false,
+        "progressNote": "Posts driven and three of four panels hung. The fourth panel, the object markers and the groundwork remain.",
+        "fields": [
+          {
+            "fieldId": "rep_work_order_reference",
+            "label": "Work order reference",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "DEMO-WO-000231",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_activity",
+            "label": "Repair activity",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Replace 4 panels, 3 posts and 2 offset blocks over a 75 ft run; reset object markers",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_start",
+            "label": "Work started",
+            "required": true,
+            "dataType": "date",
+            "validationType": "REQUIRED_FIELD",
+            "value": "2026-11-02T07:40:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_crew",
+            "label": "Crew on site",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Demo Roadside Crew 2 (synthetic), 4 operatives",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_traffic_control",
+            "label": "Traffic control / MOT record",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Shoulder closure with TMA, MOT plan DEMO-MOT-09",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_materials_record",
+            "label": "Materials used, with quantities",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "3 × W-beam panel and 3 × W6x9 post installed to date; 1 panel and 2 offset blocks still to fit",
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "Recorded progressively; the final quantities are completed when the work is."
+          },
+          {
+            "fieldId": "rep_progress_photos",
+            "label": "Progress photographs",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": "DEMO-PHOTO-006-H … DEMO-PHOTO-006-K (4 placeholder references)",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_complete",
+            "label": "Work completed",
+            "required": true,
+            "dataType": "date",
+            "validationType": "REQUIRED_FIELD",
+            "value": null,
+            "acceptance": {
+              "notEmpty": true
+            },
+            "notYetDue": true,
+            "note": "Due when the crew closes the work order. Not outstanding yet."
+          },
+          {
+            "fieldId": "rep_labour_hours",
+            "label": "Labour hours",
+            "required": true,
+            "dataType": "number",
+            "unit": "h",
+            "validationType": "REQUIRED_FIELD",
+            "value": null,
+            "acceptance": {
+              "notEmpty": true
+            },
+            "notYetDue": true,
+            "note": "Totalled at completion."
+          },
+          {
+            "fieldId": "rep_material_certificates",
+            "label": "Material conformance certificates",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": "DEMO-CERT-006-PANEL",
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "Panel certificate on file; the offset-block certificate follows with the final material line."
+          },
+          {
+            "fieldId": "rep_completion_photos",
+            "label": "Work completion photographs",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": null,
+            "acceptance": {
+              "notEmpty": true
+            },
+            "notYetDue": true,
+            "note": "Cannot exist before the work is finished."
+          },
+          {
+            "fieldId": "rep_technician_signoff",
+            "label": "Technician sign-off",
+            "required": true,
+            "dataType": "approval",
+            "validationType": "APPROVAL_COMPLETENESS",
+            "value": null,
+            "acceptance": {
+              "notEmpty": true
+            },
+            "notYetDue": true,
+            "note": "Signed on completion."
+          },
+          {
+            "fieldId": "rep_site_cleared",
+            "label": "Work area cleaned",
+            "required": true,
+            "dataType": "enum",
+            "validationType": "REQUIRED_FIELD",
+            "value": null,
+            "acceptance": {
+              "oneOf": [
+                "Yes",
+                "No"
+              ]
+            },
+            "notYetDue": true,
+            "note": "Assessed at completion."
+          }
+        ]
+      },
+      "qualityAssurance": {
+        "submission": "NOT_SUBMITTED",
+        "declaredStatus": "PENDING",
+        "responses": {},
+        "approvals": {
+          "qc": null,
+          "qa": null
+        },
+        "nonConformances": [],
+        "reviewerNotes": "ACS-526.1 will be answered once the run is complete. Rail height, post spacing and object marker checks cannot be made on a part-built run."
+      },
+      "claim": {
+        "submission": "NOT_SUBMITTED",
+        "declaredStatus": "PENDING",
+        "claimReference": null,
+        "costs": {
+          "estimatedUSD": 11500,
+          "approvedUSD": null,
+          "claimedUSD": null,
+          "recoveredUSD": null
+        },
+        "costBasis": "Synthetic estimate at work-order level. The final cost is not known while the work is in progress.",
+        "fields": []
+      },
+      "evidenceRecovery": {
+        "outcome": "Nothing is missing — the repair is in progress and its outstanding records are not due yet — so the search looks for context instead. Three earlier records about the same guardrail run are found, including a prior repair 40 ft away that explains why two offset blocks were already non-standard.",
+        "unavailableSystems": [],
+        "notRecoverable": [],
+        "candidates": [
+          {
+            "recordId": "MIMS-WO-2209",
+            "system": "MIMS",
+            "recordType": "Previous work order",
+            "resolves": null,
+            "enriches": true,
+            "summary": "Guardrail panel replacement on the same run, 14 months earlier",
+            "value": "Two panels and one post replaced after a reported strike; offset blocks reused.",
+            "capturedAt": "2025-09-04T10:00:00-04:00",
+            "keys": {
+              "incidentId": null,
+              "workOrderId": null,
+              "assetId": "DEMO-ASSET-006",
+              "locationDistanceM": 12,
+              "minutesFromIncident": -607000,
+              "direction": "WB"
+            },
+            "conflict": null
+          },
+          {
+            "recordId": "OT-INSP-96120",
+            "system": "OFFICE_TRACK",
+            "recordType": "Routine inspection",
+            "resolves": null,
+            "enriches": true,
+            "summary": "Routine roadside inspection of the run, five weeks before the collision",
+            "value": "Rail height within tolerance; two offset blocks noted as split and scheduled.",
+            "capturedAt": "2026-09-21T09:30:00-04:00",
+            "keys": {
+              "incidentId": null,
+              "workOrderId": null,
+              "assetId": "DEMO-ASSET-006",
+              "locationDistanceM": 5,
+              "minutesFromIncident": -53000,
+              "direction": "WB"
+            },
+            "conflict": null
+          },
+          {
+            "recordId": "SG-INC-2026-24119",
+            "system": "SUNGUIDE",
+            "recordType": "Prior incident record",
+            "resolves": null,
+            "enriches": true,
+            "summary": "Earlier reported strike at the same gore, no maintenance record raised",
+            "value": "Vehicle reported into the barrier; cleared before a patrol arrived.",
+            "capturedAt": "2026-06-12T22:15:00-04:00",
+            "keys": {
+              "incidentId": null,
+              "workOrderId": null,
+              "assetId": null,
+              "locationDistanceM": 18,
+              "minutesFromIncident": -199000,
+              "direction": "WB"
+            },
+            "conflict": null
+          }
+        ]
+      },
+      "workflow": {
+        "currentStage": "REPAIR",
+        "assignedRole": "TECHNICIAN",
+        "assignedTeam": "ACS Roadside Maintenance"
+      },
+      "auditTrail": [
+        {
+          "at": "2026-10-28T14:12:00-04:00",
+          "actor": "SunGuide (synthetic)",
+          "role": "SYSTEM",
+          "event": "Incident reported",
+          "detail": "Run-off-road collision into guardrail."
+        },
+        {
+          "at": "2026-10-28T16:10:00-04:00",
+          "actor": "Demo Inspector P. Okonkwo (synthetic)",
+          "role": "INSPECTOR",
+          "event": "Inspection submitted",
+          "detail": "4 panels, 3 posts, 2 offset blocks; end treatment undamaged."
+        },
+        {
+          "at": "2026-10-28T16:12:00-04:00",
+          "actor": "Validation engine",
+          "role": "SYSTEM",
+          "event": "Inspection validation passed",
+          "detail": "All 11 mandatory inspection fields satisfied."
+        },
+        {
+          "at": "2026-10-28T17:00:00-04:00",
+          "actor": "Demo Roadside Crew 4 (synthetic)",
+          "role": "TECHNICIAN",
+          "event": "Temporary protection installed",
+          "detail": "Water-filled barrier across the damaged run."
+        },
+        {
+          "at": "2026-10-30T08:20:00-04:00",
+          "actor": "Demo Planner R. Nakamura (synthetic)",
+          "role": "PLANNER",
+          "event": "Work order raised",
+          "detail": "DEMO-WO-000231 — guardrail panel and post replacement."
+        },
+        {
+          "at": "2026-11-02T07:40:00-04:00",
+          "actor": "Demo Roadside Crew 2 (synthetic)",
+          "role": "TECHNICIAN",
+          "event": "Work started",
+          "detail": "Shoulder closure taken; damaged panels removed."
+        },
+        {
+          "at": "2026-11-02T15:05:00-04:00",
+          "actor": "Demo Roadside Crew 2 (synthetic)",
+          "role": "TECHNICIAN",
+          "event": "Progress recorded",
+          "detail": "Posts driven, 3 of 4 panels hung; 4 progress photographs filed."
+        },
+        {
+          "at": "2026-11-02T15:06:00-04:00",
+          "actor": "Validation engine",
+          "role": "SYSTEM",
+          "event": "Repair in progress",
+          "detail": "7 of 13 repair fields recorded; 6 are not yet due and are reported as pending rather than missing."
+        }
+      ]
+    },
+    {
+      "demoCaseId": "ACS-DEMO-007",
+      "isDemo": true,
+      "demoLabel": "SYNTHETIC DEMO DATA",
+      "sourceIncidentId": null,
+      "locationPreference": {
+        "order": 7,
+        "direction": "EB"
+      },
+      "incident": {
+        "incidentType": "Debris / pavement damage",
+        "reportedAt": "2026-09-05T11:30:00-04:00",
+        "severity": "MINOR",
+        "description": "Synthetic scenario: a fuel spill and the clean-up that follows destroy the lane arrows and ONLY legend at an exit ramp approach. The symbols are reinstalled."
+      },
+      "asset": {
+        "assetId": "DEMO-ASSET-007",
+        "assetType": "pavement marking",
+        "assetSubtype": null,
+        "assetName": "Pavement symbols — exit arrows and ONLY legend (synthetic)",
+        "sourceAssetId": null
+      },
+      "qcqa": {
+        "templateId": "ACS-534.1",
+        "workActivity": "installation"
+      },
+      "inspection": {
+        "submission": "SUBMITTED",
+        "declaredStatus": "PASSED",
+        "inspectionId": "DEMO-INSP-007",
+        "inspectedAt": "2026-09-05T13:05:00-04:00",
+        "inspector": "Demo Inspector P. Okonkwo (synthetic)",
+        "fields": [
+          {
+            "fieldId": "insp_arrival_time",
+            "label": "Inspector on site",
+            "required": true,
+            "dataType": "date",
+            "validationType": "REQUIRED_FIELD",
+            "value": "2026-09-05T13:05:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_asset_identified",
+            "label": "Damaged asset identified",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "DEMO-ASSET-007 — 2 × exit arrow, 1 × ONLY legend",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_damage_description",
+            "label": "Damage description",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Thermoplastic symbols lifted by fuel and the absorbent clean-up; outlines faintly visible, retroreflectivity gone.",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_symbol_count",
+            "label": "Symbols to be reinstalled",
+            "required": true,
+            "dataType": "number",
+            "validationType": "REQUIRED_FIELD",
+            "value": 3,
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_pavement_condition",
+            "label": "Pavement condition at symbol locations",
+            "required": true,
+            "dataType": "enum",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Sound",
+            "acceptance": {
+              "oneOf": [
+                "Sound",
+                "Spalled",
+                "Cracked",
+                "Replace"
+              ]
+            }
+          },
+          {
+            "fieldId": "insp_removal_required",
+            "label": "Removal of old marking required",
+            "required": true,
+            "dataType": "enum",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Yes — residual thermoplastic to be removed",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_damage_photos",
+            "label": "Damage photographs",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": "DEMO-PHOTO-007-A … DEMO-PHOTO-007-C (3 placeholder references)",
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "Placeholder references."
+          },
+          {
+            "fieldId": "insp_traffic_control",
+            "label": "Traffic control in place during inspection",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Ramp closure, 10 min",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "insp_inspector_signature",
+            "label": "Inspector confirmation",
+            "required": true,
+            "dataType": "approval",
+            "validationType": "APPROVAL_COMPLETENESS",
+            "value": "P. Okonkwo, 2026-09-05T13:40:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          }
+        ]
+      },
+      "repair": {
+        "submission": "SUBMITTED",
+        "declaredStatus": "PASSED",
+        "workOrderId": "DEMO-WO-000205",
+        "completedAt": "2026-09-09T06:30:00-04:00",
+        "crew": "Demo Markings Crew 1 (synthetic)",
+        "physicalWorkComplete": true,
+        "fields": [
+          {
+            "fieldId": "rep_work_order_reference",
+            "label": "Work order reference",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "DEMO-WO-000205",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_activity",
+            "label": "Repair activity",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Residual thermoplastic removed by FDOT-approved method; 2 arrows and 1 ONLY legend reinstalled in thermoplastic with glass beads",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_start",
+            "label": "Work started",
+            "required": true,
+            "dataType": "date",
+            "validationType": "REQUIRED_FIELD",
+            "value": "2026-09-09T01:30:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_complete",
+            "label": "Work completed",
+            "required": true,
+            "dataType": "date",
+            "validationType": "REQUIRED_FIELD",
+            "value": "2026-09-09T06:30:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_crew",
+            "label": "Crew on site",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Demo Markings Crew 1 (synthetic), 3 operatives",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_labour_hours",
+            "label": "Labour hours",
+            "required": true,
+            "dataType": "number",
+            "unit": "h",
+            "validationType": "REQUIRED_FIELD",
+            "value": 15,
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_materials_record",
+            "label": "Materials used, with quantities",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "42 lb thermoplastic (QPL listed, DEMO-TP-WHT); 6 lb glass beads; 1 × primer unit",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_material_certificates",
+            "label": "Material conformance certificates",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": "DEMO-CERT-007-TP, DEMO-CERT-007-BEAD",
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "Placeholder certificate references."
+          },
+          {
+            "fieldId": "rep_conditions_record",
+            "label": "Application conditions record",
+            "required": true,
+            "dataType": "text",
+            "validationType": "TECHNICAL_THRESHOLD",
+            "value": "Pavement dry, surface 78 °F, applied at the manufacturer's stated rate",
+            "acceptance": {
+              "notEmpty": true
+            },
+            "note": "ACS-534.1 Q04 asks for the manufacturer's recommended conditions and quotes no figures, so none are asserted."
+          },
+          {
+            "fieldId": "rep_traffic_control",
+            "label": "Traffic control / MOT record",
+            "required": true,
+            "dataType": "text",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Ramp closure 01:00–07:00, MOT plan DEMO-MOT-06",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_completion_photos",
+            "label": "Work completion photographs",
+            "required": true,
+            "dataType": "attachment",
+            "validationType": "EVIDENCE_AVAILABILITY",
+            "value": "DEMO-PHOTO-007-D … DEMO-PHOTO-007-H (5 placeholder references)",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_technician_signoff",
+            "label": "Technician sign-off",
+            "required": true,
+            "dataType": "approval",
+            "validationType": "APPROVAL_COMPLETENESS",
+            "value": "Demo Foreman S. Petrov (synthetic), 2026-09-09T06:55:00-04:00",
+            "acceptance": {
+              "notEmpty": true
+            }
+          },
+          {
+            "fieldId": "rep_site_cleared",
+            "label": "Work area cleaned",
+            "required": true,
+            "dataType": "enum",
+            "validationType": "REQUIRED_FIELD",
+            "value": "Yes",
+            "acceptance": {
+              "oneOf": [
+                "Yes",
+                "No"
+              ]
+            }
+          }
+        ]
+      },
+      "qualityAssurance": {
+        "submission": "SUBMITTED",
+        "declaredStatus": "PASSED",
+        "reviewedAt": "2026-09-10T08:50:00-04:00",
+        "reviewer": "Demo QC Reviewer N. Bhatt (synthetic)",
+        "responses": {
+          "ACS-534.1-Q01": "YES",
+          "ACS-534.1-Q02": "YES",
+          "ACS-534.1-Q03": "YES",
+          "ACS-534.1-Q04": "YES",
+          "ACS-534.1-Q05": "YES"
+        },
+        "approvals": {
+          "qc": {
+            "signatory": "Demo QC Reviewer N. Bhatt (synthetic)",
+            "approvedAt": "2026-09-10T09:10:00-04:00"
+          },
+          "qa": {
+            "signatory": "Demo QA Manager T. Eriksen (synthetic)",
+            "approvedAt": "2026-09-10T14:25:00-04:00"
+          }
+        },
+        "measurements": [],
+        "nonConformances": [],
+        "reviewerNotes": "Alignment, width, placement and colour verified against the ramp drawing; night chromaticity checked on the following shift. Removal of the old marking used an approved method, so Q03 applies and passes rather than being N/A."
+      },
+      "claim": {
+        "submission": "NOT_SUBMITTED",
+        "declaredStatus": "PENDING",
+        "claimReference": null,
+        "costs": {
+          "estimatedUSD": 6300,
+          "approvedUSD": 6180,
+          "claimedUSD": null,
+          "recoveredUSD": null
+        },
+        "costBasis": "Synthetic figures. The repair cost is approved; nothing has been claimed because the claim has not been raised.",
+        "fields": [],
+        "note": "Ready to submit. The spill was attributed to an identified carrier and the evidence pack is complete; the claim has simply not been raised yet. Pending is not a failure."
+      },
+      "evidenceRecovery": {
+        "outcome": "Every upstream stage has passed and no claim record exists yet, so nothing is missing. The search gathers what a claim would need and marks the package ready for a claims officer to review. It is not submitted, and accepting evidence here never submits it.",
+        "unavailableSystems": [],
+        "notRecoverable": [],
+        "packageOutcome": {
+          "status": "READY_FOR_REVIEW",
+          "note": "Marked ready because the inspection, repair and QC/QA packs are complete and an attributable third party is identified. A claims officer still raises and submits the claim; this screen cannot and does not."
+        },
+        "candidates": [
+          {
+            "recordId": "SG-INC-2026-31002",
+            "system": "SUNGUIDE",
+            "recordType": "Incident detail record",
+            "resolves": null,
+            "enriches": true,
+            "summary": "Traffic management centre record of the spill, naming the carrier",
+            "value": "Carrier: Demo Tanker Lines (synthetic); agency reference DEMO-PD-2026-004102.",
+            "capturedAt": "2026-09-05T11:48:00-04:00",
+            "keys": {
+              "incidentId": null,
+              "workOrderId": null,
+              "assetId": null,
+              "locationDistanceM": 11,
+              "minutesFromIncident": 18,
+              "direction": "EB"
+            },
+            "conflict": null
+          },
+          {
+            "recordId": "OT-COST-40155",
+            "system": "OFFICE_TRACK",
+            "recordType": "Cost summary",
+            "resolves": null,
+            "enriches": true,
+            "summary": "Approved cost summary for the reinstatement work order",
+            "value": "DEMO-WO-000205 approved at $6,180 against a $6,300 estimate.",
+            "capturedAt": "2026-09-11T10:00:00-04:00",
+            "keys": {
+              "incidentId": null,
+              "workOrderId": "DEMO-WO-000205",
+              "assetId": "DEMO-ASSET-007",
+              "locationDistanceM": 0,
+              "minutesFromIncident": 8670,
+              "direction": "EB"
+            },
+            "conflict": null
+          },
+          {
+            "recordId": "MIMS-CERT-9120",
+            "system": "MIMS",
+            "recordType": "Conformance certificate",
+            "resolves": null,
+            "enriches": true,
+            "summary": "Thermoplastic and glass-bead batch certificates",
+            "value": "DEMO-CERT-007-TP, DEMO-CERT-007-BEAD.",
+            "capturedAt": "2026-09-08T16:20:00-04:00",
+            "keys": {
+              "incidentId": null,
+              "workOrderId": "DEMO-WO-000205",
+              "assetId": "DEMO-ASSET-007",
+              "locationDistanceM": 0,
+              "minutesFromIncident": 5330,
+              "direction": "EB"
+            },
+            "conflict": null
+          }
+        ]
+      },
+      "workflow": {
+        "currentStage": "CLAIM",
+        "assignedRole": "CLAIMS_OFFICER",
+        "assignedTeam": "ACS Claims"
+      },
+      "auditTrail": [
+        {
+          "at": "2026-09-05T11:30:00-04:00",
+          "actor": "FL511 (synthetic)",
+          "role": "SYSTEM",
+          "event": "Incident reported",
+          "detail": "Fuel spill at exit ramp approach; clean-up dispatched."
+        },
+        {
+          "at": "2026-09-05T13:40:00-04:00",
+          "actor": "Demo Inspector P. Okonkwo (synthetic)",
+          "role": "INSPECTOR",
+          "event": "Inspection submitted",
+          "detail": "3 symbols destroyed; pavement sound; removal of residue required."
+        },
+        {
+          "at": "2026-09-05T13:42:00-04:00",
+          "actor": "Validation engine",
+          "role": "SYSTEM",
+          "event": "Inspection validation passed",
+          "detail": "All 9 mandatory inspection fields satisfied."
+        },
+        {
+          "at": "2026-09-07T09:15:00-04:00",
+          "actor": "Demo Planner R. Nakamura (synthetic)",
+          "role": "PLANNER",
+          "event": "Work order raised",
+          "detail": "DEMO-WO-000205 — symbol reinstatement, night shift."
+        },
+        {
+          "at": "2026-09-09T06:55:00-04:00",
+          "actor": "Demo Markings Crew 1 (synthetic)",
+          "role": "TECHNICIAN",
+          "event": "Repair record submitted",
+          "detail": "Symbols reinstated; materials, certificates, conditions record, photographs and sign-off filed."
+        },
+        {
+          "at": "2026-09-09T06:56:00-04:00",
+          "actor": "Validation engine",
+          "role": "SYSTEM",
+          "event": "Repair validation passed",
+          "detail": "All 13 mandatory repair fields satisfied."
+        },
+        {
+          "at": "2026-09-10T09:10:00-04:00",
+          "actor": "Demo QC Reviewer N. Bhatt (synthetic)",
+          "role": "QC_REVIEWER",
+          "event": "QC approved",
+          "detail": "ACS-534.1: 5 items YES, 0 findings."
+        },
+        {
+          "at": "2026-09-10T14:25:00-04:00",
+          "actor": "Demo QA Manager T. Eriksen (synthetic)",
+          "role": "QA_MANAGER",
+          "event": "QA approved",
+          "detail": "QC pack reviewed and countersigned."
+        },
+        {
+          "at": "2026-09-11T10:00:00-04:00",
+          "actor": "Demo Supervisor G. Lindqvist (synthetic)",
+          "role": "MAINTENANCE_SUPERVISOR",
+          "event": "Repair cost approved",
+          "detail": "$6,180 approved against a $6,300 estimate."
+        },
+        {
+          "at": "2026-09-11T10:05:00-04:00",
+          "actor": "Validation engine",
+          "role": "SYSTEM",
+          "event": "Awaiting claim submission",
+          "detail": "Every upstream stage has passed and the evidence pack is complete. No claim record exists; the case is ready for submission, not failed."
+        }
+      ]
+    }
+  ]
+}

@@ -26,6 +26,8 @@ export const WORKSPACE_ICONS = Object.freeze({
   assetRisk: '<path d="M10 2.6 4 5v4.4c0 3.5 2.5 6.6 6 7.9 3.5-1.3 6-4.4 6-7.9V5l-6-2.4Z"/><path d="M10 7.4v3.1M10 12.6v.4"/>',
   // A gantry: the beam over the carriageway with its two uprights and the readers hanging off it.
   gantry: '<path d="M3.5 16.5V6M16.5 16.5V6"/><path d="M2.5 6h15"/><path d="M7 6v2.6M10 6v2.6M13 6v2.6"/>',
+  // A flask: the demo-case card, whose records are specimens rather than corridor events.
+  demoCase: '<path d="M7.5 3h5"/><path d="M8.5 3v4.2L4.8 14a1.6 1.6 0 0 0 1.4 2.4h7.6A1.6 1.6 0 0 0 15.2 14L11.5 7.2V3"/><path d="M6.6 12h6.8"/>',
   // Cleared: a clock, for something that was happening and is not any more.
   cleared: '<circle cx="10" cy="10" r="7"/><path d="M10 6v4.3l2.8 1.7"/>',
 });
@@ -56,7 +58,8 @@ export function installWorkspaceStrip(host, { cards, label, onSelect }) {
       ${card.color ? `style="--kpi-tone:${card.color}"` : ''}>
       <span class="ws-kpi-icon">${icon(card.icon)}</span>
       <span class="ws-kpi-body">
-        <span class="ws-kpi-label">${card.label}</span>
+        <span class="ws-kpi-label">${card.label}${card.badge
+          ? `<i class="ws-kpi-badge">${card.badge}</i>` : ''}</span>
         <span class="ws-kpi-number"><span class="ws-kpi-count" data-count>…</span><span class="ws-kpi-count-label" data-count-label hidden></span></span>
         <span class="ws-kpi-note" data-note>Loading…</span>
       </span>

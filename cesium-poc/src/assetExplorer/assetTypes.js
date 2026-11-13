@@ -44,6 +44,8 @@ export const ASSET_CAMERA_PRESETS = Object.freeze({
   incidentRecord: Object.freeze({ rangeM: 90, pitchDeg: -28 }),
   inspection: Object.freeze({ rangeM: 70, pitchDeg: -26 }),
   damagedAsset: Object.freeze({ rangeM: 70, pitchDeg: -26 }),
+  // A demo case is drawn at its source incident, so it is framed as an incident is.
+  acsDemoCase: Object.freeze({ rangeM: 90, pitchDeg: -28 }),
   // A bridge is an extended structure, so its span drives the distance rather than a fixed range.
   // The multiplier is generous on purpose: Cesium's default range just fits a sphere head-on, and
   // at a -28° pitch that leaves the far end of a long span off screen.
@@ -981,6 +983,95 @@ export const ASSET_TYPES = Object.freeze({
       ['Open high-priority work orders', asset.source?.openHighWorkOrders || null],
       ['Damaged (live)', asset.source?.damagedLive || null],
     ],
+  }),
+
+  /**
+   * The ACS demo cases: one synthetic incident → inspection → repair → QC/QA → claim lifecycle
+   * each, pinned to a real incident's coordinates.
+   *
+   * An ordinary asset type, so the carousel, the rail, the mini-map and the map layer treat a demo
+   * case exactly as they treat a work order. The one thing it does differently is say what it is:
+   * the card's subtitle leads with SYNTHETIC DEMO, because a record this complete would otherwise
+   * be the most convincing thing on the screen.
+   */
+  acsDemoCase: Object.freeze({
+    id: 'acsDemoCase',
+    label: 'Demo Case Validation',
+    singular: 'Demo case',
+    detailsTitle: 'Demo Case',
+    icon: 'acsDemoCase',
+    layerId: null,
+    dateLabel: 'Reported',
+    emptyMessage: 'No demo cases are loaded.',
+    errorMessage: 'Unable to load the demo cases.',
+    getDateKey: asset => maintenanceDateKey(asset.source?.createdDate),
+    getCardDate: asset => maintenanceDate(asset.source?.createdDate),
+    getTitle: asset => asset.id,
+    getSubtitle: asset => ['SYNTHETIC DEMO', text(asset.source?.assetType),
+      text(asset.source?.demoCase?.incident?.incidentType)].filter(Boolean).join(' · '),
+    // The overall workflow state, derived by the validation engine — the same words the panel and
+    // the dialog use, so one case reads the same wherever it appears.
+    // The card has one status line and no room for a second, so the evidence indicator rides on
+    // it: "Blocked at inspection · 4 missing, 2 recoverable" is what an operator scanning the
+    // seven needs, and it costs no extra height.
+    getCardStatus: asset => {
+      const evaluation = asset.source?.evaluation;
+      if (!evaluation) return null;
+      const outlook = asset.source?.outlook;
+      const evidence = !outlook ? null
+        : outlook.missing
+          ? `${outlook.missing} missing, ${outlook.recoverable} recoverable`
+          : outlook.enrichment ? `${outlook.enrichment} related records` : null;
+      return {
+        label: [evaluation.presentation.label, evidence].filter(Boolean).join(' · '),
+        tone: evaluation.presentation.tone,
+      };
+    },
+    getStatus: asset => {
+      const evaluation = asset.source?.evaluation;
+      return evaluation ? { label: evaluation.presentation.label, tone: evaluation.presentation.tone } : null;
+    },
+    /** Narrow by where the case has got to, counted over whatever else is applied. */
+    getFilters: (assets, counted = assets) => {
+      const of = (id, label, group, match) => {
+        const count = counted.filter(match).length;
+        return assets.some(match) ? [{ id, label, group, count, match }] : [];
+      };
+      const group = key => asset => asset.source?.evaluation?.presentation?.group === key;
+      const stage = key => asset => asset.source?.evaluation?.stages?.[key]?.status === 'FAILED';
+      return [
+        ...of('demo-blocked', 'Blocked or failed', 'State', group('blocked')),
+        ...of('demo-open', 'Pending or in progress', 'State', group('open')),
+        ...of('demo-closed', 'Closed', 'State', group('closed')),
+        // "Failure", not "Failed at": the dropdown pluralises its own group name for the "All …"
+        // option, and "All failed ats" is not English.
+        ...of('demo-fail-inspection', 'Inspection failed', 'Failure', stage('INSPECTION')),
+        ...of('demo-fail-repair', 'Repair failed', 'Failure', stage('REPAIR')),
+        ...of('demo-fail-qcqa', 'QC/QA failed', 'Failure', stage('QCQA')),
+        ...of('demo-fail-claim', 'Claim failed', 'Failure', stage('CLAIM')),
+        ...of('demo-evidence-missing', 'Missing evidence', 'Evidence',
+          asset => (asset.source?.outlook?.missing ?? 0) > 0),
+        ...of('demo-evidence-recoverable', 'Recoverable from another system', 'Evidence',
+          asset => (asset.source?.outlook?.recoverable ?? 0) > 0),
+        ...of('demo-evidence-unresolved', 'Unresolved evidence', 'Evidence',
+          asset => (asset.source?.outlook?.unresolved ?? 0) > 0),
+      ];
+    },
+    getSearchText: asset => [asset.id, asset.source?.title, asset.source?.assetType,
+      asset.source?.demoCase?.incident?.incidentType, asset.source?.status]
+      .filter(Boolean).join(' ').toLowerCase(),
+    details: asset => {
+      const source = asset.source ?? {};
+      const evaluation = source.evaluation;
+      return [
+        ['Data', 'SYNTHETIC DEMO DATA'],
+        ['Incident type', text(source.demoCase?.incident?.incidentType)],
+        ['Asset', text(source.demoCase?.asset?.assetName)],
+        ['Stage', text(evaluation?.stages && Object.keys(evaluation.stages).find(key => evaluation.statuses[key] !== 'PASSED')) ?? 'Closed'],
+        ['Source incident', text(source.related?.sourceIncidentId)],
+        ['Corridor position', positionLabel(asset)],
+      ];
+    },
   }),
 
   overlane: Object.freeze({

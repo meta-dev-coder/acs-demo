@@ -38,6 +38,36 @@ import { LiveEventBadge } from './LiveEventIcon.jsx';
 import { OPERATIONAL_LEVEL_COLORS } from '../liveOps/operationalImpact.js';
 import { detailFacts, impactRows, incidentFacts, incidentHeadline, incidentNarrative, reportedAt, INCIDENT_QUESTIONS, incidentQuestionSubject } from './incidentNarrative.js';
 import { askTheTwin, canAskTheTwin } from '../askTheTwinBridge.js';
+import { AcsCaseDialog } from './AcsCaseDialog.jsx';
+/**
+ * Run the ACS QC/QA validation for the open case.
+ *
+ * Only while the dialog is open: the engine is cheap but there is no reason to evaluate 75 checks
+ * for a record nobody has asked about.
+ */
+function useQcQaReview(record, acsCase, open) {
+  const [state, setState] = useState({ review: null, loading: false });
+  useEffect(() => {
+    if (!open || !record) { setState({ review: null, loading: false }); return undefined; }
+    let live = true;
+    setState({ review: null, loading: true });
+    (async () => {
+      const [{ createLocalProvider }, { reviewRecord }] = await Promise.all([
+        import('../qcqa/providers/localProvider.js'),
+        import('../qcqa/qcqaService.js'),
+      ]);
+      const maintenance = window.__maintenance ?? null;
+      if (!maintenance) { if (live) setState({ review: null, loading: false }); return; }
+      const provider = createLocalProvider({ maintenance });
+      const review = await reviewRecord(record, { provider, acsCase }).catch(() => null);
+      if (live) setState({ review, loading: false });
+    })();
+    return () => { live = false; };
+  }, [open, record?.id, acsCase?.caseId]);
+  return state;
+}
+
+import { caseForIncident, loadAcsTasks } from '../acs/acsCases.js';
 
 /**
  * Whether the panel offers its Ask the Twin questions.
@@ -262,6 +292,14 @@ export function IncidentDetailsPanel({
   const headingRef = useRef(null);
   const [tab, setTab] = useState(0);
   const context = useCorridorContext();
+  // The ACS repair tasks, read once for the session and shared by every incident.
+  const [acsTasks, setAcsTasks] = useState(null);
+  const [acsOpen, setAcsOpen] = useState(false);
+  useEffect(() => {
+    let live = true;
+    loadAcsTasks().then(payload => { if (live) setAcsTasks(payload); });
+    return () => { live = false; };
+  }, []);
 
   // Same floating behaviour as every other details panel on this map: the heading is the handle.
   useEffect(() => {
@@ -291,6 +329,13 @@ export function IncidentDetailsPanel({
   // do to the road — so they share the panel and differ only in where each line comes from. The
   // asset type decides, not the record's shape: both spell their own kind `type: 'INCIDENT'`.
   const liveEvent = isLiveEventAssetType(asset?.assetType);
+  // Which ACS repair case this incident opens. Stable for a given incident, so the same record
+  // never shows two different cases across reloads.
+  const acsCase = useMemo(
+    () => (record && acsTasks ? caseForIncident(record, acsTasks) : null),
+    [record, acsTasks],
+  );
+  const qcReview = useQcQaReview(record, acsCase, acsOpen);
   const facts = useMemo(
     () => (record ? (liveEvent ? liveEventFacts(record) : incidentFacts(record)) : null),
     [record, liveEvent],
@@ -306,7 +351,7 @@ export function IncidentDetailsPanel({
   const openRelated = onOpenRecord ? reference => { void onOpenRecord(reference.assetType, reference.id); } : null;
 
   // Selecting a different incident should not leave the panel on a tab about the previous one.
-  useEffect(() => { setTab(0); }, [asset?.id]);
+  useEffect(() => { setTab(0); setAcsOpen(false); }, [asset?.id]);
 
   // While the Cameras tab is open, its cameras are marked on the corridor — a list of four names
   // does not say which side of the crash they are on. They come off the map when the tab, the panel
@@ -523,7 +568,17 @@ export function IncidentDetailsPanel({
       )}
 
       <Stack spacing={1}>
-        <Button variant="contained" startIcon={<MyLocationOutlinedIcon />} onClick={() => onInspect(asset)}
+        {/* The repair side of the same event. Absent only when the task file cannot be read —
+            never a dead button. */}
+        {acsCase && (
+          <Button variant="contained" color="primary" endIcon={<ChevronRightIcon />}
+            onClick={() => setAcsOpen(true)}
+            aria-label={`Open ACS case ${acsCase.caseId} for ${asset.id}`}>
+            Open ACS Case
+          </Button>
+        )}
+        <Button variant={acsCase ? 'outlined' : 'contained'} startIcon={<MyLocationOutlinedIcon />}
+          onClick={() => onInspect(asset)}
           disabled={!asset.coordinates} aria-label={`View ${asset.id} on map`}>
           View on map
         </Button>
@@ -534,6 +589,9 @@ export function IncidentDetailsPanel({
         )}
       </Stack>
       </Box>
+      <AcsCaseDialog open={acsOpen} onClose={() => setAcsOpen(false)}
+        acsCase={acsCase} incident={asset}
+        review={qcReview.review} reviewLoading={qcReview.loading} />
     </Paper>
   );
 }

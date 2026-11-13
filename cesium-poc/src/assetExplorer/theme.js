@@ -2,8 +2,9 @@
  * MUI theme for the Asset Explorer island, in both modes.
  *
  * One configuration with mode-specific tokens rather than two themes: the roles below mirror the
- * CSS custom properties in i595Demo.css exactly, so the React island and the plain-DOM panels stay
- * the same colour by construction instead of by somebody remembering to update both.
+ * CSS custom properties in `src/theme.css` exactly, so the React island and the plain-DOM panels
+ * stay the same colour instead of drifting apart. (They were defined in i595Demo.css when this was
+ * written; theme.css is where they live now.)
  *
  * Semantic colours (success/warning/error) are NOT derived from the surface — an incident is the
  * same red on white as on navy, because the colour carries meaning rather than style.
@@ -23,11 +24,17 @@ export const UI_TOKENS = Object.freeze({
     accent: ROAD_STYLE.generalPurposeEB.color, accentBright: '#5C9EE0', accentContrast: '#ffffff',
   }),
   light: Object.freeze({
-    // Pure white throughout in light mode: the explorer, its cards and the details panel are one
-    // white surface, separated by lines rather than by tints.
-    surface: '#ffffff', surfaceRaised: '#ffffff', canvas: '#ffffff',
-    text: '#172033', textSecondary: '#5f6b7a',
-    line: '#d8dee6',
+    // White surfaces, separated by lines rather than by tints. The neutral roles are the SDNA
+    // palette (sdna_quasar_wf/sdna-frontend/src/css/quasar.variables.scss), matching
+    // `:root[data-theme="light"]` in theme.css value for value: neutral 80 for text, primary 40
+    // for secondary text, the primary-20 separator for lines, primary 5 for a raised surface.
+    //
+    // These are restated here rather than read from CSS because this island builds a MUI palette
+    // in JS. That makes drift possible, so the two are kept identical deliberately — changing one
+    // means changing the other.
+    surface: '#ffffff', surfaceRaised: '#fafbff', canvas: '#ffffff',
+    text: '#0f1727', textSecondary: '#5f6367',
+    line: '#d3e4f8',
     // Darkened for legibility on white; the dark mode keeps the brighter corridor teal.
     // A deeper step for legibility on white, matching the corridor's selected blue.
     accent: ROAD_STYLE.selected.color, accentBright: ROAD_STYLE.generalPurposeEB.color, accentContrast: '#ffffff',

@@ -24,6 +24,7 @@ import { AssetPositionRail } from './AssetPositionRail.jsx';
 import { AssetMiniMap } from './AssetMiniMap.jsx';
 import { AssetDetailsPanel, DETAILS_WIDTH } from './AssetDetailsPanel.jsx';
 import { IncidentDetailsPanel, INCIDENT_DETAILS_WIDTH } from './IncidentDetailsPanel.jsx';
+import { AcsDemoCasePanel, DEMO_CASE_DETAILS_WIDTH } from './AcsDemoCasePanel.jsx';
 import { IncidentTypeIcon } from './IncidentTypeIcon.jsx';
 import { isLiveEventAssetType } from './liveEventPresentation.js';
 
@@ -166,7 +167,11 @@ export function AssetExplorer({
   // both are events an operator acts on, read the same way, so they get the same surface.
   const showingIncident = detailsShowing
     && (selectedAsset.assetType === 'incidentRecord' || isLiveEventAssetType(selectedAsset.assetType));
-  const openPanelWidth = showingIncident ? INCIDENT_DETAILS_WIDTH : DETAILS_WIDTH;
+  // A demo case is a four-stage lifecycle rather than a field list, so it has its own panel for the
+  // same reason an incident does: the shared definition grid cannot say what holds a case up.
+  const showingDemoCase = detailsShowing && selectedAsset.assetType === 'acsDemoCase';
+  const openPanelWidth = showingDemoCase ? DEMO_CASE_DETAILS_WIDTH
+    : showingIncident ? INCIDENT_DETAILS_WIDTH : DETAILS_WIDTH;
   // The bottom group keeps a fixed position: selecting an asset must not slide the browser out from
   // under the cursor. It can afford to, because the mini-map sits to the LEFT of the browser — the
   // only thing that reaches toward the details panel is the browser's own right edge, and a centred
@@ -180,7 +185,17 @@ export function AssetExplorer({
       {/* The island covers the map, so it must not intercept pointer events except on its own
           surfaces — Cesium navigation has to keep working around it. */}
       <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-        {detailsShowing && (showingIncident ? (
+        {detailsShowing && (showingDemoCase ? (
+          <AcsDemoCasePanel
+            right={detailsInset}
+            top={panelTop}
+            asset={selectedAsset}
+            inspecting={inspectionViewActive}
+            onClose={() => store.setDetailsOpen(false)}
+            onInspect={onInspect}
+            onReturn={onReturn}
+          />
+        ) : showingIncident ? (
           <IncidentDetailsPanel
             right={detailsInset}
             top={panelTop}

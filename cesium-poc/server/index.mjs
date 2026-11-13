@@ -10,9 +10,30 @@ import { loadServerEnv } from './loadEnv.mjs';
 import { loadConfig } from './config.mjs';
 import { API_BASE } from './api.mjs';
 import { createReadApiHandlers } from './readApiHandlers.mjs';
+import { createConstructionApi } from './construction/api.mjs';
 
-export function createApiServer({ config = loadConfig(), env = process.env, logger = console } = {}) {
-  const { handlers, stop } = createReadApiHandlers({ config, env, logger });
+export function createApiServer({ config = loadConfig(), env = process.env, logger = console,
+  /**
+   * The Construction Integration Demo's API.
+   *
+   * Mounted here rather than in `readApiHandlers.mjs` because that module is also the EC2
+   * live-dc host's handler list, and this project has no place on that host — it would open a
+   * SQLite file there and needs a newer Node than that host is documented to carry.
+   */
+  construction = true } = {}) {
+  const { handlers: readHandlers, stop: stopRead } = createReadApiHandlers({ config, env, logger });
+  const constructionApi = construction ? createConstructionApi({ logger }) : null;
+  const handlers = constructionApi ? [...readHandlers, constructionApi] : readHandlers;
+  /*
+   * Phase 8B: the OpenProject background poller.
+   *
+   * Started here rather than inside the factory, so importing the module reaches no network and a
+   * test that builds an API gets no timer. It is a no-op unless OPENPROJECT_AUTO_SYNC_ENABLED is
+   * true and a token is configured, and `close()` awaits the cycle in flight so a shutdown cannot
+   * cut one off mid-transaction.
+   */
+  constructionApi?.startAutoSync();
+  const stop = async () => { await constructionApi?.close(); await stopRead(); };
 
   const server = createServer((request, response) => {
     (async () => {

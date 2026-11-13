@@ -1,0 +1,14 @@
+# Phase 9A — Speckle BIM retrieval verification.
+#
+# The `bundle` extra is NOT optional here. This model's version is bundle-only: its data lives in
+# a parquet bundle with no legacy object graph, and `operations.receive3` — the supported way to
+# read one — raises without pyarrow. Installing bare `specklepy` produces a script that imports
+# cleanly and then fails at the only step that matters.
+specklepy[bundle]==2026.9.2
+
+# Pulled in by specklepy[bundle]; pinned because the parquet reader is the load-bearing part.
+pyarrow==26.0.1
+
+# The GraphQL calls (tests A–C) are plain POSTs rather than the SDK's client, whose
+# `execute_query` is deprecated in this release. `requests` arrives with specklepy anyway.
+requests==2.34.2

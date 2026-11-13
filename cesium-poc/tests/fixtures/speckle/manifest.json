@@ -1,0 +1,109 @@
+{
+  "phase": "9B",
+  "generatedAt": "2026-11-11T05:29:06.966545+00:00",
+  "finishedAt": "2026-11-11T05:29:11.297188+00:00",
+  "source": {
+    "server": "https://app.speckle.systems",
+    "projectId": "13347d8410",
+    "projectName": "My First Project",
+    "modelId": "d1fdafff76",
+    "modelName": "Building-Structural",
+    "versionId": "84a80194f5",
+    "latestVersionId": "84a80194f5",
+    "versionIsLatest": true,
+    "sourceApplication": "ifc-ifcopenshell-converter",
+    "versionCreatedAt": "2026-11-11T04:28:04.378Z",
+    "referencedObject": "bundle.13347d8410.d1fdafff76.84a80194f5"
+  },
+  "units": "m",
+  "counts": {
+    "objects": 20,
+    "withGeometry": 16,
+    "withIfcGuid": 20,
+    "vertices": 4488,
+    "triangles": 1496,
+    "materials": 4
+  },
+  "ifcTypes": {
+    "IfcBeam": 6,
+    "IfcBuildingElementProxy": 5,
+    "IfcWall": 4,
+    "IfcBuilding": 1,
+    "IfcBuildingStorey": 1,
+    "IfcFooting": 1,
+    "IfcRoof": 1,
+    "IfcSite": 1
+  },
+  "levels": [
+    "00 groundfloor"
+  ],
+  "boundsModel": {
+    "min": [
+      -29.642534144846856,
+      -14.985716150583348,
+      -1.3
+    ],
+    "max": [
+      8.700000199179154,
+      9.100000178398034,
+      5.275736
+    ]
+  },
+  "boundsGltf": {
+    "min": [
+      -29.642534144846856,
+      -1.3,
+      -9.100000178398034
+    ],
+    "max": [
+      8.700000199179154,
+      5.275736,
+      14.985716150583348
+    ]
+  },
+  "centreModel": [
+    -10.47126697283385,
+    -2.9428579860926574,
+    1.9878680000000002
+  ],
+  "sizeMetres": [
+    38.34253434402601,
+    24.085716328981384,
+    6.575736
+  ],
+  "transform": {
+    "layout": "row-major, translation in the fourth column of each row",
+    "applied": true,
+    "appliedAt": "conversion",
+    "note": "Placement transforms are baked into the GLB vertices. Do NOT apply them again downstream; the GLB is already in model-world coordinates."
+  },
+  "upAxis": {
+    "source": "Z-up (IFC/Speckle)",
+    "gltf": "Y-up (baked: x, z, -y)",
+    "note": "The GLB is a conventional Y-up asset, so Cesium's default glTF handling is correct and no upAxis override is needed."
+  },
+  "georeferenced": false,
+  "georeferenceNote": "The model carries no CRS. It does contain an element named 'geo-reference' (IfcBuildingElementProxy) offset from the origin, which looks like a survey marker, but nothing states its coordinate system \u2014 so it is NOT used for placement. Supply a longitude/latitude/height/heading anchor at render time.",
+  "artifacts": {
+    "glb": "model.glb",
+    "elements": "elements.json",
+    "manifest": "manifest.json"
+  },
+  "glbBytes": 161172,
+  "featureIdAttribute": "_FEATURE_ID_0",
+  "featureMetadata": {
+    "extensions": [
+      "EXT_mesh_features",
+      "EXT_structural_metadata"
+    ],
+    "propertyTable": "elements",
+    "properties": [
+      "name",
+      "ifcGuid",
+      "ifcType",
+      "elementIndex"
+    ],
+    "note": "A Cesium pick returns a ModelFeature; getProperty('ifcGuid') is the IFC GlobalId exactly as Speckle reported it."
+  },
+  "errors": []
+}

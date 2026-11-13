@@ -1,0 +1,1088 @@
+{
+ "source": "ACS - General Accident and Repair Form (xlsx)",
+ "rowsInFile": 42,
+ "taskCount": 23,
+ "absentFromSource": [
+  "labourHours",
+  "serviceVehicle",
+  "equipment",
+  "materials",
+  "totalCostUSD"
+ ],
+ "note": "Real ACS form submissions. Labour, equipment, MOT and material sub-tables were not flattened into the export and Total_Cost is empty on every row, so those are ABSENT, not zero. Photo counts are real; the image files were not supplied.",
+ "tasks": [
+  {
+   "taskNumber": "1144",
+   "date": "2025-09-29",
+   "siteLocationText": "EB SR 84",
+   "longitude": null,
+   "latitude": null,
+   "laneDirection": "EB",
+   "stateRoad": "84",
+   "respondedBy": [],
+   "policeCaseNumber": "CS#25-063057",
+   "hsmvNumber": null,
+   "eventNumber": null,
+   "officerName": "Pineros",
+   "licensePlate": null,
+   "vehicleModel": null,
+   "insuranceCarrier": null,
+   "assetTypeHint": null,
+   "stages": [
+    {
+     "stage": "INSPECTION",
+     "date": "2025-09-29",
+     "inspector": "Jose Patino",
+     "preparedBy": "Antonieta Egoavil",
+     "qcBy": "Antonieta Egoavil",
+     "workDescription": "fence material and 5 posts",
+     "itemsRepaired": "70 ft of black vinyl dot standard fence. 5- Line post 1- Coner Post",
+     "repairBy": "On Ramp Int.",
+     "thirdPartyName": "On Ramp Int.",
+     "thirdPartyCostUSD": 2700.0,
+     "inspectionPhotos": 4,
+     "repairPhotos": 1
+    }
+   ]
+  },
+  {
+   "taskNumber": "1157",
+   "date": "2025-02-10",
+   "siteLocationText": "10.02.2025 Barriel Wall WB 595 just east of the 441 bridge",
+   "longitude": null,
+   "latitude": null,
+   "laneDirection": "WB",
+   "stateRoad": "862",
+   "respondedBy": [
+    "ACS Maintenance"
+   ],
+   "policeCaseNumber": "FWC25ON0087447",
+   "hsmvNumber": "83538511",
+   "eventNumber": "278182",
+   "officerName": "Nathan Jones",
+   "licensePlate": "QTWL24",
+   "vehicleModel": "PTRB",
+   "insuranceCarrier": "MCgriff insurence service",
+   "assetTypeHint": "Accident\tAccident",
+   "stages": [
+    {
+     "stage": "INSPECTION",
+     "date": "2025-02-10",
+     "inspector": "Jose Boza",
+     "preparedBy": "Laura Bedoya",
+     "qcBy": null,
+     "workDescription": "Diana and Boza 2 hours at accident respond. WB 595 just east of the 441 bridge. One gate completely damaged and the barrier wall.15 ft of barrier Wall under I95 3C responsibility.",
+     "itemsRepaired": "15 ft of barrier Wall under I95 3C responsibility.",
+     "repairBy": "3C",
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 3,
+     "repairPhotos": 0
+    }
+   ]
+  },
+  {
+   "taskNumber": "1162",
+   "date": "2025-06-10",
+   "siteLocationText": "NB 441 before the bridge",
+   "longitude": null,
+   "latitude": null,
+   "laneDirection": "NB",
+   "stateRoad": "7",
+   "respondedBy": [
+    "ACS Maintenance"
+   ],
+   "policeCaseNumber": null,
+   "hsmvNumber": null,
+   "eventNumber": null,
+   "officerName": null,
+   "licensePlate": null,
+   "vehicleModel": null,
+   "insuranceCarrier": null,
+   "assetTypeHint": "Fence Repair\t527",
+   "stages": [
+    {
+     "stage": "INSPECTION",
+     "date": "2025-06-10",
+     "inspector": "David Gonzalez",
+     "preparedBy": null,
+     "qcBy": null,
+     "workDescription": "repair fence  2 posts",
+     "itemsRepaired": "down fence",
+     "repairBy": "Vinier Zayas",
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 1,
+     "repairPhotos": 2
+    }
+   ]
+  },
+  {
+   "taskNumber": "1163",
+   "date": "2025-06-10",
+   "siteLocationText": "SR-84 on ramp (right Side) to Turnpike (T-7)",
+   "longitude": -80.2134277,
+   "latitude": 26.0879178,
+   "laneDirection": "NB",
+   "stateRoad": "84",
+   "respondedBy": [
+    "ACS Maintenance"
+   ],
+   "policeCaseNumber": null,
+   "hsmvNumber": null,
+   "eventNumber": null,
+   "officerName": null,
+   "licensePlate": null,
+   "vehicleModel": null,
+   "insuranceCarrier": null,
+   "assetTypeHint": "Accident\tAccident",
+   "stages": [
+    {
+     "stage": "INSPECTION",
+     "date": "2025-06-10",
+     "inspector": "Jose Boza",
+     "preparedBy": null,
+     "qcBy": null,
+     "workDescription": "5 Regular metal panels 1 Metal post",
+     "itemsRepaired": null,
+     "repairBy": null,
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 6,
+     "repairPhotos": 0
+    },
+    {
+     "stage": "REPAIR",
+     "date": "2025-08-10",
+     "inspector": "Jose Boza",
+     "preparedBy": "Jose Boza",
+     "qcBy": "Antonieta Egoavil",
+     "workDescription": "Guardrail Damage: 3 regular metal panels 1 metal Post 1 plastic Block",
+     "itemsRepaired": "Guardrail Damage: 3 regular metal panels 1 metal Post 1 plastic Block",
+     "repairBy": "Boza",
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 2,
+     "repairPhotos": 5
+    }
+   ]
+  },
+  {
+   "taskNumber": "1164",
+   "date": "2025-07-10",
+   "siteLocationText": "Turnpike North to 441/Sr-84E/595E",
+   "longitude": -80.2123172,
+   "latitude": 26.0879067,
+   "laneDirection": "NB",
+   "stateRoad": "441",
+   "respondedBy": [
+    "ACS Maintenance"
+   ],
+   "policeCaseNumber": null,
+   "hsmvNumber": null,
+   "eventNumber": null,
+   "officerName": null,
+   "licensePlate": null,
+   "vehicleModel": null,
+   "insuranceCarrier": null,
+   "assetTypeHint": "Guardrail Accident & Repair Report\tGuardrail Accident & Repair Report",
+   "stages": [
+    {
+     "stage": "INSPECTION",
+     "date": "2025-07-10",
+     "inspector": "Jose Boza",
+     "preparedBy": null,
+     "qcBy": null,
+     "workDescription": "3 Regular metal panels 2 Metal post 2 Plastic blocks",
+     "itemsRepaired": null,
+     "repairBy": null,
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 5,
+     "repairPhotos": 0
+    },
+    {
+     "stage": "REPAIR",
+     "date": "2025-12-10",
+     "inspector": "Boza",
+     "preparedBy": "Boza",
+     "qcBy": null,
+     "workDescription": "Guardrail Repair: 4 metal regular panels  2 metal post 6\u2019 2 plastic blocks  Roadway damage need asphalt and install yellows Reflectors",
+     "itemsRepaired": "Guardrail Repair remove and Install: 4 metal regular panels  2 metal post 6\u2019 2 plastic blocks  3 asphalts bags 15 yellows reflectors",
+     "repairBy": "Boza",
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 4,
+     "repairPhotos": 0
+    },
+    {
+     "stage": "REPAIR",
+     "date": "2025-12-10",
+     "inspector": "Boza",
+     "preparedBy": "Boza",
+     "qcBy": "Antonieta Egoavil",
+     "workDescription": "Guardrail Repair: 4 metal regular panels  2 metal post 6\u2019 2 plastic blocks  Roadway damage need asphalt and install yellows Reflectors",
+     "itemsRepaired": "Guardrail Repair remove and Install: 4 metal regular panels  2 metal post 6\u2019 2 plastic blocks  3 asphalts bags 15 yellows reflectors",
+     "repairBy": "Boza",
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 4,
+     "repairPhotos": 3
+    }
+   ]
+  },
+  {
+   "taskNumber": "1182",
+   "date": "2025-08-10",
+   "siteLocationText": "I595 EB Before 441",
+   "longitude": null,
+   "latitude": null,
+   "laneDirection": "EB",
+   "stateRoad": "862",
+   "respondedBy": [
+    "ACS Maintenance"
+   ],
+   "policeCaseNumber": null,
+   "hsmvNumber": null,
+   "eventNumber": "278278",
+   "officerName": null,
+   "licensePlate": null,
+   "vehicleModel": null,
+   "insuranceCarrier": null,
+   "assetTypeHint": "Accident\tAccident",
+   "stages": [
+    {
+     "stage": "INSPECTION",
+     "date": "2025-08-10",
+     "inspector": "Oscar Sosa",
+     "preparedBy": null,
+     "qcBy": null,
+     "workDescription": "Is this under I 95 3C?  The barrier wall is a new barrier wall.  Technically, it hasn't been turned over to us yet.",
+     "itemsRepaired": null,
+     "repairBy": null,
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 10,
+     "repairPhotos": 0
+    },
+    {
+     "stage": "INSPECTION",
+     "date": "2025-08-10",
+     "inspector": "Oscar Sosa",
+     "preparedBy": null,
+     "qcBy": null,
+     "workDescription": "Is this under I 95 3C?  The barrier wall is a new barrier wall.  Technically, it hasn't been turned over to us yet.",
+     "itemsRepaired": null,
+     "repairBy": null,
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 0,
+     "repairPhotos": 0
+    }
+   ]
+  },
+  {
+   "taskNumber": "1183",
+   "date": "2025-09-10",
+   "siteLocationText": "SR 84 EB After University Dr",
+   "longitude": null,
+   "latitude": null,
+   "laneDirection": "EB",
+   "stateRoad": "84",
+   "respondedBy": [
+    "ACS Maintenance"
+   ],
+   "policeCaseNumber": null,
+   "hsmvNumber": null,
+   "eventNumber": "278360",
+   "officerName": null,
+   "licensePlate": "PYHN66",
+   "vehicleModel": null,
+   "insuranceCarrier": null,
+   "assetTypeHint": "Accident\tAccident",
+   "stages": [
+    {
+     "stage": "INSPECTION",
+     "date": "2025-09-10",
+     "inspector": "Jose Boza",
+     "preparedBy": null,
+     "qcBy": null,
+     "workDescription": "Damage Structure 86A904",
+     "itemsRepaired": null,
+     "repairBy": null,
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 14,
+     "repairPhotos": 0
+    }
+   ]
+  },
+  {
+   "taskNumber": "1191",
+   "date": "2025-12-10",
+   "siteLocationText": "+26.114874,-80.313249",
+   "longitude": -80.313249,
+   "latitude": 26.114874,
+   "laneDirection": "WB",
+   "stateRoad": null,
+   "respondedBy": [
+    "TMC",
+    "Road Ranger",
+    "ACS Maintenance"
+   ],
+   "policeCaseNumber": null,
+   "hsmvNumber": null,
+   "eventNumber": null,
+   "officerName": null,
+   "licensePlate": null,
+   "vehicleModel": null,
+   "insuranceCarrier": null,
+   "assetTypeHint": "Accident\tAccident",
+   "stages": [
+    {
+     "stage": "INSPECTION",
+     "date": "2025-12-10",
+     "inspector": "Ismael",
+     "preparedBy": "Ismael",
+     "qcBy": null,
+     "workDescription": "Scrach in sound wall",
+     "itemsRepaired": null,
+     "repairBy": null,
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 0,
+     "repairPhotos": 0
+    }
+   ]
+  },
+  {
+   "taskNumber": "1200",
+   "date": "2025-10-19",
+   "siteLocationText": "595 WB Exit 8 Ramp To FLORIDA TURNPIKE",
+   "longitude": null,
+   "latitude": null,
+   "laneDirection": "WB",
+   "stateRoad": null,
+   "respondedBy": [
+    "TMC",
+    "Road Ranger",
+    "ACS Maintenance"
+   ],
+   "policeCaseNumber": null,
+   "hsmvNumber": null,
+   "eventNumber": "278594",
+   "officerName": null,
+   "licensePlate": null,
+   "vehicleModel": null,
+   "insuranceCarrier": null,
+   "assetTypeHint": "Guardrail Accident & Repair Report\tGuardrail Accident & Repair Report Accident\tAccident",
+   "stages": [
+    {
+     "stage": "INSPECTION",
+     "date": "2025-10-19",
+     "inspector": "Boza",
+     "preparedBy": "Jose Boza",
+     "qcBy": null,
+     "workDescription": "Guardrail Damage:  2 metal panels  2 plastic blocks",
+     "itemsRepaired": null,
+     "repairBy": null,
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 4,
+     "repairPhotos": 0
+    },
+    {
+     "stage": "REPAIR",
+     "date": "2025-10-19",
+     "inspector": "Boza",
+     "preparedBy": "Jose Boza",
+     "qcBy": null,
+     "workDescription": "Guardrail Damage:  2 metal panels  2 plastic blocks",
+     "itemsRepaired": "Guardrail Damage:  2 metal panels  2 plastic blocks  Miscellaneous",
+     "repairBy": "Boza",
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 4,
+     "repairPhotos": 0
+    },
+    {
+     "stage": "REPAIR",
+     "date": "2025-10-19",
+     "inspector": "Boza",
+     "preparedBy": "Jose Boza",
+     "qcBy": "Antonieta Egoavil",
+     "workDescription": "Guardrail Damage:  2 metal panels  2 plastic blocks",
+     "itemsRepaired": "Guardrail Damage:  2 metal panels  2 plastic blocks  Miscellaneous",
+     "repairBy": "Boza",
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 4,
+     "repairPhotos": 3
+    }
+   ]
+  },
+  {
+   "taskNumber": "1206",
+   "date": "2025-10-20",
+   "siteLocationText": "Turnpike South on ramp to 595 & SR-84",
+   "longitude": null,
+   "latitude": null,
+   "laneDirection": "SB",
+   "stateRoad": null,
+   "respondedBy": [],
+   "policeCaseNumber": null,
+   "hsmvNumber": null,
+   "eventNumber": null,
+   "officerName": null,
+   "licensePlate": null,
+   "vehicleModel": null,
+   "insuranceCarrier": null,
+   "assetTypeHint": "Guardrail Accident & Repair Report\tGuardrail Accident & Repair Report Accident\tAccident",
+   "stages": [
+    {
+     "stage": "INSPECTION",
+     "date": "2025-10-20",
+     "inspector": "Boza",
+     "preparedBy": "Boza",
+     "qcBy": null,
+     "workDescription": "Guardrail damage:  3 metal regular panels  2 metal post (6\u2019)",
+     "itemsRepaired": null,
+     "repairBy": null,
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 3,
+     "repairPhotos": 0
+    },
+    {
+     "stage": "REPAIR",
+     "date": "2025-10-20",
+     "inspector": "Boza",
+     "preparedBy": "Boza",
+     "qcBy": null,
+     "workDescription": "Guardrail damage:  3 metal regular panels  2 metal post (6\u2019)",
+     "itemsRepaired": "3 metal regular panels  2 metal post (6\u2019)  2 plastic blocks  Miscellaneous",
+     "repairBy": "Boza",
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 3,
+     "repairPhotos": 2
+    },
+    {
+     "stage": "REPAIR",
+     "date": "2025-10-20",
+     "inspector": "Boza",
+     "preparedBy": "Boza",
+     "qcBy": "Antonieta Egoavil",
+     "workDescription": "Guardrail damage:  3 metal regular panels  2 metal post (6\u2019)",
+     "itemsRepaired": "3 metal regular panels  2 metal post (6\u2019)  2 plastic blocks  Miscellaneous",
+     "repairBy": "Boza",
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 3,
+     "repairPhotos": 4
+    }
+   ]
+  },
+  {
+   "taskNumber": "1221",
+   "date": "2025-10-24",
+   "siteLocationText": "595 EB ramp to Marina",
+   "longitude": null,
+   "latitude": null,
+   "laneDirection": "EB",
+   "stateRoad": null,
+   "respondedBy": [
+    "TMC",
+    "Road Ranger",
+    "ACS Maintenance",
+    "Police"
+   ],
+   "policeCaseNumber": "Fhp25ON0501662",
+   "hsmvNumber": null,
+   "eventNumber": null,
+   "officerName": null,
+   "licensePlate": null,
+   "vehicleModel": null,
+   "insuranceCarrier": null,
+   "assetTypeHint": "Accident\tAccident",
+   "stages": [
+    {
+     "stage": "INSPECTION",
+     "date": "2025-10-24",
+     "inspector": "Rivera",
+     "preparedBy": null,
+     "qcBy": null,
+     "workDescription": "Guardrail 6 panel, 2 metal post,4 plastic blocks",
+     "itemsRepaired": null,
+     "repairBy": null,
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 0,
+     "repairPhotos": 0
+    }
+   ]
+  },
+  {
+   "taskNumber": "1222",
+   "date": "2025-10-26",
+   "siteLocationText": "(26.0861701, -80.2140285)",
+   "longitude": -80.2140285,
+   "latitude": 26.0861701,
+   "laneDirection": "EB",
+   "stateRoad": null,
+   "respondedBy": [
+    "ACS Maintenance"
+   ],
+   "policeCaseNumber": null,
+   "hsmvNumber": null,
+   "eventNumber": null,
+   "officerName": null,
+   "licensePlate": null,
+   "vehicleModel": null,
+   "insuranceCarrier": null,
+   "assetTypeHint": "Attenuator Accident\t531.3 Guardrail Accident & Repair Report\tGuardrail Accident & Repair Report Accident\tAccident",
+   "stages": [
+    {
+     "stage": "REPAIR",
+     "date": "2025-10-26",
+     "inspector": "Boza",
+     "preparedBy": "Boza",
+     "qcBy": "Antonieta Egoavil",
+     "workDescription": "Attenuator nose Repair (small) 2 regular metal panels",
+     "itemsRepaired": "Attenuator fixed on 10.28.2025: 3M REFLECTIVE SHEETING & Steel Nose Assembly Narrow Yellow QG.",
+     "repairBy": null,
+     "thirdPartyName": "JB Harper Contractor, LLC.",
+     "thirdPartyCostUSD": 1162.02,
+     "inspectionPhotos": 0,
+     "repairPhotos": 6
+    },
+    {
+     "stage": "REPAIR",
+     "date": "2025-10-26",
+     "inspector": "Boza",
+     "preparedBy": "Boza",
+     "qcBy": null,
+     "workDescription": "Attenuator nose Repair (small) 2 regular metal panels",
+     "itemsRepaired": "2 W Beam Rail 12\u20196\u201d",
+     "repairBy": "Boza",
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 0,
+     "repairPhotos": 0
+    },
+    {
+     "stage": "REPAIR",
+     "date": "2025-10-26",
+     "inspector": "Boza",
+     "preparedBy": "Boza",
+     "qcBy": null,
+     "workDescription": "Attenuator nose Repair (small) 2 regular metal panels",
+     "itemsRepaired": "2 W Beam Rail 12\u20196\u201d",
+     "repairBy": "Boza",
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 0,
+     "repairPhotos": 7
+    }
+   ]
+  },
+  {
+   "taskNumber": "1231",
+   "date": "2025-10-28",
+   "siteLocationText": "(26.0892702, -80.2136218) (T-7)",
+   "longitude": -80.2136218,
+   "latitude": 26.0892702,
+   "laneDirection": "EB",
+   "stateRoad": null,
+   "respondedBy": [
+    "TMC",
+    "Road Ranger",
+    "ACS Maintenance"
+   ],
+   "policeCaseNumber": "FHP25ONO510316",
+   "hsmvNumber": "Crash Number: 27068987",
+   "eventNumber": null,
+   "officerName": "D.A Rodr\u00edguez",
+   "licensePlate": "PIUX24",
+   "vehicleModel": "MERC",
+   "insuranceCarrier": "Garrison Property and Casualty",
+   "assetTypeHint": "Accident\tAccident",
+   "stages": [
+    {
+     "stage": "INSPECTION",
+     "date": "2025-10-28",
+     "inspector": "Boza",
+     "preparedBy": "Boza",
+     "qcBy": null,
+     "workDescription": "Guardrail damage  3 regular metal panels  3 metal Post (6\u2019) 2 plastic Blocks Asphalt Damage ( 5 or 6 bags to repair)",
+     "itemsRepaired": null,
+     "repairBy": null,
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 5,
+     "repairPhotos": 0
+    },
+    {
+     "stage": "REPAIR",
+     "date": "2025-10-28",
+     "inspector": "Boza",
+     "preparedBy": "Boza",
+     "qcBy": null,
+     "workDescription": "Guardrail damage  3 regular metal panels  3 metal Post (6\u2019) 2 plastic Blocks Asphalt Damage ( 5 or 6 bags to repair)",
+     "itemsRepaired": "Guardrail damage  3 regular metal panels  3 metal Post (6\u2019) 2 plastic Blocks Asphalt Damage",
+     "repairBy": "Boza",
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 5,
+     "repairPhotos": 7
+    }
+   ]
+  },
+  {
+   "taskNumber": "1235",
+   "date": "2025-10-29",
+   "siteLocationText": "T-9",
+   "longitude": null,
+   "latitude": null,
+   "laneDirection": "NB",
+   "stateRoad": null,
+   "respondedBy": [
+    "ACS Maintenance"
+   ],
+   "policeCaseNumber": null,
+   "hsmvNumber": null,
+   "eventNumber": null,
+   "officerName": null,
+   "licensePlate": null,
+   "vehicleModel": null,
+   "insuranceCarrier": null,
+   "assetTypeHint": "Accident\tAccident",
+   "stages": [
+    {
+     "stage": "INSPECTION",
+     "date": "2025-10-29",
+     "inspector": "Boza",
+     "preparedBy": null,
+     "qcBy": null,
+     "workDescription": "End Treatment: 1- W-Beam Rail especial 12\u20196\u201d 1- breakaway post (wood) 1- Nose (ET-Plus Terminal Head)",
+     "itemsRepaired": null,
+     "repairBy": null,
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 6,
+     "repairPhotos": 0
+    },
+    {
+     "stage": "REPAIR",
+     "date": "2025-10-29",
+     "inspector": "Boza",
+     "preparedBy": null,
+     "qcBy": null,
+     "workDescription": "End Treatment: 1- W-Beam Rail especial 12\u20196\u201d 1- breakaway post (wood) 1- Nose (ET-Plus Terminal Head)",
+     "itemsRepaired": "End treatment repair",
+     "repairBy": "Boza",
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 0,
+     "repairPhotos": 7
+    }
+   ]
+  },
+  {
+   "taskNumber": "1248",
+   "date": "2025-02-11",
+   "siteLocationText": "595 WB Before Exit to Hiatus Road (north Shoulder)",
+   "longitude": null,
+   "latitude": null,
+   "laneDirection": "WB",
+   "stateRoad": null,
+   "respondedBy": [
+    "TMC",
+    "Road Ranger",
+    "ACS Maintenance"
+   ],
+   "policeCaseNumber": "FHP25ON0518590",
+   "hsmvNumber": null,
+   "eventNumber": "278976",
+   "officerName": null,
+   "licensePlate": "FLZR08",
+   "vehicleModel": "Range Rover",
+   "insuranceCarrier": null,
+   "assetTypeHint": "Accident\tAccident",
+   "stages": [
+    {
+     "stage": "INSPECTION",
+     "date": "2025-02-11",
+     "inspector": "Boza",
+     "preparedBy": "Boza",
+     "qcBy": null,
+     "workDescription": "Vehicle Fired next wall need pressure Washing and paint.",
+     "itemsRepaired": null,
+     "repairBy": null,
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 4,
+     "repairPhotos": 0
+    },
+    {
+     "stage": "INSPECTION",
+     "date": "2025-02-11",
+     "inspector": "Boza",
+     "preparedBy": "Boza",
+     "qcBy": null,
+     "workDescription": "Vehicle Fired next wall need pressure Washing and paint.",
+     "itemsRepaired": null,
+     "repairBy": null,
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 4,
+     "repairPhotos": 0
+    }
+   ]
+  },
+  {
+   "taskNumber": "1249",
+   "date": "2025-02-11",
+   "siteLocationText": "SR-84 West at Flamingo",
+   "longitude": null,
+   "latitude": null,
+   "laneDirection": "WB",
+   "stateRoad": null,
+   "respondedBy": [
+    "TMC",
+    "Road Ranger",
+    "ACS Maintenance"
+   ],
+   "policeCaseNumber": "80515",
+   "hsmvNumber": null,
+   "eventNumber": "278974",
+   "officerName": null,
+   "licensePlate": null,
+   "vehicleModel": null,
+   "insuranceCarrier": null,
+   "assetTypeHint": "Accident\tAccident",
+   "stages": [
+    {
+     "stage": "INSPECTION",
+     "date": "2025-02-11",
+     "inspector": "Boza",
+     "preparedBy": "Boza",
+     "qcBy": null,
+     "workDescription": "End Treatment damage: 2- silder assembly posts  1- W-Beam Rail special panel for SKT 1- SKT 350 Nose 2- W-Beam panel standard 12\u20196\u201d 3- metal Post 6\u2019 1- breakaway wooden post 3- woods blocks",
+     "itemsRepaired": null,
+     "repairBy": null,
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 7,
+     "repairPhotos": 2
+    }
+   ]
+  },
+  {
+   "taskNumber": "1255",
+   "date": "2025-04-11",
+   "siteLocationText": "(26.0869525, -80.2039403)",
+   "longitude": -80.2039403,
+   "latitude": 26.0869525,
+   "laneDirection": "EB",
+   "stateRoad": null,
+   "respondedBy": [
+    "ACS Maintenance"
+   ],
+   "policeCaseNumber": null,
+   "hsmvNumber": null,
+   "eventNumber": null,
+   "officerName": null,
+   "licensePlate": null,
+   "vehicleModel": null,
+   "insuranceCarrier": null,
+   "assetTypeHint": "Guardrail Accident & Repair Report\tGuardrail Accident & Repair Report",
+   "stages": [
+    {
+     "stage": "REPAIR",
+     "date": "2025-04-11",
+     "inspector": "Boza",
+     "preparedBy": null,
+     "qcBy": null,
+     "workDescription": "Guardrail Repair  End treatment",
+     "itemsRepaired": "Guardrail repair: 12 W-Beam regular 12\u20196\u201d 1 W beam Special 12\u2019 6\u201d 1 breakaway wood post 4 asphalt bags",
+     "repairBy": "Boza",
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 3,
+     "repairPhotos": 10
+    },
+    {
+     "stage": "REPAIR",
+     "date": "2025-04-11",
+     "inspector": "Boza",
+     "preparedBy": null,
+     "qcBy": null,
+     "workDescription": "Guardrail Repair  End treatment",
+     "itemsRepaired": "Guardrail repair: 12 W-Beam regular 12\u20196\u201d 1 W beam Special 12\u2019 6\u201d 1 breakaway wood post 4 asphalt bags",
+     "repairBy": "Boza",
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 3,
+     "repairPhotos": 14
+    }
+   ]
+  },
+  {
+   "taskNumber": "1283",
+   "date": "2025-05-11",
+   "siteLocationText": "(26.0846778, -80.1925346)",
+   "longitude": -80.1925346,
+   "latitude": 26.0846778,
+   "laneDirection": "WB",
+   "stateRoad": null,
+   "respondedBy": [
+    "ACS Maintenance"
+   ],
+   "policeCaseNumber": null,
+   "hsmvNumber": null,
+   "eventNumber": null,
+   "officerName": null,
+   "licensePlate": null,
+   "vehicleModel": null,
+   "insuranceCarrier": null,
+   "assetTypeHint": "Attenuator Accident\t531.3 Small Sign Repair \t520",
+   "stages": [
+    {
+     "stage": "INSPECTION",
+     "date": "2025-05-11",
+     "inspector": "Boza",
+     "preparedBy": "Boza",
+     "qcBy": null,
+     "workDescription": "Sign leaning need to remove and reinstall with Concrete and level",
+     "itemsRepaired": null,
+     "repairBy": null,
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 4,
+     "repairPhotos": 0
+    },
+    {
+     "stage": "REPAIR",
+     "date": "2025-05-11",
+     "inspector": "Boza",
+     "preparedBy": "Boza",
+     "qcBy": null,
+     "workDescription": "Sign leaning need to remove and reinstall with Concrete and level",
+     "itemsRepaired": "Repair leaning sign",
+     "repairBy": "Boza",
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 4,
+     "repairPhotos": 3
+    }
+   ]
+  },
+  {
+   "taskNumber": "1305",
+   "date": "2025-04-11",
+   "siteLocationText": "I595 SR-7 Interchange",
+   "longitude": null,
+   "latitude": null,
+   "laneDirection": "NB",
+   "stateRoad": "862",
+   "respondedBy": [
+    "ACS Maintenance"
+   ],
+   "policeCaseNumber": null,
+   "hsmvNumber": null,
+   "eventNumber": null,
+   "officerName": null,
+   "licensePlate": null,
+   "vehicleModel": null,
+   "insuranceCarrier": null,
+   "assetTypeHint": null,
+   "stages": [
+    {
+     "stage": "INSPECTION",
+     "date": "2025-04-11",
+     "inspector": "Oscar Sosa",
+     "preparedBy": null,
+     "qcBy": null,
+     "workDescription": null,
+     "itemsRepaired": null,
+     "repairBy": null,
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 7,
+     "repairPhotos": 4
+    }
+   ]
+  },
+  {
+   "taskNumber": "1318",
+   "date": "2025-11-14",
+   "siteLocationText": "EB SR84 to marina mile",
+   "longitude": null,
+   "latitude": null,
+   "laneDirection": "EB",
+   "stateRoad": "84",
+   "respondedBy": [
+    "TMC"
+   ],
+   "policeCaseNumber": null,
+   "hsmvNumber": null,
+   "eventNumber": null,
+   "officerName": null,
+   "licensePlate": null,
+   "vehicleModel": null,
+   "insuranceCarrier": null,
+   "assetTypeHint": null,
+   "stages": [
+    {
+     "stage": "INSPECTION",
+     "date": "2025-11-14",
+     "inspector": "jose patino",
+     "preparedBy": null,
+     "qcBy": null,
+     "workDescription": "repair attenuator 1319  nose, 1 type 2 cart, 2 type 2 carts",
+     "itemsRepaired": null,
+     "repairBy": null,
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 3,
+     "repairPhotos": 1
+    }
+   ]
+  },
+  {
+   "taskNumber": "1319",
+   "date": "2025-11-17",
+   "siteLocationText": "441 NB NNRC",
+   "longitude": null,
+   "latitude": null,
+   "laneDirection": "NB",
+   "stateRoad": "441",
+   "respondedBy": [],
+   "policeCaseNumber": null,
+   "hsmvNumber": null,
+   "eventNumber": null,
+   "officerName": null,
+   "licensePlate": null,
+   "vehicleModel": null,
+   "insuranceCarrier": null,
+   "assetTypeHint": "Accident\tAccident",
+   "stages": [
+    {
+     "stage": "INSPECTION",
+     "date": "2025-11-17",
+     "inspector": "Oscar Sosa",
+     "preparedBy": null,
+     "qcBy": null,
+     "workDescription": null,
+     "itemsRepaired": null,
+     "repairBy": null,
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 3,
+     "repairPhotos": 0
+    },
+    {
+     "stage": "REPAIR",
+     "date": "2025-11-17",
+     "inspector": "Oscar Sosa",
+     "preparedBy": null,
+     "qcBy": null,
+     "workDescription": null,
+     "itemsRepaired": "End treatment Repair: 1- Special W- Beam 12\u20196\u201d  1 - wood Block 1- breakaway wood post  Miscellaneous",
+     "repairBy": "Boza",
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 3,
+     "repairPhotos": 6
+    }
+   ]
+  },
+  {
+   "taskNumber": "1321",
+   "date": "2025-11-14",
+   "siteLocationText": "Attenuator #1319",
+   "longitude": null,
+   "latitude": null,
+   "laneDirection": "EB",
+   "stateRoad": null,
+   "respondedBy": [
+    "ACS Maintenance"
+   ],
+   "policeCaseNumber": null,
+   "hsmvNumber": null,
+   "eventNumber": null,
+   "officerName": null,
+   "licensePlate": null,
+   "vehicleModel": null,
+   "insuranceCarrier": null,
+   "assetTypeHint": "Accident\tAccident",
+   "stages": [
+    {
+     "stage": "QC",
+     "date": "2025-11-14",
+     "inspector": "Oscar Sosa",
+     "preparedBy": "Jose Patino",
+     "qcBy": "Jose Patino, AE",
+     "workDescription": "2 Type I 1 Type II",
+     "itemsRepaired": "1 - 3M REFLECTIVE SHEETING 2 - Cartridge Assembly Type I QG 1 -  Cartridge Assembly Type II QG 1 - Steel Nose Assembly Narrow Yellow QG II",
+     "repairBy": "JB Harper",
+     "thirdPartyName": "J.B. Harper",
+     "thirdPartyCostUSD": 4653.43,
+     "inspectionPhotos": 2,
+     "repairPhotos": 1
+    }
+   ]
+  },
+  {
+   "taskNumber": "1343",
+   "date": "2025-11-24",
+   "siteLocationText": "Flamingo Texas U-Turn SR 84",
+   "longitude": null,
+   "latitude": null,
+   "laneDirection": "NB",
+   "stateRoad": "84",
+   "respondedBy": [
+    "ACS Maintenance"
+   ],
+   "policeCaseNumber": null,
+   "hsmvNumber": null,
+   "eventNumber": null,
+   "officerName": null,
+   "licensePlate": null,
+   "vehicleModel": null,
+   "insuranceCarrier": null,
+   "assetTypeHint": "Accident\tAccident",
+   "stages": [
+    {
+     "stage": "INSPECTION",
+     "date": "2025-11-24",
+     "inspector": "Jose Boza",
+     "preparedBy": null,
+     "qcBy": null,
+     "workDescription": null,
+     "itemsRepaired": null,
+     "repairBy": null,
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 4,
+     "repairPhotos": 0
+    },
+    {
+     "stage": "REPAIR",
+     "date": "2025-11-24",
+     "inspector": "Jose Boza",
+     "preparedBy": null,
+     "qcBy": null,
+     "workDescription": null,
+     "itemsRepaired": "Install 2 W-Beams regular 12\u20196\u201d",
+     "repairBy": "Boza",
+     "thirdPartyName": null,
+     "thirdPartyCostUSD": null,
+     "inspectionPhotos": 4,
+     "repairPhotos": 5
+    }
+   ]
+  }
+ ]
+}

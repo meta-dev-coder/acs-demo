@@ -1,0 +1,1142 @@
+/* ==========================================================================================
+   Construction Integration Demo.
+
+   Only what the shared sheets do not already give. The theme tokens and the navigation bar come
+   from theme.css and appNav.css, so this project cannot drift from I-595's chrome, and nothing
+   here can reach an I-595 screen: the two never run in the same document.
+   ========================================================================================== */
+@import '../appNav.css';
+
+/* The shell is absolutely positioned, so the document needs a height of its own or the body
+   collapses to nothing and takes the whole page with it. I-595 gets this from its map container. */
+html, body { height: 100%; }
+body { margin: 0; background: var(--ui-bg, var(--ui-surface-solid)); color: var(--ui-text);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+.ci-root { position: absolute; inset: 0; left: var(--app-nav-w); display: flex;
+  flex-direction: column; min-width: 0; overflow: hidden; }
+
+/* The synthetic badge: part of the chrome, so no screen can be built that forgets it. */
+/* The banner wraps between its clauses and never overflows: it is three inline-blocks in a
+   flex row that wraps, so a narrow window stacks whole sentences instead of breaking one in
+   half. `letter-spacing` plus uppercase makes this longer text about twice as wide as the
+   original, so the wrapping is not optional. */
+.ci-synthetic {
+  flex: none; display: flex; flex-wrap: wrap; gap: 2px 10px;
+  margin: 0; padding: 7px 20px; border-bottom: 1px solid var(--ui-border-soft);
+  background: var(--ui-accent-tint); color: var(--ui-accent);
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  line-height: 1.5;
+}
+/* The one clause that is NOT a denial. It reads differently because it means something
+   different, and it still carries its own words rather than relying on the colour. */
+.ci-synthetic [data-part="sandbox"] { color: var(--ui-text); opacity: .95; }
+.ci-synthetic [data-part="production"] { color: var(--ui-accent); }
+
+@media (max-width: 720px) {
+  .ci-synthetic { padding: 7px 14px; letter-spacing: .03em; }
+}
+
+.ci-workspaces { flex: 1; min-height: 0; overflow-y: auto; }
+
+.ci-workspace { padding: 24px 28px 40px; max-width: 920px; }
+/* `display` is not set above, so [hidden] works — stated anyway, because every panel in this
+   repository that forgot it stayed on screen. */
+.ci-workspace[hidden] { display: none; }
+
+.ci-ws-head h1 { margin: 0 0 6px; font-size: 22px; font-weight: 650; letter-spacing: -.01em; }
+.ci-ws-purpose { margin: 0 0 24px; max-width: 70ch; color: var(--ui-text-secondary); font-size: 13.5px; }
+
+.ci-ws-body { padding: 18px 20px; border: 1px solid var(--ui-border); border-radius: 12px;
+  background: var(--ui-surface-solid); box-shadow: var(--ui-shadow-soft); }
+.ci-ws-body h2 { margin: 0 0 10px; font-size: 10.5px; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ui-text-dim); }
+.ci-ws-list { margin: 0; padding-left: 18px; color: var(--ui-text); font-size: 13px; }
+.ci-ws-list li { margin: 3px 0; }
+.ci-ws-pending { margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--ui-border-soft);
+  max-width: 70ch; color: var(--ui-text-muted); font-size: 12.5px; }
+
+.ci-theme-toggle { margin-top: 8px; padding: 7px 4px; border: 1px solid var(--ui-border-soft);
+  border-radius: 10px; background: transparent; color: var(--ui-text-secondary);
+  font: inherit; font-size: 10.5px; cursor: pointer; }
+.ci-theme-toggle:hover { background: var(--ui-hover); color: var(--ui-text); }
+.ci-theme-toggle:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: -2px; }
+
+@media (max-width: 700px) {
+  .ci-workspace { padding: 18px 16px 32px; }
+}
+
+/* ── Integration Overview ──────────────────────────────────────────────────────────────────── */
+
+.ci-overview { display: grid; gap: 20px; }
+
+.ci-status { margin: 0; padding: 14px 16px; border: 1px solid var(--ui-border);
+  border-radius: 10px; background: var(--ui-surface-solid); color: var(--ui-text-secondary); }
+.ci-status[data-state="error"] { border-color: var(--ui-border); color: var(--ui-text); }
+
+.ci-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ci-button { padding: 8px 14px; border: 1px solid var(--ui-accent-tint); border-radius: 9px;
+  background: var(--ui-accent-tint); color: var(--ui-accent); font: inherit; font-size: 12.5px;
+  font-weight: 650; cursor: pointer; }
+.ci-button:hover:not(:disabled) { background: var(--ui-hover); }
+.ci-button:disabled { opacity: .6; cursor: progress; }
+.ci-button:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+.ci-button--quiet { background: transparent; border-color: var(--ui-border);
+  color: var(--ui-text-secondary); font-weight: 500; }
+.ci-actions-note { color: var(--ui-text-muted); font-size: 12px; }
+
+.ci-cards { display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); }
+.ci-card { padding: 14px 16px 16px; border: 1px solid var(--ui-border); border-radius: 12px;
+  background: var(--ui-surface-solid); box-shadow: var(--ui-shadow-soft); }
+.ci-card header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ci-card-id { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; color: var(--ui-text-dim); }
+/* The app's tone vocabulary: ok / warn / bad / info. Never colour alone — each carries its word. */
+.ci-card-health { padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 650;
+  background: var(--ui-hover); color: var(--ui-text-secondary); }
+.ci-card-health[data-tone="ok"] { background: var(--ui-tone-ok-bg); color: var(--ui-tone-ok); }
+.ci-card-health[data-tone="warn"] { background: var(--ui-tone-warn-bg); color: var(--ui-tone-warn); }
+.ci-card-health[data-tone="bad"] { background: var(--ui-tone-bad-bg); color: var(--ui-tone-bad); }
+.ci-card h3 { margin: 8px 0 4px; font-size: 14px; font-weight: 650; }
+.ci-card-moves { margin: 0 0 12px; color: var(--ui-text-secondary); font-size: 12px; }
+.ci-card-counts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 14px; margin: 0 0 12px; }
+.ci-card-counts > div { display: flex; justify-content: space-between; gap: 8px; }
+.ci-card-counts dt { color: var(--ui-text-muted); font-size: 11.5px; }
+.ci-card-counts dd { margin: 0; font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ci-card-control, .ci-card-note { margin: 0; padding-top: 10px;
+  border-top: 1px solid var(--ui-border-soft); color: var(--ui-text-muted); font-size: 11.5px; }
+.ci-card-note { border-top: 0; padding-top: 0; }
+
+.ci-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.ci-table caption { margin-bottom: 8px; text-align: left; color: var(--ui-text-muted); font-size: 11.5px; }
+.ci-table th, .ci-table td { padding: 6px 10px; border-bottom: 1px solid var(--ui-border-soft); text-align: right; }
+.ci-table thead th, .ci-table tbody th { font-weight: 600; }
+/*
+ * A COLUMN HEADING SITS OVER ITS OWN VALUES.
+ *
+ * Cells default to right (they are overwhelmingly numbers and dates, and tabular-nums only reads
+ * as a column when the digits line up). Headings used to default to LEFT, so in a nine-column
+ * table every heading but the first floated away from the values beneath it — "PROGRESS" at the
+ * left of a cell whose "35%" sat at the right.
+ *
+ * Headings now take the same default as cells, and the exceptions are derived from the markup
+ * rather than written out per table: there are 21 tables and 137 column headings here, and a
+ * hand-maintained list of which ones are text would be wrong within a release.
+ */
+.ci-table tbody th { text-align: left; }
+/*
+ * `:has()` rather than a bare `:first-child`: the first column is a text label only in the tables
+ * whose rows actually begin with a row header. The change-history table starts with a plain cell,
+ * and giving it a left heading over right-aligned values would have reintroduced the same bug in
+ * a different table.
+ */
+.ci-table:has(tbody th[scope="row"]) thead th:first-child { text-align: left; }
+/*
+ * Any other column whose values are prose. Put it on BOTH the <th> and the <td> — that pairing is
+ * the whole point, and it replaced inline `style="text-align:left"` on the cells alone, which was
+ * how two tables ended up with a right-aligned heading over left-aligned text.
+ */
+.ci-table .ci-col--text { text-align: left; }
+.ci-table thead th { color: var(--ui-text-dim); font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; }
+.ci-table td { font-variant-numeric: tabular-nums; }
+
+/* ── Phase 3: mapping, exceptions, reconciliation ──────────────────────────────────────────── */
+
+.ci-workbench, .ci-exceptions { display: grid; gap: 16px; }
+
+/* The six existing construction modules keep their width; these two need the room. */
+.ci-workspace[data-workspace="mappingWorkbench"],
+/*
+ * The Integration Overview outgrew its 920px column.
+ *
+ * That width was right when this workspace was five cards and one six-row table. It now also
+ * carries two live data panels — SAP Live Cost and the OpenProject schedule — whose tables have
+ * nine and four columns, and squeezing those into 920px wrapped every date onto two lines while
+ * leaving most of the screen empty. Widened the same way the other data-heavy workspaces already
+ * are, rather than by special-casing the panels.
+ */
+.ci-workspace[data-workspace="integrationOverview"] { max-width: 1680px; }
+
+.ci-workspace[data-workspace="exceptions"] { max-width: none; }
+
+.ci-subtabs { margin: 0 0 4px; }
+.ci-subtabs button { pointer-events: auto; }
+
+.ci-summary { display: grid; gap: 10px; margin: 0;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.ci-summary > div { padding: 10px 12px; border: 1px solid var(--ui-border);
+  border-radius: 10px; background: var(--ui-surface-solid); }
+.ci-summary dt { color: var(--ui-text-muted); font-size: 11px; }
+.ci-summary dd { margin: 2px 0 0; font-size: 19px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.ci-summary small { display: block; margin-top: 2px; color: var(--ui-text-dim); font-size: 10.5px; }
+
+.ci-filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.ci-filter { display: grid; gap: 3px; font-size: 11px; color: var(--ui-text-muted); }
+.ci-filter select, .ci-filter input { min-width: 130px; height: 30px; padding: 0 8px;
+  border: 1px solid var(--ui-border); border-radius: 7px; background: var(--ui-surface-solid);
+  color: var(--ui-text); font: inherit; font-size: 12px; }
+.ci-filter--search input { min-width: 230px; }
+
+.ci-split { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
+.ci-split:has(.ci-drawer) { grid-template-columns: minmax(0, 1fr) minmax(320px, 420px); }
+.ci-split-main { min-width: 0; overflow-x: auto; }
+
+.ci-table--rows { background: var(--ui-surface-solid); border: 1px solid var(--ui-border);
+  border-radius: 10px; overflow: hidden; }
+.ci-table--rows th[scope="row"] { white-space: nowrap; }
+.ci-table--rows th[scope="row"] small { display: block; font-weight: 400; color: var(--ui-text-dim); }
+.ci-table--rows tbody tr { cursor: pointer; }
+.ci-table--rows tbody tr:hover { background: var(--ui-hover); }
+.ci-table--rows tbody tr:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: -2px; }
+.ci-table--rows caption { caption-side: bottom; margin-top: 8px; text-align: left;
+  color: var(--ui-text-muted); font-size: 11px; }
+
+.ci-chip { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 10.5px;
+  font-weight: 600; background: var(--ui-hover); color: var(--ui-text-secondary); white-space: nowrap; }
+.ci-chip[data-tone="ok"] { background: var(--ui-tone-ok-bg); color: var(--ui-tone-ok); }
+.ci-chip[data-tone="warn"] { background: var(--ui-tone-warn-bg); color: var(--ui-tone-warn); }
+.ci-chip[data-tone="bad"] { background: var(--ui-tone-bad-bg); color: var(--ui-tone-bad); }
+
+.ci-drawer { position: sticky; top: 0; max-height: calc(100dvh - 160px); overflow-y: auto;
+  padding: 14px 16px 20px; border: 1px solid var(--ui-border); border-radius: 12px;
+  background: var(--ui-surface-solid); box-shadow: var(--ui-shadow-soft); }
+.ci-drawer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.ci-drawer h2 { margin: 2px 0 0; font-size: 17px; }
+.ci-drawer h3 { margin: 18px 0 6px; font-size: 10.5px; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ui-text-dim); }
+.ci-drawer p { margin: 0 0 6px; font-size: 12.5px; }
+
+.ci-chain { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.ci-chain li { padding: 7px 10px; border-left: 3px solid var(--ui-border);
+  background: var(--ui-surface-raised); border-radius: 0 7px 7px 0; }
+.ci-chain li[data-basis="APPROVED"] { border-left-color: var(--ui-accent); }
+.ci-chain li[data-basis="UNRESOLVED"], .ci-chain li[data-basis="NONE"] { border-left-color: var(--ui-tone-warn); }
+.ci-chain-step { display: block; font-size: 10.5px; color: var(--ui-text-dim); }
+.ci-chain-id { font-size: 13px; font-weight: 600; }
+.ci-chain small { display: block; color: var(--ui-text-muted); font-size: 11px; }
+
+.ci-findings, .ci-candidates, .ci-history { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.ci-findings li, .ci-candidates li { padding: 9px 11px; border: 1px solid var(--ui-border-soft);
+  border-radius: 9px; background: var(--ui-surface-raised); font-size: 12.5px; }
+.ci-findings li[data-tone="bad"] { border-left: 3px solid var(--ui-tone-bad); }
+.ci-findings li[data-tone="warn"] { border-left: 3px solid var(--ui-tone-warn); }
+.ci-findings li[data-tone="ok"] { border-left: 3px solid var(--ui-tone-ok); }
+.ci-findings small, .ci-candidates small, .ci-history small {
+  display: block; margin-top: 3px; color: var(--ui-text-muted); font-size: 11px; }
+.ci-candidates label { display: block; cursor: pointer; }
+.ci-why { margin: 5px 0 0 20px; padding: 0; color: var(--ui-text-muted); font-size: 11.5px; }
+.ci-history li { padding: 6px 0; border-bottom: 1px solid var(--ui-border-soft); font-size: 12px; }
+.ci-history li:last-child { border-bottom: 0; }
+
+@media (max-width: 1200px) {
+  .ci-split:has(.ci-drawer) { grid-template-columns: 1fr; }
+  .ci-drawer { position: static; max-height: none; }
+}
+
+/* ── Phase 4: construction progress ────────────────────────────────────────────────────────── */
+
+.ci-workspace:has(.cpt-root) { max-width: none; padding: 16px 18px 24px; }
+.cp-root { display: grid; gap: 12px; }
+
+.cp-toolbar, .cp-timeline { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
+  padding: 10px 12px; border: 1px solid var(--ui-border); border-radius: 10px;
+  background: var(--ui-surface-solid); }
+.cp-toolbar .ci-filter strong { font-size: 13px; color: var(--ui-text); }
+.cp-timeline { align-items: center; }
+.cp-timeline input[type="range"] { flex: 1; min-width: 200px; accent-color: var(--ui-accent); }
+.cp-date { font-variant-numeric: tabular-nums; font-size: 13px; }
+
+/* Left tree, centre model, right detail. The model gets the room. */
+.cp-grid { display: grid; gap: 12px; grid-template-columns: minmax(230px, 300px) minmax(0, 1fr) minmax(280px, 360px);
+  align-items: stretch; min-height: 520px; }
+@media (max-width: 1400px) { .cp-grid { grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); }
+  .cp-detail { grid-column: 1 / -1; } }
+@media (max-width: 900px) { .cp-grid { grid-template-columns: 1fr; } }
+
+.cp-tree-panel, .cp-model, .cp-detail { border: 1px solid var(--ui-border); border-radius: 10px;
+  background: var(--ui-surface-solid); overflow: auto; }
+.cp-tree-panel { padding: 8px; max-height: 560px; }
+.cp-detail { padding: 12px 14px; max-height: 560px; }
+.cp-model { display: flex; flex-direction: column; min-height: 420px; overflow: hidden; }
+.cp-model-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 10px;
+  border-bottom: 1px solid var(--ui-border-soft); font-size: 11.5px; }
+.cp-categories { display: flex; flex-wrap: wrap; gap: 10px; color: var(--ui-text-secondary); }
+.cp-categories label { display: flex; align-items: center; gap: 4px; }
+.cp-canvas { flex: 1; min-height: 340px; position: relative; }
+.ci-viewer { position: absolute; inset: 0; }
+.ci-viewer .cesium-viewer-bottom { display: none; }
+
+.cp-legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; padding: 8px 10px;
+  border-top: 1px solid var(--ui-border-soft); list-style: none;
+  color: var(--ui-text-secondary); font-size: 11px; }
+.cp-legend li { display: flex; align-items: center; gap: 5px; }
+.cp-swatch { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+
+.cp-tree { margin: 0; padding: 0; list-style: none; font-size: 12px; }
+.cp-tree ul { margin: 0; padding: 0 0 0 4px; list-style: none; }
+.cp-tree summary { padding: 5px 4px; cursor: pointer; font-weight: 600; font-size: 11.5px;
+  color: var(--ui-text-secondary); }
+.cp-tree summary small { color: var(--ui-text-dim); font-weight: 400; }
+.cp-activity { display: grid; grid-template-columns: 58px 1fr 54px 38px; gap: 6px; align-items: center;
+  width: 100%; padding: 4px 5px; border: 0; border-radius: 6px; background: transparent;
+  color: var(--ui-text); font: inherit; font-size: 11.5px; text-align: left; cursor: pointer; }
+.cp-activity:hover { background: var(--ui-hover); }
+.cp-activity.is-selected { background: var(--ui-accent-tint); color: var(--ui-accent); }
+.cp-activity-id { font-variant-numeric: tabular-nums; color: var(--ui-text-dim); }
+.cp-activity-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp-activity-pct { text-align: right; font-variant-numeric: tabular-nums; }
+/* Two bars, not one blended figure: the schedule's claim and the verified evidence. */
+.cp-bars { position: relative; height: 9px; border-radius: 5px; background: var(--ui-surface-raised);
+  overflow: hidden; }
+.cp-bar { position: absolute; left: 0; height: 4px; border-radius: 3px; }
+.cp-bar--planned { top: 0; background: var(--ui-tone-info); }
+.cp-bar--actual { bottom: 0; background: var(--ui-tone-ok); }
+
+.cp-facts { display: grid; gap: 6px; margin: 10px 0; }
+.cp-facts > div { display: grid; grid-template-columns: 44% 1fr; gap: 8px; font-size: 12px; }
+.cp-facts dt { color: var(--ui-text-muted); }
+.cp-facts dd { margin: 0; }
+
+.cp-bottom { border: 1px solid var(--ui-border); border-radius: 10px;
+  background: var(--ui-surface-solid); overflow: hidden; }
+.cp-bottom-body { padding: 12px 14px; max-height: 320px; overflow: auto; }
+.cp-bottom .ci-subtabs { margin: 0; padding: 6px 8px 0; border-bottom: 1px solid var(--ui-border-soft); }
+.ci-table--rows tr.is-selected { background: var(--ui-accent-tint); }
+.cp-message[hidden] { display: none; }
+
+/* ── Phase 5: approvals ────────────────────────────────────────────────────────────────────── */
+.ci-workspace[data-workspace="approvals"] { max-width: none; }
+.ci-approvals { display: grid; gap: 14px; }
+.ap-session { padding: 10px 12px; border: 1px solid var(--ui-border); border-radius: 10px;
+  background: var(--ui-surface-solid); }
+.ci-bucket { padding: 5px 11px; border: 1px solid var(--ui-border); border-radius: 999px;
+  background: transparent; color: var(--ui-text-secondary); font: inherit; font-size: 11.5px;
+  cursor: pointer; }
+.ci-bucket.is-on { background: var(--ui-accent-tint); border-color: var(--ui-accent-tint);
+  color: var(--ui-accent); font-weight: 650; }
+.ci-bucket small { color: var(--ui-text-dim); }
+.ci-bucket.is-on small { color: inherit; }
+.ci-approvals .ci-drawer h3 { margin-top: 16px; }
+.ci-button:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ── Phase 6: history, audit and the guided demo ───────────────────────────────────────────── */
+.ci-workspace[data-workspace="auditHistory"] { max-width: none; }
+.ci-history { display: grid; gap: 14px; }
+.ci-history .ci-table--rows { font-size: 11.5px; }
+.ci-history .ci-table--rows td, .ci-history .ci-table--rows th { padding: 5px 8px; }
+.sh-absent { color: var(--ui-text-dim); font-style: italic; }
+.sh-state { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-variant-numeric: tabular-nums; }
+.ci-history tbody tr[data-sh-link] { cursor: pointer; }
+
+.sh-timeline { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.sh-timeline li { position: relative; padding: 6px 0 6px 18px; }
+.sh-timeline li::before { content: ''; position: absolute; left: 3px; top: 12px;
+  width: 8px; height: 8px; border-radius: 50%; background: var(--ui-border); }
+.sh-timeline li[data-tone="ok"]::before { background: var(--ui-tone-ok); }
+.sh-timeline li[data-tone="warn"]::before { background: var(--ui-tone-warn); }
+.sh-timeline li[data-tone="bad"]::before { background: var(--ui-tone-bad); }
+.sh-timeline li:not(:last-child)::after { content: ''; position: absolute; left: 6.5px; top: 22px;
+  bottom: -2px; width: 1px; background: var(--ui-border-soft); }
+.sh-state-name { font-size: 12.5px; font-weight: 650; }
+.sh-timeline small { display: block; color: var(--ui-text-muted); font-size: 11px; }
+
+/* The guided demo: a rail that can be put away, never a mode. */
+.gd-toggle { position: absolute; right: 16px; bottom: 16px; z-index: 30; padding: 8px 14px;
+  border: 1px solid var(--ui-accent-tint); border-radius: 999px; background: var(--ui-accent-tint);
+  color: var(--ui-accent); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+.gd-toggle:hover { background: var(--ui-hover); }
+.gd-rail { position: absolute; right: 16px; bottom: 60px; z-index: 31; width: 340px;
+  max-height: calc(100dvh - 180px); overflow-y: auto; padding: 12px 14px 16px;
+  border: 1px solid var(--ui-border); border-radius: 12px; background: var(--ui-surface-solid);
+  box-shadow: 0 16px 40px var(--ui-shadow-color); }
+.gd-rail[hidden] { display: none; }
+.gd-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.gd-head small { display: block; color: var(--ui-text-muted); font-size: 11px; }
+.gd-tabs { margin: 10px 0 8px; }
+.gd-steps, .gd-scenarios { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; }
+.gd-steps li, .gd-scenarios li { padding: 7px 9px; border: 1px solid var(--ui-border-soft);
+  border-radius: 8px; background: var(--ui-surface-raised); }
+.gd-steps li[data-tone="ok"] { border-left: 3px solid var(--ui-tone-ok); }
+.gd-steps li[data-tone="warn"] { border-left: 3px solid var(--ui-tone-warn); }
+.gd-steps li[data-tone="info"] { border-left: 3px solid var(--ui-border); }
+.gd-steps button, .gd-scenarios button { display: flex; align-items: center; gap: 7px; width: 100%;
+  padding: 0; border: 0; background: transparent; color: var(--ui-text); font: inherit;
+  font-size: 12.5px; text-align: left; cursor: pointer; }
+.gd-n { flex: none; width: 18px; height: 18px; border-radius: 50%; background: var(--ui-hover);
+  color: var(--ui-text-secondary); font-size: 10.5px; display: grid; place-items: center; }
+.gd-title { flex: 1; font-weight: 600; }
+.gd-steps small, .gd-scenarios small { display: block; margin-top: 3px;
+  color: var(--ui-text-muted); font-size: 11px; }
+.gd-detail { color: var(--ui-text-secondary) !important; }
+.gd-blocked { color: var(--ui-tone-warn) !important; }
+.gd-reset { margin-top: 12px; width: 100%; }
+
+/* ── Phase 7A: SAP sandbox connectivity ────────────────────────────────────────────────────── */
+
+/* The two statuses carry equal visual weight on purpose. A "Connected" banner above a quiet
+   footnote about S/4HANA would be read as SAP being live, which is the one wrong conclusion
+   this section exists to prevent. */
+.ci-sandbox-heads { display: grid; gap: 10px; margin: 0 0 14px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.ci-sandbox-head { margin: 0; padding: 10px 12px; border: 1px solid var(--ui-border);
+  border-left-width: 3px; border-radius: 10px; background: var(--ui-surface-solid); }
+.ci-sandbox-head strong { display: block; font-size: 13px; font-weight: 650; }
+.ci-sandbox-head span { display: block; margin-top: 4px; color: var(--ui-text-muted);
+  font-size: 11.5px; }
+.ci-sandbox-head[data-tone="ok"] { border-left-color: var(--ui-tone-ok); }
+.ci-sandbox-head[data-tone="warn"] { border-left-color: var(--ui-tone-warn); }
+.ci-sandbox-head[data-tone="bad"] { border-left-color: var(--ui-tone-bad); }
+.ci-sandbox-head[data-tone="info"] { border-left-color: var(--ui-border); }
+
+.ci-sandbox-rows { display: grid; gap: 6px 18px; margin: 0 0 14px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.ci-sandbox-rows > div { display: flex; justify-content: space-between; align-items: baseline;
+  gap: 12px; padding: 5px 0; border-bottom: 1px solid var(--ui-border-soft); }
+.ci-sandbox-rows dt { flex: none; color: var(--ui-text-muted); font-size: 11.5px; }
+.ci-sandbox-rows dd { margin: 0; text-align: right; font-size: 12px; }
+.ci-sandbox-rows dd code { font-size: 11px; color: var(--ui-text-secondary); word-break: break-all; }
+.ci-sandbox-rows dd .ci-card-note { display: block; }
+.ci-sandbox .ci-actions { margin-bottom: 14px; }
+/* This table's rows are not selectable — it is evidence of one call, not a work queue. */
+.ci-sandbox .ci-table--rows tbody tr { cursor: default; }
+.ci-sandbox .ci-table--rows tbody tr:hover { background: transparent; }
+
+/* ── Phase 7C: subtabs and the live SAP cost screen ────────────────────────────────────────── */
+
+.ci-subtabs { display: flex; gap: 2px; margin: 0 0 16px; border-bottom: 1px solid var(--ui-border); }
+.ci-subtab { padding: 8px 14px; border: 0; border-bottom: 2px solid transparent; background: none;
+  color: var(--ui-text-muted); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.ci-subtab:hover { color: var(--ui-text); }
+.ci-subtab[aria-selected="true"] { color: var(--ui-accent); border-bottom-color: var(--ui-accent); }
+.ci-subtab:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: -2px; }
+
+.slc-root { display: grid; gap: 14px; }
+
+.slc-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  flex-wrap: wrap; }
+.slc-head h2 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: 0; text-transform: none; }
+.slc-head-sub { margin: 3px 0 0; color: var(--ui-text-muted); font-size: 11.5px; }
+.slc-head-side { display: flex; align-items: center; gap: 10px; }
+
+/* The caveat is a banner, not a footnote: it is the thing a viewer is most likely to get wrong. */
+.slc-caveat { margin: 0; padding: 10px 12px; border: 1px solid var(--ui-border);
+  border-left: 3px solid var(--ui-tone-warn); border-radius: 10px; background: var(--ui-surface-solid);
+  color: var(--ui-text-muted); font-size: 11.5px; line-height: 1.55; }
+.slc-caveat strong { display: block; margin-bottom: 3px; color: var(--ui-text); font-size: 12px; }
+
+.slc-facts { display: grid; gap: 8px 20px; margin: 0;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.slc-facts > div { display: flex; flex-direction: column; gap: 2px; padding: 8px 0 0;
+  border-top: 1px solid var(--ui-border-soft); }
+.slc-facts dt { color: var(--ui-text-muted); font-size: 11px; }
+.slc-facts dt small { display: block; color: var(--ui-text-dim); font-size: 10px; }
+.slc-facts dd { margin: 0; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.slc-facts dd small { display: block; color: var(--ui-text-dim); font-size: 10.5px; font-weight: 400; }
+.slc-total { font-size: 17px; color: var(--ui-accent); }
+
+.slc-filters { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--ui-border);
+  border-radius: 10px; background: var(--ui-surface-solid); }
+.slc-filter-row { display: flex; gap: 12px; align-items: baseline; }
+.slc-filter-label { flex: none; width: 118px; color: var(--ui-text-muted); font-size: 11px; }
+.slc-filter-value { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: baseline; }
+.slc-filter-value small { color: var(--ui-text-dim); font-size: 10.5px; }
+.slc-excluded summary { color: var(--ui-text-muted); font-size: 11.5px; cursor: pointer; }
+.slc-excluded[open] summary { margin-bottom: 8px; }
+.slc-excluded code { font-size: 10.5px; word-break: break-all; }
+
+.slc-body { display: grid; gap: 14px; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  align-items: start; }
+@media (max-width: 900px) { .slc-body { grid-template-columns: minmax(0, 1fr); } }
+
+/* Indentation carries the hierarchy, and the hierarchy came from UUIDs. */
+.slc-tree th[scope="row"] { padding-left: calc(10px + var(--depth, 0) * 18px); }
+.slc-tree .slc-code { font-weight: 600; }
+.slc-tree th[scope="row"] small { display: block; margin-left: 20px; font-weight: 400;
+  color: var(--ui-text-dim); }
+.slc-tree .slc-parent { text-align: left; color: var(--ui-text-muted); font-size: 11.5px; }
+/* Same reason as .ops-name: a parent code is a label, not a figure. The heading takes only the
+   alignment — not the muted colour or the body size, which belong to the cell. */
+.slc-tree thead th.slc-parent { text-align: left; color: var(--ui-text-dim); font-size: 10.5px; }
+.slc-tree tbody tr.slc-no-cost th[scope="row"] .slc-code { color: var(--ui-text-muted); }
+.slc-twisty { width: 16px; padding: 0; border: 0; background: none; color: var(--ui-text-muted);
+  font: inherit; font-size: 10px; cursor: pointer; }
+.slc-twisty--leaf { display: inline-block; cursor: default; }
+.slc-twisty:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+
+.slc-detail { padding: 12px 14px; border: 1px solid var(--ui-border); border-radius: 10px;
+  background: var(--ui-surface-solid); }
+.slc-detail h3 { margin: 0 0 10px; font-size: 13px; font-weight: 650; }
+.slc-detail h3 small { font-weight: 400; color: var(--ui-text-muted); }
+.slc-detail th[scope="row"] small { display: block; font-weight: 400; color: var(--ui-text-dim); }
+.slc-detail tfoot th, .slc-detail tfoot td { border-top: 1px solid var(--ui-border);
+  border-bottom: 0; font-weight: 650; }
+.slc-detail-empty { padding: 14px; border: 1px dashed var(--ui-border); border-radius: 10px; }
+
+.slc-foot h3 { margin: 0 0 8px; font-size: 10.5px; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ui-text-dim); }
+.slc-warnings { margin: 0; }
+.slc-warnings strong { display: block; text-transform: capitalize; }
+.slc-clean { margin: 0; }
+
+/* ── Phase 8A: OpenProject Live Schedule ───────────────────────────────────────────────────── */
+
+/*
+ * Shaped like the SAP Live Cost panel on purpose. The two live sources should read as the same
+ * kind of thing — a real external system, dated, with its provenance stated — so a viewer learns
+ * the pattern once.
+ */
+.ops-root { display: grid; gap: 14px; }
+
+.ops-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  flex-wrap: wrap; }
+.ops-head h2 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: 0; text-transform: none; }
+.ops-head-sub { margin: 3px 0 0; color: var(--ui-text-muted); font-size: 11.5px; }
+.ops-head-side { display: flex; align-items: center; gap: 10px; }
+
+/*
+ * The provenance banner. The two chips sit side by side because the misreading this panel invites
+ * is that the live figures and the synthetic ones are the same kind of claim.
+ */
+.ops-provenance { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin: 0;
+  padding: 10px 12px; border: 1px solid var(--ui-border); border-left: 3px solid var(--ui-tone-info);
+  border-radius: 10px; background: var(--ui-surface-solid); color: var(--ui-text-muted);
+  font-size: 11.5px; line-height: 1.55; }
+
+.ops-facts { display: grid; gap: 8px 20px; margin: 0;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.ops-facts > div { display: flex; flex-direction: column; gap: 2px; padding: 8px 0 0;
+  border-top: 1px solid var(--ui-border-soft); }
+.ops-facts dt { color: var(--ui-text-muted); font-size: 11px; }
+.ops-facts dt small { display: block; color: var(--ui-text-dim); font-size: 10px; }
+.ops-facts dd { margin: 0; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ops-facts dd small { display: block; color: var(--ui-text-dim); font-size: 10.5px; font-weight: 400; }
+
+.ops-filters summary { color: var(--ui-text-muted); font-size: 11.5px; cursor: pointer; }
+.ops-filters[open] summary { margin-bottom: 8px; }
+.ops-filters code { font-size: 10.5px; word-break: break-all; }
+
+/*
+ * ONE COLUMN, table above detail — not the side-by-side the SAP cost panel uses.
+ *
+ * Two reasons. The activity table has nine columns and a side-by-side left it about 1 000px, which
+ * wrapped "Cast Level 2 Columns" over three lines and each date over two. And a table sized by its
+ * content OVERFLOWS a `1.4fr` grid cell rather than shrinking into it, so the detail pane was
+ * drawn over the table's last column — the "Link" header sat underneath the empty-state text.
+ *
+ * `min-width: 0` plus `overflow-x: auto` on the pane means that collision cannot come back: if the
+ * table ever outgrows the page it scrolls inside its own pane instead of painting over a sibling.
+ */
+.ops-body { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+.ops-table-pane { min-width: 0; overflow-x: auto; }
+
+/*
+ * The synchronisation status row (Phase 8B).
+ *
+ * One band under the provenance note, so "is this current?" is answered next to "what kind of
+ * data is this?" rather than at the bottom of the screen. It wraps rather than scrolls: five
+ * facts and a button fit one line on a wide screen and stack on a narrow one, and the accent
+ * left border marks it as chrome about the data rather than part of the data.
+ */
+.ops-sync { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--ui-border);
+  border-left: 3px solid var(--ui-accent-line); border-radius: 10px;
+  background: var(--ui-surface-raised); }
+.ops-sync[data-sync-enabled="false"] { border-left-color: var(--ui-border-strong); }
+.ops-sync[data-sync-state="AUTH_PARKED"] { border-left-color: var(--ui-tone-bad); }
+.ops-sync-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 8px 12px; }
+.ops-sync-facts { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0; }
+.ops-sync-facts > div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ops-sync-facts dt { color: var(--ui-text-muted); font-size: 10.5px; letter-spacing: .04em;
+  text-transform: uppercase; }
+.ops-sync-facts dd { margin: 0; font-size: 12px; font-weight: 600;
+  font-variant-numeric: tabular-nums; }
+.ops-sync-facts dd small { color: var(--ui-text-dim); font-size: 10.5px; font-weight: 400; }
+.ops-sync-scope { margin: 0; }
+.ops-sync .ci-status { margin: 0; }
+.ops-detail-pane { min-width: 0; }
+
+.ops-table { table-layout: auto; }
+.ops-table tbody tr { cursor: pointer; }
+/* Dates, ids and the status chip are short values that must never wrap mid-token. */
+.ops-table th[scope="row"], .ops-table td { white-space: nowrap; }
+.ops-table .ops-name { text-align: left; white-space: normal; min-width: 22ch; }
+/* The activity NAME is prose, so its heading is left too. Tagged on the <th> rather than keyed to
+   a column number, which a later column insertion would silently break. */
+.ops-table thead th.ops-name { white-space: nowrap; min-width: 0; }
+.ops-table .ops-name small { display: block; color: var(--ui-text-dim); font-size: 10.5px; }
+.ops-table td small { display: block; color: var(--ui-text-dim); font-size: 10.5px; font-weight: 400; }
+
+.ops-detail { padding: 12px 14px; border: 1px solid var(--ui-border); border-radius: 10px;
+  background: var(--ui-surface-solid); }
+.ops-detail h3 { margin: 0 0 10px; font-size: 13px; font-weight: 650; }
+.ops-detail h4 { margin: 14px 0 8px; font-size: 10.5px; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ui-text-dim); }
+.ops-detail h4 .ci-chip { margin-left: 6px; letter-spacing: 0; text-transform: none; }
+.ops-detail-empty { padding: 14px; border: 1px dashed var(--ui-border); border-radius: 10px; }
+.ops-description { margin: 0 0 10px; color: var(--ui-text-muted); font-size: 11.5px;
+  line-height: 1.55; white-space: pre-wrap; }
+
+.ops-detail-facts { display: grid; gap: 6px 18px; margin: 0;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.ops-detail-facts > div { display: flex; flex-direction: column; gap: 1px; padding: 6px 0 0;
+  border-top: 1px solid var(--ui-border-soft); }
+.ops-detail-facts dt { color: var(--ui-text-muted); font-size: 10.5px; }
+.ops-detail-facts dd { margin: 0; font-size: 12px; font-weight: 600;
+  font-variant-numeric: tabular-nums; }
+.ops-detail-facts dd small { display: block; color: var(--ui-text-dim); font-size: 10px;
+  font-weight: 400; }
+
+/* The conversion cross-check. Green when the source's own arithmetic agrees with our basis. */
+.ops-check { border-left: 3px solid var(--ui-border); padding-left: 8px; }
+.ops-check[data-agrees="true"] { border-left-color: var(--ui-tone-ok); }
+/* The link out. The browser default is unreadable on this surface in either theme. */
+.ops-open { margin: 10px 0 0; font-size: 11.5px; }
+.ops-open a { color: var(--ui-accent); text-decoration: none; border-bottom: 1px solid currentColor; }
+.ops-open a:hover { color: var(--ui-text); }
+.ops-open a:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+
+/* The chain, drawn so the arrow visibly stops at the candidate. */
+.ops-chain { display: grid; gap: 2px; justify-items: start; margin: 0 0 8px; }
+.ops-chain-node { padding: 4px 8px; border: 1px solid var(--ui-border); border-radius: 6px;
+  background: var(--ui-surface); font-size: 11px; }
+.ops-chain-node small { display: block; color: var(--ui-text-dim); font-size: 10px; }
+.ops-chain-node[data-kind="live"] { border-left: 3px solid var(--ui-tone-ok); }
+.ops-chain-node[data-kind="candidate"] { border-left: 3px solid var(--ui-tone-warn); }
+.ops-chain-node[data-kind="synthetic"] { border-left: 3px solid var(--ui-text-dim); }
+.ops-chain-arrow { margin-left: 10px; color: var(--ui-text-dim); font-size: 11px; }
+
+.ops-comparison { margin-top: 10px; }
+.ops-comparison th[scope="row"] { text-align: left; }
+.ops-comparison .ci-chip { margin-right: 5px; }
+.ops-comparison tfoot th, .ops-comparison tfoot td { border-top: 1px solid var(--ui-border);
+  border-bottom: 0; font-weight: 650; }
+/* The caveat is part of the number, not an aside. */
+.ops-caveat { border-left: 3px solid var(--ui-tone-warn); padding-left: 8px; }
+
+/* On a wide screen the mapping and the change history read better side by side. */
+@media (min-width: 1200px) {
+  .ops-detail { display: grid; gap: 0 24px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .ops-detail > h3, .ops-detail > .ops-description, .ops-detail > .ops-detail-facts,
+  .ops-detail > .ops-check, .ops-detail > .ops-open, .ops-detail > .ci-status {
+    grid-column: 1 / -1; }
+  .ops-detail > .ops-mapping, .ops-detail > .ops-changes { min-width: 0; }
+}
+
+.ops-changes table { font-size: 11px; }
+.ops-changes td, .ops-changes th { white-space: nowrap; }
+.ops-warnings { margin: 0; }
+
+/*
+ * ── Real BIM Model (Phase 9B) ──────────────────────────────────────────────────────────────────
+ *
+ * The viewer lives in its own grid cell and is NEVER re-rendered by the panel's markup updates —
+ * re-creating the canvas on every background sync would drop the camera and the WebGL context.
+ * Chrome on top, the model and its details side by side, the element list beneath.
+ */
+.rbm-root { display: grid; gap: 14px;
+  grid-template-areas: "chrome chrome" "stage details" "list list";
+  grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); align-items: start; }
+.rbm-chrome { grid-area: chrome; display: grid; gap: 12px; }
+.rbm-stage { grid-area: stage; min-width: 0; }
+.rbm-details { grid-area: details; min-width: 0; max-height: 560px; overflow-y: auto; }
+.rbm-list { grid-area: list; min-width: 0; max-height: 320px; overflow: auto; }
+
+/* One column under a laptop width: a 300px details pane beside a viewer stops being a viewer. */
+@media (max-width: 1180px) {
+  .rbm-root { grid-template-areas: "chrome" "stage" "details" "list";
+    grid-template-columns: minmax(0, 1fr); }
+}
+
+/*
+ * `position: relative`, overriding `.ci-viewer`'s `position: absolute; inset: 0`.
+ *
+ * That rule is correct for the Tower A viewer, which fills a positioned parent. Here the viewer
+ * is a GRID CELL, and an absolutely positioned child takes no space: the stage collapsed to zero
+ * height and the canvas escaped to the nearest positioned ancestor, painting itself across the
+ * top of the page. Measured in the browser, not guessed.
+ */
+.rbm-viewer { position: relative; inset: auto; height: 520px;
+  border: 1px solid var(--ui-border); border-radius: 10px;
+  overflow: hidden; background: var(--ui-surface-solid); }
+
+.rbm-filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.rbm-filter { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px;
+  border: 1px solid var(--ui-border); border-radius: 999px; background: var(--ui-surface-raised);
+  color: var(--ui-text); font: inherit; font-size: 11.5px; cursor: pointer; }
+.rbm-filter:hover { background: var(--ui-hover); }
+.rbm-filter small { color: var(--ui-text-dim); font-variant-numeric: tabular-nums; }
+/* Hidden classes are dimmed AND struck through: never colour or opacity alone. */
+.rbm-filter[data-off="true"] { opacity: .55; text-decoration: line-through; }
+.rbm-filter:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+
+.rbm-swatch { width: 9px; height: 9px; border-radius: 2px; display: inline-block;
+  border: 1px solid var(--ui-border-strong); flex: none; }
+
+.rbm-table code, .ops-detail code { font-size: 11px; }
+.rbm-props { margin-top: 10px; border-top: 1px solid var(--ui-border-soft); padding-top: 8px; }
+.rbm-props summary { color: var(--ui-text-muted); font-size: 11px; cursor: pointer;
+  letter-spacing: .05em; text-transform: uppercase; }
+.rbm-props summary small { color: var(--ui-text-dim); text-transform: none; letter-spacing: 0; }
+.rbm-props[open] summary { margin-bottom: 6px; }
+
+/*
+ * ── Construction Progress subtabs, BIM timeline and changes (Phase 9C) ─────────────────────────
+ */
+/*
+ * A FLEX CHAIN FROM THE SCROLL CONTAINER TO THE VIEWER.
+ *
+ * The viewer used to be sized with `calc(100dvh - 300px)`, where 300px was a guess at the chrome
+ * above it — the banner, the workspace heading, the subtab bar, the version strip, the controls.
+ * Measured in the browser the guess was 149px short on the Timeline and 61px short on Changes,
+ * so the page scrolled, which is the one thing this phase had to fix.
+ *
+ * Giving the workspace a definite height and letting the viewer row flex means the viewer takes
+ * exactly the space that is left, whatever is above it, at any window size.
+ */
+/*
+ * `:not([hidden])` is load-bearing.
+ *
+ * `.ci-workspace[hidden] { display: none }` and this selector have the SAME specificity, so this
+ * one won simply by being later in the file — and `display: flex` beat `display: none`. The
+ * result was Construction Progress rendering inside every other workspace, which is what it
+ * looked like on screen.
+ *
+ * THE CHAIN IS KEYED OFF `.cpt-root`, NOT OFF AN AREA ID. It used to say
+ * `[data-workspace="constructionProgress"]`; Phase 10A regrouped that screen under Schedule & 4D
+ * and BIM Coordination, so the chain stopped matching, `height: 100%` resolved to auto, and the
+ * Cesium canvas — which sizes itself from its container and then reports a new container size —
+ * grew a little on every frame. Keying off the screen means a later regrouping cannot break it
+ * the same way.
+ */
+.ci-workspace:not([hidden]):has(.cpt-root) { height: 100%; display: flex;
+  flex-direction: column; min-height: 0;
+  /* `box-sizing` is content-box here, so `height: 100%` plus the workspace's own 16px/24px
+     padding overflowed its scroll container by exactly 40px. Measured, not guessed. */
+  box-sizing: border-box; }
+.ci-workspace:has(.cpt-root) .cpt-root { flex: 1; min-height: 0;
+  display: flex; flex-direction: column; gap: 12px; }
+/*
+ * TWO NESTED SUBTAB LAYERS, so every link in the chain has to be a flex container.
+ *
+ * Phase 10A put this screen inside an AREA that has its own `.ci-subtab-panes` / `.ci-subtab-pane`
+ * wrapper, so the chain now runs workspace → area panes → area pane → `.cpt-root` → its own panes
+ * → its own pane → `.bt-root`. The area pane was still `display: block`, so `.cpt-root`'s
+ * `flex: 1` did nothing, it took its content height instead, and the viewer below it had no
+ * definite height to resolve `height: 100%` against — which is how the canvas ended up growing.
+ */
+.ci-workspace:has(.cpt-root) .ci-subtab-panes { flex: 1; min-height: 0;
+  display: flex; flex-direction: column; }
+.ci-workspace:has(.cpt-root) .ci-subtab-pane:not([hidden]) {
+  flex: 1; height: 100%; min-height: 0; box-sizing: border-box; }
+/* The AREA pane holds `.cpt-root`, whose own `flex: 1` is inert unless this is a flex container. */
+.ci-workspace:has(.cpt-root) .ci-subtab-pane:not([hidden]):has(.cpt-root) {
+  display: flex; flex-direction: column; }
+/* Breathing room under the viewer so it does not sit flush on the window edge. */
+.cpt-root > .ci-subtab-panes > .ci-subtab-pane:not([hidden]) { padding-bottom: 16px; }
+/* Overview and the existing schedule screen keep their own scrolling. */
+.ci-workspace:has(.cpt-root) #cpt-pane-overview,
+.ci-workspace:has(.cpt-root) #cpt-pane-schedule { overflow-y: auto; }
+/* A sibling subtab in the same area (Mapping Workbench) is not a viewer screen: it inherits the
+   definite height from the chain above, so it must scroll inside rather than overflow the area. */
+.ci-workspace:has(.cpt-root) > .ci-subtab-panes > .ci-subtab-pane:not([hidden]):not(:has(.cpt-root)) {
+  overflow-y: auto; }
+.cpt-overview { display: grid; gap: 12px; }
+.cpt-grid { display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); align-items: start; }
+.cpt-card { padding: 12px 14px; border: 1px solid var(--ui-border); border-radius: 10px;
+  background: var(--ui-surface-raised); }
+.cpt-card h3 { margin: 0 0 10px; font-size: 13px; font-weight: 650;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* The design card and the construction card are visually distinct on purpose: they are different
+   measurements and must never read as two halves of one number. */
+.cpt-card[data-kind="design"] { border-left: 3px solid var(--ui-accent-line); }
+.cpt-card[data-kind="construction"] { border-left: 3px solid var(--ui-tone-ok); }
+.cpt-card[data-kind="construction"]:has([data-cpt-unavailable]) { border-left-color: var(--ui-tone-warn); }
+.cpt-card[data-kind="schedule"] { border-left: 3px solid var(--ui-border-strong); }
+.cpt-card .ci-status { margin: 0 0 8px; }
+
+/*
+ * ── BIM Timeline (Phase 9D) ───────────────────────────────────────────────────────────────────
+ *
+ * Three rows: chrome, then the viewer beside its stage summary. NO change table underneath — that
+ * was the single biggest source of scrolling on this screen and it moved to BIM Changes.
+ *
+ * The viewer is sized from the VIEWPORT rather than a fixed pixel height, so the model and its
+ * summary fit on one screen together without the page scrolling to reach them.
+ */
+.bt-root { display: grid; gap: 12px; height: 100%; min-height: 0;
+  grid-template-areas: "chrome chrome" "stage aside";
+  grid-template-columns: minmax(0, 3fr) minmax(290px, 1fr);
+  grid-template-rows: auto minmax(0, 1fr); align-items: stretch; }
+.bt-chrome { grid-area: chrome; display: grid; gap: 10px; }
+.bt-stage { grid-area: stage; min-width: 0; }
+.bt-aside { grid-area: aside; min-width: 0; min-height: 0; display: grid; gap: 12px;
+  align-content: start; overflow-y: auto; }
+.bt-stage { min-height: 0; }
+.bt-stage .ci-viewer { position: relative; inset: auto; height: 100%; min-height: 300px;
+  border: 1px solid var(--ui-border); border-radius: 10px; overflow: hidden;
+  background: var(--ui-surface-solid); }
+
+.bt-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  flex-wrap: wrap; }
+.bt-head h3 { margin: 0; font-size: 15px; font-weight: 650; }
+.bt-head h3 small { color: var(--ui-text-muted); font-size: 11.5px; font-weight: 400;
+  margin-left: 8px; }
+.bt-head-sub { margin: 2px 0 0; color: var(--ui-text-muted); font-size: 11.5px; }
+.bt-head-side { display: flex; align-items: center; gap: 8px; }
+
+/* The version strip is the ONE primary version control — the 9C slider beside it was a second
+   mechanism for the same choice. */
+.bt-strip { display: flex; gap: 6px; margin: 0; padding: 0 0 4px; list-style: none;
+  overflow-x: auto; }
+.bt-strip li { flex: none; }
+.bt-node { display: grid; gap: 1px; min-width: 104px; padding: 7px 10px; text-align: left;
+  border: 1px solid var(--ui-border); border-radius: 10px; background: var(--ui-surface-raised);
+  color: var(--ui-text); font: inherit; cursor: pointer; }
+.bt-node:hover { background: var(--ui-hover); }
+.bt-node[data-selected="true"] { border-color: var(--ui-accent); background: var(--ui-accent-soft); }
+.bt-node:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+.bt-label { font-size: 13px; font-weight: 650; }
+.bt-count { font-size: 11px; font-variant-numeric: tabular-nums; }
+.bt-count small { color: var(--ui-text-dim); }
+.bt-delta { display: flex; gap: 5px; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.bt-delta em { font-style: normal; font-weight: 600; }
+
+.bt-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bt-position { font-size: 11.5px; color: var(--ui-text-muted);
+  font-variant-numeric: tabular-nums; }
+
+.bt-stage-summary, .bt-element { padding: 11px 13px; border: 1px solid var(--ui-border);
+  border-radius: 10px; background: var(--ui-surface-raised); }
+.bt-stage-summary h4, .bt-element h5 { margin: 0 0 6px; font-size: 13px; font-weight: 650;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bt-stage-when { margin: 0 0 10px; color: var(--ui-text-muted); font-size: 11px; }
+.bt-stage-facts, .bt-element-facts { display: grid; gap: 5px; margin: 0; }
+.bt-stage-facts > div, .bt-element-facts > div { display: flex; align-items: baseline;
+  justify-content: space-between; gap: 10px; padding: 3px 0;
+  border-bottom: 1px solid var(--ui-border-soft); }
+.bt-stage-facts dt, .bt-element-facts dt { color: var(--ui-text-muted); font-size: 11px; }
+.bt-stage-facts dd, .bt-element-facts dd { margin: 0; font-size: 12px; font-weight: 600;
+  font-variant-numeric: tabular-nums; text-align: right; }
+.bt-introduced { margin-top: 10px; }
+.bt-introduced h5 { margin: 0 0 5px; font-size: 10.5px; font-weight: 600; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--ui-text-muted); }
+.bt-introduced li { display: flex; align-items: center; gap: 6px; font-size: 11.5px; }
+.bt-introduced em { color: var(--ui-tone-ok); font-style: normal; font-size: 10.5px; }
+.bt-pick-hint { padding: 11px 13px; border: 1px dashed var(--ui-border); border-radius: 10px; }
+.bt-element code { font-size: 10.5px; }
+
+/*
+ * ── BIM Changes (Phase 9D) ────────────────────────────────────────────────────────────────────
+ *
+ * Toolbar and counts on top, then the viewer beside a panel that scrolls INTERNALLY. The page
+ * itself does not grow with the element list — 63 elements used to push the details panel off
+ * the bottom of the screen.
+ */
+.bc-root { display: grid; gap: 12px; height: 100%; min-height: 0;
+  grid-template-areas: "chrome chrome" "stage panel";
+  grid-template-columns: minmax(0, 1.85fr) minmax(330px, 1fr);
+  grid-template-rows: auto minmax(0, 1fr); align-items: stretch; }
+.bc-chrome { grid-area: chrome; display: grid; gap: 10px; }
+.bc-stage { grid-area: stage; min-width: 0; }
+.bc-panel { grid-area: panel; min-width: 0; min-height: 0; display: grid; gap: 10px;
+  align-content: start; overflow-y: auto; }
+.bc-stage { min-height: 0; }
+.bc-stage .ci-viewer { position: relative; inset: auto; height: 100%; min-height: 300px;
+  border: 1px solid var(--ui-border); border-radius: 10px; overflow: hidden;
+  background: var(--ui-surface-solid); }
+
+.bc-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.bc-toolbar label { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px;
+  color: var(--ui-text-muted); }
+.bc-spacer { flex: 1 1 auto; }
+.bc-toolbar select, .bc-refine select, .bc-refine input[type="search"] {
+  padding: 4px 8px; border: 1px solid var(--ui-border); border-radius: 8px;
+  background: var(--ui-surface-raised); color: var(--ui-text); font: inherit; font-size: 11.5px; }
+
+/* The counts double as the filter. One control, not two. */
+.bc-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.bc-count { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
+  border: 1px solid var(--ui-border); border-radius: 999px; background: var(--ui-surface-raised);
+  color: var(--ui-text); font: inherit; font-size: 11.5px; cursor: pointer; }
+.bc-count:hover { background: var(--ui-hover); }
+.bc-count[data-on="true"] { border-color: var(--ui-accent); background: var(--ui-accent-soft); }
+.bc-count:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+.bc-count strong { font-variant-numeric: tabular-nums; }
+.bc-total { font-size: 11px; color: var(--ui-text-muted); margin-left: auto; }
+
+.bc-refine { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.bc-context { display: inline-flex; align-items: center; gap: 5px; font-size: 11px;
+  color: var(--ui-text-muted); }
+
+.bc-list-wrap { max-height: 300px; overflow-y: auto; border: 1px solid var(--ui-border);
+  border-radius: 10px; background: var(--ui-surface-solid); }
+.bc-list { margin: 0; padding: 0; list-style: none; }
+.bc-list li + li { border-top: 1px solid var(--ui-border-soft); }
+.bc-item { display: grid; gap: 2px; width: 100%; padding: 8px 11px; text-align: left;
+  background: none; border: 0; color: var(--ui-text); font: inherit; cursor: pointer; }
+.bc-item:hover { background: var(--ui-hover); }
+.bc-item[data-selected="true"] { background: var(--ui-accent-tint); }
+.bc-item:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: -2px; }
+.bc-item-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; }
+.bc-item-meta { display: flex; gap: 8px; color: var(--ui-text-dim); font-size: 10.5px; }
+.bc-item-meta code { font-size: 10px; }
+.bc-item-detail { color: var(--ui-text-muted); font-size: 10.5px; }
+
+.bc-detail { background: var(--ui-surface-raised); }
+.bc-detail h4 { margin: 0 0 8px; font-size: 13px; font-weight: 650; }
+.bc-props { margin-top: 10px; }
+.bc-props h5 { margin: 0 0 6px; font-size: 10.5px; font-weight: 600; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--ui-text-muted); }
+.bc-props h5 small { color: var(--ui-text-dim); letter-spacing: 0; text-transform: none; }
+.bc-prop-table code { font-size: 10px; word-break: break-all; }
+.bc-prop-table td, .bc-prop-table th { font-size: 11px; }
+
+/* Change colours. Every one is paired with a word in the legend and in the chip. */
+[data-kind="ADDED"] { color: var(--ui-tone-ok); }
+[data-kind="REMOVED"] { color: var(--ui-tone-bad); }
+[data-kind="MODIFIED"] { color: var(--ui-tone-warn); }
+[data-kind="UNCHANGED"] { color: var(--ui-text-dim); }
+
+.cpt-actions { margin-top: 2px; }
+
+/* Narrow screens: stack, but keep a usable viewer height and the version controls reachable. */
+@media (max-width: 1180px) {
+  .bt-root { grid-template-areas: "chrome" "stage" "aside"; grid-template-columns: minmax(0, 1fr); }
+  .bc-root { grid-template-areas: "chrome" "stage" "panel"; grid-template-columns: minmax(0, 1fr); }
+  /* Stacked: the pane scrolls as a whole and the viewer keeps a usable height. */
+  .ci-workspace:has(.cpt-root) .ci-subtab-pane:not([hidden]) {
+    height: auto; overflow-y: auto; }
+  .bt-root, .bc-root { height: auto; grid-template-rows: auto auto auto; }
+  .bt-aside, .bc-panel { overflow: visible; }
+  .bt-stage .ci-viewer, .bc-stage .ci-viewer { height: 420px; }
+}
+
+.ci-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/*
+ * ── Phase 10A: Project Overview and Construction Lifecycle ─────────────────────────────────────
+ */
+.ci-workspace-head h2 { margin: 0; font-size: 20px; font-weight: 650; }
+.ci-workspace-purpose { margin: 4px 0 0; color: var(--ui-text-muted); font-size: 12px;
+  max-width: 92ch; }
+
+/* Project Overview — three bands, no KPI wall. */
+.po-root { display: grid; gap: 14px; }
+.po-card { padding: 13px 15px; border: 1px solid var(--ui-border); border-radius: 10px;
+  background: var(--ui-surface-raised); }
+.po-card h3 { margin: 0 0 9px; font-size: 13px; font-weight: 650;
+  display: flex; align-items: baseline; gap: 8px; }
+.po-card h3 + .po-metrics { margin-bottom: 14px; }
+.po-card h3 small { color: var(--ui-text-dim); font-size: 11px; font-weight: 400; }
+.po-metrics { display: grid; gap: 8px; margin: 0; align-items: stretch;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+/* The wrapper around a clickable metric is a grid item; without this the button inside it keeps
+   its own content height and the cards in a row end up different sizes. */
+.po-metrics > div { display: grid; min-width: 0; }
+/* A metric that opens the workflow clearing it is a button; one that does not is plain text.
+   Flex column with the value pushed to the bottom: a card with a hint line is otherwise taller
+   than its neighbours and the numbers stop lining up across the row. */
+.po-metric { display: flex; flex-direction: column; width: 100%; height: 100%;
+  box-sizing: border-box; padding: 8px 10px; text-align: left;
+  border: 1px solid var(--ui-border-soft); border-radius: 9px; background: var(--ui-surface);
+  color: var(--ui-text); font: inherit; cursor: pointer; }
+.po-metric:hover { background: var(--ui-hover); border-color: var(--ui-border); }
+.po-metric:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+.po-metric--static { cursor: default; background: transparent; }
+.po-metric dt { color: var(--ui-text-muted); font-size: 11px; }
+.po-metric dt small { display: block; color: var(--ui-text-dim); font-size: 10px; }
+.po-metric dd { margin: 6px 0 0; margin-top: auto; padding-top: 4px; font-size: 20px;
+  font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.po-metric dd[data-tone="warn"] { color: var(--ui-tone-warn); }
+.po-metric dd[data-tone="bad"] { color: var(--ui-tone-bad); }
+.po-attention .po-table { margin-top: 2px; }
+.po-table small { display: block; color: var(--ui-text-dim); font-size: 10.5px; }
+.po-split { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+  align-items: start; }
+.po-sources, .po-decisions { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.po-sources li, .po-decisions li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px;
+  padding-bottom: 7px; border-bottom: 1px solid var(--ui-border-soft); font-size: 12px; }
+.po-sources small, .po-decisions small { color: var(--ui-text-dim); font-size: 10.5px; }
+.po-sources em, .po-decisions em { color: var(--ui-text-muted); font-size: 10.5px;
+  font-style: normal; }
+.po-when { color: var(--ui-text-dim); font-size: 10.5px; font-variant-numeric: tabular-nums;
+  min-width: 13ch; }
+
+/*
+ * Construction Lifecycle — the model beside the activity, the stage body below the stepper.
+ * Same flex chain as the BIM screens so the viewer fills what is left and the page never scrolls.
+ */
+.cl-root { display: grid; gap: 12px; height: 100%; min-height: 0;
+  grid-template-areas: "chrome chrome" "stage panel";
+  grid-template-columns: minmax(0, 1.5fr) minmax(360px, 1fr);
+  grid-template-rows: auto minmax(0, 1fr); align-items: stretch; }
+.cl-chrome { grid-area: chrome; display: grid; gap: 10px; }
+.cl-stage-view { grid-area: stage; min-width: 0; min-height: 0; }
+.cl-panel { grid-area: panel; min-width: 0; min-height: 0; display: grid; gap: 12px;
+  align-content: start; overflow-y: auto; }
+.cl-stage-view .ci-viewer { position: relative; inset: auto; height: 100%; min-height: 280px;
+  border: 1px solid var(--ui-border); border-radius: 10px; overflow: hidden;
+  background: var(--ui-surface-solid); }
+
+.cl-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.cl-picker label { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px;
+  color: var(--ui-text-muted); }
+.cl-picker select { max-width: 460px; }
+.cl-picker select, .cl-picker input[type="search"] { padding: 4px 8px;
+  border: 1px solid var(--ui-border); border-radius: 8px; background: var(--ui-surface-raised);
+  color: var(--ui-text); font: inherit; font-size: 11.5px; }
+.cl-count { color: var(--ui-text-dim); font-size: 11px; }
+
+.cl-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  flex-wrap: wrap; }
+.cl-head h3 { margin: 0; font-size: 15px; font-weight: 650; }
+.cl-head-sub { margin: 2px 0 0; color: var(--ui-text-muted); font-size: 11.5px; }
+.cl-head-side { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cl-source { color: var(--ui-accent); font-size: 11.5px; text-decoration: none;
+  border-bottom: 1px solid currentColor; }
+
+/* The stepper. Six equal steps; the caption under it is not decoration. */
+.cl-stepper { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.cl-stepper li { flex: 1 1 150px; }
+.cl-step { display: grid; gap: 3px; width: 100%; padding: 7px 10px; text-align: left;
+  border: 1px solid var(--ui-border); border-radius: 9px; background: var(--ui-surface-raised);
+  color: var(--ui-text); font: inherit; cursor: pointer; }
+.cl-step:hover { background: var(--ui-hover); }
+.cl-step[data-on="true"] { border-color: var(--ui-accent); background: var(--ui-accent-soft); }
+.cl-step:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+.cl-step-n { color: var(--ui-text-dim); font-size: 10px; font-variant-numeric: tabular-nums; }
+.cl-step-label { font-size: 12px; font-weight: 650; }
+.cl-stepper-note { margin: 0; }
+
+.cl-section { padding: 12px 14px; border: 1px solid var(--ui-border); border-radius: 10px;
+  background: var(--ui-surface-raised); }
+.cl-section h4 { margin: 0 0 9px; font-size: 13px; font-weight: 650;
+  display: flex; align-items: baseline; gap: 7px; }
+.cl-section h4 small { color: var(--ui-text-dim); font-size: 11px; font-weight: 400; }
+.cl-stage-detail { margin: 0 0 9px; font-size: 12px; }
+.cl-facts { display: grid; gap: 4px; margin: 0; }
+.cl-facts > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding: 4px 0; border-bottom: 1px solid var(--ui-border-soft); }
+.cl-facts dt { color: var(--ui-text-muted); font-size: 11px; flex: none; }
+.cl-facts dd { margin: 0; font-size: 12px; font-weight: 600; text-align: right;
+  font-variant-numeric: tabular-nums; }
+.cl-facts--tight dd { font-weight: 400; }
+/* An absent value reads as absent, never as a dash that might be a zero. */
+.cl-absent { color: var(--ui-text-dim); font-weight: 400; font-style: italic; font-size: 11px; }
+.cl-writeback { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--ui-border-soft); }
+.cl-writeback h5 { margin: 0 0 6px; font-size: 10.5px; font-weight: 600; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--ui-text-muted); }
+
+.cl-issues { margin: 0; padding: 0; list-style: none; display: grid; gap: 9px; }
+.cl-issues li { display: grid; gap: 2px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--ui-border-soft); font-size: 12px; }
+.cl-issues small { color: var(--ui-text-dim); font-size: 10.5px; }
+.cl-issues em { color: var(--ui-text-muted); font-size: 10.5px; font-style: normal; }
+
+/* The lifecycle gets the same height chain the BIM screens use. */
+.ci-workspace[data-workspace="lifecycle"]:not([hidden]) { height: 100%; display: flex;
+  flex-direction: column; min-height: 0; box-sizing: border-box; }
+.ci-workspace[data-workspace="lifecycle"] .ci-subtab-panes { flex: 1; min-height: 0; }
+.ci-workspace[data-workspace="lifecycle"] .ci-subtab-pane:not([hidden]) { height: 100%;
+  min-height: 0; box-sizing: border-box; padding-bottom: 16px; }
+
+@media (max-width: 1180px) {
+  .ci-workspace[data-workspace="lifecycle"] .ci-subtab-pane:not([hidden]) { height: auto;
+    overflow-y: auto; }
+  .cl-root { height: auto; grid-template-areas: "chrome" "stage" "panel";
+    grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; }
+  .cl-panel { overflow: visible; }
+  .cl-stage-view .ci-viewer { height: 380px; }
+}
+
+/*
+ * ── Create Construction Task (Phase 10B) ───────────────────────────────────────────────────
+ *
+ * A right-side drawer over the screen that opened it, NOT a modal. The rest of the demo has no
+ * dialogs and the brief asks for none ("no stacked popups"), and an overlay that still shows the
+ * model behind it is the point when the task is being created from what is selected in it.
+ *
+ * It is `position: fixed` because the two screens it opens from are both flex columns with their
+ * own scroll chains — a sticky drawer inside either one is clipped by the viewer's container.
+ */
+/* Above `.app-role` (z-index 40 in appNav.css), which sits at the same top-right corner the
+   drawer opens into. At an equal z-index the role select won on DOM order and drew over the
+   drawer's own heading — so the number has to be higher, not equal. */
+.ctd-drawer { position: fixed; top: 0; right: 0; bottom: 0; z-index: 60;
+  width: min(430px, 100vw); max-height: 100dvh; overflow-y: auto; border-radius: 0;
+  border: 0; border-left: 1px solid var(--ui-border);
+  box-shadow: -18px 0 46px -24px rgba(0, 0, 0, .55); }
+.ctd-drawer h3 { margin: 0; font-size: 16px; font-weight: 650; text-transform: none;
+  letter-spacing: 0; color: var(--ui-text); }
+.ctd-dest { margin: 10px 0 14px; padding: 8px 10px; border-radius: 8px;
+  background: var(--ui-surface-raised); font-size: 12px; color: var(--ui-text-muted); }
+.ctd-dest strong { color: var(--ui-text); }
+.ctd-dest small { display: block; color: var(--ui-text-dim); font-size: 10.5px; }
+
+.ctd-form { display: grid; gap: 11px; }
+.ctd-row { display: grid; gap: 11px; grid-template-columns: 1fr 1fr; }
+.ctd-field { display: grid; gap: 4px; min-width: 0; }
+.ctd-field > span { font-size: 11.5px; color: var(--ui-text-muted); }
+.ctd-field > span em { font-style: normal; color: var(--ui-text-dim); font-size: 10px; }
+.ctd-field input, .ctd-field select, .ctd-field textarea {
+  width: 100%; box-sizing: border-box; padding: 7px 9px; font: inherit; font-size: 13px;
+  color: var(--ui-text); background: var(--ui-surface); border: 1px solid var(--ui-border);
+  border-radius: 8px; }
+.ctd-field textarea { resize: vertical; min-height: 56px; }
+.ctd-field input:focus-visible, .ctd-field select:focus-visible,
+.ctd-field textarea:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+.ctd-field input:disabled, .ctd-field select:disabled, .ctd-field textarea:disabled {
+  opacity: .6; cursor: not-allowed; }
+/* A field the source rejected is marked by its border AND its message, never by colour alone. */
+.ctd-field:has(.ctd-error) input, .ctd-field:has(.ctd-error) select,
+.ctd-field:has(.ctd-error) textarea { border-color: var(--ui-tone-bad); }
+.ctd-error { color: var(--ui-tone-bad); font-size: 11px; }
+.ctd-field small { color: var(--ui-text-dim); font-size: 10.5px; }
+.ctd-field small[data-tone="warn"] { color: var(--ui-tone-warn); }
+
+.ctd-more { border: 1px solid var(--ui-border-soft); border-radius: 9px; padding: 8px 10px; }
+.ctd-more summary { cursor: pointer; font-size: 12px; color: var(--ui-text-muted); }
+.ctd-more > .ctd-row, .ctd-more > .ctd-field { margin-top: 10px; }
+
+.ctd-bim { padding: 10px 11px; border: 1px solid var(--ui-border-soft); border-radius: 9px;
+  background: var(--ui-surface-raised); }
+.ctd-bim h4 { margin: 0 0 7px; font-size: 12.5px; font-weight: 650; }
+.ctd-elements { margin: 0; padding: 0; list-style: none; display: grid; gap: 5px;
+  max-height: 168px; overflow-y: auto; }
+.ctd-elements li { display: flex; align-items: center; gap: 7px; padding: 5px 7px;
+  background: var(--ui-surface); border-radius: 7px; font-size: 12px; }
+.ctd-elements strong { font-weight: 600; min-width: 0; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.ctd-elements code { margin-left: auto; color: var(--ui-text-dim); font-size: 10px; }
+.ctd-remove { padding: 2px 7px; font: inherit; font-size: 10.5px; color: var(--ui-text-muted);
+  background: transparent; border: 1px solid var(--ui-border); border-radius: 999px;
+  cursor: pointer; }
+.ctd-remove:hover { color: var(--ui-tone-bad); border-color: var(--ui-tone-bad); }
+
+.ctd-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.ctd-outcome { margin-top: 12px; padding: 12px 13px; border-radius: 10px;
+  border: 1px solid var(--ui-border); background: var(--ui-surface-raised); }
+.ctd-outcome h4 { margin: 0 0 6px; font-size: 14px; font-weight: 650; }
+.ctd-outcome[data-tone="ok"] { border-left: 3px solid var(--ui-tone-ok); }
+.ctd-outcome[data-tone="warn"] { border-left: 3px solid var(--ui-tone-warn); }
+.ctd-outcome[data-tone="bad"] { border-left: 3px solid var(--ui-tone-bad); }
+.ctd-diffs { margin: 4px 0 0; padding-left: 18px; font-size: 12px; color: var(--ui-text-muted); }
+.ctd-warn { padding: 8px 9px; border-radius: 8px; background: var(--ui-tone-warn-bg);
+  color: var(--ui-tone-warn); font-size: 12px; }
+
+/* The selection strip above the BIM table, where a task is created from chosen geometry. */
+.bc-toolbar--select { border-top: 1px solid var(--ui-border-soft); padding-top: 8px; }
+.bc-multi { display: flex; align-items: center; gap: 6px; font-size: 12px;
+  color: var(--ui-text-muted); white-space: nowrap; }
+.bc-selected { font-size: 12px; color: var(--ui-text-muted); min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-create { margin-left: auto; white-space: nowrap; }
+
+@media (max-width: 720px) {
+  .ctd-drawer { width: 100vw; }
+  .ctd-row { grid-template-columns: 1fr; }
+}

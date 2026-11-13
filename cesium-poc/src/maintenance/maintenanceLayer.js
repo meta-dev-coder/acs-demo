@@ -430,6 +430,14 @@ export function installMaintenanceLayer(viewer) {
       highlightById(id, assetType);
       for (const fn of listeners) fn(assetType, id);
     },
+    /**
+     * Ring a marker without selecting its record.
+     *
+     * Case Map Focus Mode needs the location marked but must not put the record into the Asset
+     * Explorer: the explorer would then open its own details card for the real incident, which is
+     * exactly the thing a focused case is not. Pass null to clear the ring.
+     */
+    highlight(assetType, id) { highlightById(id, assetType); },
     destroy() {
       disposed = true;
       removeMoveEnd(); removeChanged(); listeners.clear();

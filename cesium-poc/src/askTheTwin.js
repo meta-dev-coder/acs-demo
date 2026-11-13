@@ -21,9 +21,11 @@ import { createTwinUiApi, logLine } from './twinUiApi.js';
 import { renderBlocks } from './askTwinBlocks.js';
 import { createEvidenceChips } from './askTwinEvidence.js';
 import { loadSources, normalizeSources, presetFor, saveSources, scopeLine, SOURCES, sourcesForScreen, toggleSource } from './askTwinSources.js';
-import { buildTwinContext, REFERENT_KINDS } from './spatial/twinContext.js';
+import { buildTwinContext, isAuthorisedAction, REFERENT_KINDS } from './spatial/twinContext.js';
 import { createCapabilityRegistry, PROVENANCE } from './twin/capabilities.js';
 import { isCompoundQuestion, planFor, runInvestigation, runnablePlan } from './twin/orchestrator.js';
+import { createCaseCapabilities, CASE_ACTIONS } from './maintenance/caseCapabilities.js';
+import { caseCapabilityInput, caseIdIn, composeCaseAnswer, planCaseQuestion } from './maintenance/caseAnswers.js';
 
 // `npm run dev` serves the orchestrator itself (server/ask/localAsk.mjs), so a dev build asks it
 // same-origin; a build without VITE_ASK_THE_TWIN_API keeps the deployed service.
@@ -110,7 +112,15 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
    * A function, so the chat always reaches the session for whatever incident is open NOW, and so
    * every number it quotes comes from the same engine the Simulation Lab is showing.
    */
-  safetySimulation = null } = {}) {
+  safetySimulation = null,
+  /**
+   * The Asset Operations & Maintenance workspace's own adapter (`askServices`).
+   *
+   * Gives the assistant the screen's context, the case and claim records the workbench is already
+   * drawing, the two asynchronous services it already uses, and the navigation actions it already
+   * performs. Nothing here is a second copy of the case data.
+   */
+  assetOps = null } = {}) {
   /**
    * What the last answer was about, so a follow-up can say "it".
    *
@@ -150,6 +160,7 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     selectedAssetId: assetExplorer?.selectedAssetId ?? null,
     spatialContext: activeSpatialContext,
     referent: lastReferenced,
+    assetOps: assetOps?.context?.() ?? null,
   });
   // ── Toggle button ──────────────────────────────────────────────────────
   const btn = document.createElement('button');
@@ -195,6 +206,7 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
       <p class="ask-twin-persona-note">A persona changes the emphasis, the starter questions and the default data sources. Toggle sources under the conversation; it narrows what a question reads (focus, not access control).</p>
     </div>
     <div class="ask-twin-body">
+      <p class="ask-twin-context" role="status" hidden></p>
       <div class="ask-twin-area-bar">
         <button type="button" class="ask-twin-area-btn ask-twin-area-select">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1" stroke-dasharray="3 2"/></svg>
@@ -260,10 +272,31 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
       const inLab = document.querySelector('[data-tab="lab"]')?.getAttribute('aria-selected') === 'true';
       return inLab ? SIMULATION_SUGGESTIONS : SAFETY_SUGGESTIONS;
     }
+    // Asset Operations & Maintenance asks about the case in front of the operator. Derived from
+    // the stage statuses, so a failed inspection and a closed case never offer the same four.
+    if (assetOps && document.body.dataset.section === 'maintenance') {
+      const offered = assetOps.suggestions?.() ?? [];
+      if (offered.length) return offered;
+    }
+    // Otherwise the persona's starters, falling back to the generic set.
     return PERSONA_SUGGESTIONS[persona] ?? SUGGESTIONS;
   }
 
+  /**
+   * The compact indicator: "ACS-DEMO-005 · Highway Lighting · Closed".
+   *
+   * A reminder of what is being investigated, not a second case dashboard — the workbench beside it
+   * owns the case's detail.
+   */
+  function renderContextIndicator() {
+    const label = assetOps && document.body.dataset.section === 'maintenance'
+      ? assetOps.indicator?.() ?? null : null;
+    contextEl.hidden = !label;
+    contextEl.textContent = label ?? '';
+  }
+
   function renderSuggestions() {
+    renderContextIndicator();
     suggestEl.replaceChildren();
     for (const text of suggestionsNow()) {
       const chip = document.createElement('button');
@@ -331,6 +364,9 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     btn.hidden = open;
     btn.classList.toggle('active', open);
     dock.setDocked(open);
+    // The Case Workbench reads this to give up the strip the panel sits on, rather than having its
+    // right-hand controls covered.
+    document.body.classList.toggle('ask-twin-open', open);
     if (open) { renderSuggestions(); renderContext(); input.focus(); scrollBottom(); }
   }
   btn.onclick = () => toggle();
@@ -1147,12 +1183,17 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
 
   /** @returns {Promise<boolean>} true when the question was about a map asset and is answered. */
   /** The capabilities, built against the same services the screens use. */
-  const capabilities = createCapabilityRegistry({
-    tmc,
-    safetyIntelligence,
-    maintenanceRecords,
-    assetIndex: typeof assetIndex === 'function' ? assetIndex : () => assetIndex,
-    centerline,
+  const capabilities = Object.freeze({
+    ...createCapabilityRegistry({
+      tmc,
+      safetyIntelligence,
+      maintenanceRecords,
+      assetIndex: typeof assetIndex === 'function' ? assetIndex : () => assetIndex,
+      centerline,
+    }),
+    // The ACS case capabilities, in the same shape and merged into the same registry — one tool
+    // layer, not a second one. They are no-ops without the workspace adapter.
+    ...(assetOps ? createCaseCapabilities(assetOps) : {}),
   });
 
   /**
@@ -1263,6 +1304,105 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     return out.join('\n');
   }
 
+  /* ── Asset Operations & Maintenance: the ACS case ──────────────────────────────────────────
+   *
+   * Grounded by construction. The question is planned into read-only capabilities, the existing
+   * orchestrator runs them under its own limits, and the answer is composed from what came back.
+   * Nothing is invented: a validation result, an evidence record, a claim amount or a retrieval
+   * outcome that no capability returned does not appear.
+   */
+
+  /** The case the last case answer was about, so a change of case is announced rather than implied. */
+  let lastCaseAnswered = null;
+
+  async function answerAboutCase(question) {
+    if (!assetOps || document.body.dataset.section !== 'maintenance') return false;
+    const context = twinContext();
+    const screen = context.assetOps;
+    if (!screen) return false;
+    const plan = planCaseQuestion(question, screen);
+    if (!plan.length) return false;
+
+    const named = caseIdIn(question);
+    const investigating = named ?? screen.selectedCaseId ?? null;
+    // "Prevent answers from an earlier case being mistaken for answers about the newly selected
+    // one." Said once, when it changes, rather than stamped on every reply.
+    if (investigating && lastCaseAnswered && investigating !== lastCaseAnswered) {
+      addLocalMsg(`Now investigating ${investigating}. Everything above was about ${lastCaseAnswered}.`);
+    }
+
+    const run = await runInvestigation(plan, capabilities,
+      { ...context, capabilityInput: caseCapabilityInput(question, screen, plan) });
+    // Nothing came back at all: fall through rather than present an empty investigation.
+    const answered = Object.values(run.results).some(result => result?.status === 'ok');
+    if (!answered && !run.steps.some(step => step.status === 'unavailable')) return false;
+
+    addMsg('assistant', composeCaseAnswer(run, screen) || 'Nothing could be read for that question.');
+    offerCaseActions(run.actions);
+    if (investigating) {
+      lastCaseAnswered = investigating;
+      remember(REFERENT_KINDS.CASE, investigating);
+    }
+    return true;
+  }
+
+  /**
+   * The safe navigation actions, offered as buttons.
+   *
+   * Two checks, and both matter. The TYPE has to be in the vocabulary, which is what
+   * `isAuthorisedAction` decides. The SUBJECT has to be a record this workspace actually holds,
+   * which is what `caseOf` decides — the selection alone is too narrow, because a claims answer
+   * legitimately names cases nobody has selected yet, and those ids came from the workspace's own
+   * records rather than from a model.
+   *
+   * None of these writes: there is no approve, submit, close or attach in the vocabulary at all.
+   */
+  function offerCaseActions(actions) {
+    if (!actions?.length || !assetOps) return;
+    const context = twinContext();
+    const allowed = new Set(Object.values(CASE_ACTIONS));
+    const runnable = actions.filter(action => {
+      // An id with no record behind it moves nothing, whatever produced it.
+      if (action.caseId && !assetOps.caseOf?.(action.caseId)) return false;
+      if (action.assetId && !assetOps.assets?.()?.has?.(String(action.assetId))) return false;
+      const target = action.caseId ?? action.assetId ?? null;
+      return isAuthorisedAction({ ...action, entityId: target ? null : undefined }, context, allowed);
+    });
+    if (!runnable.length) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'ask-twin-msg ask-twin-msg--assistant ask-twin-actions';
+    for (const action of runnable) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'ask-twin-fly-btn';
+      button.textContent = action.label;
+      button.onclick = () => {
+        const done = runCaseAction(action);
+        button.textContent = done ? `✓ ${action.label}` : `Could not ${action.label.toLowerCase()}`;
+        button.disabled = true;
+      };
+      wrap.appendChild(button);
+    }
+    messages.appendChild(wrap);
+    scrollBottom();
+  }
+
+  /** One action, through the workspace's own navigation. Only one detail surface can result. */
+  function runCaseAction(action) {
+    switch (action.type) {
+      case CASE_ACTIONS.VIEW_CASE_ON_MAP: return Boolean(assetOps.viewCaseOnMap?.(action.caseId));
+      case CASE_ACTIONS.OPEN_VALIDATION_STAGE:
+        return Boolean(assetOps.openValidationStage?.(action.caseId, action.stage));
+      case CASE_ACTIONS.SHOW_MISSING_EVIDENCE: return Boolean(assetOps.showMissingEvidence?.(action.caseId));
+      case CASE_ACTIONS.OPEN_CLAIM: return Boolean(assetOps.openClaim?.(action.caseId));
+      case CASE_ACTIONS.OPEN_RELATED_CASE: return Boolean(assetOps.openCase?.(action.caseId));
+      case CASE_ACTIONS.HIGHLIGHT_ASSET: return Boolean(assetOps.highlightAsset?.(action.assetId));
+      case CASE_ACTIONS.SHOW_AUDIT_HISTORY: return Boolean(assetOps.showAuditHistory?.(action.caseId));
+      // An action with no counterpart in the workspace is refused rather than improvised.
+      default: return false;
+    }
+  }
+
   /**
    * Answer from the Safety Intelligence screen's own findings, while that screen is open.
    *
@@ -1299,6 +1439,10 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
   }
 
   async function answerLocally(question) {
+    // The ACS case comes first while Asset Operations is open: on that screen "why did inspection
+    // fail?" is a question about the selected case, and every route below would answer about the
+    // corridor instead. Its own planner is additive, so a compound case question keeps every clause.
+    if (await answerAboutCase(question)) return true;
     // A compound question is investigated first, so its later clauses are not discarded by a
     // handler that recognises only the first.
     if (await answerByInvestigation(question)) return true;
@@ -1795,6 +1939,7 @@ export function installAskTheTwin(viewer, { cameraControls, assetExplorer, segme
     destroy() {
       document.removeEventListener(ASK_THE_TWIN_EVENT, onAskEvent);
       if (import.meta.env?.DEV && window.__twinUi === ui) delete window.__twinUi;
+      document.body.classList.remove('ask-twin-open');
       selection.destroy(); dock.destroy(); btn.remove(); panel.remove();
     },
   };

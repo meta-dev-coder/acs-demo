@@ -5,10 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>I-595 Toll-Plaza Flow — SUMO × Cesium</title>
     <script>
-      // Runs before first paint. The I-595 app is dynamically imported, so without this guard the
-      // browser briefly paints the legacy HTML below before that module and its CSS arrive.
-      if (new URLSearchParams(location.search).get('demo') === 'i595') {
+      // Runs before first paint. A project's page module is dynamically imported, so without this
+      // guard the browser briefly paints the legacy HTML below before that module and its CSS
+      // arrive. The ids are repeated here rather than read from src/projects.js on purpose: this
+      // has to run before any module loads, and a project that is not listed simply gets no
+      // pre-paint loader rather than a broken one.
+      var bootTitles = {
+        'i595': ['Loading I-595 Digital Twin', 'Preparing the corridor map\u2026'],
+        'construction-integration': ['Loading Construction Integration Demo', 'Preparing the integration workspace\u2026'],
+      };
+      var booting = bootTitles[new URLSearchParams(location.search).get('demo')];
+      if (booting) {
         document.documentElement.classList.add('i595-booting');
+        document.addEventListener('DOMContentLoaded', function () {
+          var loader = document.querySelector('#i595-boot-loader');
+          if (!loader) return;
+          loader.setAttribute('aria-label', booting[0]);
+          loader.querySelector('.i595-boot-loader-title').textContent = booting[0];
+          loader.querySelector('.i595-boot-loader-note').textContent = booting[1];
+        });
       }
     </script>
     <style>

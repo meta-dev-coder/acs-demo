@@ -34,6 +34,7 @@ import { createStreetViewPlacement } from "./streetViewPlacement.js";
 import { installMapExplorer } from "./mapExplorer.js";
 import { createThemeMode } from "./themeMode.js";
 import { installAppNav } from "./appNav.js";
+import { installProjectSwitcher } from "./projectSwitcher.js";
 import { installMaintenanceLayer } from "./maintenance/maintenanceLayer.js";
 import { installMaintenanceWorkspace } from "./maintenance/maintenanceWorkspace.js";
 import { safetyMaintenance, installSafetyWorkspace, installTrafficWorkspace } from "./safetyWorkspace.js";
@@ -106,6 +107,9 @@ const appNav = installAppNav(document.body, {
   layersOpen: false,
   onToggleLayers: (open) => { if (open) setExplorerCollapsed(true); },
 });
+// This repository holds more than one project (src/projects.js). The switcher is how the other
+// one is reached; choosing it loads that project's page, which is what keeps the two isolated.
+installProjectSwitcher(appNav.nav, 'i595');
 
 const status = document.querySelector("#layer-status");
 const inputs = [...document.querySelectorAll('input[type="checkbox"]')];
@@ -464,7 +468,12 @@ try {
   });
   if (import.meta.env.DEV) { window.__assetExplorer = assetExplorer; window.__viewer = viewer; }
 
-  const maintenance = installMaintenanceWorkspace(viewer, { assetExplorer, maintenanceLayer, layerStore, corridorStatus, roadShields });
+  const maintenance = installMaintenanceWorkspace(viewer, { assetExplorer, maintenanceLayer, layerStore, corridorStatus, roadShields,
+    // The corridor geometry, so an incident can be placed along it. Measured, not an FDOT milepost.
+    centerline: corridor,
+    // A new subtab or a new case changes which questions are worth asking, so the chat's
+    // suggestions and its context chip follow the selection, as the TMC's already do.
+    onContextChange: () => chat?.refreshSuggestions?.() });
   maintenanceWorkspace = maintenance;
   // Ask the Twin can be asked for a ticket before Maintenance has ever been opened, so the classes
   // load in the background rather than only on arrival.
@@ -593,6 +602,9 @@ try {
     // so a late pick from a module still shutting down could put the old strip back.
     assetExplorer.store.setActiveExplorerType(null);
     workspaces[section]?.activate();
+    // Changing screen changes what "here" is, so the chat's suggestions and its context chip have
+    // to follow. Without this the Asset Operations case chip stayed on screen on the TMC.
+    chat?.refreshSuggestions?.();
   });
   cameraControls.setIconMarkers(appNav.section === "liveOps");
   messageSignControls.setIconMarkers(appNav.section === "liveOps");
@@ -643,6 +655,9 @@ try {
       reveal: type => maintenanceWorkspace?.reveal?.(type, { live: true }),
       showOnly: (type, records) => maintenanceWorkspace?.showOnly?.(type, records),
     },
+    // The Asset Operations & Maintenance screen's own context, its case and claim records, and its
+    // navigation. The workspace owns all of it; the assistant reads and asks it to move.
+    assetOps: maintenance.askServices,
   });
   chat = askTwin;
   if (import.meta.env.DEV) window.__askTwin = askTwin;

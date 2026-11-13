@@ -1,0 +1,145 @@
+/* ==========================================================================================
+   Theme tokens — the single source of truth for application chrome in both modes.
+
+   Dark is the base (the values below are exactly what the app shipped with); light overrides
+   only what changes. The Asset Explorer's MUI theme is built from the same roles, so the React
+   island and the plain-DOM panels cannot drift apart.
+
+   What is deliberately NOT here: route, traffic, severity and weather colours, Cesium entity
+   colours and anything drawn onto the map. Those carry meaning rather than style, and they read
+   the same in both modes.
+   ========================================================================================== */
+:root {
+  /* Surfaces */
+  --ui-surface: #0d1829f5;          /* floating panels over the map */
+  --ui-surface-solid: #0b1729;      /* bars and rails */
+  --ui-surface-raised: #17293d;     /* nested rows and inputs */
+  --ui-surface-sunken: #0b172980;
+
+  /* Text */
+  --ui-text: #e8eef6;
+  --ui-text-secondary: #92a8c3;
+  --ui-text-muted: #7f93ac;
+  /* Used in thirteen places and never defined until now. On HTML that silently inherited and looked
+     fine; on SVG `fill` an invalid value falls back to the initial value, so every chart tick and
+     axis label rendered BLACK on a dark panel. */
+  --ui-text-dim: #92a8c3;
+
+  /* Lines and states */
+  --ui-border: #ffffff1f;
+  --ui-border-soft: #ffffff14;
+  --ui-border-strong: #ffffff24;
+  --ui-hover: #ffffff0d;
+  --ui-active: #ffffff14;
+  --ui-shadow: 0 16px 48px #0005;
+  --ui-shadow-soft: 0 12px 32px #0006;
+
+  /* Accent — the corridor teal, in three strengths */
+  --ui-accent: #67f4e2;             /* text and icons on dark */
+  --ui-accent-strong: #38c9bf;      /* fills */
+  --ui-accent-soft: #17383f;        /* tonal selected background */
+  --ui-accent-contrast: #0b1729;    /* text on an accent fill */
+
+  /* The left navigation bar's width — everything anchored to the left edge clears it. */
+  /* Wide enough for the longest workspace name. At 76px "Maintenance" ran the full width of its
+     button with nothing either side of it, which read as overflow rather than a label. */
+  --app-nav-w: 92px;
+
+  /* Scrollbars */
+  --ui-surface-translucent: #0b1729d9;   /* rail and floating bars, over the map */
+  --ui-accent-tint: #67f4e229;           /* selected tint */
+  --ui-accent-line: #67f4e26b;           /* accent border */
+  /* Status colours as *label text*. The map's own geometry colours are untouched by these — a
+     closure is the same red on the map in both modes; only the words on a panel change weight. */
+  --ui-status-express: #fcd970;
+  --ui-status-live: #4ade80;
+  --ui-status-alert: #ff9a8b;
+  --ui-shadow-color: #0005;
+  --ui-scroll-track: transparent;
+  --ui-scroll-thumb: #ffffff24;
+
+  /* Status TONES — ok / warn / bad / info, as a label colour and its tonal background.
+     These were hard-coded in nine places across the construction CSS, which meant light mode kept
+     showing dark-mode greens and ambers on white. They are tokens now so both modes are stated in
+     one place. The values here are exactly what was hard-coded, so dark mode is unchanged. */
+  --ui-tone-ok: #35c79a;
+  --ui-tone-ok-bg: #1f7a5f2e;
+  --ui-tone-warn: #e0a24e;
+  --ui-tone-warn-bg: #8a5a1b2e;
+  --ui-tone-bad: #ee6a6a;
+  --ui-tone-bad-bg: #8a26262e;
+  --ui-tone-info: #4e9ae0;
+}
+
+:root[data-theme="light"] {
+  /* ----------------------------------------------------------------------------------------
+     Light mode is the SDNA palette, taken from sdna_quasar_wf/sdna-frontend/src/css/
+     quasar.variables.scss so this demo and the Quasar app read as one product.
+
+     Source map, so a change there can be traced here:
+       $neutral-colors 0/5/10/20/30/80   surfaces, scrollbars, body text
+       $primary-colors 1/5/10/20/30/40/50/90   accent, borders, hover, secondary text
+       $alice-blue, $separator-color, $text-muted
+       $positive / $warning / $negative  status tones
+
+     TWO HUES ARE DARKENED, and only those two. SDNA sets status text to the full-strength hue on
+     a 10% tint of itself (its own .sev-1/.sev-2 rule). On white, $positive #21c846 is 2.2:1 and
+     $warning #f89133 is 2.3:1 — both well under 4.5:1, so small bold labels in those colours are
+     hard to read. They are darkened to the same hue at 4.9:1 and 5.1:1. $negative #d01818 (5.5:1)
+     and $primary #1862d0 (5.7:1) already pass and are used exactly as SDNA defines them.
+     ---------------------------------------------------------------------------------------- */
+
+  /* Surfaces — neutral 0, primary 5, $alice-blue */
+  --ui-surface: #ffffff;
+  --ui-surface-solid: #ffffff;
+  --ui-surface-raised: #fafbff;
+  --ui-surface-sunken: #f2f4fb;
+
+  /* Text — neutral 80, primary 40, $text-muted */
+  --ui-text: #0f1727;
+  --ui-text-secondary: #5f6367;
+  --ui-text-dim: #757575;
+  --ui-text-muted: #757575;
+
+  /* Lines and states — the primary ramp, as SDNA uses it for separators and .bg-focused */
+  --ui-border: #d3e4f8;
+  --ui-border-soft: #eaf2ff;
+  --ui-border-strong: #bad4f4;
+  --ui-hover: #eaf2ff;
+  --ui-active: #d3e4f8;
+  /* Restrained, and tinted with the navy rather than pure black. */
+  --ui-shadow: 0 6px 18px #0f172714;
+  --ui-shadow-soft: 0 4px 12px #0f17270f;
+
+  /* Accent — $primary, with primary 90 for fills and primary 10 for the tonal background */
+  --ui-accent: #1862d0;
+  --ui-accent-strong: #1d6adf;
+  --ui-accent-soft: #eaf2ff;
+  --ui-accent-contrast: #ffffff;
+
+  --ui-surface-translucent: #ffffff;
+  --ui-accent-tint: #1862d01a;
+  --ui-accent-line: #1862d066;
+  --ui-status-express: #a15e21;
+  --ui-status-live: #15822d;
+  --ui-status-alert: #d01818;
+  --ui-shadow-color: #0f172720;
+  --ui-scroll-track: #f4f4f4;
+  --ui-scroll-thumb: #c7c7c7;
+
+  /* Tones. The background is the hue at 10%, which is SDNA's own $positive-10 / $negative-10
+     pattern; the label colour is the hue, darkened only where white demanded it. */
+  --ui-tone-ok: #15822d;
+  --ui-tone-ok-bg: #21c8461a;
+  --ui-tone-warn: #a15e21;
+  --ui-tone-warn-bg: #f891331a;
+  --ui-tone-bad: #d01818;
+  --ui-tone-bad-bg: #d018181a;
+  --ui-tone-info: #1862d0;
+}
+
+/* Scrollbars follow the mode instead of staying dark on a white panel. */
+* { scrollbar-color: var(--ui-scroll-thumb) var(--ui-scroll-track); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--ui-scroll-track); }
+::-webkit-scrollbar-thumb { background: var(--ui-scroll-thumb); border-radius: 6px; }

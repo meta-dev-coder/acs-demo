@@ -34,7 +34,7 @@ const ICONS = Object.freeze({
 /** The workspaces, in the order they are shown. */
 export const NAV_SECTIONS = Object.freeze([
   Object.freeze({ id: 'traffic', label: 'Traffic', icon: 'traffic' }),
-  Object.freeze({ id: 'maintenance', label: 'Maintenance', icon: 'maintenance' }),
+  Object.freeze({ id: 'maintenance', label: 'Asset Operations & Maintenance', icon: 'maintenance' }),
   Object.freeze({ id: 'safety', label: 'Safety', icon: 'safety' }),
   Object.freeze({ id: 'liveOps', label: 'Live Ops', icon: 'liveOps' }),
   Object.freeze({ id: 'tmc', label: 'TMC', icon: 'tmc' }),
@@ -83,16 +83,28 @@ export function installAppNav(host, {
   sections = NAV_SECTIONS,
   onSelect = null,
   onToggleLayers = null,
+  /**
+   * The roles offered, and the storage key their choice is remembered under.
+   *
+   * Defaulted to I-595's own, so that project is unchanged. Another project in this repository
+   * has its own workspaces and its own roles; without this it would render a bar in which every
+   * one of its sections is hidden, because no I-595 role carries them.
+   */
+  roles = APP_ROLES,
+  roleStorageKey = 'i595-role',
+  /** Hide the role control entirely, for a project with only one. The bar still works. */
+  showRoles = true,
 } = {}) {
+  const resolve = id => roles.find(entry => entry.id === id) ?? roles[0];
   let savedRole;
-  try { savedRole = localStorage.getItem('i595-role'); } catch {}
-  let role = resolveRole(savedRole);
+  try { savedRole = localStorage.getItem(roleStorageKey); } catch {}
+  let role = resolve(savedRole);
   const allowedSections = () => role.sections.map(id => sections.find(entry => entry.id === id)).filter(Boolean);
   const nav = document.createElement('nav');
   nav.className = 'app-nav';
   nav.setAttribute('aria-label', 'Workspaces');
   nav.innerHTML = `
-    <label class="app-role"><select aria-label="Role">${APP_ROLES.map(role => `<option value="${role.id}">${role.label}</option>`).join('')}</select></label>
+    <label class="app-role"${showRoles ? '' : ' hidden'}><select aria-label="Role">${roles.map(entry => `<option value="${entry.id}">${entry.label}</option>`).join('')}</select></label>
     <div class="app-nav-sections">${sections.map(entry => item(entry.id, entry.label, entry.icon, 'aria-current="false"')).join('')}</div>
     <div class="app-nav-foot">${item('layers', 'Explorer', 'layers', 'data-action="layers" aria-pressed="false" aria-controls="layer-content"')}</div>`;
   host.append(nav);
@@ -146,8 +158,8 @@ export function installAppNav(host, {
   const roleSelect = roleControl.querySelector('select');
   host.append(roleControl);
   roleSelect.onchange = () => {
-    role = resolveRole(roleSelect.value);
-    try { localStorage.setItem('i595-role', role.id); } catch {}
+    role = resolve(roleSelect.value);
+    try { localStorage.setItem(roleStorageKey, role.id); } catch {}
     current = resolveSection(current, allowedSections());
     render();
     announce(current);

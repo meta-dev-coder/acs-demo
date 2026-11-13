@@ -18,10 +18,14 @@
  *
  * Pure: state in, a serialisable snapshot out. No DOM writes, no Cesium, no fetching.
  */
+import { assetOpsIds, describeAssetOps } from '../maintenance/assetOpsContext.js';
 
 /** Entities a follow-up can refer to as "it". Anything else is not resolvable and is refused. */
 export const REFERENT_KINDS = Object.freeze({
   INCIDENT: 'INCIDENT',
+  /** An ACS case and its claim — the Asset Operations & Maintenance records. */
+  CASE: 'CASE',
+  CLAIM: 'CLAIM',
   CAMERA: 'CAMERA',
   SIGN: 'SIGN',
   PATROL: 'PATROL',
@@ -107,6 +111,12 @@ function tmcContextOf(tmc) {
 export function buildTwinContext({
   screen = null, role = null, viewer = null, layerStore = null, tmc = null,
   selectedAssetId = null, spatialContext = null, referent = null, now = Date.now(),
+  /**
+   * The Asset Operations & Maintenance screen's own state, already resolved by
+   * `maintenance/assetOpsContext.js`. Null everywhere else, so nothing about that workspace
+   * travels with a question asked on another screen.
+   */
+  assetOps = null,
 } = {}) {
   const onTmc = screen === 'tmc';
   const tmcState = onTmc ? tmcContextOf(tmc) : null;
@@ -116,6 +126,7 @@ export function buildTwinContext({
     // The present, always stated, so the model never has to assume what "now" is.
     nowIso: new Date(now).toISOString(),
     tmc: tmcState,
+    assetOps: screen === 'maintenance' ? assetOps ?? null : null,
     selectedAssetId: text(selectedAssetId),
     mapExtent: mapExtentOf(viewer),
     activeLayers: activeLayersOf(layerStore),
@@ -173,6 +184,8 @@ export function describeTwinContext(context) {
     if (tmc.responseFocus) lines.push(`Response map focus: ${tmc.responseFocus}.`);
   }
 
+  for (const line of describeAssetOps(context.assetOps)) lines.push(line);
+
   if (context.selectedAssetId) lines.push(`Selected asset: ${context.selectedAssetId}.`);
   if (context.area) {
     lines.push(`A map area is selected: ${context.area.sections.length} section(s), `
@@ -204,6 +217,9 @@ export function authorisedIds(context) {
   for (const id of tmc?.eligiblePatrolIds ?? []) add(id);
   add(context?.selectedAssetId);
   add(context?.lastReferenced?.id);
+  // The Asset Operations screen's own identifiers: the selected case, its claim, its asset and the
+  // real incident whose location it borrows.
+  for (const id of assetOpsIds(context?.assetOps)) add(id);
   return ids;
 }
 

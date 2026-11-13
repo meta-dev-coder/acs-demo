@@ -1,0 +1,53 @@
+/* ==========================================================================================
+   The left navigation bar, the role control and the hidden-section rule.
+
+   Lifted out of i595Demo.css unchanged so a second project in this repository can mount the same
+   `installAppNav` bar without importing I-595's whole stylesheet. Colours come entirely from the
+   theme tokens, so light and dark need nothing of their own.
+
+   What stayed behind in i595Demo.css: every `body:has(.app-role) …` rule that nudges an I-595
+   panel down to clear the role control. Those are that project's layout, not the bar's.
+   ========================================================================================== */
+.app-nav { position: absolute; top: 0; left: 0; bottom: 0; z-index: 40; width: var(--app-nav-w);
+  display: flex; flex-direction: column; justify-content: space-between; gap: 8px; padding: 12px 8px;
+  background: var(--ui-surface-solid); border-right: 1px solid var(--ui-border-soft); box-shadow: var(--ui-shadow-soft); }
+.app-nav-sections, .app-nav-foot { display: flex; flex-direction: column; gap: 4px; }
+.app-nav-foot { border-top: 1px solid var(--ui-border-soft); padding-top: 10px; }
+.app-nav-item { display: flex; flex-direction: column; align-items: center; gap: 5px; width: 100%;
+  padding: 9px 2px; border: 0; border-radius: 12px; background: transparent; color: var(--ui-text-secondary);
+  font: inherit; font-size: 10px; letter-spacing: .01em; text-align: center; cursor: pointer;
+  transition: background .15s ease, color .15s ease; }
+.app-nav-item svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.app-nav-item:hover { background: var(--ui-hover); color: var(--ui-text); }
+.app-nav-item:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: -2px; }
+/* The chosen workspace and an open Layers panel read the same: tinted, accented, never colour alone. */
+.app-nav-item[aria-current="page"], .app-nav-item[aria-pressed="true"] { background: var(--ui-accent-tint); color: var(--ui-accent); }
+.app-nav-label { line-height: 1.2; }
+/* A long name stays on one line and keeps a margin either side rather than touching the corners. */
+.app-nav-item { padding-inline: 6px; }
+
+.app-role { position: absolute; top: 16px; right: 16px; z-index: 40; display: flex; align-items: center; padding: 0; border: 0; background: transparent; box-shadow: none; font-size: 12px; color: var(--ui-text-secondary); }
+.app-role select { width: 170px; min-width: 0; padding: 6px 8px; border: 1px solid var(--ui-border); border-radius: 7px; background: var(--ui-surface-solid); color: var(--ui-text); font: inherit; }
+.app-role select:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+.app-nav-item[hidden] { display: none; }
+
+@media (max-width: 700px) {
+  :root { --app-nav-w: 56px; }
+  .app-nav { padding: 8px 6px; }
+  .app-nav-item { font-size: 0; gap: 0; padding: 10px 2px; }
+  .app-nav-item svg { width: 20px; height: 20px; }
+}
+
+/* The project control, beside the role control it qualifies. */
+.app-project { position: absolute; top: 16px; right: 200px; z-index: 40; display: flex;
+  align-items: center; gap: 8px; font-size: 12px; color: var(--ui-text-secondary); }
+.app-project-caption { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ui-text-dim); }
+.app-project select { width: 230px; padding: 6px 8px; border: 1px solid var(--ui-border);
+  border-radius: 7px; background: var(--ui-surface-solid); color: var(--ui-text); font: inherit; }
+.app-project select:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+
+@media (max-width: 700px) {
+  .app-project { right: 16px; top: 52px; }
+  .app-project select { width: 170px; }
+}

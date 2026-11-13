@@ -26,3 +26,19 @@ deploy/ec2/releases/
 
 # Ask the Twin local store (npm run twin:store) and recorded model responses
 .twin-store/
+
+# Local state for the Construction Integration Demo (SQLite). Generated, never committed.
+.data/
+
+# Phase 9A — the Speckle verification tool is Python. The venv is a 40 MB build artefact (pyarrow
+# alone is 37 MB) and the report is generated output that names the account that ran it, so
+# neither belongs in the repository. The script, its pins and its README do.
+tools/speckle/.venv/
+tools/speckle/verification-report.json
+__pycache__/
+*.pyc
+
+# Phase 9B — converted Speckle artifacts. Regenerated from Speckle on demand and cached by
+# immutable version id, so they are build output, not source. A committed copy of one model lives
+# in tests/fixtures/speckle/ as a test fixture and IS tracked.
+.data/speckle/

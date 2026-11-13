@@ -17,6 +17,7 @@ import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import HorizontalRuleOutlinedIcon from '@mui/icons-material/HorizontalRuleOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import GppMaybeOutlinedIcon from '@mui/icons-material/GppMaybeOutlined';
+import ScienceOutlinedIcon from '@mui/icons-material/ScienceOutlined';
 import { IncidentTypeIcon } from './IncidentTypeIcon.jsx';
 
 const ICONS = {
@@ -40,6 +41,8 @@ const ICONS = {
   clearedEvent: HistoryOutlinedIcon,
   // A shield with a warning: the asset itself is fine, what has happened to it is not.
   riskAsset: GppMaybeOutlinedIcon,
+  // A flask: this record is a specimen, not something that happened on the corridor.
+  acsDemoCase: ScienceOutlinedIcon,
 };
 
 /**

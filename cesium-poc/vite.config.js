@@ -2,6 +2,7 @@ import { loadServerEnv } from './server/loadEnv.mjs';
 import { createMessageSignsApi } from './server/messageSigns.mjs';
 import { createDataConnectApi } from './server/dataConnect.mjs';
 import { createLiveDcReadApi } from './server/liveDc/liveReadApi.mjs';
+import { createConstructionApi } from './server/construction/api.mjs';
 
 // Before any plugin reads process.env: Vite only exposes VITE_-prefixed variables, and the
 // server-side credentials are deliberately not prefixed, so nothing else would load them. The EC2 web
@@ -84,6 +85,30 @@ const liveDcReadApi = api => ({ name: 'i595-live-dc-read-api',
   configurePreviewServer(server) { server.middlewares.use(api.middleware); },
 });
 
+// The Construction Integration Demo's own API and SQLite database. Same-origin, same factory
+// shape as the others, and entirely separate from I-595: its own tables in its own file, under
+// /api/construction/*. It is deliberately NOT in readApiHandlers.mjs — that module is shared with
+// the EC2 live-dc host, which has no business carrying this project.
+const constructionApi = () => {
+  const api = createConstructionApi();
+  // Phase 8B: the OpenProject poller starts with the dev server and stops with it. `startAutoSync`
+  // is a no-op unless OPENPROJECT_AUTO_SYNC_ENABLED=true, and the worker is a process-wide
+  // singleton, so a reloaded module graph finds the running one instead of arming a second timer.
+  const start = () => { void api.startAutoSync(); };
+  return { name: 'construction-integration-api',
+    configureServer(server) {
+      server.middlewares.use(api.middleware);
+      start();
+      server.httpServer?.on('close', () => { void api.close(); });
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(api.middleware);
+      start();
+      server.httpServer?.on('close', () => { void api.close(); });
+    },
+  };
+};
+
 // CCTV snapshot proxy — pipes DIVAS JPEG bytes through same-origin to avoid CORS issues.
 const snapshotApi = () => {
   const api = createSnapshotApi();
@@ -112,7 +137,10 @@ export default defineConfig({
   // automatic runtime is enough for it — no fast-refresh plugin, so the rest of the app's plain
   // HMR is untouched.
   esbuild: { jsx: 'automatic' },
-  plugins: [cesium({ cesiumBuildRootPath, cesiumBuildPath: join(cesiumBuildRootPath, "Cesium") }), liveEventsApi(liveEvents), askApi(liveEvents, liveDc, historicalDc), snapshotApi(), messageSignsApi(), dataConnectApi(historicalDc), liveDcReadApi(liveDc)],
+  // Upstream's wiring (liveEvents, askApi, historicalDc) plus this branch's constructionApi.
+  // The incoming side still called liveEventsApi(liveDc) and dataConnectApi() with no argument,
+  // which predates the shared clients created above; those signatures are the ones to keep.
+  plugins: [cesium({ cesiumBuildRootPath, cesiumBuildPath: join(cesiumBuildRootPath, "Cesium") }), liveEventsApi(liveEvents), askApi(liveEvents, liveDc, historicalDc), snapshotApi(), messageSignsApi(), dataConnectApi(historicalDc), liveDcReadApi(liveDc), constructionApi()],
   // Port 5188 (not the default 5180) keeps this NTTA worktree isolated from a sibling session's
   // dev server sharing localhost. Disable auto-open under headless e2e.
   server: { port: 5188, open: false, strictPort: true,

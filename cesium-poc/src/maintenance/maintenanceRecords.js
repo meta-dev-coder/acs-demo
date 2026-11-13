@@ -407,14 +407,21 @@ export function summarize(records, key) {
   const count = predicate => open.filter(predicate).length;
   const failed = count(item => /fail/i.test(item.status ?? ''));
   // Inspections are the exception: an inspection that passed needs nobody, so what matters is how
-  // many FAILED. Every other class leads with what is still open.
-  const headline = key === 'inspections' ? failed : open.length;
+  // many FAILED. Incidents are the other one: the register publishes no status column, so every
+  // historical incident reads as not-open and the card said "0 · None open" over 178 recorded
+  // crashes. An incident is a thing that happened, not a thing that is open, so it leads with how
+  // many happened in the period. Every other class leads with what is still open.
+  const headline = key === 'inspections' ? failed : key === 'incidents' ? total : open.length;
+  // Counted over the whole class for incidents, for the same reason: counting lane closures inside
+  // an empty open set reports none of them.
+  const closures = records.filter(item => /^y/i.test(item.related?.laneClosure ?? '')).length;
   const note = key === 'tickets' || key === 'workOrders' ? `${count(isHighPriority)} high priority`
     : key === 'tasks' ? `${count(item => /in progress/i.test(item.status ?? ''))} in progress`
       : key === 'inspections' ? `${open.length} inspected`
-        : key === 'incidents' ? `${count(item => /^y/i.test(item.related?.laneClosure ?? ''))} with lane closure`
+        : key === 'incidents' ? `${closures} with lane closure`
           : null;
-  return { total, open: open.length, failed, headline, note: open.length ? note : null, located, linked };
+  return { total, open: open.length, failed, headline,
+    note: key === 'incidents' ? (total ? note : null) : (open.length ? note : null), located, linked };
 }
 
 /**
