@@ -1,4 +1,5 @@
 import { displayName, roadClassLabel, LENGTH_UNIT } from '../roads/roadModel.js';
+import { RoadLiveEvents } from './RoadLiveEvents.jsx';
 
 /** A labelled value. `null` is rendered as a stated absence, never as 0 or a blank. */
 function Row({ label, value, note }) {
@@ -30,7 +31,7 @@ function Impedance({ value }) {
   return value.toLocaleString('en-US');
 }
 
-export function RoadDetailsPanel({ road, onViewOnMap, onClear }) {
+export function RoadDetailsPanel({ road, traffic, onStreetView, onViewOnMap, onOpenEvent, onClear }) {
   const p = road.properties;
   /**
    * An address range, or nothing. `0 to 0` is the source's "no range assigned" sentinel — 705 of
@@ -55,8 +56,19 @@ export function RoadDetailsPanel({ road, onViewOnMap, onClear }) {
 
       <div className="road-details-actions">
         <button type="button" className="road-btn is-primary" onClick={onViewOnMap}>View on map</button>
+        {/* The midpoint of this segment, which is where the panorama is looked up. A tunnel
+            centreline has no street-level imagery to find, so it is not offered one. */}
+        {onStreetView && !road.isTunnel && (
+          <button type="button" className="road-btn" onClick={onStreetView}>Street View</button>
+        )}
         <button type="button" className="road-btn" onClick={onClear}>Clear selection</button>
       </div>
+      {onStreetView && road.isTunnel && (
+        <p className="road-note">
+          Street View is not offered for a tunnel centreline: the geometry is underground, so a
+          panorama looked up at it would be of the surface street above, not of this road.
+        </p>
+      )}
 
       <section>
         <h3>Road identity</h3>
@@ -109,13 +121,23 @@ export function RoadDetailsPanel({ road, onViewOnMap, onClear }) {
         </p>
       </section>
 
+      <RoadLiveEvents road={road} traffic={traffic} onOpenEvent={onOpenEvent} />
+
       <section>
         <h3>Operational information</h3>
         <dl>
-          <Row label="Traffic status" value={null} note="Not connected — no traffic feed is wired to this twin" />
           <Row label="Lane count" value={null} note="Not in the source dataset" />
           <Row label="Speed limit" value={null} note="Not in the source dataset" />
-          <Row label="Construction status" value={null} note="Not connected — no construction schedule is wired to this twin" />
+          <Row
+            label="Measured traffic speed"
+            value={null}
+            note="No speed feed is available from FL511 — see Live Traffic › Overview"
+          />
+          <Row
+            label="PortMiami construction schedule"
+            value={null}
+            note="Not connected. FL511 construction events are externally reported traffic events and are listed above, not port project records"
+          />
         </dl>
       </section>
     </aside>

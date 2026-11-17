@@ -445,3 +445,405 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .infra-sources a { font-size: 12px; color: var(--ui-accent); }
 .infra-history > li { font-size: 10.5px; color: var(--ui-text-secondary); }
 .infra-history span { display: block; color: var(--ui-text-muted); }
+
+/* ---------------------------------------------------------------------------------------------
+   Live Traffic — FL511 events, cameras and message signs.
+
+   Reuses the road explorer's furniture (.road-explorer, .road-details, .road-btn, dl rows) so the
+   workspace is visually the same object as the other three explorers. Only what is genuinely new
+   is styled here: the subtab strip, the freshness chips, the association rows and the two tones
+   that carry meaning — a note (neutral, "here is how this was derived") and a warning (amber,
+   "do not read more into this than it says").
+   --------------------------------------------------------------------------------------------- */
+
+.traffic-workspace { display: flex; flex-direction: column; }
+
+.traffic-tabs {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  padding: 8px 10px; border-bottom: 1px solid var(--ui-border-soft);
+}
+.traffic-tabs button {
+  flex: 0 0 auto; padding: 4px 8px; font: inherit; font-size: 11px; line-height: 1.3;
+  color: var(--ui-text-secondary); background: transparent;
+  border: 1px solid transparent; border-radius: 6px; cursor: pointer;
+}
+.traffic-tabs button:hover { background: var(--ui-surface-hover); color: var(--ui-text-primary); }
+.traffic-tabs button[aria-selected="true"] {
+  color: var(--ui-text-primary); background: var(--ui-surface-hover);
+  border-color: var(--ui-border); font-weight: 600;
+}
+
+.traffic-body { flex: 1 1 auto; overflow-y: auto; padding: 4px 0 10px; }
+
+/* Freshness chips. The tone is the message: live is green, anything else is amber, because
+   "cached" and "unreachable" both mean the numbers on screen may not be current. */
+.traffic-chip {
+  display: inline-flex; align-items: baseline; gap: 5px;
+  padding: 1px 6px; border-radius: 999px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.01em; white-space: nowrap;
+}
+.traffic-chip small { font-weight: 400; opacity: 0.75; }
+.traffic-chip.is-live { color: #10603a; background: #dcf5e7; }
+.traffic-chip.is-warn { color: #8a4b08; background: #fdeccd; }
+.traffic-chip.is-muted { color: var(--ui-text-secondary); background: var(--ui-surface-hover); }
+
+.traffic-note, .traffic-warn {
+  margin: 6px 14px; font-size: 11px; line-height: 1.45; color: var(--ui-text-secondary);
+}
+.traffic-warn {
+  color: #8a4b08; background: #fdeccd80; border-left: 2px solid #e0952f;
+  padding: 6px 8px; border-radius: 0 4px 4px 0;
+}
+.traffic-warn.is-banner { margin: 8px 10px 0; }
+.traffic-note a { color: var(--ui-accent); }
+
+/* ---- lists ---- */
+.traffic-list, .traffic-inline-list, .traffic-links, .traffic-plain-list {
+  margin: 0; padding: 0; list-style: none;
+}
+.traffic-list > li + li { border-top: 1px solid var(--ui-border-soft); }
+.traffic-list button, .traffic-inline-event {
+  display: grid; gap: 2px; width: 100%; padding: 8px 14px;
+  font: inherit; text-align: left; color: inherit;
+  background: transparent; border: 0; cursor: pointer;
+}
+.traffic-list button:hover, .traffic-inline-event:hover { background: var(--ui-surface-hover); }
+.traffic-list button[aria-pressed="true"] {
+  background: var(--ui-surface-selected, var(--ui-surface-hover));
+  box-shadow: inset 2px 0 0 var(--ui-accent);
+}
+.traffic-row-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.traffic-row-head svg { flex: 0 0 auto; }
+.traffic-row-title {
+  font-size: 12px; font-weight: 600; color: var(--ui-text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.traffic-row-meta { font-size: 10.5px; color: var(--ui-text-secondary); }
+
+/* An association line, and the status word that carries its weight. */
+.traffic-assoc { display: block; font-size: 10.5px; color: var(--ui-text-secondary); }
+.traffic-assoc strong.is-matched { color: #15822d; }
+.traffic-assoc strong.is-candidate { color: #8a4b08; }
+.traffic-assoc strong.is-unmatched { color: var(--ui-text-secondary); }
+.traffic-assoc em { font-style: normal; color: var(--ui-accent); }
+.traffic-assoc small { display: block; opacity: 0.85; }
+
+/* ---- empty states ---- */
+.traffic-empty { padding: 14px; }
+.traffic-empty p { margin: 0; font-size: 12px; color: var(--ui-text-primary); }
+.traffic-empty-note {
+  margin-top: 6px !important; font-size: 10.5px !important; color: var(--ui-text-secondary) !important;
+}
+
+/* ---- overview ---- */
+.traffic-overview section { padding: 10px 14px; border-top: 1px solid var(--ui-border-soft); }
+.traffic-overview h3, .traffic-details h3, .traffic-road-section h3, .traffic-asset-events h3 {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin: 0 0 6px; font-size: 11px; font-weight: 650;
+  text-transform: uppercase; letter-spacing: 0.04em; color: var(--ui-text-secondary);
+}
+.traffic-subhead { margin-top: 12px !important; }
+
+.traffic-counts { margin: 0; padding: 10px 14px; display: grid; gap: 5px; }
+.traffic-counts > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.traffic-counts dt {
+  display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ui-text-secondary);
+}
+.traffic-counts dd {
+  margin: 0; font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums;
+  color: var(--ui-text-primary);
+}
+
+.traffic-status-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 5px; }
+.traffic-status-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.traffic-status-list span { font-size: 11.5px; color: var(--ui-text-secondary); }
+
+.traffic-kv { margin: 0; display: grid; gap: 5px; }
+.traffic-kv > div { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.traffic-kv dt { font-size: 11.5px; color: var(--ui-text-secondary); }
+.traffic-kv dd { margin: 0; font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ---- association blocks in the details panels ---- */
+.traffic-links > li {
+  padding: 8px 10px; margin: 0 0 6px; border-radius: 6px;
+  background: var(--ui-surface-hover); border-left: 3px solid var(--ui-border);
+}
+.traffic-links > li.is-matched { border-left-color: #15822d; }
+.traffic-links > li.is-candidate { border-left-color: #e0952f; }
+.traffic-link-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.traffic-link-head strong { font-size: 12px; }
+.traffic-link-status { font-size: 10px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.03em; }
+.is-matched .traffic-link-status { color: #15822d; }
+.is-candidate .traffic-link-status { color: #8a4b08; }
+.traffic-link-meta, .traffic-link-why {
+  margin: 3px 0 0; font-size: 10.5px; color: var(--ui-text-secondary);
+}
+.traffic-link-why { font-style: italic; }
+.traffic-links .road-btn.is-small { margin-top: 6px; }
+.road-btn.is-small { padding: 3px 8px; font-size: 10.5px; }
+
+.traffic-plain-list > li { padding: 5px 0; font-size: 11.5px; border-top: 1px solid var(--ui-border-soft); }
+.traffic-plain-list > li:first-child { border-top: 0; }
+.traffic-plain-list small { display: block; font-size: 10.5px; color: var(--ui-text-secondary); }
+
+.traffic-details h2 { display: flex; align-items: center; gap: 7px; }
+
+/* ---- camera snapshot ---- */
+.traffic-snapshot { margin: 10px 14px 0; }
+.traffic-snapshot img {
+  display: block; width: 100%; border-radius: 6px; background: var(--ui-surface-hover);
+}
+.traffic-snapshot figcaption {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 5px;
+}
+.traffic-snapshot figcaption small { font-size: 10px; color: var(--ui-text-secondary); text-align: right; }
+
+/* A sign's own text, in the sign's own idiom, so it reads as content rather than as our prose. */
+.traffic-sign-message {
+  margin: 0 0 8px; padding: 10px 12px; border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px; line-height: 1.5; letter-spacing: 0.02em;
+  white-space: pre-wrap; word-break: break-word;
+  color: #f8b500; background: #14181f;
+}
+
+/* ---- the sections embedded in the road and asset panels ---- */
+.traffic-road-section, .traffic-asset-events { padding: 10px 14px; border-top: 1px solid var(--ui-border-soft); }
+.traffic-asset-events { padding: 0 0 12px; border-top: 0; border-bottom: 1px solid var(--ui-border-soft); margin-bottom: 10px; }
+.traffic-inline-event { padding: 6px 0; }
+.traffic-inline-list > li + li { border-top: 1px solid var(--ui-border-soft); }
+.traffic-candidates { margin-top: 8px; }
+.traffic-candidates > summary,
+.traffic-layer-group > summary {
+  cursor: pointer; font-size: 11px; color: var(--ui-text-secondary); padding: 3px 0;
+}
+.traffic-candidates .traffic-note, .traffic-candidates .traffic-warn { margin-left: 0; margin-right: 0; }
+.traffic-road-section .traffic-note, .traffic-road-section .traffic-warn,
+.traffic-asset-events .traffic-note, .traffic-asset-events .traffic-warn { margin-left: 0; margin-right: 0; }
+
+/* ---- the layer rail's Live Traffic group ---- */
+.traffic-layer-group {
+  margin-top: 7px; padding-top: 7px; border-top: 1px solid var(--ui-border-soft);
+}
+.traffic-layer-group > summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  list-style: none;
+}
+.traffic-layer-group > summary::-webkit-details-marker { display: none; }
+.traffic-layer-group > summary .layer-name { font-weight: 600; color: var(--ui-text-primary); }
+.layer-toggle.is-traffic {
+  display: flex; align-items: center; gap: 6px; padding: 3px 0 3px 2px; cursor: pointer;
+}
+.layer-toggle.is-traffic svg { flex: 0 0 auto; }
+.layer-toggle.is-traffic .layer-name { font-size: 11.5px; }
+.layer-toggle.is-traffic .layer-count { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 900px) {
+  .traffic-details { right: 16px; top: auto; bottom: 16px; max-height: 46%; }
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Street View.
+
+   The panorama is rendered by the Google Maps JS SDK into .street-view-pano; everything else is
+   this app's own chrome in the same surface treatment as the panels. The overlay covers the map
+   completely, so while it is up every other panel is hidden rather than floating over a panorama
+   it has nothing to do with.
+   --------------------------------------------------------------------------------------------- */
+
+.street-view {
+  position: absolute; inset: 0; z-index: 6;
+  display: flex; flex-direction: column; pointer-events: none;
+}
+.street-view > * { pointer-events: auto; }
+.street-view-pano { position: absolute; inset: 0; background: #0b1729; }
+.street-view-pano > div { width: 100%; height: 100%; }
+
+/* z-index, not just DOM order: the Google SDK gives its own canvas a stacking context, and
+   without an explicit level here that canvas paints over the bar and swallows clicks on
+   "Return to Digital Twin" — leaving no way out of the panorama but the Escape key. */
+.street-view-bar {
+  position: relative; z-index: 2;
+  display: flex; align-items: center; gap: 16px;
+  margin: 16px; margin-bottom: auto; padding: 10px 12px 10px 16px;
+  border: 1px solid var(--ui-border); border-radius: 14px;
+  background: var(--ui-surface); box-shadow: 0 12px 32px rgb(15 23 42 / 0.18);
+  color: var(--ui-text-primary);
+}
+.street-view-identity { min-width: 0; }
+.street-view-title {
+  margin: 0; font-size: 11px; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--ui-text-secondary);
+}
+.street-view-context {
+  margin: 2px 0 0; font-size: 12.5px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.street-view-imagery {
+  margin: 0 0 0 auto; padding: 4px 9px;
+  border: 1px solid var(--ui-border-soft); border-radius: 999px;
+  font-size: 10.5px; color: var(--ui-text-secondary); white-space: nowrap;
+}
+.street-view-return {
+  flex: none; padding: 8px 14px;
+  border: 1px solid var(--ui-accent); border-radius: 9px;
+  background: var(--ui-accent); color: #fff;
+  font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.street-view-return:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+
+.street-view-status {
+  position: relative; z-index: 2; margin: auto auto 24px; padding: 8px 14px;
+  border: 1px solid var(--ui-border); border-radius: 999px;
+  background: var(--ui-surface); color: var(--ui-text-primary); font-size: 12px;
+}
+
+/* While a panorama is open, nothing else may float over it. */
+.app-viewport:has(.street-view) :is(.map-left, .road-details, .map-controls, .app-notice) {
+  display: none;
+}
+
+/* The placement hint sits over the live map: placement keeps the map visible. */
+.street-view-placement {
+  position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%);
+  z-index: 5; margin: 0; padding: 9px 16px;
+  border: 1px solid var(--ui-accent); border-radius: 999px;
+  background: var(--ui-surface); box-shadow: 0 12px 32px rgb(15 23 42 / 0.18);
+  color: var(--ui-text-primary); font-size: 12.5px; white-space: nowrap;
+}
+.street-view-placement[data-state="unavailable"] { border-color: #e0952f; color: #8a4b08; }
+
+.map-controls button[aria-pressed="true"] {
+  background: var(--ui-accent); border-color: var(--ui-accent); color: #fff;
+}
+.map-controls button[aria-pressed="true"] svg { stroke: #fff; fill: none; }
+.map-controls button.has-icon svg { fill: none; }
+/* Pegman is a filled silhouette, unlike the stroked navigation glyphs beside it. */
+.map-controls button[title^="Street View"] svg { fill: currentColor; stroke: none; }
+.map-controls button[title^="Street View"][aria-pressed="true"] svg { fill: #fff; stroke: none; }
+
+@media (max-width: 900px) {
+  .street-view-bar { flex-wrap: wrap; gap: 10px; margin: 10px; }
+  .street-view-imagery { margin-left: 0; order: 3; }
+}
+
+/* Candidate footprints carry their size and part count: distance alone cannot tell a small shed
+   from a multi-part aggregate, and this registry never auto-confirms on distance. */
+.infra-cand-shape { display: block; font-size: 10px; color: var(--ui-text-secondary); }
+
+/* The sources behind an asset's identity, on its first tab. */
+.infra-source-list { margin: 0; padding: 0 14px 4px; list-style: none; display: grid; gap: 7px; }
+.infra-source-list li { display: grid; gap: 1px; font-size: 11.5px; }
+.infra-source-list a { color: var(--ui-accent); font-weight: 600; }
+.infra-source-list small { font-size: 10.5px; color: var(--ui-text-secondary); }
+.infra-source-supports { font-style: italic; }
+
+/* The Facility tab: rate lines and the port-wide notes. */
+.infra-rate-list { margin: 0; padding: 0 14px; list-style: none; display: grid; gap: 6px; }
+.infra-rate-list li { display: grid; gap: 1px; }
+.infra-rate-list span { font-size: 11.5px; color: var(--ui-text-secondary); }
+.infra-rate-list strong { font-size: 12px; font-variant-numeric: tabular-nums; }
+.infra-rate-list small { font-size: 10.5px; color: var(--ui-text-secondary); }
+.infra-note-list { margin: 4px 14px 8px; padding-left: 16px; display: grid; gap: 4px; }
+.infra-note-list li { font-size: 11px; line-height: 1.45; color: var(--ui-text-secondary); }
+
+/* ---- Ask the Twin --------------------------------------------------------------------- */
+
+.app-nav-ask {
+  margin-left: auto; margin-right: 16px; padding: 6px 14px;
+  border: 1px solid var(--ui-border-strong); border-radius: 8px;
+  background: transparent; font-size: 12.5px; font-weight: 600; color: var(--ui-text-secondary);
+  cursor: pointer;
+}
+.app-nav-ask:hover { background: var(--ui-hover); color: var(--ui-accent); }
+.app-nav-ask[aria-pressed="true"] {
+  background: var(--ui-accent-soft); border-color: var(--ui-accent-line); color: var(--ui-accent);
+}
+
+/* The assistant takes the right column; the contextual panel steps left rather than being
+   covered, so an answer and the record it is about can be read at the same time. */
+.ask-panel {
+  position: absolute; top: 16px; right: 74px; width: 360px; max-height: calc(100% - 32px);
+  display: flex; flex-direction: column;
+  border: 1px solid var(--ui-border); border-radius: 12px;
+  background: var(--ui-surface); box-shadow: var(--ui-shadow);
+  z-index: 3;
+}
+.app-viewport.has-ask .road-details { right: 450px; }
+
+.ask-context {
+  margin: 0; padding: 8px 14px;
+  border-top: 1px solid var(--ui-border-soft); border-bottom: 1px solid var(--ui-border-soft);
+  font-size: 11.5px; color: var(--ui-text-secondary);
+}
+.ask-context strong { color: var(--ui-text); font-weight: 600; }
+
+.ask-thread { flex: 1; min-height: 120px; overflow-y: auto; padding: 10px 14px; }
+
+.ask-suggest-head {
+  margin: 2px 0 8px; font-size: 11px; font-weight: 650; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ui-text-secondary);
+}
+.ask-suggestion {
+  display: block; width: 100%; margin-bottom: 6px; padding: 8px 10px; text-align: left;
+  border: 1px solid var(--ui-border); border-radius: 8px;
+  background: var(--ui-surface-raised); font-size: 12.5px; color: var(--ui-text); cursor: pointer;
+}
+.ask-suggestion:hover:not(:disabled) { border-color: var(--ui-accent-line); color: var(--ui-accent); }
+.ask-suggestion:disabled { opacity: .55; cursor: default; }
+.ask-suggest-note { display: block; margin-top: 2px; font-size: 11px; color: var(--ui-text-muted); }
+
+/* A question is a short right-aligned line, not a bubble: the answers are what matter here. */
+.ask-question {
+  margin: 12px 0 6px; padding: 6px 10px; border-radius: 8px 8px 2px 8px;
+  background: var(--ui-accent-soft); color: var(--ui-text);
+  font-size: 12.5px; font-weight: 600; margin-left: 32px;
+}
+.ask-answer { margin: 0 0 14px; }
+.ask-message { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--ui-text); }
+
+.ask-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.ask-action {
+  padding: 5px 11px; border: 1px solid var(--ui-accent-line); border-radius: 7px;
+  background: var(--ui-accent-tint); font-size: 12px; font-weight: 600; color: var(--ui-accent);
+  cursor: pointer;
+}
+.ask-action:hover { background: var(--ui-accent-soft); }
+
+.ask-sources { margin: 8px 0 0; padding: 0; list-style: none; }
+.ask-sources li { font-size: 11px; color: var(--ui-text-secondary); }
+.ask-source-name { font-weight: 600; }
+.ask-source-age { color: var(--ui-text-muted); }
+
+.ask-warnings { margin: 6px 0 0; padding-left: 16px; }
+.ask-warnings li { font-size: 11px; line-height: 1.45; color: var(--ui-text-muted); }
+
+.ask-confidence { margin: 8px 0 0; font-size: 11px; font-weight: 600; color: var(--ui-text-secondary); }
+.ask-confidence.is-high { color: var(--ui-tone-ok); }
+.ask-confidence.is-medium { color: var(--ui-tone-warn); }
+.ask-confidence.is-low { color: var(--ui-tone-bad); }
+/* The basis is printed, not only a tooltip: a label without its reason is the thing this avoids. */
+.ask-confidence-why { display: block; margin-top: 1px; font-weight: 400; color: var(--ui-text-muted); }
+
+.ask-busy { margin: 6px 0; font-size: 12px; color: var(--ui-text-secondary); }
+.ask-error { margin: 6px 0; font-size: 12px; color: var(--ui-tone-bad); }
+
+.ask-input { display: flex; gap: 6px; padding: 10px 14px; border-top: 1px solid var(--ui-border-soft); }
+.ask-input input {
+  flex: 1; min-width: 0; padding: 7px 10px;
+  border: 1px solid var(--ui-border-strong); border-radius: 8px;
+  background: var(--ui-surface-raised); font-size: 12.5px; color: var(--ui-text);
+}
+.ask-input input:focus { outline: none; border-color: var(--ui-accent-line); }
+.ask-input button {
+  padding: 7px 14px; border: 0; border-radius: 8px;
+  background: var(--ui-accent-strong); font-size: 12.5px; font-weight: 600;
+  color: var(--ui-accent-contrast); cursor: pointer;
+}
+.ask-input button:disabled { opacity: .5; cursor: default; }
+
+.ask-clear {
+  margin: 0 14px 12px; padding: 5px 0; border: 0; border-radius: 6px;
+  background: transparent; font-size: 11.5px; color: var(--ui-text-secondary); cursor: pointer;
+}
+.ask-clear:hover { color: var(--ui-accent); }

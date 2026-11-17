@@ -1,0 +1,186 @@
+{
+ "item2": [
+  {
+   "itemId": "409",
+   "location": [
+    25.771976,
+    -80.151245
+   ],
+   "icon": {
+    "url": "/Generated/Content/Images/511/map_cameraStreams.svg"
+   },
+   "expando": {
+    "videoEnabled": true
+   },
+   "title": ""
+  },
+  {
+   "itemId": "425",
+   "location": [
+    25.779968,
+    -80.188655
+   ],
+   "icon": {
+    "url": "/Generated/Content/Images/511/map_cameraStreams.svg"
+   },
+   "expando": {
+    "videoEnabled": true
+   },
+   "title": ""
+  },
+  {
+   "itemId": "468",
+   "location": [
+    25.777638,
+    -80.163871
+   ],
+   "icon": {
+    "url": "/Generated/Content/Images/511/map_cameraStreams.svg"
+   },
+   "expando": {
+    "videoEnabled": true
+   },
+   "title": ""
+  },
+  {
+   "itemId": "469",
+   "location": [
+    25.781845,
+    -80.173453
+   ],
+   "icon": {
+    "url": "/Generated/Content/Images/511/map_cameraStreams.svg"
+   },
+   "expando": {
+    "videoEnabled": true
+   },
+   "title": ""
+  },
+  {
+   "itemId": "470",
+   "location": [
+    25.774566,
+    -80.140713
+   ],
+   "icon": {
+    "url": "/Generated/Content/Images/511/map_cameraStreams.svg"
+   },
+   "expando": {
+    "videoEnabled": true
+   },
+   "title": ""
+  },
+  {
+   "itemId": "604",
+   "location": [
+    25.787537,
+    -80.178003
+   ],
+   "icon": {
+    "url": "/Generated/Content/Images/511/map_cameraStreams.svg"
+   },
+   "expando": {
+    "videoEnabled": true
+   },
+   "title": ""
+  },
+  {
+   "itemId": "5360",
+   "location": [
+    25.770124,
+    -80.190208
+   ],
+   "icon": {
+    "url": "/Generated/Content/Images/511/map_cameraStreams.svg"
+   },
+   "expando": {
+    "videoEnabled": true
+   },
+   "title": ""
+  },
+  {
+   "itemId": "5425",
+   "location": [
+    25.785833,
+    -80.193542
+   ],
+   "icon": {
+    "url": "/Generated/Content/Images/511/map_cameraStreams.svg"
+   },
+   "expando": {
+    "videoEnabled": true
+   },
+   "title": ""
+  },
+  {
+   "itemId": "5426",
+   "location": [
+    25.786733,
+    -80.186748
+   ],
+   "icon": {
+    "url": "/Generated/Content/Images/511/map_cameraStreams.svg"
+   },
+   "expando": {
+    "videoEnabled": true
+   },
+   "title": ""
+  },
+  {
+   "itemId": "5490",
+   "location": [
+    25.778431,
+    -80.199486
+   ],
+   "icon": {
+    "url": "/Generated/Content/Images/511/map_cameraStreams.svg"
+   },
+   "expando": {
+    "videoEnabled": true
+   },
+   "title": ""
+  },
+  {
+   "itemId": "1",
+   "location": [
+    26.17325,
+    -80.892882
+   ],
+   "icon": {
+    "url": "/Generated/Content/Images/511/map_cameraStreams.svg"
+   },
+   "expando": {
+    "videoEnabled": true
+   },
+   "title": ""
+  },
+  {
+   "itemId": "3",
+   "location": [
+    26.17025,
+    -80.954844
+   ],
+   "icon": {
+    "url": "/Generated/Content/Images/511/map_cameraStreams.svg"
+   },
+   "expando": {
+    "videoEnabled": true
+   },
+   "title": ""
+  },
+  {
+   "itemId": "5",
+   "location": [
+    26.1705,
+    -81.01725
+   ],
+   "icon": {
+    "url": "/Generated/Content/Images/511/map_cameraStreams.svg"
+   },
+   "expando": {
+    "videoEnabled": true
+   },
+   "title": ""
+  }
+ ]
+}

@@ -77,3 +77,26 @@ export const ASSET_CATEGORIES = Object.freeze([
 export const MERCATOR_NOTE = Object.freeze({
   lengthFactorAt: latitude => 1 / Math.cos((latitude * Math.PI) / 180),
 });
+
+/**
+ * How old the shipped footprint extract is, and what that means for matching.
+ *
+ * Measured from the file, not assumed: every one of the 6,000 features carries a YEARUPDATE
+ * between 2015 and 2023, and NONE is 2024 or later. So any structure built since 2023 is
+ * necessarily absent, however close a reviewer stands to it on the map.
+ *
+ * That is not a defect to work around — it is the reason an asset is allowed to stay unlinked.
+ * Confirming the nearest available polygon for a building that is not in the file would put a
+ * wrong OBJECTID into the registry and make it look reviewed.
+ */
+export const FOOTPRINT_COVERAGE = Object.freeze({
+  yearUpdateFrom: 2015,
+  yearUpdateTo: 2023,
+  featureCount: 6000,
+  completeFeatureCount: 6673,
+  note:
+    'This footprint extract carries YEARUPDATE values from 2015 to 2023 and none later, and it is '
+    + '6,000 of the complete file\u2019s 6,673 features. A structure completed after 2023, or one '
+    + 'in the 673 features not shipped, will have no footprint here \u2014 leave the asset '
+    + 'unlinked rather than confirming the nearest polygon.',
+});

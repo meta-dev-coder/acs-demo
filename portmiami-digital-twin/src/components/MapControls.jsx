@@ -13,6 +13,14 @@ const WEATHER_ICON = (
   </svg>
 );
 
+/** Pegman's silhouette, on the same 20x20 grid as the other glyphs. */
+const STREET_VIEW_ICON = (
+  <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+    <circle cx="10" cy="4.4" r="2.4" />
+    <path d="M6.2 9.3a3.8 3.8 0 0 1 7.6 0v3.1h-1.9v4.9H8.1v-4.9H6.2Z" />
+  </svg>
+);
+
 const BUTTONS = [
   { key: 'zoomIn', label: 'Zoom in', glyph: '+', prop: 'onZoomIn' },
   { key: 'zoomOut', label: 'Zoom out', glyph: '−', prop: 'onZoomOut' },
@@ -23,12 +31,17 @@ const BUTTONS = [
   { key: 'northUp', label: 'Face north', glyph: 'N', prop: 'onNorthUp', group: true },
   { key: 'reset', label: 'Home — reset to PortMiami', glyph: '⌖', prop: 'onReset', group: true },
   { key: 'weather', label: 'Weather — today and the next 7 days', icon: WEATHER_ICON, prop: 'onWeather', group: true },
+  { key: 'streetView', label: 'Street View — drop onto the map', icon: STREET_VIEW_ICON, prop: 'onStreetView' },
 ];
 
 export function MapControls(handlers) {
   return (
     <div className="map-controls" role="group" aria-label="Map navigation">
-      {BUTTONS.map(button => (
+      {BUTTONS
+        // A button with no handler is not rendered: Street View is absent when it is switched off
+        // or has no key, rather than present and dead.
+        .filter(button => typeof handlers[button.prop] === 'function')
+        .map(button => (
         <button
           key={button.key}
           type="button"
@@ -36,6 +49,7 @@ export function MapControls(handlers) {
           title={button.label}
           aria-label={button.label}
           aria-haspopup={button.key === 'weather' ? 'dialog' : undefined}
+          aria-pressed={button.key === 'streetView' ? Boolean(handlers.streetViewArmed) : undefined}
           onClick={handlers[button.prop]}
         >
           {button.icon ?? <span aria-hidden="true">{button.glyph}</span>}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Cartesian3, HeadingPitchRange, BoundingSphere } from 'cesium';
-import { assetForBuilding } from './infrastructure/assetModel.js';
+import { assetForBuilding, representativePoint } from './infrastructure/assetModel.js';
 import { PROJECT } from './config/portMiami.js';
 import { usePortTwin, TWIN_STATUS } from './hooks/usePortTwin.js';
 import { useMapPicker } from './hooks/useMapPicker.js';
@@ -18,9 +18,25 @@ import { WeatherDialog } from './components/WeatherDialog.jsx';
 import { InfrastructureExplorer } from './components/InfrastructureExplorer.jsx';
 import { AssetDetailsPanel } from './components/AssetDetailsPanel.jsx';
 import { useInfrastructure } from './hooks/useInfrastructure.js';
+import { useLiveTraffic } from './hooks/useLiveTraffic.js';
+import { useStreetView } from './hooks/useStreetView.js';
+import { installAssetMarkerLayer } from './cesium/assetMarkerLayer.js';
+import { StreetViewOverlay, StreetViewHint } from './components/StreetViewOverlay.jsx';
+import { LiveTrafficWorkspace } from './components/LiveTrafficWorkspace.jsx';
+import { AskTwinPanel } from './components/AskTwinPanel.jsx';
+import { useAskTwin } from './hooks/useAskTwin.js';
+import { ACTION } from './ask/actions.js';
+import { LiveEventDetailsPanel } from './components/LiveEventDetailsPanel.jsx';
+import { CameraDetailsPanel } from './components/CameraDetailsPanel.jsx';
+import { MessageSignDetailsPanel } from './components/MessageSignDetailsPanel.jsx';
 
 /** Which explorer is open. One at a time: two 330px columns would crowd the map. */
-const EXPLORER = Object.freeze({ NONE: 'NONE', ROADS: 'ROADS', BUILDINGS: 'BUILDINGS', INFRA: 'INFRA' });
+const EXPLORER = Object.freeze({
+  NONE: 'NONE', ROADS: 'ROADS', BUILDINGS: 'BUILDINGS', INFRA: 'INFRA', TRAFFIC: 'TRAFFIC',
+});
+
+/** The selection kinds the live-traffic layer owns. */
+const TRAFFIC_KINDS = Object.freeze(['traffic-event', 'traffic-camera', 'traffic-sign']);
 
 /**
  * The PortMiami shell.
@@ -40,6 +56,23 @@ function flyToPoint(viewer, [longitude, latitude]) {
     { duration: 1.6, offset: new HeadingPitchRange(0, -Math.PI / 3.2, 400) });
 }
 
+/**
+ * Frame a group of points — the several roads, buildings or cameras one answer highlighted.
+ *
+ * A bounding sphere of them all, rather than a flight to the first: an answer that highlights
+ * twelve segments has not shown them if the camera lands on one.
+ */
+function flyToPoints(viewer, points) {
+  if (!viewer || viewer.isDestroyed() || !points.length) return;
+  const sphere = BoundingSphere.fromPoints(
+    points.map(([longitude, latitude]) => Cartesian3.fromDegrees(longitude, latitude, 0)));
+  viewer.camera.cancelFlight();
+  viewer.camera.flyToBoundingSphere(sphere, {
+    duration: 1.6,
+    offset: new HeadingPitchRange(0, -Math.PI / 3.2, Math.max(500, sphere.radius * 3.2)),
+  });
+}
+
 export function App() {
   const containerRef = useRef(null);
   // Holds the live map-click handler; the shared picker is built once and reads through it.
@@ -49,6 +82,12 @@ export function App() {
   const [selection, setSelection] = useState(null);
   const [explorer, setExplorer] = useState(EXPLORER.NONE);
   const [weatherOpen, setWeatherOpen] = useState(false);
+  /**
+   * What an Ask the Twin answer is highlighting, by layer. Held here rather than pushed straight
+   * into the layers so that ONE effect still owns emphasis: the registry's links and the
+   * assistant's highlight are merged, instead of each overwriting the other's paint.
+   */
+  const [askEmphasis, setAskEmphasis] = useState({ roads: [], buildings: [] });
 
   // A map click opens the explorer that owns what was picked, so the selection is visible in both
   // places at once. Clicking bare tiles clears the selection and leaves the explorer as it was.
@@ -56,12 +95,28 @@ export function App() {
     setSelection(hit);
     if (hit?.kind === 'road') setExplorer(EXPLORER.ROADS);
     if (hit?.kind === 'building') setExplorer(EXPLORER.BUILDINGS);
+    // A traffic marker opens Live Traffic on the subtab that lists it, so the map pick and the
+    // list selection are visible together — the same behaviour roads and buildings already have.
+    if (TRAFFIC_KINDS.includes(hit?.kind)) setExplorer(EXPLORER.TRAFFIC);
   }, []);
 
   const pickerRef = useMapPicker(viewerRef, hit => selectFromMapRef.current(hit));
   const roads = useRoadNetwork(viewerRef, pickerRef);
   const buildings = useBuildingFootprints(viewerRef, pickerRef);
   const infra = useInfrastructure({ segments: roads.segments, buildings: buildings.buildings });
+  const traffic = useLiveTraffic(viewerRef, pickerRef);
+  const streetView = useStreetView(viewerRef, { segments: roads.segments });
+  const streetViewOn = streetView.enabled && streetView.available;
+
+  // Marks whichever asset is selected. Its own data source, so it is visible whether or not the
+  // Road Network and Building layers happen to be switched on.
+  const assetMarkerRef = useRef(null);
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || viewer.isDestroyed() || assetMarkerRef.current) return undefined;
+    assetMarkerRef.current = installAssetMarkerLayer(viewer);
+    return () => { assetMarkerRef.current?.destroy(); assetMarkerRef.current = null; };
+  }, [viewerRef, status]);
 
   // Indexes by OBJECTID, built once per dataset, so a panel never scans 6,000 records to name one.
   const roadsById = useMemo(() => new Map(roads.segments.map(s => [s.objectId, s])), [roads.segments]);
@@ -77,26 +132,57 @@ export function App() {
     selectFromMap(hit);
   };
 
-  // Emphasise the selected asset's links on the two existing layers. No third layer, no second
-  // selection engine — the layers already own their entities.
+  // Emphasise the selected asset's links on the two existing layers, plus whatever the last Ask
+  // the Twin answer highlighted. No third layer, no second selection engine — the layers already
+  // own their entities, and this is still the only place that paints emphasis.
   useEffect(() => {
-    roads.layerRef.current?.setEmphasis(infra.emphasis.roads);
-    buildings.layerRef.current?.setEmphasis(infra.emphasis.buildings);
-  }, [infra.emphasis, roads.layerRef, buildings.layerRef, roads.state, buildings.state]);
+    const merge = (fromLinks, fromAsk) => {
+      const merged = new Map(fromLinks);
+      // A confirmed link outranks a highlight: the assistant's result is a candidate by nature.
+      for (const objectId of fromAsk) if (!merged.has(objectId)) merged.set(objectId, 'CANDIDATE');
+      return merged;
+    };
+    roads.layerRef.current?.setEmphasis(merge(infra.emphasis.roads, askEmphasis.roads));
+    buildings.layerRef.current?.setEmphasis(merge(infra.emphasis.buildings, askEmphasis.buildings));
+  }, [infra.emphasis, askEmphasis, roads.layerRef, buildings.layerRef, roads.state, buildings.state]);
 
-  /** Fly to an asset: its confirmed footprint if it has one, else its derived street point. */
+  /**
+   * Mark the selected asset. Driven by selection rather than by "View on map", so choosing an
+   * asset in the list answers "which one is this?" immediately.
+   */
+  useEffect(() => {
+    const marker = assetMarkerRef.current;
+    if (!marker) return;
+    const asset = infra.selected;
+    if (!asset) { marker.clear(); return; }
+    // One definition of "where is this asset", shared by the marker, the camera and the details
+    // panel: a confirmed footprint, else the footprint the address fronts onto, else the geocoded
+    // street point, else nothing.
+    const where = representativePoint(asset, infra.linksFor(asset.id), buildingsById);
+    if (!where.point) { marker.clear(); return; }
+    marker.show({ name: asset.name, point: where.point }, { status: where.status });
+  }, [infra, buildingsById]);
+
+  /**
+   * Fly to an asset. The same three tiers the marker uses, so the camera and the pin can never
+   * disagree about where the thing is: a confirmed footprint, else the footprint the address
+   * fronts onto, else the street point, else no flight at all rather than a guess.
+   */
   const viewAsset = useCallback(() => {
     const asset = infra.selected;
     if (!asset) return;
     const confirmedBuilding = infra.linksFor(asset.id).buildingLinks
       .find(link => link.status === 'CONFIRMED');
     if (confirmedBuilding && buildings.layerRef.current) {
+      // The footprint is shown by EMPHASIS on the building layer, so flying to it with that layer
+      // hidden would land on a close-up of nothing. Switch it on, as the traffic workspace does.
+      buildings.setVisible(true);
       buildings.layerRef.current.flyTo(confirmedBuilding.buildingObjectId);
       return;
     }
-    // No confirmed footprint and no location means no flight at all, rather than a guess.
-    if (asset.point) flyToPoint(viewerRef.current, asset.point);
-  }, [infra, buildings.layerRef, viewerRef]);
+    const where = representativePoint(asset, infra.linksFor(asset.id), buildingsById);
+    if (where.point) flyToPoint(viewerRef.current, where.point);
+  }, [infra, buildings, buildingsById, viewerRef]);
 
   // One selection, pushed down. Whichever layer does not own it is cleared, which is what stops a
   // building click from leaving an amber road highlighted behind it.
@@ -105,7 +191,151 @@ export function App() {
   useEffect(() => {
     selectRoad(selection?.kind === 'road' ? selection.id : null);
     selectBuilding(selection?.kind === 'building' ? selection.id : null);
-  }, [selection, selectRoad, selectBuilding]);
+    traffic.layerRef.current?.select(TRAFFIC_KINDS.includes(selection?.kind) ? selection : null);
+  }, [selection, selectRoad, selectBuilding, traffic.layerRef]);
+
+  // Opening a camera or a sign reads its detail from FL511 once; the hook caches by id.
+  const { loadCamera, loadMessageSign } = traffic;
+  useEffect(() => {
+    if (selection?.kind === 'traffic-camera') void loadCamera(selection.id);
+    if (selection?.kind === 'traffic-sign') void loadMessageSign(selection.id);
+  }, [selection, loadCamera, loadMessageSign]);
+
+  /**
+   * Select a traffic record from a LIST. The map layer it belongs to is switched on at the same
+   * time, so "View on map" can never fly the camera to a marker that is not drawn.
+   */
+  const selectTraffic = useCallback((kind, id, iconKey) => {
+    infra.clearSelection();
+    traffic.revealFor(iconKey);
+    setSelection(id == null ? null : { kind, id });
+  }, [infra, traffic]);
+
+  const viewTraffic = useCallback(() => {
+    if (!TRAFFIC_KINDS.includes(selection?.kind)) return;
+    traffic.layerRef.current?.flyTo(selection.kind.replace('traffic-', ''), selection.id);
+  }, [selection, traffic.layerRef]);
+
+  /**
+   * Open Street View at a point on the map. Used by the camera and road panels.
+   *
+   * Street View is Google's imagery of the public street, not a view through the asset: a camera's
+   * panorama shows the road the camera overlooks, from the kerb, and is captured on Google's own
+   * schedule. The panels say so where they offer it.
+   */
+  const streetViewAt = useCallback((longitude, latitude, label) => {
+    void streetView.openAt({ longitude, latitude, label });
+  }, [streetView]);
+
+  /** Jump from a traffic marker to the road it is associated with. */
+  const openRoad = useCallback(id => {
+    infra.clearSelection();
+    setSelection({ kind: 'road', id });
+    setExplorer(EXPLORER.ROADS);
+    roads.layerRef.current?.flyTo(id);
+  }, [infra, roads.layerRef]);
+
+  // ---- Ask the Twin ----------------------------------------------------------------------------
+
+  const ask = useAskTwin({
+    selection, infra, roads, buildings, traffic, explorer, viewerRef, buildingsById,
+  });
+
+  /** Fly to an asset by id, using the same three tiers the marker and "View on map" use. */
+  const flyToAssetById = useCallback(assetId => {
+    const asset = infra.assets.find(a => a.id === assetId);
+    if (!asset) return;
+    const confirmed = infra.linksFor(assetId).buildingLinks.find(link => link.status === 'CONFIRMED');
+    if (confirmed && buildings.layerRef.current) {
+      buildings.setVisible(true);
+      buildings.layerRef.current.flyTo(confirmed.buildingObjectId);
+      return;
+    }
+    const where = representativePoint(asset, infra.linksFor(assetId), buildingsById);
+    if (where.point) flyToPoint(viewerRef.current, where.point);
+  }, [infra, buildings, buildingsById, viewerRef]);
+
+  /**
+   * The ONE place an Ask the Twin action touches the map.
+   *
+   * Every action arriving here has already been validated against the loaded data, and every
+   * branch below calls the same layer methods the explorers call. The assistant has no other way
+   * to move the camera or change a selection, which is what keeps the two from disagreeing.
+   */
+  const runAskAction = useCallback(action => {
+    switch (action.type) {
+      case ACTION.FLY_TO_ASSET: {
+        // Select it too, so the Infrastructure explorer, the marker and the camera agree.
+        setSelection(null);
+        infra.select(action.assetId);
+        setExplorer(EXPLORER.INFRA);
+        flyToAssetById(action.assetId);
+        break;
+      }
+      case ACTION.OPEN_ASSET_DETAILS: {
+        setSelection(null);
+        infra.select(action.assetId);
+        setExplorer(EXPLORER.INFRA);
+        break;
+      }
+      case ACTION.SELECT_ROAD: {
+        openRoad(action.objectId);
+        break;
+      }
+      case ACTION.SELECT_BUILDING: {
+        infra.clearSelection();
+        setSelection({ kind: 'building', id: action.objectId });
+        setExplorer(EXPLORER.BUILDINGS);
+        buildings.setVisible(true);
+        buildings.layerRef.current?.flyTo(action.objectId);
+        break;
+      }
+      case ACTION.SHOW_ROADS: {
+        roads.setVisible(true);
+        setAskEmphasis(current => ({ ...current, roads: action.objectIds }));
+        flyToPoints(viewerRef.current, action.objectIds
+          .map(id => roadsById.get(id)?.midpoint).filter(Boolean));
+        break;
+      }
+      case ACTION.SHOW_BUILDINGS: {
+        buildings.setVisible(true);
+        setAskEmphasis(current => ({ ...current, buildings: action.objectIds }));
+        flyToPoints(viewerRef.current, action.objectIds
+          .map(id => buildingsById.get(id)?.centroid).filter(Boolean));
+        break;
+      }
+      case ACTION.SHOW_CAMERAS: {
+        traffic.revealFor('CAMERA');
+        // One camera is a selection, which opens its existing details panel; several is a view.
+        if (action.cameraIds.length === 1) {
+          selectTraffic('traffic-camera', action.cameraIds[0], 'CAMERA');
+        }
+        flyToPoints(viewerRef.current, action.cameraIds
+          .map(id => traffic.camerasById.get(id))
+          .filter(Boolean).map(camera => [camera.longitude, camera.latitude]));
+        break;
+      }
+      case ACTION.SHOW_TRAFFIC_EVENTS: {
+        const events = action.eventIds.map(id => traffic.eventsById.get(id)).filter(Boolean);
+        for (const event of events) traffic.revealFor(event.type);
+        if (events.length === 1) selectTraffic('traffic-event', events[0].id, events[0].type);
+        flyToPoints(viewerRef.current, events
+          .map(event => [event.longitude, event.latitude])
+          .filter(([lon, lat]) => Number.isFinite(lon) && Number.isFinite(lat)));
+        break;
+      }
+      default:
+        break;
+    }
+  }, [infra, roads, buildings, traffic, roadsById, buildingsById, viewerRef, openRoad, selectTraffic, flyToAssetById]);
+
+  const selectedTrafficEvent = selection?.kind === 'traffic-event'
+    ? traffic.eventsById.get(selection.id) ?? null : null;
+  const selectedCamera = selection?.kind === 'traffic-camera'
+    ? traffic.camerasById.get(selection.id) ?? null : null;
+  const selectedSign = selection?.kind === 'traffic-sign'
+    ? traffic.signsById.get(selection.id) ?? null : null;
+  const trafficSelected = Boolean(selectedTrafficEvent || selectedCamera || selectedSign);
 
   const clearSelection = useCallback(() => setSelection(null), []);
   const viewRoad = useCallback(id => roads.layerRef.current?.flyTo(id), [roads.layerRef]);
@@ -114,8 +344,9 @@ export function App() {
 
   return (
     <div className="app">
-      <TopNav project={PROJECT} />
-      <main className="app-viewport">
+      <TopNav project={PROJECT} askOpen={ask.open} onToggleAsk={ask.toggle} />
+      {/* `has-ask` shifts the contextual detail column left so the assistant never covers it. */}
+      <main className={`app-viewport${ask.open ? ' has-ask' : ''}`}>
         <div className="cesium-container" ref={containerRef} />
 
         {/* The left column: the layer rail with whichever explorer is open stacked under it. A
@@ -126,6 +357,7 @@ export function App() {
             roads={roads}
             buildings={buildings}
             infra={infra}
+            traffic={traffic}
             explorer={explorer}
             onToggleExplorer={toggleExplorer}
           />
@@ -146,15 +378,60 @@ export function App() {
         {explorer === EXPLORER.INFRA && (
           <InfrastructureExplorer infra={infra} onClose={() => setExplorer(EXPLORER.NONE)} />
         )}
+
+        {explorer === EXPLORER.TRAFFIC && (
+          <LiveTrafficWorkspace
+            traffic={traffic}
+            selection={selection}
+            onSelectEvent={id => selectTraffic('traffic-event', id, traffic.eventsById.get(id)?.type)}
+            onSelectCamera={id => selectTraffic('traffic-camera', id, 'CAMERA')}
+            onSelectSign={id => selectTraffic('traffic-sign', id, 'MESSAGE_SIGN')}
+            onClose={() => setExplorer(EXPLORER.NONE)}
+          />
+        )}
         </div>
 
-        {/* One contextual panel at a time: an asset selection supersedes a road or building one. */}
-        {infra.selected ? (
+        {/* One contextual panel at a time. A traffic marker is read first: picking one clears the
+            asset selection, so these cannot both be true. */}
+        {selectedTrafficEvent && (
+          <LiveEventDetailsPanel
+            event={selectedTrafficEvent}
+            onViewOnMap={viewTraffic}
+            onViewRoad={openRoad}
+            onClear={clearSelection}
+          />
+        )}
+        {selectedCamera && (
+          <CameraDetailsPanel
+            camera={selectedCamera}
+            detail={traffic.cameraDetails[selectedCamera.id]}
+            onStreetView={streetViewOn
+              ? () => streetViewAt(selectedCamera.longitude, selectedCamera.latitude,
+                  traffic.cameraDetails[selectedCamera.id]?.name ?? `FL511 camera ${selectedCamera.id}`)
+              : undefined}
+            onViewOnMap={viewTraffic}
+            onViewRoad={openRoad}
+            onClear={clearSelection}
+          />
+        )}
+        {selectedSign && (
+          <MessageSignDetailsPanel
+            sign={selectedSign}
+            detail={traffic.signDetails[selectedSign.id]}
+            onViewOnMap={viewTraffic}
+            onViewRoad={openRoad}
+            onClear={clearSelection}
+          />
+        )}
+
+        {!trafficSelected && infra.selected ? (
           <AssetDetailsPanel
             asset={infra.selected}
             infra={infra}
             roadsById={roadsById}
             buildingsById={buildingsById}
+            traffic={traffic}
+            onOpenEvent={id => selectTraffic('traffic-event', id, traffic.eventsById.get(id)?.type)}
             onViewOnMap={viewAsset}
             onViewRoad={viewRoad}
             onViewBuilding={viewBuilding}
@@ -162,10 +439,20 @@ export function App() {
           />
         ) : null}
 
-        {!infra.selected && selection?.kind === 'road' && roads.selected && (
-          <RoadDetailsPanel road={roads.selected} onViewOnMap={roads.flyToSelected} onClear={clearSelection} />
+        {!trafficSelected && !infra.selected && selection?.kind === 'road' && roads.selected && (
+          <RoadDetailsPanel
+            road={roads.selected}
+            traffic={traffic}
+            onStreetView={streetViewOn
+              ? () => streetViewAt(roads.selected.midpoint[0], roads.selected.midpoint[1],
+                  roads.selected.name || `Unnamed road · segment ${roads.selected.objectId}`)
+              : undefined}
+            onViewOnMap={roads.flyToSelected}
+            onOpenEvent={id => selectTraffic('traffic-event', id, traffic.eventsById.get(id)?.type)}
+            onClear={clearSelection}
+          />
         )}
-        {!infra.selected && selection?.kind === 'building' && buildings.selected && (
+        {!trafficSelected && !infra.selected && selection?.kind === 'building' && buildings.selected && (
           <BuildingDetailsPanel
             building={buildings.selected}
             linkedAsset={assetForBuilding(infra.assets, infra.index, buildings.selected.objectId)}
@@ -176,7 +463,13 @@ export function App() {
           />
         )}
 
+        {ask.open && (
+          <AskTwinPanel ask={ask} onRunAction={runAskAction} onClose={() => ask.setOpen(false)} />
+        )}
+
         <MapControls
+          onStreetView={streetViewOn ? streetView.togglePlacement : undefined}
+          streetViewArmed={streetView.isPlacing}
           onZoomIn={() => zoom(0.75)}
           onZoomOut={() => zoom(1 / 0.75)}
           onRotateLeft={() => nudge(-15, 0)}
@@ -189,6 +482,11 @@ export function App() {
         />
 
         <WeatherDialog open={weatherOpen} onClose={() => setWeatherOpen(false)} />
+
+        {/* Placement draws on the live map, so its hint sits over the map rather than in a panel.
+            The overlay replaces the map entirely once a panorama is open. */}
+        <StreetViewHint streetView={streetView} />
+        <StreetViewOverlay streetView={streetView} />
 
         {status === TWIN_STATUS.INITIALISING && <LoadingOverlay />}
         {notice && <p className="app-notice" role="status">{notice}</p>}

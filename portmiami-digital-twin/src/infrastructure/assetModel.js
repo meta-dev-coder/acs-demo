@@ -10,6 +10,7 @@
 import { ASSET_CATEGORIES, ASSET_SOURCES, INFRASTRUCTURE_ASSETS } from '../config/infrastructure.js';
 import { geocodeAddress } from './assetGeocode.js';
 import { buildingCandidates, roadCandidates } from './assetCandidates.js';
+import { frontageFootprint } from './assetFrontage.js';
 import { buildingLink, LINK_STATUS, MATCH_METHODS, roadLink } from './assetLinks.js';
 
 export const categoryOf = id => ASSET_CATEGORIES.find(category => category.id === id) ?? null;
@@ -47,10 +48,20 @@ export function resolveAssets({ segments, buildings }) {
 
     const point = location.longitude != null ? [location.longitude, location.latitude] : null;
 
+    // Which footprint the address fronts onto, when the asset is a structure at all and the walk
+    // off the addressed side of the street reaches one. The street point stays the asset's
+    // `point` — geocoding, candidates and evidence are all claims about the ADDRESS — and the
+    // frontage is carried alongside it, for the map marker to stand on. Null is the normal case
+    // for a surface lot, for an unbuilt terminal, and wherever the ray finds nothing.
+    const frontage = ready && asset.attributes.structure === 'BUILDING'
+      ? frontageFootprint(geocode, segments, buildings)
+      : null;
+
     return {
       ...asset,
       location,
       point,
+      frontage,
       group: groupOf(asset.category),
       geocode,
       candidates: ready && point
@@ -167,3 +178,78 @@ export const linkFromMapSelection = (assetId, buildingObjectId, relationship) =>
 });
 
 export { LINK_STATUS };
+
+/**
+ * The point that best represents an asset, and how it was arrived at.
+ *
+ * Three tiers, strongest first. Each is a different KIND of claim, and the `basis` string says
+ * which, so a reader is never shown a coordinate without being told what produced it:
+ *
+ *   FOOTPRINT  the centroid of a footprint a reviewer CONFIRMED. The only tier derived from
+ *              building geometry rather than from an address, and the only one that is about the
+ *              building itself. With several confirmed footprints, the centroid of their combined
+ *              extent — a terminal spanning two polygons has no single one to point at.
+ *   FRONTAGE   the footprint the address fronts onto: the first building entered by a short walk
+ *              perpendicular from the street point onto the SIDE the county address range states.
+ *              Still a candidate rather than a confirmation — but it is on the structure, which is
+ *              what someone asking "where is Garage K" is looking for.
+ *   DERIVED    the geocoded street address. A point ON THE ROAD, interpolated into a block's
+ *              address range; the facility stands back from it by an unknown distance.
+ *   UNKNOWN    no confirmed footprint and no address that geocodes. There is no point, and none
+ *              is invented.
+ *
+ * @param {object} asset           a resolved asset
+ * @param {{buildingLinks: object[]}} links  that asset's links
+ * @param {Map<number, object>} buildingsById
+ */
+export function representativePoint(asset, links, buildingsById) {
+  const confirmed = (links?.buildingLinks ?? [])
+    .filter(link => link.status === LINK_STATUS.CONFIRMED)
+    .map(link => buildingsById?.get(link.buildingObjectId))
+    .filter(building => building?.bounds);
+
+  if (confirmed.length > 0) {
+    // The combined extent of every confirmed footprint, so a two-polygon terminal is represented
+    // between its parts rather than at whichever one happened to be linked first.
+    let west = Infinity, south = Infinity, east = -Infinity, north = -Infinity;
+    for (const { bounds } of confirmed) {
+      west = Math.min(west, bounds.west); south = Math.min(south, bounds.south);
+      east = Math.max(east, bounds.east); north = Math.max(north, bounds.north);
+    }
+    return {
+      point: [(west + east) / 2, (south + north) / 2],
+      status: 'FOOTPRINT',
+      basis: confirmed.length === 1
+        ? `Centroid of confirmed building footprint OBJECTID ${confirmed[0].objectId}.`
+        : `Centre of the combined extent of ${confirmed.length} confirmed footprints (OBJECTID ${confirmed.map(b => b.objectId).join(', ')}).`,
+      buildingObjectIds: confirmed.map(building => building.objectId),
+    };
+  }
+
+  if (asset?.frontage) {
+    return {
+      point: asset.frontage.point,
+      status: 'FRONTAGE',
+      basis: asset.frontage.reason,
+      buildingObjectIds: [asset.frontage.objectId],
+    };
+  }
+
+  if (asset?.point) {
+    return {
+      point: asset.point,
+      status: 'DERIVED',
+      basis: asset.location?.basis ?? 'Derived from the street address.',
+      buildingObjectIds: [],
+    };
+  }
+  return { point: null, status: 'UNKNOWN', basis: asset?.geocode?.reason ?? null, buildingObjectIds: [] };
+}
+
+/** How a representative point was arrived at, in words for a panel. */
+export const POINT_STATUS_LABELS = Object.freeze({
+  FOOTPRINT: 'From confirmed building footprint',
+  FRONTAGE: 'On the footprint the address fronts onto',
+  DERIVED: 'Derived from street address',
+  UNKNOWN: 'No location established',
+});

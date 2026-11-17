@@ -2,6 +2,7 @@ import { buildingLabel, buildingSourceLabel, buildingTypeLabel } from '../buildi
 import { ASSET_CATEGORIES, MERCATOR_NOTE } from '../config/buildings.js';
 import { categoryLabel as assetCategoryLabel } from '../infrastructure/assetModel.js';
 import { BUILDING_RELATIONSHIPS } from '../infrastructure/assetLinks.js';
+import { ASSET_SOURCES, OPERATIONAL_STATUS_LABELS } from '../config/infrastructure.js';
 
 function Row({ label, value, note }) {
   const missing = value === null || value === undefined || value === '';
@@ -67,11 +68,35 @@ export function BuildingDetailsPanel({ building, linkedAsset, onOpenAsset, onFin
                   ? 'Name read from an official Miami-Dade source'
                   : 'Backed only by a secondary source'}
               />
+              {linkedAsset.asset.operationalStatus && (
+                <Row
+                  label="Operational status"
+                  value={OPERATIONAL_STATUS_LABELS[linkedAsset.asset.operationalStatus.state]
+                    ?? linkedAsset.asset.operationalStatus.state}
+                  note={linkedAsset.asset.operationalStatus.basis}
+                />
+              )}
               <Row
                 label="Relationship"
                 value={BUILDING_RELATIONSHIPS[linkedAsset.link.relationship] ?? linkedAsset.link.relationship}
                 note={linkedAsset.link.evidence}
               />
+              {/* Where the asset's identity came from. A named terminal on a footprint is only
+                  as good as the source that named it, so the source is cited here rather than
+                  left behind in the Infrastructure explorer. */}
+              {(linkedAsset.asset.sources ?? []).map(id => {
+                const source = ASSET_SOURCES[id];
+                return source ? (
+                  <Row
+                    key={id}
+                    label="Source"
+                    value={<a href={source.url} target="_blank" rel="noopener noreferrer">{source.title}</a>}
+                    note={`${source.publisher} · ${source.authority === 'OFFICIAL' ? 'official' : 'secondary'}`
+                      + `${source.revised ? ` · revised ${source.revised}` : ''}`
+                      + ` · ${linkedAsset.asset.supports?.[id] ?? 'cited for this asset'}`}
+                  />
+                ) : null;
+              })}
             </>
           ) : building.asset ? (
             <>

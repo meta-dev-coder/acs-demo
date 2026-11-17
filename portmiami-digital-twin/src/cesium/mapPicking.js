@@ -16,14 +16,16 @@ import { ScreenSpaceEventHandler, ScreenSpaceEventType } from 'cesium';
  * @typedef {object} PickableLayer
  * @property {string} kind       what this layer selects, e.g. 'road' or 'building'
  * @property {string} idPrefix   entity-id prefix, e.g. 'road-'
- * @property {(entityId: string) => number|null} parseId  entity id -> the layer's own identifier
- * @property {(id: number|null) => void} setHovered
+ * @property {(entityId: string) => number|string|null} parseId  entity id -> the layer's own
+ *           identifier. A number for roads and buildings (OBJECTID); a string for FL511 markers,
+ *           whose ids are FL511's own. Only `null` means "not mine".
+ * @property {(id: number|string|null) => void} setHovered
  * @property {() => boolean} isPickable   false while the layer is hidden
  */
 
 /**
  * @param {import('cesium').Viewer} viewer
- * @param {{onSelect?: (hit: {kind: string, id: number}|null) => void}} [hooks]
+ * @param {{onSelect?: (hit: {kind: string, id: number|string}|null) => void}} [hooks]
  */
 export function createMapPicker(viewer, { onSelect } = {}) {
   /** @type {PickableLayer[]} */

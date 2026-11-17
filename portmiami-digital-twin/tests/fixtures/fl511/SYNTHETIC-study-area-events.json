@@ -1,0 +1,58 @@
+{
+  "_README": [
+    "SYNTHETIC TEST DATA. Not an FL511 recording.",
+    "",
+    "Every other file in this directory was captured verbatim from fl511.com on 2026-11-16. This",
+    "one was written by hand, because at capture time FL511 had ZERO events of any kind inside the",
+    "PortMiami study area (statewide: 2 incidents, 23 closures, 113 construction, 0 congestion, 10",
+    "disabled vehicles - none of them in the box). Rendering, filtering and road association could",
+    "not be exercised against a real in-area event, so these were constructed.",
+    "",
+    "What IS real about them: the coordinates. Each sits on the midpoint of a named PortMiami",
+    "centreline in public/data/portmiami_roads_merged.geojson, so the association tests run against",
+    "genuine county geometry. The envelope is the real one FL511 uses (item2 / itemId / location as",
+    "[lat, lon] / secondarylocation / title).",
+    "",
+    "This file is used ONLY by tests/liveTraffic.test.mjs. It is never served to the application",
+    "and never reaches the map."
+  ],
+  "item2": [
+    {
+      "itemId": "TEST-INC-1",
+      "location": [25.771415, -80.164243],
+      "title": "Crash on Port Blvd at Biscayne Blvd",
+      "_anchor": "midpoint of OBJECTID 14302, PORT BLVD; names the road it is on"
+    },
+    {
+      "itemId": "TEST-INC-2",
+      "location": [25.775051, -80.177674],
+      "title": "Disabled vehicle east of Caribbean Way",
+      "_anchor": "midpoint of OBJECTID 9218, CARIBBEAN WAY; names it as a road it is measured FROM"
+    },
+    {
+      "itemId": "TEST-INC-3",
+      "location": [25.777708, -80.177956],
+      "_anchor": "midpoint of OBJECTID 12087, N AMERICA WAY; NO title at all, so proximity only"
+    },
+    {
+      "itemId": "TEST-CLO-1",
+      "location": [26.1, -80.25],
+      "secondarylocation": [25.771415, -80.164243],
+      "title": "Closure on Port Blvd",
+      "_anchor": "primary point is up on I-595, secondary is on PORT BLVD: ENDPOINT_IN_AREA"
+    },
+    {
+      "itemId": "TEST-CLO-2",
+      "location": [25.74, -80.17],
+      "secondarylocation": [25.82, -80.17],
+      "title": "Long closure crossing the study area",
+      "_anchor": "both points outside the box, the line between them crosses it: SPAN_CROSSES_AREA"
+    },
+    {
+      "itemId": "TEST-OUT-1",
+      "location": [26.1275, -80.3679],
+      "title": "Crash on I-595 at SR 84",
+      "_anchor": "Fort Lauderdale. Must be filtered OUT."
+    }
+  ]
+}

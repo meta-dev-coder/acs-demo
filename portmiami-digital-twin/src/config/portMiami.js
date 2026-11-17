@@ -96,3 +96,23 @@ export const PORT_MIAMI = Object.freeze({
   cameraLimits: CAMERA_LIMITS,
   futureLayers: FUTURE_LAYERS,
 });
+
+/**
+ * Street View.
+ *
+ * Off by setting VITE_ENABLE_STREET_VIEW=false — the same flag name the ACS twin uses, so one
+ * `.env.local` governs both. It needs no key of its own: it uses VITE_GOOGLE_MAPS_API_KEY, the
+ * same browser key the photorealistic tileset needs, so Street View is available exactly when the
+ * 3D basemap is.
+ *
+ * Two Google products are involved, and they are billed separately: the Map Tiles API (Street View
+ * Tiles) answers "is there a panorama here", and the Maps JavaScript API renders the panorama a
+ * viewer actually looks at. Both are billable.
+ */
+export const STREET_VIEW = Object.freeze({
+  // `import.meta.env?.` and not `import.meta.env.`: this file is imported by the node:test suites
+  // too, where Vite has not defined `import.meta.env` at all. Everything else in this module is a
+  // plain constant, which is why it could be imported under Node before this flag existed.
+  enabled: String(import.meta.env?.VITE_ENABLE_STREET_VIEW ?? 'true').toLowerCase() !== 'false',
+  apiKeyEnvVar: 'VITE_GOOGLE_MAPS_API_KEY',
+});
