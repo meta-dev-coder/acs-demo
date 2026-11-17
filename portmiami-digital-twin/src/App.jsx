@@ -105,6 +105,13 @@ export function App() {
   const { status, notice, viewerRef, resetView, zoom, nudge, northUp } = usePortTwin(containerRef);
   /** Open state lives here, because the map-control column has to know to step aside. */
   const [plannerOpen, setPlannerOpen] = useState(false);
+  /**
+   * Presentation mode: the same live scene and the same scenario, with the chrome stood down.
+   *
+   * It collapses the rail and folds the insight dock rather than hiding the application behind a
+   * mock-up — everything on screen is still the running twin, and the way out stays in the bar.
+   */
+  const [presenting, setPresenting] = useState(false);
 
   const [selection, setSelection] = useState(null);
   const [explorer, setExplorer] = useState(EXPLORER.NONE);
@@ -454,10 +461,12 @@ export function App() {
   const isExplorer = workspace === WORKSPACE.EXPLORER;
 
   return (
-    <div className="app has-rail">
-      <WorkspaceSidebar workspace={workspace} onChange={setWorkspace} />
+    <div className={`app has-rail${presenting ? ' is-presenting' : ''}`}>
+      <WorkspaceSidebar workspace={workspace} onChange={setWorkspace} forceCollapsed={presenting} />
       <div className="app-main">
-      <TopNav project={PROJECT} askOpen={ask.open} onToggleAsk={ask.toggle} />
+      <TopNav project={PROJECT} askOpen={ask.open} onToggleAsk={ask.toggle}
+        scenario={workspace === WORKSPACE.PLANNER ? planner.selected?.name : null}
+        presenting={presenting} onPresent={() => setPresenting(value => !value)} />
       {/* `has-ask` shifts the contextual detail column left so the assistant never covers it. */}
       <main className={`app-viewport${ask.open ? ' has-ask' : ''}`}>
         <div className="cesium-container" ref={containerRef} />

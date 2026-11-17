@@ -38,7 +38,7 @@ export const HIGHLIGHT_STYLE = Object.freeze({
   roofOpacity: 0.42,
   outline: '#00E5FF',
   outlineWidth: 3.5,
-  labelBackground: '#0b1729',
+  labelBackground: '#071B35',
 });
 
 /**
@@ -52,7 +52,7 @@ export const TRACED_STYLE = Object.freeze({
   roofOpacity: 0.4,
   outline: '#e0952f',
   outlineWidth: 3.5,
-  labelBackground: '#0b1729',
+  labelBackground: '#071B35',
 });
 
 /** A footprint nobody has endorsed: amber throughout, and no solid envelope. */
@@ -62,7 +62,7 @@ export const CANDIDATE_STYLE = Object.freeze({
   roofOpacity: 0.3,
   outline: '#e0952f',
   outlineWidth: 3,
-  labelBackground: '#0b1729',
+  labelBackground: '#071B35',
 });
 
 /** How far the envelope is pushed outside the real footprint, to stop it z-fighting the mesh. */

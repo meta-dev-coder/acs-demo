@@ -40,8 +40,10 @@ function rememberedCollapsed() {
   }
 }
 
-export function WorkspaceSidebar({ workspace, onChange }) {
+export function WorkspaceSidebar({ workspace, onChange, forceCollapsed = false }) {
   const [collapsed, setCollapsed] = useState(rememberedCollapsed);
+  /** Presentation mode collapses the rail without overwriting the user's own preference. */
+  const shown = forceCollapsed || collapsed;
 
   useEffect(() => {
     try {
@@ -54,11 +56,16 @@ export function WorkspaceSidebar({ workspace, onChange }) {
   const toggle = useCallback(() => setCollapsed(value => !value), []);
 
   return (
-    <nav className={`workspace-rail${collapsed ? ' is-collapsed' : ''}`} aria-label="Workspaces">
-      <div className="workspace-brand" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7">
+    <nav className={`workspace-rail${shown ? ' is-collapsed' : ''}`} aria-label="Workspaces">
+      <div className="workspace-brand">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+          strokeWidth="1.7" aria-hidden="true" focusable="false">
           <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z" /><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5" />
         </svg>
+        <span className="workspace-brand-name">
+          SuperDNA
+          <em>3D Lab</em>
+        </span>
       </div>
       <ul>
         {ITEMS.map(item => (
@@ -68,7 +75,7 @@ export function WorkspaceSidebar({ workspace, onChange }) {
               className="workspace-item"
               aria-current={workspace === item.id ? 'page' : undefined}
               onClick={() => onChange(item.id)}
-              title={collapsed ? `${item.label} — ${item.hint}` : item.hint}
+              title={shown ? `${item.label} — ${item.hint}` : item.hint}
             >
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
                 strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -79,19 +86,23 @@ export function WorkspaceSidebar({ workspace, onChange }) {
           </li>
         ))}
       </ul>
-      <button
-        type="button"
-        className="workspace-toggle"
-        onClick={toggle}
-        aria-expanded={!collapsed}
-        title={collapsed ? 'Expand the menu' : 'Collapse the menu'}
-      >
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
-          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d={collapsed ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'} />
-        </svg>
-        <span className="sr-only">{collapsed ? 'Expand the menu' : 'Collapse the menu'}</span>
-      </button>
+      {/* Hidden in presentation mode: the rail is collapsed deliberately there, and a control
+          that would undo it is a control someone can press by accident mid-demo. */}
+      {!forceCollapsed && (
+        <button
+          type="button"
+          className="workspace-toggle"
+          onClick={toggle}
+          aria-expanded={!collapsed}
+          title={collapsed ? 'Expand the menu' : 'Collapse the menu'}
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d={collapsed ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'} />
+          </svg>
+          <span className="sr-only">{collapsed ? 'Expand the menu' : 'Collapse the menu'}</span>
+        </button>
+      )}
     </nav>
   );
 }

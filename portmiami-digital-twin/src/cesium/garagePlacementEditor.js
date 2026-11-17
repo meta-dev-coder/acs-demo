@@ -40,7 +40,7 @@ export const EDITOR_STYLE = Object.freeze({
   handle: '#ffffff',
   handleActive: '#ffd400',
   rotate: '#e0952f',
-  label: '#0b1729',
+  label: '#071B35',
 });
 
 /** Where the envelope sits when no ground sample has been taken. See `BASE_HEIGHT_SOURCE`. */

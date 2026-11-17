@@ -2,6 +2,62 @@
    PortMiami opens in light mode (index.html sets data-theme="light"). */
 @import './theme.css';
 
+/* ---- PortMiami palette ------------------------------------------------------------------
+   The client's palette, applied by REDEFINING the shared tokens rather than by introducing a
+   second set beside them. Everything already built reads these names, so the whole application
+   moves together and nothing has to choose which system to follow.
+
+   theme.css states a 4.5:1 floor for small text and darkens two SDNA hues to reach it. The same
+   rule is applied here, and it caught one: the client's warning #B76A12 is 4.13:1 on white and
+   3.88:1 on the page background — under the floor for the small bold labels it is used on. It is
+   darkened to #A86111, the same hue at 4.79:1 on white and 4.50:1 on the background.
+
+   CYAN IS NOT A TEXT COLOUR here. #00BFEA is 2.18:1 on white: it is the accent for the 3D scene,
+   tab underlines, leader lines and rules, and never carries a word on a light surface.
+   ------------------------------------------------------------------------------------------ */
+:root[data-theme="light"] {
+  --pm-navy: #071B35;
+  --pm-cyan: #00BFEA;
+
+  --ui-surface: #ffffff;
+  --ui-surface-solid: #ffffff;
+  --ui-surface-raised: #fbfcfe;
+  --ui-surface-sunken: #f6f8fb;
+
+  --ui-text: #142033;
+  --ui-text-secondary: #657184;
+  --ui-text-dim: #657184;
+  --ui-text-muted: #8795a8;
+
+  --ui-border: #e2e8f0;
+  --ui-border-soft: #eef2f7;
+  --ui-border-strong: #cbd5e1;
+  --ui-hover: #f1f5fa;
+  --ui-active: #e6eef9;
+  --ui-shadow: 0 10px 30px #14203314;
+  --ui-shadow-soft: 0 2px 8px #1420330f;
+
+  --ui-accent: #1769e0;
+  --ui-accent-strong: #1769e0;
+  --ui-accent-soft: #eef4fd;
+  --ui-accent-contrast: #ffffff;
+  --ui-accent-tint: #1769e014;
+  --ui-accent-line: #1769e066;
+
+  --ui-tone-ok: #15822d;
+  --ui-tone-ok-bg: #15822d14;
+  --ui-tone-warn: #a86111;
+  --ui-tone-warn-bg: #b76a1214;
+  --ui-tone-bad: #c73e3e;
+  --ui-tone-bad-bg: #c73e3e14;
+  --ui-tone-info: #1769e0;
+
+  /* The 4/8 spacing scale and the radii the components share. */
+  --pm-radius-sm: 8px;
+  --pm-radius: 12px;
+  --pm-radius-lg: 16px;
+}
+
 * { box-sizing: border-box; }
 html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 body {
@@ -14,15 +70,39 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .app { display: flex; flex-direction: column; height: 100%; }
 
 /* ---- Top bar ---------------------------------------------------------------------------- */
+/* 62px: tall enough for the two-line identity, short enough to leave the map the screen. */
 .app-nav {
-  flex: none; display: flex; align-items: center; justify-content: space-between; gap: 24px;
-  padding: 10px 20px; background: var(--ui-surface-solid);
-  border-bottom: 1px solid var(--ui-border); box-shadow: var(--ui-shadow-soft); z-index: 2;
+  flex: none; height: 62px; display: flex; align-items: center; justify-content: space-between;
+  gap: 20px; padding: 0 20px; background: var(--ui-surface-solid);
+  border-bottom: 1px solid var(--ui-border); z-index: 2;
 }
-.app-nav-identity h1 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
+.app-nav-identity h1 { margin: 0; font-size: 18px; font-weight: 650; letter-spacing: -.012em; }
 .app-nav-identity p { margin: 1px 0 0; font-size: 12px; color: var(--ui-text-secondary); }
+.app-nav-actions { display: flex; align-items: center; gap: 14px; }
 .app-nav-place { margin: 0; text-align: right; font-size: 12px; font-weight: 600; color: var(--ui-text); }
 .app-nav-place span { display: block; font-weight: 400; color: var(--ui-text-secondary); }
+
+/* What is being evaluated, kept visible even when the panel is closed or minimised. */
+.app-nav-scenario {
+  flex: 0 1 auto; min-width: 0; margin: 0 auto 0 0; padding: 5px 12px;
+  border: 1px solid var(--ui-border); border-radius: 999px; background: var(--ui-surface-sunken);
+  font-size: 12.5px; font-weight: 600; color: var(--ui-text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.app-nav-scenario span {
+  margin-right: 7px; font-size: 10.5px; font-weight: 650; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ui-text-secondary);
+}
+
+.app-nav-present {
+  padding: 7px 13px; border: 1px solid var(--ui-border-strong); border-radius: 999px;
+  background: transparent; font-size: 12.5px; font-weight: 600; color: var(--ui-text-secondary);
+  transition: background .16s ease, color .16s ease, border-color .16s ease;
+}
+.app-nav-present:hover { background: var(--ui-hover); color: var(--ui-accent); border-color: var(--ui-accent-line); }
+.app-nav-present[aria-pressed="true"] {
+  background: var(--pm-navy); border-color: var(--pm-navy); color: #fff;
+}
 
 /* ---- Viewport --------------------------------------------------------------------------- */
 .app-viewport { position: relative; flex: 1; min-height: 0; }
@@ -856,15 +936,25 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* The dark navy rail from the client's reference, on this app's own tokens. */
 .workspace-rail {
   position: relative;
-  flex: none; width: 196px; display: flex; flex-direction: column; gap: 4px;
-  padding: 14px 10px; background: #0b1729; color: #e8eef6;
-  transition: width 160ms ease;
+  flex: none; width: 216px; display: flex; flex-direction: column; gap: 4px;
+  padding: 14px 10px; background: var(--pm-navy); color: #e8eef6;
+  transition: width 180ms ease;
 }
 /* Icon-only. Wide enough for the 20px glyph and its hit target, and nothing else. */
-.workspace-rail.is-collapsed { width: 56px; padding-left: 8px; padding-right: 8px; }
+.workspace-rail.is-collapsed { width: 64px; padding-left: 10px; padding-right: 10px; }
+@media (prefers-reduced-motion: reduce) { .workspace-rail { transition: none; } }
 .workspace-brand {
-  display: flex; align-items: center; gap: 8px; padding: 4px 8px 14px; color: #67a6f4;
+  display: flex; align-items: center; gap: 9px; padding: 4px 8px 16px; color: var(--pm-cyan);
 }
+.workspace-brand-name {
+  display: flex; flex-direction: column; gap: 1px;
+  font-size: 13px; font-weight: 700; letter-spacing: -.01em; color: #fff; white-space: nowrap;
+}
+.workspace-brand-name em {
+  font-size: 9.5px; font-style: normal; font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: #8aa6c8;
+}
+.workspace-rail.is-collapsed .workspace-brand-name { display: none; }
 .workspace-rail ul { margin: 0; padding: 0; list-style: none; }
 .workspace-item {
   display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 4px;
@@ -874,7 +964,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .workspace-item svg { flex: none; }
 .workspace-item:hover { background: #ffffff0f; color: #e8eef6; }
-.workspace-item[aria-current="page"] { background: #1862d0; color: #fff; }
+.workspace-item[aria-current="page"] { background: var(--ui-accent); color: #fff; }
 .workspace-rail.is-collapsed .workspace-item { justify-content: center; padding: 9px 0; gap: 0; }
 /* `display: none` rather than width 0: the label must not keep a sliver of its box. */
 .workspace-rail.is-collapsed .workspace-item-label { display: none; }
@@ -915,29 +1005,67 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 
 .scenario-panel {
-  position: absolute; top: 16px; right: 74px; width: 360px; max-height: calc(100% - 210px);
+  position: absolute; top: 18px; right: 18px; width: 386px; max-height: calc(100% - 36px);
   display: flex; flex-direction: column;
-  border: 1px solid var(--ui-border); border-radius: 12px;
+  border: 1px solid var(--ui-border); border-radius: var(--pm-radius-lg);
   background: var(--ui-surface); box-shadow: var(--ui-shadow); z-index: 3;
 }
-.scenario-tabs { display: flex; gap: 2px; padding: 10px 12px 0; }
-.scenario-tabs button {
-  flex: 1; padding: 7px 0; border: 0; border-bottom: 2px solid transparent;
-  background: transparent; font-size: 12.5px; font-weight: 600;
-  color: var(--ui-text-secondary); cursor: pointer;
+.scenario-panel-title h2 { margin: 0; font-size: 15.5px; font-weight: 650; letter-spacing: -.01em; }
+.scenario-panel-title p { margin: 1px 0 0; font-size: 11.5px; color: var(--ui-text-secondary); }
+.scenario-panel-head-actions { display: flex; align-items: center; gap: 2px; }
+
+/* Tabs carry the blue underline; the rule beneath them ties the three together. */
+.scenario-tabs {
+  display: flex; gap: 2px; padding: 4px 14px 0; border-bottom: 1px solid var(--ui-border);
 }
+.scenario-tabs button {
+  flex: 1; padding: 9px 0; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  background: transparent; font-size: 13px; font-weight: 600;
+  color: var(--ui-text-secondary); cursor: pointer;
+  transition: color .16s ease, border-color .16s ease;
+}
+.scenario-tabs button:hover { color: var(--ui-text); }
 .scenario-tabs button[aria-selected="true"] { color: var(--ui-accent); border-bottom-color: var(--ui-accent); }
 
-.scenario-list { margin: 8px 0 0; padding: 0 12px; list-style: none; }
+.scenario-list { margin: 10px 0 0; padding: 0 14px; list-style: none; }
 .scenario-choice {
-  display: flex; align-items: center; gap: 9px; margin-bottom: 5px; padding: 8px 10px;
-  border: 1px solid var(--ui-border); border-radius: 9px; cursor: pointer;
+  position: relative;
+  display: flex; align-items: flex-start; gap: 10px; margin-bottom: 6px; padding: 9px 11px;
+  border: 1px solid var(--ui-border); border-radius: var(--pm-radius);
+  background: var(--ui-surface); cursor: pointer;
+  transition: border-color .16s ease, background .16s ease, box-shadow .16s ease;
 }
-.scenario-choice.is-selected { border-color: var(--ui-accent-line); background: var(--ui-accent-soft); }
-.scenario-choice input { accent-color: var(--ui-accent); }
-.scenario-choice-body { display: flex; flex-direction: column; min-width: 0; }
-.scenario-choice-name { font-size: 12.5px; font-weight: 650; color: var(--ui-text); }
-.scenario-choice-meta { font-size: 11px; color: var(--ui-text-secondary); }
+.scenario-choice:hover { border-color: var(--ui-border-strong); box-shadow: var(--ui-shadow-soft); }
+.scenario-choice.is-selected {
+  border-color: var(--ui-accent); background: var(--ui-accent-soft); box-shadow: none;
+}
+.scenario-choice input { margin: 2px 0 0; accent-color: var(--ui-accent); }
+/* A small contextual icon, in the secondary ink until the card is the chosen one. */
+.scenario-choice-mark {
+  flex: none; display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: var(--pm-radius-sm);
+  background: var(--ui-surface-sunken); color: var(--ui-text-secondary);
+}
+.scenario-choice.is-selected .scenario-choice-mark { background: #fff; color: var(--ui-accent); }
+.scenario-choice-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.scenario-choice-head { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.scenario-choice-head b {
+  font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--ui-text-secondary);
+}
+.scenario-choice.is-selected .scenario-choice-head b { color: var(--ui-accent); }
+.scenario-choice-name { font-size: 13px; font-weight: 650; color: var(--ui-text); }
+.scenario-choice-note { font-size: 11px; color: var(--ui-text-secondary); }
+.scenario-choice-meta { display: flex; align-items: baseline; gap: 7px; margin-top: 2px; }
+.scenario-choice-meta em {
+  font-size: 12px; font-style: normal; font-weight: 650; color: var(--ui-text);
+}
+/* The assumption tag never leaves: the figure is from a concept slide, not a proposal. */
+.scenario-choice-meta i {
+  padding: 1px 6px; border-radius: 999px; background: var(--ui-tone-warn-bg);
+  font-size: 9.5px; font-style: normal; font-weight: 650; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--ui-tone-warn);
+}
 .scenario-list-actions { display: flex; gap: 5px; padding: 4px 12px 8px; }
 .scenario-list-actions button {
   flex: 1; padding: 5px 0; border: 1px solid var(--ui-border-strong); border-radius: 7px;
@@ -1156,10 +1284,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .scenario-open:hover { border-color: var(--ui-accent-line); }
 
-.scenario-panel { top: 16px; max-height: calc(100% - 32px); }
 .scenario-panel-head {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  padding: 8px 10px 0;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+  padding: 13px 14px 10px;
 }
 .app-viewport.has-ask .scenario-open { right: 826px; }
 
@@ -1269,7 +1396,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 
 /* The camera buttons the panel carries while the map-control column is hidden. */
-.scenario-panel-camera { display: flex; gap: 2px; }
+.scenario-panel-camera {
+  display: flex; gap: 3px; padding: 0 14px 10px; border-bottom: 1px solid var(--ui-border-soft);
+}
 .scenario-panel-camera button {
   display: flex; align-items: center; justify-content: center;
   width: 28px; height: 28px; padding: 0;
@@ -1278,3 +1407,203 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .scenario-panel-camera button:hover { color: var(--ui-accent); border-color: var(--ui-accent-line); }
 .scenario-panel-camera button:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+
+/* ---- Bottom insight dock ----------------------------------------------------------------- */
+
+.scenario-dock {
+  position: absolute; left: 18px; right: 422px; bottom: 18px; z-index: 3;
+  display: flex; flex-direction: column;
+  border: 1px solid var(--ui-border); border-radius: var(--pm-radius-lg);
+  background: var(--ui-surface); box-shadow: var(--ui-shadow); overflow: hidden;
+}
+/* One row, so the dock can be read at a glance and folded away without losing the headline. */
+.scenario-dock-toggle {
+  display: flex; align-items: baseline; gap: 10px; width: 100%;
+  padding: 9px 14px; border: 0; background: transparent; text-align: left;
+}
+.scenario-dock-toggle > span {
+  flex: none; font-size: 11px; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--ui-text-secondary);
+}
+.scenario-dock-toggle > em {
+  flex: 1; min-width: 0; font-style: normal; font-size: 12.5px; color: var(--ui-text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.scenario-dock-toggle > i { flex: none; font-style: normal; color: var(--ui-text-secondary); }
+.scenario-dock-toggle:hover { background: var(--ui-hover); }
+.scenario-dock-cards {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+  background: var(--ui-border-soft); border-top: 1px solid var(--ui-border);
+}
+.scenario-dock-cards .scenario-card {
+  margin: 0; padding: 12px 14px 14px; border: 0; border-radius: 0;
+  background: var(--ui-surface); box-shadow: none;
+}
+.scenario-dock .scenario-card h3 {
+  margin: 0 0 7px; font-size: 11px; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--ui-text-secondary);
+}
+/* One large number per card, and everything else visibly subordinate to it. */
+.scenario-dock .scenario-big {
+  display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px;
+  font-size: 27px; font-weight: 650; letter-spacing: -.02em; color: var(--ui-text);
+}
+.scenario-dock .scenario-big span {
+  font-size: 11.5px; font-weight: 500; letter-spacing: 0; color: var(--ui-text-secondary);
+}
+.scenario-dock .scenario-big.is-warn { color: var(--ui-tone-warn); }
+.scenario-dock .scenario-mini { display: grid; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.scenario-dock .scenario-mini li {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  font-size: 11.5px;
+}
+.scenario-dock .scenario-mini em { font-style: normal; color: var(--ui-text-secondary); }
+.scenario-dock .scenario-mini b {
+  font-weight: 600; color: var(--ui-text); text-align: right;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.scenario-dock .scenario-secondary { margin-top: 10px; width: 100%; }
+.scenario-dock .scenario-empty { margin: 0; font-size: 12px; color: var(--ui-text-secondary); }
+
+/* Narrow desktops: the cards scroll horizontally rather than becoming three cramped columns.
+   The dock stays CLEAR of the panel rather than extending under it — sliding beneath a panel it
+   cannot be read through is worse than scrolling. */
+@media (max-width: 1280px) {
+  .scenario-dock-cards {
+    grid-auto-flow: column; grid-auto-columns: minmax(230px, 1fr); grid-template-columns: none;
+    overflow-x: auto;
+  }
+}
+/* Below this the dock has no useful width beside the panel, so it keeps only its summary row
+   and the cards are reached by opening it over the map. */
+@media (max-width: 1100px) {
+  .scenario-dock { right: 18px; }
+  .scenario-panel { max-height: calc(100% - 120px); }
+}
+
+/* ---- Presentation mode -------------------------------------------------------------------
+   The same live scene with the chrome stood down — the layer controls and explorer column step
+   out, the rail is collapsed, and the dock folds to its one-line summary. Nothing is replaced
+   by a picture of itself. */
+.app.is-presenting .layer-controls,
+.app.is-presenting .infra-explorer,
+.app.is-presenting .road-explorer,
+.app.is-presenting .scenario-open { display: none; }
+.app.is-presenting .scenario-dock { right: 422px; }
+.app.is-presenting .app-nav { box-shadow: none; }
+
+/* Motion: short, and off entirely for anyone who asks for that. */
+.scenario-choice, .scenario-tabs button, .scenario-collapsible-body,
+.app-nav-present, .workspace-item { transition-duration: 180ms; }
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .01ms !important; animation-iteration-count: 1 !important;
+      transition-duration: .01ms !important; }
+}
+
+/* ---- Simulate: KPI summary ---------------------------------------------------------------- */
+
+.scenario-runmeta { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 11px;
+  color: var(--ui-text-secondary); }
+.scenario-tag {
+  padding: 2px 7px; border-radius: 999px; font-size: 9.5px; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase;
+}
+.scenario-tag.is-synthetic { background: var(--ui-tone-warn-bg); color: var(--ui-tone-warn); }
+
+.scenario-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.scenario-kpis article {
+  padding: 10px 11px; border: 1px solid var(--ui-border); border-radius: var(--pm-radius);
+  background: var(--ui-surface-raised);
+}
+.scenario-kpis h5 {
+  margin: 0 0 4px; font-size: 10.5px; font-weight: 650; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--ui-text-secondary);
+}
+.scenario-kpis p {
+  display: flex; flex-direction: column; gap: 1px; margin: 0;
+  font-size: 24px; font-weight: 650; letter-spacing: -.02em; color: var(--ui-text);
+}
+.scenario-kpis p span {
+  font-size: 11px; font-weight: 500; letter-spacing: 0; color: var(--ui-text-secondary);
+}
+
+.scenario-traffic, .scenario-keyfindings {
+  padding: 11px 12px; border: 1px solid var(--ui-border); border-radius: var(--pm-radius);
+}
+.scenario-traffic h5, .scenario-keyfindings h5 {
+  margin: 0 0 7px; font-size: 10.5px; font-weight: 650; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--ui-text-secondary);
+}
+.scenario-traffic-road { margin: 0 0 8px; font-size: 12.5px; font-weight: 600; }
+.scenario-vc { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.scenario-vc-bar {
+  flex: 1; height: 7px; border-radius: 999px; background: var(--ui-surface-sunken); overflow: hidden;
+}
+.scenario-vc-bar span { display: block; height: 100%; border-radius: 999px; }
+.scenario-vc-bar span.is-info { background: var(--ui-accent); }
+.scenario-vc-bar span.is-warn { background: var(--ui-tone-warn); }
+.scenario-vc-bar span.is-bad { background: var(--ui-tone-bad); }
+.scenario-vc-bar span.is-none { background: var(--ui-border-strong); }
+.scenario-vc b { font-size: 13px; font-weight: 650; }
+.scenario-vc b.is-info { color: var(--ui-accent); }
+.scenario-vc b.is-warn { color: var(--ui-tone-warn); }
+.scenario-vc b.is-bad { color: var(--ui-tone-bad); }
+.scenario-vc em { font-style: normal; font-size: 10.5px; color: var(--ui-text-secondary); }
+.scenario-traffic .scenario-mini { display: grid; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.scenario-traffic .scenario-mini li {
+  display: flex; justify-content: space-between; gap: 10px; font-size: 11.5px;
+}
+.scenario-traffic .scenario-mini em { font-style: normal; color: var(--ui-text-secondary); }
+.scenario-traffic .scenario-mini b { font-weight: 600; }
+
+/* Three findings, colour-coded by what they are — never a green tick on a synthetic result. */
+.scenario-keyfindings ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.scenario-keyfindings li {
+  padding: 7px 9px; border-left: 3px solid var(--ui-accent); border-radius: 0 7px 7px 0;
+  background: var(--ui-accent-soft); font-size: 11.5px; line-height: 1.45; color: var(--ui-text);
+}
+.scenario-keyfindings li.is-warn { border-left-color: var(--ui-tone-warn); background: var(--ui-tone-warn-bg); }
+.scenario-keyfindings li.is-bad { border-left-color: var(--ui-tone-bad); background: var(--ui-tone-bad-bg); }
+
+/* ---- Compare ------------------------------------------------------------------------------ */
+
+.scenario-compare-head h4 { margin: 0; font-size: 14.5px; font-weight: 650; }
+.scenario-compare-head p { margin: 2px 0 0; font-size: 11.5px; color: var(--ui-text-secondary); }
+
+.scenario-compare-cards { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.scenario-compare-cards li {
+  position: relative;
+  display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: 4px 9px;
+  padding: 10px 11px; border: 1px solid var(--ui-border); border-radius: var(--pm-radius);
+}
+.scenario-compare-cards li.is-selected { border-color: var(--ui-accent); background: var(--ui-accent-soft); }
+/* The model's own top-ranked option. A ring, not a rosette: the ranking rests on synthetic
+   inputs, and a trophy would read as a verified verdict. */
+.scenario-compare-cards li.is-best { box-shadow: inset 0 0 0 1px var(--ui-accent-line); }
+.scenario-compare-cards li.is-best::after {
+  content: 'Ranks first'; position: absolute; top: -8px; right: 10px; padding: 1px 7px;
+  border: 1px solid var(--ui-accent-line); border-radius: 999px; background: var(--ui-surface);
+  font-size: 9.5px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--ui-accent);
+}
+.scenario-compare-key {
+  display: flex; align-items: center; justify-content: center; width: 22px; height: 22px;
+  border-radius: 7px; background: var(--ui-surface-sunken);
+  font-size: 11px; font-weight: 700; color: var(--ui-text-secondary);
+}
+.scenario-compare-cards li.is-selected .scenario-compare-key { background: #fff; color: var(--ui-accent); }
+.scenario-compare-name { font-size: 12.5px; font-weight: 650; }
+.scenario-compare-cards b {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 0;
+  font-size: 17px; font-weight: 650; letter-spacing: -.02em;
+}
+.scenario-compare-cards b em {
+  font-style: normal; font-size: 9.5px; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--ui-text-secondary);
+}
+.scenario-compare-cards dl {
+  grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto 1fr auto; gap: 2px 8px;
+  margin: 4px 0 0; font-size: 11px;
+}
+.scenario-compare-cards dt { color: var(--ui-text-secondary); }
+.scenario-compare-cards dd { margin: 0; font-weight: 600; text-align: right; }

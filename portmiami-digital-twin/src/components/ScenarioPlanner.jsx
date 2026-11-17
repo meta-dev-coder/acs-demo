@@ -25,6 +25,34 @@ import { compareRuns } from '../scenarios/comparison.js';
 import { CapacityChart, DemandChart, TrafficChart } from './ScenarioCharts.jsx';
 
 const fmt = value => (Number.isFinite(value) ? Math.round(value).toLocaleString() : 'Not calculated');
+
+/**
+ * How a volume-to-capacity ratio should read.
+ *
+ * Restrained on purpose, and never green: a V/C under 0.85 on a SYNTHETIC single-road test is not
+ * a verified pass, so it gets the informational blue rather than a tick.
+ */
+const vcTone = value => {
+  if (!Number.isFinite(value)) return 'none';
+  if (value >= 1) return 'bad';
+  if (value >= 0.85) return 'warn';
+  return 'info';
+};
+
+/**
+ * The thing most limiting this scenario, in three words.
+ *
+ * Read off the run's own numbers rather than asserted: unmet demand first because it is what a
+ * planner acts on, then the access road, then nothing — and "Not evaluated" where the model had
+ * no road to test, which is a different statement from "no constraint".
+ */
+function constraintOf(results) {
+  if (!results) return 'Not evaluated';
+  if (Number.isFinite(results.demand?.unmet) && results.demand.unmet > 0) return 'Parking supply';
+  if (!results.traffic?.road) return 'Access road not evaluated';
+  if (Number.isFinite(results.traffic?.vcRatio) && results.traffic.vcRatio >= 0.9) return 'Access road';
+  return 'None identified';
+}
 const pct = value => (Number.isFinite(value) ? `${value.toFixed(0)}%` : 'Not calculated');
 const ratio = value => (Number.isFinite(value) ? value.toFixed(2) : 'Not calculated');
 
@@ -744,8 +772,71 @@ function SimulateTab({ planner }) {
       {latest ? (
         <>
           <p className="scenario-runmeta">
-            Run {latest.id} · model {latest.modelVersion} · {new Date(latest.executedAt).toLocaleString()} · {latest.dataMode}
+            <span className="scenario-tag is-synthetic">{latest.dataMode}</span>
+            {new Date(latest.executedAt).toLocaleString()} · model {latest.modelVersion}
           </p>
+
+          {/* The four figures someone needs to understand the run, before any of the detail. */}
+          <div className="scenario-kpis">
+            <article>
+              <h5>Proposed capacity</h5>
+              <p>{fmt(r.capacity.proposedTotalCapacity)}<span>spaces</span></p>
+            </article>
+            <article>
+              <h5>Additional spaces</h5>
+              <p>{fmt(r.capacity.additionalSpaces)}<span>{pct(r.capacity.increasePct)} increase</span></p>
+            </article>
+            <article>
+              <h5>Demand served</h5>
+              <p>{pct(r.demand.coveragePct)}<span>{fmt(r.demand.served)} of {fmt(r.demand.forecastDemand)}</span></p>
+            </article>
+            <article>
+              <h5>Added peak-hour vehicles</h5>
+              <p>{fmt(r.trips.total)}<span>{fmt(r.trips.arrivals)} in · {fmt(r.trips.departures)} out</span></p>
+            </article>
+          </div>
+
+          {/* Traffic, with a bar for the V/C ratio. The scope line below is not optional: this is
+              one approach road under assumed volumes, not a traffic study. */}
+          <section className="scenario-traffic">
+            <h5>Access-road impact</h5>
+            {r.traffic.road ? (
+              <>
+                <p className="scenario-traffic-road">{r.traffic.road.name}</p>
+                <div className="scenario-vc">
+                  <div className="scenario-vc-bar">
+                    <span className={`is-${vcTone(r.traffic.vcRatio)}`}
+                      style={{ width: `${Math.min(100, Math.max(2, (r.traffic.vcRatio ?? 0) * 100))}%` }} />
+                  </div>
+                  <b className={`is-${vcTone(r.traffic.vcRatio)}`}>{ratio(r.traffic.vcRatio)}</b>
+                  <em>modelled V/C</em>
+                </div>
+                <ul className="scenario-mini">
+                  <li><em>Peak queue</em>
+                    <b>{Number.isFinite(r.traffic.queue?.peakQueue) ? `${Math.round(r.traffic.queue.peakQueue)} veh` : 'Not calculated'}</b></li>
+                  <li><em>Clears in</em>
+                    <b>{r.traffic.queue?.clearanceMinutes === null ? 'Does not clear'
+                      : Number.isFinite(r.traffic.queue?.clearanceMinutes) ? `${r.traffic.queue.clearanceMinutes.toFixed(0)} min` : 'Not calculated'}</b></li>
+                </ul>
+              </>
+            ) : (
+              <p className="scenario-empty">No access road nominated, so no traffic result was produced.</p>
+            )}
+          </section>
+
+          {planner.findings.length > 0 && (
+            <section className="scenario-keyfindings">
+              <h5>Key findings</h5>
+              <ul>
+                {planner.findings.slice(0, 3).map(finding => (
+                  <li key={finding.text} className={`is-${finding.tone}`}>{finding.text}</li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          <Collapsible title="View calculation details"
+            summary={`${fmt(r.capacity.existingCapacity)} existing · ${r.capacity.addedFloors} added floors`}>
           <dl className="scenario-results">
             <dt>Existing capacity</dt>
             <dd>{fmt(r.capacity.existingCapacity)}
@@ -780,6 +871,9 @@ function SimulateTab({ planner }) {
               {fmt(r.geometryCheck.additionalSpaces)} spaces at {selected.assumptions.grossAreaPerSpaceM2} m² gross each.
             </p>
           )}
+          </Collapsible>
+          {/* Warnings stay OUTSIDE the disclosure: a limitation someone has to open a section to
+              find is a limitation that will not be read. */}
           {latest.warnings.map(warning => <p key={warning} className="scenario-warn">{warning}</p>)}
         </>
       ) : (
@@ -805,10 +899,36 @@ function CompareTab({ planner }) {
   if (rows.length === 0) return <p className="scenario-empty">Run at least one scenario to compare.</p>;
   const demand = rows.find(r => Number.isFinite(r.metrics.forecastDemand))?.metrics.forecastDemand ?? null;
 
+  const best = recommendation.available ? recommendation.ranking[0]?.runId : null;
+
   return (
     <div className="scenario-tab">
+      <header className="scenario-compare-head">
+        <h4>Compare parking alternatives</h4>
+        <p>Evaluate capacity, traffic impact and planning trade-offs</p>
+      </header>
+
+      {/* One card per alternative that has been run, so the differences read before the table.
+          The ring marks the model's own top-ranked option — never a fixed scenario. */}
+      <ul className="scenario-compare-cards">
+        {rows.map(row => (
+          <li key={row.runId}
+            className={`${row.scenarioId === planner.selected?.id ? 'is-selected' : ''}${row.runId === best ? ' is-best' : ''}`.trim() || undefined}>
+            <span className="scenario-compare-key">{row.key ?? '—'}</span>
+            <span className="scenario-compare-name">{scenarioTitle(row)}</span>
+            <b>{fmt(row.metrics.addedSpaces)}<em>added spaces</em></b>
+            <dl>
+              <dt>Total capacity</dt><dd>{fmt(row.metrics.capacity)}</dd>
+              <dt>Demand served</dt><dd>{fmt(row.metrics.demandServed)}</dd>
+              <dt>Added vehicles</dt><dd>{fmt(row.metrics.addedVehicles)}</dd>
+              <dt>Access road V/C</dt><dd>{ratio(row.metrics.accessVc)}</dd>
+            </dl>
+          </li>
+        ))}
+      </ul>
+
       <div className="scenario-recommend">
-        <h4>Recommendation</h4>
+        <h4>Model recommendation</h4>
         {recommendation.available
           ? <>
             <p className="scenario-rec-line">{recommendation.reason}</p>
@@ -874,10 +994,47 @@ function CompareTab({ planner }) {
 
 // ---- the workspace --------------------------------------------------------------------------------
 
+/**
+ * What each alternative IS, in the fewest words that still distinguish them.
+ *
+ * Titles and one-line blurbs only — every number on the card comes from the scenario itself, so
+ * a card can never state a capacity the model is not using.
+ */
+const SCENARIO_CARD = Object.freeze({
+  EXPAND_EXISTING: {
+    blurb: 'Add floors to a registered garage',
+    glyph: <><path d="M4 20h16" /><path d="M6 20V9l6-4 6 4v11" /><path d="M10 20v-5h4v5" /></>,
+  },
+  NEW_GARAGE: {
+    blurb: 'A new structure on a site you position',
+    glyph: <><rect x="4" y="7" width="16" height="13" rx="2" /><path d="M9 20v-6h6v6" /><path d="M4 11h16" /></>,
+  },
+  OPTIMIZE_SURFACE: {
+    blurb: 'Re-lay out existing surface parking',
+    glyph: <><rect x="3" y="6" width="18" height="12" rx="2" /><path d="M7 10v4M12 10v4M17 10v4" /></>,
+  },
+  DEFAULT: { blurb: 'Custom alternative', glyph: <circle cx="12" cy="12" r="8" /> },
+});
+
+/**
+ * The scenario's own name, without the "A. " the identifier chip already carries.
+ *
+ * The NAME comes from the scenario, never from a table in this file: the panel, the top bar, the
+ * run records, Compare and Ask the Twin must all call an alternative the same thing, and a title
+ * hardcoded here would be the one place that disagreed.
+ */
+const scenarioTitle = scenario => String(scenario?.name ?? '').replace(/^[A-Z]\.\s*/, '');
+
+/** The same for a comparison row, which carries the run's recorded scenario name. */
+
+
 export function ScenarioPlanner({
   planner, garages, roadsById, buildingsById, onOpenAssistant, onLinkFootprint,
   open, onOpenChange, cameraHandlers,
 }) {
+  /** Minimised keeps the scenario and the map state; only the body folds away. */
+  const [minimised, setMinimised] = useState(false);
+  const [dockOpen, setDockOpen] = useState(true);
   const { tab, setTab, selected, scenarios, findings, latest } = planner;
   /** Closed on arrival: the workspace opens on the map, not on a form. Owned by App, because the
       map-control column has to step aside while it is open. */
@@ -906,15 +1063,26 @@ export function ScenarioPlanner({
       <section className={`scenario-panel${planner.geometryMode ? ' is-compact' : ''}`}
         aria-label="Scenario configuration">
         <header className="scenario-panel-head">
-          {/* The map-control column is hidden while this panel is open — the panel is where it
-              used to be — so the camera buttons live here instead, and go on working on the map
-              behind. Same definitions and same handlers as the column: see `MapControls.jsx`. */}
-          <div className="scenario-panel-camera" role="group" aria-label="Map navigation">
-            <MapControlButtons handlers={cameraHandlers ?? {}} keys={PANEL_CAMERA_KEYS} grouped={false} />
+          <div className="scenario-panel-title">
+            <h2>Parking Expansion Planner</h2>
+            <p>Evaluate infrastructure alternatives</p>
           </div>
-          <button type="button" className="road-icon-btn" aria-label="Close planner"
-            onClick={() => setOpen(false)}>×</button>
+          <div className="scenario-panel-head-actions">
+            <button type="button" className="road-icon-btn" aria-expanded={!minimised}
+              aria-label={minimised ? 'Expand the planner' : 'Minimise the planner'}
+              title={minimised ? 'Expand' : 'Minimise'}
+              onClick={() => setMinimised(value => !value)}>{minimised ? '▣' : '—'}</button>
+            <button type="button" className="road-icon-btn" aria-label="Close planner"
+              title="Close" onClick={() => setOpen(false)}>×</button>
+          </div>
         </header>
+        {/* The map-control column is hidden while this panel is open — the panel is where it
+            used to be — so the camera buttons live here instead, and go on working on the map
+            behind. Same definitions and same handlers as the column: see `MapControls.jsx`. */}
+        <div className="scenario-panel-camera" role="group" aria-label="Map navigation">
+          <MapControlButtons handlers={cameraHandlers ?? {}} keys={PANEL_CAMERA_KEYS} grouped={false} />
+        </div>
+        {!minimised && (<>
         <div className="scenario-tabs" role="tablist">
           {[[PLANNER_TAB.PLAN, 'Plan'], [PLANNER_TAB.SIMULATE, 'Simulate'], [PLANNER_TAB.COMPARE, 'Compare']].map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>
@@ -924,20 +1092,34 @@ export function ScenarioPlanner({
         </div>
 
         <ul className="scenario-list">
-          {scenarios.map(scenario => (
-            <li key={scenario.id}>
-              <label className={`scenario-choice${selected?.id === scenario.id ? ' is-selected' : ''}`}>
-                <input type="radio" name="scenario" checked={selected?.id === scenario.id}
-                  onChange={() => planner.select(scenario.id)} />
-                <span className="scenario-choice-body">
-                  <span className="scenario-choice-name">{scenario.name}</span>
-                  <span className="scenario-choice-meta">
-                    +{Number(scenario.assumptions.additionalSpaces).toLocaleString()} spaces · assumption
+          {scenarios.map(scenario => {
+            const meta = SCENARIO_CARD[scenario.type] ?? SCENARIO_CARD.DEFAULT;
+            return (
+              <li key={scenario.id}>
+                <label className={`scenario-choice${selected?.id === scenario.id ? ' is-selected' : ''}`}>
+                  <input type="radio" name="scenario" checked={selected?.id === scenario.id}
+                    onChange={() => planner.select(scenario.id)} />
+                  <span className="scenario-choice-mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+                      strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{meta.glyph}</svg>
                   </span>
-                </span>
-              </label>
-            </li>
-          ))}
+                  <span className="scenario-choice-body">
+                    <span className="scenario-choice-head">
+                      {scenario.key && <b>Scenario {scenario.key}</b>}
+                      <span className="scenario-choice-name">{scenarioTitle(scenario)}</span>
+                    </span>
+                    <span className="scenario-choice-note">{meta.blurb}</span>
+                    <span className="scenario-choice-meta">
+                      <em>+{Number(scenario.assumptions.additionalSpaces).toLocaleString()} spaces</em>
+                      {/* Never dropped, however compact the card gets: the figure is from a
+                          concept slide, not from a PortMiami proposal. */}
+                      <i>assumption</i>
+                    </span>
+                  </span>
+                </label>
+              </li>
+            );
+          })}
         </ul>
 
         <div className="scenario-tabbody">
@@ -951,59 +1133,81 @@ export function ScenarioPlanner({
 
         {planner.sitePicker.hint && <p className="scenario-hint">{planner.sitePicker.hint}</p>}
         {planner.massingWarning && <p className="scenario-warn">{planner.massingWarning}</p>}
+        </>)}
       </section>
 
-      {/* The results strip. Only drawn once a run exists; before that it says so. Hidden while
-          geometry is being chosen, so the map is clear to work on. */}
+      {/* The insight dock. Three compact cards, one primary number each, collapsible — it sits
+          over the map, so it earns its height. It folds itself away while geometry is being
+          placed or edited, because that is exactly when the handles it would cover matter. */}
       {!planner.geometryMode && !planner.placement?.editing && (
-      <section className="scenario-results-bar" aria-label="Scenario results">
-        <article className="scenario-card">
-          <h3>Parking Capacity</h3>
+      <section className={`scenario-dock${dockOpen ? '' : ' is-collapsed'}`} aria-label="Scenario results">
+        <button type="button" className="scenario-dock-toggle" aria-expanded={dockOpen}
+          onClick={() => setDockOpen(value => !value)}>
+          <span>Results</span>
           {r ? (
-            <>
-              <p className="scenario-big">{fmt(r.capacity.proposedTotalCapacity)}<span>spaces proposed</span></p>
-              <ul className="scenario-mini">
-                <li>
-                  <em>{latest.inputSnapshot.capacitySource ? 'Existing (published)' : 'Existing (assumed)'}</em>
-                  <b>{fmt(r.capacity.existingCapacity)}</b>
-                </li>
-                <li><em>Added</em><b>{fmt(r.capacity.additionalSpaces)}</b></li>
-                <li><em>Usable at peak</em><b>{fmt(r.capacity.usableCapacity)}</b></li>
-              </ul>
-            </>
-          ) : <p className="scenario-empty">Not run yet.</p>}
-        </article>
+            <em>{fmt(r.capacity.proposedTotalCapacity)} spaces proposed · {fmt(r.trips.total)} added peak-hour vehicles</em>
+          ) : <em>Not run yet</em>}
+          <i aria-hidden="true">{dockOpen ? '▾' : '▴'}</i>
+        </button>
+        {dockOpen && (
+        <div className="scenario-dock-cards">
+          <article className="scenario-card">
+            <h3>Parking Capacity</h3>
+            {r ? (
+              <>
+                <p className="scenario-big">{fmt(r.capacity.proposedTotalCapacity)}<span>spaces proposed</span></p>
+                <ul className="scenario-mini">
+                  <li>
+                    <em>{latest.inputSnapshot.capacitySource ? 'Existing (published)' : 'Existing (assumed)'}</em>
+                    <b>{fmt(r.capacity.existingCapacity)}</b>
+                  </li>
+                  <li><em>Added</em><b>{fmt(r.capacity.additionalSpaces)}</b></li>
+                  <li><em>Usable at peak</em><b>{fmt(r.capacity.usableCapacity)}</b></li>
+                </ul>
+              </>
+            ) : <p className="scenario-empty">Run a scenario to see capacity.</p>}
+          </article>
 
-        <article className="scenario-card">
-          <h3>Traffic Impact</h3>
-          {r ? (
-            <>
-              <p className="scenario-big">{fmt(r.trips.total)}<span>added peak-hour vehicles</span></p>
-              <ul className="scenario-mini">
-                <li><em>Access road</em><b>{r.traffic.road?.name ?? 'None'}</b></li>
-                <li><em>Modelled V/C</em><b>{ratio(r.traffic.vcRatio)}</b></li>
-                <li><em>Peak queue</em><b>{Number.isFinite(r.traffic.queue?.peakQueue) ? `${Math.round(r.traffic.queue.peakQueue)} veh` : '—'}</b></li>
-              </ul>
-            </>
-          ) : <p className="scenario-empty">Not run yet.</p>}
-        </article>
+          <article className="scenario-card">
+            <h3>Traffic Impact</h3>
+            {r ? (
+              <>
+                <p className="scenario-big">{fmt(r.trips.total)}<span>added peak-hour vehicles</span></p>
+                <ul className="scenario-mini">
+                  <li><em>Access road</em><b>{r.traffic.road?.name ?? 'None'}</b></li>
+                  <li><em>Modelled V/C</em><b>{ratio(r.traffic.vcRatio)}</b></li>
+                  <li><em>Peak queue</em><b>{Number.isFinite(r.traffic.queue?.peakQueue) ? `${Math.round(r.traffic.queue.peakQueue)} veh` : '—'}</b></li>
+                </ul>
+              </>
+            ) : <p className="scenario-empty">Run a scenario to see traffic impact.</p>}
+          </article>
 
-        <article className="scenario-card is-findings">
-          <h3>Key Findings</h3>
-          {findings.length ? (
-            <ul className="scenario-findings">
-              {findings.map(finding => (
-                <li key={finding.text} className={`is-${finding.tone}`}>{finding.text}</li>
-              ))}
-            </ul>
-          ) : <p className="scenario-empty">Run a scenario to produce findings.</p>}
-          {onOpenAssistant && (
-            <button type="button" className="scenario-secondary" onClick={onOpenAssistant}>
-              Ask the Twin about this
-            </button>
-          )}
-        </article>
+          {/* Planning insights: what the run means, rather than another set of the same numbers.
+              Unmet demand is the figure a planner acts on, so it leads. */}
+          <article className="scenario-card">
+            <h3>Planning Insights</h3>
+            {r ? (
+              <>
+                <p className={`scenario-big${r.demand.unmet > 0 ? ' is-warn' : ''}`}>
+                  {fmt(r.demand.unmet)}<span>spaces still unmet at peak</span>
+                </p>
+                <ul className="scenario-mini">
+                  <li><em>Demand served</em><b>{pct(r.demand.coveragePct)}</b></li>
+                  <li><em>Forecast peak demand</em><b>{fmt(r.demand.forecastDemand)}</b></li>
+                  <li><em>Main constraint</em><b>{constraintOf(r)}</b></li>
+                </ul>
+              </>
+            ) : <p className="scenario-empty">Run a scenario to see what it changes.</p>}
+            {onOpenAssistant && (
+              <button type="button" className="scenario-secondary" onClick={onOpenAssistant}>
+                Ask the Twin about this
+              </button>
+            )}
+          </article>
+        </div>
+        )}
       </section>
+      )}
       )}
       </>
       )}
