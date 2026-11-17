@@ -67,8 +67,16 @@ const restingStyle = segment => {
  * @param {import('../roads/roadModel.js').RoadSegment[]} segments
  * @param {{picker?: ReturnType<import('./mapPicking.js').createMapPicker>}} [hooks]
  */
-export function installRoadNetworkLayer(viewer, segments, { picker } = {}) {
+/**
+ * @param {object} [options]
+ * @param {boolean} [options.visible]  the layer's INITIAL visibility. It has to be passed in:
+ *   the data loads asynchronously, so this layer is installed after React's visibility effect has
+ *   already run, and a source created visible would stay visible until the toggle was touched.
+ *   The building layer takes it for the same reason.
+ */
+export function installRoadNetworkLayer(viewer, segments, { picker, visible = true } = {}) {
   const source = new CustomDataSource('port-roads');
+  source.show = visible;
   const byId = new Map();
 
   for (const segment of segments) {

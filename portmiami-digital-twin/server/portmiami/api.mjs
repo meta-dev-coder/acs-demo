@@ -23,17 +23,72 @@ import { describeCamera } from './cameras.mjs';
 import { describeMessageSign, parseMessageSignDetail } from './messageSigns.mjs';
 import { parseCarouselCameras } from '../fl511/tooltip.mjs';
 import { interpretQuestion } from './askInterpreter.mjs';
+import {
+  GEOMETRY_SOURCE, VERIFICATION_STATUS, assetExists, createGeometryStore, validateGeometry,
+} from './geometryStore.mjs';
 
 export const API_BASE = '/api/portmiami';
+
+/**
+ * Which stored geometry the app should draw.
+ *
+ * The documented priority, in one place so the server and the browser cannot disagree:
+ * authoritative first, then a reviewer-confirmed GIS footprint, then a reviewer-confirmed traced
+ * outline, and a candidate only when nothing confirmed exists. A candidate can never displace a
+ * confirmed record.
+ */
+export function pickActive(rows = []) {
+  const rank = row => {
+    if (row.verificationStatus === 'AUTHORITATIVE') return 0;
+    if (row.verificationStatus === 'USER_CONFIRMED' && row.geometrySource === 'BUILDING_GEOJSON') return 1;
+    if (row.verificationStatus === 'USER_CONFIRMED' && row.geometrySource === 'MANUALLY_DIGITIZED') return 2;
+    if (row.verificationStatus === 'USER_CONFIRMED') return 3;
+    return 4;
+  };
+  return [...rows].sort((a, b) => rank(a) - rank(b)
+    || String(b.updatedAt).localeCompare(String(a.updatedAt)))[0] ?? null;
+}
 const SNAPSHOT_BASE = `${API_BASE}/camera`;
 const SNAPSHOT_RE = new RegExp(`^${SNAPSHOT_BASE}/(\\d+)/snapshot$`);
 const IMAGE_TIMEOUT_MS = 5_000;
 /** The still-image host DIVAS serves FL511's cameras from, as ACS's proxy already uses. */
 const IMAGE_HOST = 'https://images-dis.divas.cloud/DGI';
 
+/**
+ * Geometry writes are OFF unless an operator turns them on, and then only from this machine.
+ *
+ * This application has no users, no sessions and no authentication. An earlier draft gated writes
+ * on a token the browser sent — which would have meant shipping the server's own secret inside
+ * the JavaScript bundle, where anyone who can load the page can read it. That is not authorisation;
+ * it is a secret in public. It was removed.
+ *
+ * What replaces it carries no secret at all: `PORTMIAMI_GEOMETRY_EDIT=local` enables writing, and
+ * the request must arrive from a loopback address. That is a trusted-local-environment switch — it
+ * suits the demonstration this is built for and nothing more. On a shared host, leave it unset:
+ * reads keep working, writes answer 403 with the reason, and the planner shows a read-only state.
+ *
+ * Editing on a shared deployment needs the sign-in this application does not have. Until then
+ * there is no configuration here that makes it safe, and none is offered.
+ */
+export const EDIT_MODE = Object.freeze({ OFF: 'off', LOCAL: 'local' });
+
+const editMode = (env = process.env) =>
+  ((env.PORTMIAMI_GEOMETRY_EDIT ?? '').trim().toLowerCase() === EDIT_MODE.LOCAL
+    ? EDIT_MODE.LOCAL : EDIT_MODE.OFF);
+
+/** Loopback only: 127.0.0.0/8, ::1, and the IPv4-mapped form Node reports. */
+export function isLoopback(address) {
+  const value = String(address ?? '');
+  return value === '::1'
+    || value === '127.0.0.1'
+    || /^::ffff:127\./.test(value)
+    || /^127\./.test(value);
+}
+
 export function createLiveTrafficApi({
   config = loadFl511Config(), region = DEFAULT_REGION, roadsPath = DEFAULT_ROADS_PATH,
   service, network, logger = console, fetchImpl = fetch,
+  geometryStore = createGeometryStore(), env = process.env,
 } = {}) {
   let ready = null, roadNetwork = network ?? null;
   /** camera id -> its detail, once read. Also the snapshot proxy's scope guard. */
@@ -46,6 +101,9 @@ export function createLiveTrafficApi({
     if (service) return service;
     const roads = roadNetwork ?? await loadRoadNetwork(roadsPath);
     roadNetwork = roads;
+    const probe = await geometryStore.writable?.();
+    logger.log?.(`[PortMiami] asset geometry: ${geometryStore.path}`
+      + ` (editing ${editMode(env)}${probe && !probe.ok ? `, NOT WRITABLE: ${probe.reason}` : ''})`);
     logger.log?.(`[PortMiami] live traffic: ${config.baseUrl}, study area `
       + `${JSON.stringify(region.bbox)}, ${roads.count} road segments, `
       + `${config.refreshSeconds}s events / ${config.assetRefreshSeconds}s cameras+signs`);
@@ -165,6 +223,137 @@ export function createLiveTrafficApi({
     try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return null; }
   }
 
+  /** Is this request allowed to change geometry? */
+  function mayWrite(request) {
+    if (editMode(env) !== EDIT_MODE.LOCAL) {
+      return {
+        ok: false, status: 403,
+        reason: 'Geometry editing is disabled. This deployment has no user accounts, so writes stay '
+          + 'off until an operator sets PORTMIAMI_GEOMETRY_EDIT=local on a trusted machine. '
+          + 'Reading geometry is unaffected.',
+      };
+    }
+    const address = request.socket?.remoteAddress;
+    if (!isLoopback(address)) {
+      return {
+        ok: false, status: 403,
+        reason: 'Geometry editing is enabled for this machine only; this request came from '
+          + `${address ?? 'an unknown address'}.`,
+      };
+    }
+    return { ok: true };
+  }
+
+  /** What the UI should say about its own permissions. */
+  const writeStatus = request => {
+    const allowed = mayWrite(request);
+    return {
+      writable: allowed.ok,
+      readOnlyReason: allowed.ok ? null : allowed.reason,
+      editMode: editMode(env),
+    };
+  };
+
+  /** GET / POST / PUT / DELETE for one asset's geometry. */
+  async function handleGeometry(request, response, assetId, geometryId) {
+    if (!assetExists(assetId)) {
+      sendJson(response, 404, { ok: false, reason: `No infrastructure asset "${assetId}".` });
+      return;
+    }
+
+    if (request.method === 'GET' || request.method === 'HEAD') {
+      const rows = await geometryStore.list(assetId);
+      sendJson(response, 200, {
+        ok: true,
+        assetId,
+        geometries: rows,
+        // The one the app should draw, by the documented priority.
+        active: pickActive(rows),
+        ...writeStatus(request),
+      });
+      return;
+    }
+
+    const allowed = mayWrite(request);
+    if (!allowed.ok) {
+      sendJson(response, allowed.status, { ok: false, reason: allowed.reason });
+      return;
+    }
+
+    if (request.method === 'DELETE') {
+      if (!geometryId) {
+        sendJson(response, 400, { ok: false, reason: 'A geometry id is required to delete one.' });
+        return;
+      }
+      const result = await geometryStore.remove(assetId, geometryId);
+      if (!result.ok) {
+        sendJson(response, result.reason === 'PROTECTED' ? 409 : 404, {
+          ok: false,
+          reason: result.reason === 'PROTECTED'
+            ? 'That record is AUTHORITATIVE and is not deletable through this endpoint.'
+            : 'No such geometry for this asset.',
+        });
+        return;
+      }
+      sendJson(response, 200, { ok: true, removed: result.removed.id });
+      return;
+    }
+
+    const body = await readBody(request, { maxBytes: 512 * 1024 });
+    if (!body) {
+      sendJson(response, 400, { ok: false, reason: 'A JSON body is required.' });
+      return;
+    }
+
+    if (request.method === 'POST') {
+      const check = validateGeometry(body.geometry);
+      if (!check.ok) { sendJson(response, 422, { ok: false, reason: check.reason }); return; }
+      const source = GEOMETRY_SOURCE[body.geometrySource] ?? null;
+      const status = VERIFICATION_STATUS[body.verificationStatus] ?? null;
+      if (!source || !status) {
+        sendJson(response, 422, {
+          ok: false,
+          reason: 'geometrySource and verificationStatus must be among '
+            + `${Object.keys(GEOMETRY_SOURCE).join('/')} and ${Object.keys(VERIFICATION_STATUS).join('/')}.`,
+        });
+        return;
+      }
+      const row = await geometryStore.save(assetId, {
+        geometry: body.geometry,
+        geometrySource: source,
+        verificationStatus: status,
+        heightM: Number.isFinite(Number(body.heightM)) ? Number(body.heightM) : null,
+        heightSource: typeof body.heightSource === 'string' ? body.heightSource.slice(0, 120) : null,
+        buildingObjectIds: Array.isArray(body.buildingObjectIds)
+          ? body.buildingObjectIds.map(Number).filter(Number.isInteger).slice(0, 50) : [],
+        sourceReference: typeof body.sourceReference === 'string' ? body.sourceReference.slice(0, 500) : null,
+      });
+      sendJson(response, 201, { ok: true, geometry: row });
+      return;
+    }
+
+    if (request.method === 'PUT') {
+      if (!geometryId) {
+        sendJson(response, 400, { ok: false, reason: 'A geometry id is required to update one.' });
+        return;
+      }
+      if (body.geometry) {
+        const check = validateGeometry(body.geometry);
+        if (!check.ok) { sendJson(response, 422, { ok: false, reason: check.reason }); return; }
+      }
+      if (body.verificationStatus && !VERIFICATION_STATUS[body.verificationStatus]) {
+        sendJson(response, 422, { ok: false, reason: 'Unknown verificationStatus.' });
+        return;
+      }
+      const row = await geometryStore.update(assetId, geometryId, body);
+      if (!row) { sendJson(response, 404, { ok: false, reason: 'No such geometry for this asset.' }); return; }
+      sendJson(response, 200, { ok: true, geometry: row });
+      return;
+    }
+
+    sendJson(response, 405, { ok: false, reason: 'Geometry supports GET, POST, PUT and DELETE.' });
+  }
+
   async function handle(request, response) {
     const url = new URL(request.url, 'http://localhost');
     const { pathname } = url;
@@ -179,6 +368,21 @@ export function createLiveTrafficApi({
       const body = await readBody(request);
       const { status, body: payload } = await interpretQuestion(body?.question, { fetchImpl });
       sendJson(response, status, payload);
+      return true;
+    }
+
+    // ---- asset geometry: the only read/write resource this API has ---------------------------
+    // The segments are matched loosely and decoded, because a geometry id carries an ISO
+    // timestamp whose colons arrive percent-encoded. Matching the raw path against a character
+    // class silently missed every DELETE and PUT, which then fell through to "only GET".
+    const geometryRoute = /^\/api\/portmiami\/assets\/([^/]{1,200})\/geometry(?:\/([^/]{1,300}))?$/
+      .exec(pathname);
+    if (geometryRoute) {
+      const decode = value => {
+        if (value === undefined) return null;
+        try { return decodeURIComponent(value); } catch { return value; }
+      };
+      await handleGeometry(request, response, decode(geometryRoute[1]), decode(geometryRoute[2]));
       return true;
     }
 

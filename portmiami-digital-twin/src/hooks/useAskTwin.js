@@ -40,13 +40,28 @@ async function interpret(question) {
 let turnId = 0;
 const nextId = () => { turnId += 1; return `turn-${turnId}`; };
 
-export function useAskTwin({ selection, infra, roads, buildings, traffic, explorer, viewerRef, buildingsById }) {
+export function useAskTwin({
+  selection, infra, roads, buildings, traffic, explorer, viewerRef, buildingsById, planner,
+}) {
   const [open, setOpen] = useState(false);
   const [turns, setTurns] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   /** Conversation memory: subjects and result ids only. Cleared with the conversation. */
   const memoryRef = useRef(createSession());
+
+  /**
+   * The planner's LIVE scenarios and runs, not a copy read back from storage.
+   *
+   * `createDataView` falls back to `loadScenarios()` when no planner is supplied, and that stopped
+   * working the day scenario state became session-only: nothing is written to that key any more,
+   * so every scenario question answered "the scenario planner has no scenarios yet" while three
+   * of them sat on screen. Passing the live state keeps an answer and the Compare tab looking at
+   * the same runs by construction.
+   */
+  const plannerView = useMemo(
+    () => ({ scenarios: planner?.scenarios ?? [], runs: planner?.runs ?? [] }),
+    [planner?.scenarios, planner?.runs]);
 
   const view = useMemo(() => createDataView({
     assets: infra.assets,
@@ -55,7 +70,8 @@ export function useAskTwin({ selection, infra, roads, buildings, traffic, explor
     buildingsById,
     linksFor: id => infra.linksFor(id),
     traffic,
-  }), [infra, roads.segments, buildings.buildings, buildingsById, traffic]);
+    planner: plannerView,
+  }), [infra, roads.segments, buildings.buildings, buildingsById, traffic, plannerView]);
 
   const ready = viewReady(view);
 

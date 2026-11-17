@@ -847,3 +847,434 @@ button { font: inherit; color: inherit; cursor: pointer; }
   background: transparent; font-size: 11.5px; color: var(--ui-text-secondary); cursor: pointer;
 }
 .ask-clear:hover { color: var(--ui-accent); }
+
+/* ---- Workspaces --------------------------------------------------------------------- */
+
+.app.has-rail { flex-direction: row; }
+.app-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* The dark navy rail from the client's reference, on this app's own tokens. */
+.workspace-rail {
+  position: relative;
+  flex: none; width: 196px; display: flex; flex-direction: column; gap: 4px;
+  padding: 14px 10px; background: #0b1729; color: #e8eef6;
+  transition: width 160ms ease;
+}
+/* Icon-only. Wide enough for the 20px glyph and its hit target, and nothing else. */
+.workspace-rail.is-collapsed { width: 56px; padding-left: 8px; padding-right: 8px; }
+.workspace-brand {
+  display: flex; align-items: center; gap: 8px; padding: 4px 8px 14px; color: #67a6f4;
+}
+.workspace-rail ul { margin: 0; padding: 0; list-style: none; }
+.workspace-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 4px;
+  padding: 9px 10px; border: 0; border-radius: 8px; background: transparent;
+  font-size: 12.5px; font-weight: 600; line-height: 1.25; text-align: left;
+  color: #9fb3cd; cursor: pointer;
+}
+.workspace-item svg { flex: none; }
+.workspace-item:hover { background: #ffffff0f; color: #e8eef6; }
+.workspace-item[aria-current="page"] { background: #1862d0; color: #fff; }
+.workspace-rail.is-collapsed .workspace-item { justify-content: center; padding: 9px 0; gap: 0; }
+/* `display: none` rather than width 0: the label must not keep a sliver of its box. */
+.workspace-rail.is-collapsed .workspace-item-label { display: none; }
+.workspace-rail.is-collapsed .workspace-brand { justify-content: center; padding: 4px 0 14px; }
+
+/* The one control that opens and closes the rail, on its edge, as in the sdna-quasar drawer. */
+.workspace-toggle {
+  position: absolute; top: 18px; right: -13px; z-index: 3;
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0;
+  border: 1px solid #27405f; border-radius: 999px; background: #12213a;
+  color: #9fb3cd; cursor: pointer;
+}
+.workspace-toggle:hover { background: #1862d0; border-color: #1862d0; color: #fff; }
+.workspace-toggle:focus-visible { outline: 2px solid #67a6f4; outline-offset: 2px; }
+
+/* Visible to a screen reader, not on screen. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ---- Parking Scenario Planner -------------------------------------------------------- */
+
+.scenario-header {
+  position: absolute; top: 16px; left: 16px; right: 450px; z-index: 2;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: 10px 14px; border: 1px solid var(--ui-border); border-radius: 12px;
+  background: var(--ui-surface); box-shadow: var(--ui-shadow);
+}
+.scenario-header h2 { margin: 0; font-size: 15px; font-weight: 650; }
+.scenario-header p { margin: 2px 0 0; font-size: 12px; color: var(--ui-text-secondary); }
+/* Permanent, never dismissible: the one thing this screen must always communicate. */
+.scenario-badge {
+  flex: none; padding: 5px 10px; border: 1px solid var(--ui-tone-warn);
+  border-radius: 999px; background: var(--ui-tone-warn-bg);
+  font-size: 11px; font-weight: 650; color: var(--ui-tone-warn);
+}
+
+.scenario-panel {
+  position: absolute; top: 16px; right: 74px; width: 360px; max-height: calc(100% - 210px);
+  display: flex; flex-direction: column;
+  border: 1px solid var(--ui-border); border-radius: 12px;
+  background: var(--ui-surface); box-shadow: var(--ui-shadow); z-index: 3;
+}
+.scenario-tabs { display: flex; gap: 2px; padding: 10px 12px 0; }
+.scenario-tabs button {
+  flex: 1; padding: 7px 0; border: 0; border-bottom: 2px solid transparent;
+  background: transparent; font-size: 12.5px; font-weight: 600;
+  color: var(--ui-text-secondary); cursor: pointer;
+}
+.scenario-tabs button[aria-selected="true"] { color: var(--ui-accent); border-bottom-color: var(--ui-accent); }
+
+.scenario-list { margin: 8px 0 0; padding: 0 12px; list-style: none; }
+.scenario-choice {
+  display: flex; align-items: center; gap: 9px; margin-bottom: 5px; padding: 8px 10px;
+  border: 1px solid var(--ui-border); border-radius: 9px; cursor: pointer;
+}
+.scenario-choice.is-selected { border-color: var(--ui-accent-line); background: var(--ui-accent-soft); }
+.scenario-choice input { accent-color: var(--ui-accent); }
+.scenario-choice-body { display: flex; flex-direction: column; min-width: 0; }
+.scenario-choice-name { font-size: 12.5px; font-weight: 650; color: var(--ui-text); }
+.scenario-choice-meta { font-size: 11px; color: var(--ui-text-secondary); }
+.scenario-list-actions { display: flex; gap: 5px; padding: 4px 12px 8px; }
+.scenario-list-actions button {
+  flex: 1; padding: 5px 0; border: 1px solid var(--ui-border-strong); border-radius: 7px;
+  background: transparent; font-size: 11.5px; color: var(--ui-text-secondary); cursor: pointer;
+}
+.scenario-list-actions button:hover:not(:disabled) { color: var(--ui-accent); border-color: var(--ui-accent-line); }
+.scenario-list-actions button:disabled { opacity: .45; cursor: default; }
+
+.scenario-tabbody { flex: 1; min-height: 100px; overflow-y: auto; padding: 4px 12px 12px;
+  border-top: 1px solid var(--ui-border-soft); }
+.scenario-tab { display: flex; flex-direction: column; gap: 9px; }
+
+.scenario-field { display: flex; flex-direction: column; gap: 3px; }
+.scenario-field-label { font-size: 11px; font-weight: 650; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--ui-text-secondary); }
+.scenario-field-note { font-size: 10.5px; line-height: 1.4; color: var(--ui-text-muted); }
+.scenario-field input, .scenario-field select, .assumption-value input {
+  padding: 6px 8px; border: 1px solid var(--ui-border-strong); border-radius: 7px;
+  background: var(--ui-surface-raised); font-size: 12.5px; color: var(--ui-text);
+}
+.scenario-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.scenario-provenance { padding: 9px 10px; border: 1px solid var(--ui-border); border-radius: 9px;
+  background: var(--ui-surface-raised); }
+.scenario-provenance h4 { margin: 0 0 6px; font-size: 11px; font-weight: 650;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--ui-text-secondary); }
+.scenario-provenance dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 0; }
+.scenario-provenance dt { font-size: 11px; color: var(--ui-text-secondary); }
+.scenario-provenance dd { margin: 0; font-size: 11.5px; color: var(--ui-text); }
+/* Verified, assumed and missing are three different claims and read as three different things. */
+.scenario-provenance dd.is-verified { color: var(--ui-tone-ok); font-weight: 600; }
+.scenario-provenance dd.is-assumed { color: var(--ui-tone-warn); }
+.scenario-provenance dd.is-missing { color: var(--ui-text-muted); font-style: italic; }
+
+.scenario-toggle { display: flex; gap: 3px; }
+.scenario-toggle button {
+  flex: 1; padding: 6px 0; border: 1px solid var(--ui-border-strong); border-radius: 7px;
+  background: transparent; font-size: 11.5px; color: var(--ui-text-secondary); cursor: pointer;
+}
+.scenario-toggle button[aria-pressed="true"] {
+  background: var(--ui-accent-soft); border-color: var(--ui-accent-line); color: var(--ui-accent);
+}
+.scenario-pick, .scenario-secondary {
+  padding: 7px 10px; border: 1px solid var(--ui-border-strong); border-radius: 8px;
+  background: transparent; font-size: 12px; font-weight: 600; color: var(--ui-text-secondary);
+  cursor: pointer;
+}
+.scenario-pick.is-armed { border-color: var(--ui-tone-warn); color: var(--ui-tone-warn); background: var(--ui-tone-warn-bg); }
+.scenario-secondary:hover, .scenario-pick:hover { color: var(--ui-accent); border-color: var(--ui-accent-line); }
+
+.scenario-run {
+  padding: 10px 0; border: 0; border-radius: 9px; background: var(--ui-accent-strong);
+  font-size: 13px; font-weight: 700; color: var(--ui-accent-contrast); cursor: pointer;
+}
+.scenario-run:disabled { opacity: .45; cursor: default; }
+.scenario-runmeta { margin: 0; font-size: 10.5px; color: var(--ui-text-muted); }
+
+.scenario-results { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 0; }
+.scenario-results dt { font-size: 11px; color: var(--ui-text-secondary); }
+.scenario-results dd { margin: 0; font-size: 12px; font-weight: 600; color: var(--ui-text);
+  font-variant-numeric: tabular-nums; }
+.scenario-results dd em { font-weight: 400; font-style: normal; color: var(--ui-text-muted); }
+
+.scenario-empty, .scenario-scope, .scenario-hint {
+  margin: 4px 0; font-size: 11px; line-height: 1.45; color: var(--ui-text-muted);
+}
+.scenario-warn {
+  margin: 4px 0; padding: 7px 9px; border-left: 3px solid var(--ui-tone-warn); border-radius: 0 7px 7px 0;
+  background: var(--ui-tone-warn-bg); font-size: 11px; line-height: 1.45; color: var(--ui-text);
+}
+.scenario-blocking { margin: 4px 0; padding-left: 18px; }
+.scenario-blocking li { font-size: 11.5px; color: var(--ui-tone-bad); }
+
+.scenario-assumptions section { margin-top: 10px; }
+.scenario-assumptions h4 { margin: 0 0 5px; font-size: 11px; font-weight: 650;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--ui-text-secondary); }
+.scenario-assumptions-head { display: flex; align-items: flex-start; gap: 8px; }
+.scenario-assumptions-head p { margin: 0; font-size: 11px; color: var(--ui-text-muted); }
+.scenario-assumptions-head button {
+  flex: none; padding: 4px 8px; border: 1px solid var(--ui-border-strong); border-radius: 6px;
+  background: transparent; font-size: 11px; color: var(--ui-text-secondary); cursor: pointer;
+}
+.assumption-row { padding: 6px 0; border-bottom: 1px solid var(--ui-border-soft); }
+.assumption-head { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: 11.5px; font-weight: 600; color: var(--ui-text); }
+.assumption-value { display: flex; align-items: center; gap: 5px; }
+.assumption-value input { width: 78px; text-align: right; }
+.assumption-value em { font-style: normal; font-size: 10.5px; color: var(--ui-text-muted); }
+.assumption-basis { margin: 3px 0 0; font-size: 10.5px; line-height: 1.4; color: var(--ui-text-muted); }
+
+.scenario-recommend { padding: 9px 10px; border: 1px solid var(--ui-accent-line); border-radius: 9px;
+  background: var(--ui-accent-soft); }
+.scenario-recommend h4 { margin: 0 0 5px; font-size: 11px; font-weight: 650;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--ui-accent); }
+.scenario-rec-line { margin: 0 0 7px; font-size: 11.5px; line-height: 1.45; color: var(--ui-text); }
+.scenario-ranking { margin: 0; padding: 0; list-style: none; }
+.scenario-ranking li { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12px; }
+.scenario-rank { width: 18px; height: 18px; border-radius: 50%; background: var(--ui-accent-strong);
+  color: var(--ui-accent-contrast); font-size: 11px; font-weight: 700; text-align: center; line-height: 18px; }
+.scenario-rank-name { flex: 1; min-width: 0; color: var(--ui-text); }
+.scenario-rank-score { font-variant-numeric: tabular-nums; color: var(--ui-text-secondary); }
+.scenario-weights { margin: 4px 0; padding-left: 16px; }
+.scenario-weights li { font-size: 10.5px; line-height: 1.45; color: var(--ui-text-muted); }
+.scenario-excluded-head { margin: 6px 0 0; font-size: 10.5px; font-weight: 650; color: var(--ui-text-secondary); }
+
+.scenario-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.scenario-table th, .scenario-table td { padding: 5px 6px; text-align: right;
+  border-bottom: 1px solid var(--ui-border-soft); font-variant-numeric: tabular-nums; }
+.scenario-table thead th { color: var(--ui-text-secondary); font-weight: 650; }
+.scenario-table tbody th { text-align: left; font-weight: 500; color: var(--ui-text-secondary); }
+.scenario-table td { color: var(--ui-text); }
+
+.scenario-figure { margin: 10px 0 0; }
+.scenario-figure svg { width: 100%; height: auto; }
+.scenario-figure figcaption { margin-top: 3px; font-size: 10.5px; line-height: 1.4; color: var(--ui-text-muted); }
+
+/* The results strip. Three cards, no decoration, each reporting a calculated value. */
+.scenario-results-bar {
+  position: absolute; left: 16px; right: 450px; bottom: 16px; z-index: 2;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+}
+.scenario-card {
+  padding: 11px 13px; border: 1px solid var(--ui-border); border-radius: 12px;
+  background: var(--ui-surface); box-shadow: var(--ui-shadow-soft);
+}
+.scenario-card h3 { margin: 0 0 6px; font-size: 11px; font-weight: 650;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--ui-text-secondary); }
+.scenario-big { margin: 0; font-size: 26px; font-weight: 700; line-height: 1.1;
+  color: var(--ui-text); font-variant-numeric: tabular-nums; }
+.scenario-big span { display: block; font-size: 11px; font-weight: 400; color: var(--ui-text-secondary); }
+.scenario-mini { margin: 7px 0 0; padding: 0; list-style: none; }
+.scenario-mini li { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; }
+.scenario-mini em { font-style: normal; color: var(--ui-text-secondary); }
+.scenario-mini b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.scenario-card.is-findings { max-height: 180px; overflow-y: auto; }
+.scenario-findings { margin: 0; padding-left: 15px; }
+.scenario-findings li { font-size: 11px; line-height: 1.45; margin-bottom: 4px; color: var(--ui-text); }
+.scenario-findings li.is-good { color: var(--ui-tone-ok); }
+.scenario-findings li.is-warn { color: var(--ui-tone-warn); }
+.scenario-findings li.is-bad { color: var(--ui-tone-bad); }
+
+/* Ask the Twin and the planner both want the right column. When both are open the planner steps
+   left, and the header and results strip step left with it, so nothing is stacked on anything. */
+.app-viewport.has-ask .scenario-panel { right: 450px; }
+.app-viewport.has-ask .scenario-header,
+.app-viewport.has-ask .scenario-results-bar { right: 826px; }
+
+/* A candidate footprint offered for confirmation. Amber, like every other provisional thing. */
+.scenario-candidate {
+  padding: 8px 10px; border: 1px solid var(--ui-tone-warn); border-radius: 9px;
+  background: var(--ui-tone-warn-bg);
+}
+.scenario-candidate p { margin: 0 0 7px; font-size: 11px; line-height: 1.45; color: var(--ui-text); }
+.scenario-candidate strong { font-variant-numeric: tabular-nums; }
+
+/* Choosing a garage's geometry: pick county polygons, or trace one. */
+.scenario-geometry {
+  padding: 9px 10px; border: 1px solid var(--ui-border); border-radius: 9px;
+  background: var(--ui-surface-raised);
+}
+.scenario-geometry.is-active { border-color: var(--ui-accent-line); background: var(--ui-accent-soft); }
+.scenario-geometry h4 {
+  margin: 0 0 6px; font-size: 11px; font-weight: 650; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--ui-text-secondary);
+}
+.scenario-geometry-state { margin: 0 0 6px; font-size: 11.5px; line-height: 1.45; }
+.scenario-geometry-state.is-verified { color: var(--ui-tone-ok); font-weight: 600; }
+.scenario-geometry-state.is-assumed { color: var(--ui-tone-warn); }
+.scenario-geometry-state.is-missing { color: var(--ui-text-muted); font-style: italic; }
+.scenario-geometry-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.scenario-geometry-actions button { flex: 1 1 auto; }
+
+.scenario-picked { margin: 4px 0 0; padding: 0; list-style: none; }
+.scenario-picked li {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center;
+  padding: 4px 0; border-bottom: 1px solid var(--ui-border-soft);
+  font-size: 11.5px; font-variant-numeric: tabular-nums;
+}
+.scenario-picked li button {
+  padding: 2px 7px; border: 1px solid var(--ui-border-strong); border-radius: 6px;
+  background: transparent; font-size: 10.5px; color: var(--ui-text-secondary); cursor: pointer;
+}
+.scenario-picked-total { font-weight: 650; border-bottom: 0; }
+
+.scenario-height { display: flex; align-items: flex-end; gap: 7px; margin-top: 9px; }
+.scenario-height .scenario-field { flex: 1; }
+
+/* Working on the map: the panel narrows so the garage is not hidden behind it. */
+.scenario-panel.is-compact { width: 300px; max-height: calc(100% - 32px); }
+.scenario-panel.is-compact .scenario-list,
+.scenario-panel.is-compact .scenario-list-actions,
+.scenario-panel.is-compact .scenario-tabs { display: none; }
+
+.scenario-geometry-meta { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 6px 0 0; }
+.scenario-geometry-meta dt { font-size: 10.5px; color: var(--ui-text-secondary); }
+.scenario-geometry-meta dd { margin: 0; font-size: 10.5px; color: var(--ui-text); font-variant-numeric: tabular-nums; }
+
+.scenario-readonly {
+  margin: 6px 0 0; padding: 7px 9px; border-left: 3px solid var(--ui-tone-info, #4e9ae0);
+  border-radius: 0 7px 7px 0; background: var(--ui-surface-sunken);
+  font-size: 11px; line-height: 1.45; color: var(--ui-text-secondary);
+}
+
+.scenario-diagnostics-toggle {
+  display: flex; align-items: center; gap: 7px; margin-top: 7px;
+  font-size: 11px; color: var(--ui-text-secondary);
+}
+.scenario-diagnostics-toggle input { accent-color: var(--ui-accent); }
+
+/* The planner opens from a button at the top right; the map is this workspace's default state. */
+.scenario-open {
+  position: absolute; top: 16px; right: 74px; z-index: 4;
+  padding: 9px 16px; border: 1px solid var(--ui-border); border-radius: 10px;
+  background: var(--ui-surface); box-shadow: var(--ui-shadow);
+  font-size: 13px; font-weight: 650; color: var(--ui-accent); cursor: pointer;
+}
+.scenario-open:hover { border-color: var(--ui-accent-line); }
+
+.scenario-panel { top: 16px; max-height: calc(100% - 32px); }
+.scenario-panel-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 10px 0;
+}
+.app-viewport.has-ask .scenario-open { right: 826px; }
+
+.scenario-session-note {
+  margin: 6px 12px 10px; font-size: 10.5px; line-height: 1.45; color: var(--ui-text-muted);
+}
+
+/* ---- Proposed garage placement (Scenario B) ------------------------------------------- */
+
+.scenario-placement { display: flex; flex-direction: column; gap: 8px; }
+.scenario-placement-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.scenario-placement-actions button { flex: 1 1 auto; min-width: 94px; }
+.scenario-placement-rotate { display: flex; gap: 6px; }
+.scenario-placement-rotate button {
+  flex: 1; padding: 5px 8px; border: 1px solid var(--ui-border); border-radius: 7px;
+  background: var(--ui-surface); font-size: 12px; cursor: pointer;
+}
+.scenario-placement-rotate button:hover { background: var(--ui-surface-muted, #f2f5f9); }
+
+.scenario-collapsible { border: 1px solid var(--ui-border); border-radius: 9px; overflow: hidden; }
+.scenario-collapsible-head {
+  display: flex; align-items: baseline; gap: 8px; width: 100%;
+  padding: 8px 10px; border: 0; background: var(--ui-surface-muted, #f4f7fb);
+  font-size: 12.5px; text-align: left; cursor: pointer;
+}
+.scenario-collapsible-title { font-weight: 650; }
+/* Wraps rather than truncates: the summary is what stands in for the block when it is closed,
+   so cutting it off at "Garage B · 4 confi…" defeats the point of having one. */
+.scenario-collapsible-summary {
+  flex: 1; min-width: 0; font-size: 11.5px; color: var(--ui-text-secondary);
+}
+.scenario-collapsible-chevron { flex: none; font-weight: 700; color: var(--ui-text-secondary); }
+.scenario-collapsible-body {
+  display: flex; flex-direction: column; gap: 8px; padding: 10px; border-top: 1px solid var(--ui-border);
+}
+
+.scenario-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: end; }
+.scenario-checkline { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+
+.scenario-readout { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; margin: 0; font-size: 12px; }
+.scenario-readout dt { color: var(--ui-text-secondary); }
+.scenario-readout dd { margin: 0; font-weight: 650; text-align: right; }
+
+.scenario-conflicts { display: flex; flex-direction: column; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.scenario-conflicts li {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 7px 9px; border-left: 3px solid var(--ui-border); border-radius: 0 7px 7px 0;
+  background: var(--ui-surface-muted, #f4f7fb); font-size: 11.5px;
+}
+.scenario-conflicts li span { color: var(--ui-text-secondary); }
+/* A conflict, a clear result and an unevaluated one are three different claims and look it. */
+.scenario-conflicts li.is-conflict { border-left-color: var(--ui-tone-warn, #b06a00); background: var(--ui-tone-warn-bg, #fff6e5); }
+.scenario-conflicts li.is-clear { border-left-color: #2f9e52; }
+.scenario-conflicts li.is-not_evaluated { border-left-color: #94a3b8; }
+
+.scenario-ok { margin: 0; font-size: 12px; color: #1f7a3d; }
+.scenario-error { margin: 0; font-size: 12px; color: var(--ui-tone-bad, #b3261e); }
+.scenario-secondary.is-danger { color: var(--ui-tone-bad, #b3261e); }
+.scenario-primary {
+  padding: 7px 10px; border: 1px solid var(--ui-accent-strong); border-radius: 8px;
+  background: var(--ui-accent-strong); font-size: 12px; font-weight: 650;
+  color: var(--ui-accent-contrast); cursor: pointer;
+}
+.scenario-primary:hover { filter: brightness(1.08); }
+
+/* The 4-way nudge pad and the floor stepper. */
+.scenario-nudge { display: flex; align-items: center; gap: 10px; }
+.scenario-nudge-pad {
+  flex: none; display: grid; grid-template-columns: repeat(3, 28px); grid-template-rows: repeat(3, 24px);
+  gap: 2px;
+}
+/* The middle cell is empty on purpose — it is where the thing being moved is. */
+.scenario-nudge-steps { align-self: center; }
+.scenario-nudge-pad button {
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--ui-border-strong); border-radius: 6px; background: var(--ui-surface);
+  font-size: 14px; line-height: 1; color: var(--ui-text-secondary); cursor: pointer;
+}
+.scenario-nudge-pad button:hover { color: var(--ui-accent); border-color: var(--ui-accent-line); }
+.scenario-nudge-pad .is-up { grid-area: 1 / 2; }
+.scenario-nudge-pad .is-left { grid-area: 2 / 1; }
+.scenario-nudge-pad .is-right { grid-area: 2 / 3; }
+.scenario-nudge-pad .is-down { grid-area: 3 / 2; }
+.scenario-nudge-steps { display: flex; flex-wrap: wrap; gap: 4px; }
+.scenario-nudge-steps button {
+  padding: 4px 8px; border: 1px solid var(--ui-border); border-radius: 999px;
+  background: var(--ui-surface); font-size: 11px; color: var(--ui-text-secondary); cursor: pointer;
+}
+.scenario-nudge-steps button.is-selected {
+  border-color: var(--ui-accent-line); background: var(--ui-accent-soft, #e8f0fe); color: var(--ui-accent);
+  font-weight: 650;
+}
+
+.scenario-stepper { display: flex; align-items: stretch; gap: 4px; }
+.scenario-stepper input { flex: 1; min-width: 0; }
+.scenario-stepper button {
+  flex: none; width: 30px; border: 1px solid var(--ui-border-strong); border-radius: 7px;
+  background: var(--ui-surface); font-size: 15px; line-height: 1; color: var(--ui-text-secondary);
+  cursor: pointer;
+}
+.scenario-stepper button:hover:not(:disabled) { color: var(--ui-accent); border-color: var(--ui-accent-line); }
+.scenario-stepper button:disabled { opacity: .4; cursor: default; }
+
+/* Inside a collapsible the provenance block is already in a box, so it drops its own. */
+.scenario-collapsible-body > .scenario-provenance {
+  padding: 0; border: 0; border-radius: 0; background: transparent;
+}
+
+/* The camera buttons the panel carries while the map-control column is hidden. */
+.scenario-panel-camera { display: flex; gap: 2px; }
+.scenario-panel-camera button {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0;
+  border: 1px solid var(--ui-border); border-radius: 7px; background: var(--ui-surface);
+  font-size: 14px; line-height: 1; color: var(--ui-text-secondary); cursor: pointer;
+}
+.scenario-panel-camera button:hover { color: var(--ui-accent); border-color: var(--ui-accent-line); }
+.scenario-panel-camera button:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }

@@ -1169,3 +1169,512 @@ payload, follow-up resolution, the honest fallbacks and the 503.
 
 Then select a road in the Road Network explorer and ask **"Which buildings are within 200 metres of
 this road?"** to show the context line resolving "this road" to the selection.
+
+## Parking Expansion Scenario Planner
+
+The second workspace. Select a registered garage, configure expansion alternatives, visualise the
+proposed construction in 3D, run a deterministic simulation, and compare the alternatives.
+
+**Every figure this planner produces is synthetic.** Not one is a PortMiami measurement, a county
+forecast or an approved project. The badge saying so is permanent and the assumptions panel is one
+click away, because the single most important thing this screen communicates is which numbers are
+verified — the garages, their footprints, the roads — and which are invented.
+
+### Two workspaces, one viewer
+
+`WorkspaceSidebar` switches between the Digital Twin Explorer and the planner. There is no router
+in this project, so the workspace is component state, and **the Cesium viewer is never unmounted**:
+switching changes which panels are mounted over the map, so the camera, the tiles and every layer
+survive untouched. A verified check: the suite records the camera before and after a switch and
+asserts it has not moved.
+
+### Files
+
+| File | What it is |
+|---|---|
+| `src/config/scenarioPlanner.js` | the assumption register — every number, with its basis sentence |
+| `src/scenarios/capacityModel.js` | capacity, stated or estimated from geometry |
+| `src/scenarios/demandModel.js` | the compound-growth demand forecast |
+| `src/scenarios/trafficModel.js` | access-road loading and the conserving queue |
+| `src/scenarios/simulation.js` | the deterministic run → a `ScenarioRun` |
+| `src/scenarios/comparison.js` | comparison, the ranking and the key findings |
+| `src/scenarios/scenarioModel.js` | scenario shape, seeds, validation |
+| `src/scenarios/scenarioStore.js` | persistence (localStorage, same pattern as the link store) |
+| `src/cesium/scenarioMassingLayer.js` | the highlight and the proposed massing |
+| `src/cesium/sitePicker.js` | "click the map to choose a candidate site" |
+| `src/hooks/useScenarioPlanner.js` | planner state |
+| `src/components/ScenarioPlanner.jsx` | the workspace, with Plan / Simulate / Compare |
+| `src/components/ScenarioCharts.jsx` | the three plots, drawn from run results |
+| `src/ask/scenarioTools.js` | Ask the Twin's read-only view of saved runs |
+| `src/scenarios/garagePlacement.js` | the parametric proposed garage: ENU frame, ring, handles, edits, capacity, validation |
+| `src/scenarios/siteConflicts.js` | footprint-against-layers overlap, with NOT_EVALUATED for what this twin lacks |
+| `src/scenarios/placementStore.js` | the one piece of scenario work that survives a reload — a *saved* placement |
+| `src/cesium/garagePlacementEditor.js` | the preview, the drag handles and the plane-based pointer maths |
+
+### Formulas
+
+```text
+Proposed total capacity = existing capacity + additional spaces
+Usable capacity         = proposed total × utilisation%
+Estimated spaces        = (footprint area × parking floors) ÷ GROSS area per space
+Forecast demand         = base demand × (1 + annual growth)^years × peak-day multiplier
+Demand served           = min(usable capacity, forecast demand)
+Additional arrivals     = additional spaces × utilisation% × vehicles/space × peak arrival share
+Access capacity         = capacity per lane × lanes × (1 − construction closure%)
+V/C                     = (baseline volume + added vehicles) ÷ assumed capacity
+Queue (5-min steps)     = queue + arrivals − min(queue + arrivals, service rate)
+```
+
+Four traps these avoid, each with a test:
+
+- **Gross, not stall, area per space.** 32 m²/space covers aisles, ramps, cores and structure. A
+  stall's own ~14 m² would roughly double every capacity estimate.
+- **Trips come from occupied spaces, not built ones.** An empty deck generates no traffic, and one
+  trip per space per hour would multiply the traffic result several times over.
+- **Demand served is capped at demand.** Otherwise spare capacity inflates the ranking.
+- **A missing input is "not calculated", never 0.** `Number(null)` is 0, which is how an
+  unpublished building height becomes a confident `0 m` in a results table.
+
+### The 3D massing, and why it sits above the building
+
+Google's photorealistic tiles already contain the real garage. Extruding its footprint from the
+ground puts a box through the photogrammetry: the surfaces z-fight and the box swallows the
+building. Per-feature styling is not available on that tileset, and clipping it against one
+footprint is fragile across tile loads.
+
+So the proposal is drawn as **additional floors above the existing roof**. The roof elevation is
+*measured* by sampling the rendered mesh (`clampToHeightMostDetailed`, the same technique the asset
+marker uses), the volume is extruded from there up by floors × floor-to-floor, and a brighter cap
+closes it. It never intersects the photogrammetry. If the mesh cannot be sampled the layer falls
+back to an explicitly assumed elevation **and says so in the panel**.
+
+**The extract's HEIGHT field is never read as metres.** 577 of the 6,000 footprints carry a HEIGHT
+and the source states no unit or datum for any of them; feet and metres differ by a factor of three
+in a massing. So only the *added* height is ever reported, and a run whose footprint has a HEIGHT
+value says explicitly that it was not interpreted. A test asserts both.
+
+A surface-lot scenario gets **no massing at all** — a reconfigured car park is not a building.
+
+### The garage highlight
+
+`src/cesium/garageHighlight.js` is a reusable controller — `highlightGarage()`, `estimateHeight()`,
+`clearHighlight()`, `flyTo()`, `destroy()` — on its own data source, separate from the proposed
+massing. The highlight works the moment a garage is chosen: no simulation run, and it survives
+switching between Plan, Simulate and Compare.
+
+**It draws a building, not a lid.** Translucent blue walls extruded from the sampled ground to the
+structure's height, a brighter roof plane, cyan polylines around the base and the top, and a
+vertical edge at each corner. The perimeter is polylines because `polygon.outlineWidth` is not
+honoured at a usable width on most WebGL platforms.
+
+**The envelope is inflated outward by ~1.2 m.** Google's tiles already contain the real garage, so
+an envelope on exactly the same footprint shares surfaces with the mesh and z-fights along every
+wall. Pushing it out makes the envelope *enclose* the building instead of coinciding with it. It is
+a visualisation device: every area reported in the UI comes from the original ring.
+
+**Height is an input, not a measurement.** `existingHeightM` is an editable assumption. *Estimate
+from 3D tiles* samples the mesh — low percentile around the perimeter for the ground, high
+percentile inside for the roof — and reports the implied height *and its spread* for a person to
+accept or reject. A sample never becomes the height on its own, and the extract's HEIGHT field is
+still never read as metres.
+
+### Asset geometry lives on the server
+
+**The architectural gap, stated plainly:** this project has no database — its dependencies are
+`cesium`, `react` and `react-dom` — and **no authentication of any kind**. The server was a
+framework-free, read-only FL511 proxy. All persistence was `localStorage`.
+
+That caused a client-visible failure. A footprint traced for Garage A existed only in the browser
+that drew it; every other browser fell back to the unconfirmed candidate, OBJECTID 794643. Geometry
+is now stored **server-side** and loaded by every session.
+
+**The smallest solution consistent with the project:** a JSON file written by the existing
+`node:http` server (`server/portmiami/geometryStore.mjs`), written atomically (temp file +
+rename) and shaped like the table it stands in for, so moving to a real database later is a port
+of one file. It is *not* multi-writer safe across processes — one host writing one file is the
+deployment this matches.
+
+```http
+GET    /api/portmiami/assets/:assetId/geometry
+POST   /api/portmiami/assets/:assetId/geometry
+PUT    /api/portmiami/assets/:assetId/geometry/:geometryId
+DELETE /api/portmiami/assets/:assetId/geometry/:geometryId
+```
+
+`POST` validates GeoJSON type, coordinate ranges, **longitude/latitude order** (a swapped pair
+lands outside the study area and is refused), ring closure, self-intersection, and area between
+50 m² and 500,000 m². The asset id is checked against the real registry. `DELETE` refuses an
+`AUTHORITATIVE` record.
+
+**On authorisation, honestly.** There are no user accounts. An earlier draft gated writes on a
+token the browser sent — which would have meant **shipping the server's own secret inside the
+JavaScript bundle**, where anyone who can load the page can read it. That is not authorisation; it
+is a secret in public. It was removed, and a test now fails the suite if any frontend module ever
+references a geometry credential again.
+
+What replaces it carries no secret at all:
+
+```text
+PORTMIAMI_GEOMETRY_EDIT=local    # enable editing, accepted only from a loopback address
+PORTMIAMI_GEOMETRY_FILE=/srv/…   # where the store lives (see the warning below)
+```
+
+Editing is **off unless an operator sets it**, and then only requests from the same machine are
+accepted. That is a trusted-local-environment switch suitable for the demonstration this is built
+for, and nothing more. On a shared host leave it unset: reads keep working, writes answer 403 with
+the reason, and the planner shows a **read-only** banner with the edit buttons hidden.
+
+**Editing on a shared deployment needs the sign-in this application does not have.** There is no
+configuration here that makes it safe, and none is offered.
+
+### Storage location and deployment limits
+
+The store is a single JSON file. The server logs its resolved path and whether it is writable at
+startup:
+
+```text
+[PortMiami] asset geometry: …/server/data/asset-geometry.json (editing local)
+```
+
+| | |
+|---|---|
+| Default path | `server/data/asset-geometry.json`, **inside the checkout** |
+| Override | `PORTMIAMI_GEOMETRY_FILE` |
+| Write | atomic — temp file then `rename`, so a crash cannot truncate the store |
+| Restart | survives; verified by restarting the server and re-reading over HTTP |
+| Browser state | none needed; the record is retrievable with `curl` alone |
+
+**The default is a demo default, not a deployment one.** It sits in the checkout, so a container
+image, a read-only filesystem or a fresh build directory would lose it. Set
+`PORTMIAMI_GEOMETRY_FILE` to a path on a persistent volume before deploying, and back that file
+up — it is the only copy of any geometry a reviewer has drawn. The store is also **not
+multi-writer safe across processes**: one host writing one file is the deployment this matches.
+
+### One resolver, four tiers
+
+`src/infrastructure/geometryResolver.js` is the single answer to "what is this garage's
+footprint?", used by the planner, the highlight, the massing and the panels.
+
+| Priority | Tier | |
+|---|---|---|
+| 1 | `AUTHORITATIVE` | recorded as official GIS |
+| 2 | `CONFIRMED_GIS` | a reviewer-confirmed building footprint |
+| 3 | `CONFIRMED_TRACED` | a reviewer-confirmed traced outline — user-defined, not a survey |
+| 4 | `CANDIDATE` | the footprint the address fronts onto — evidence only |
+
+A candidate **can never displace** a confirmed record, and once anything confirmed exists the
+candidate is not even returned. The resolver reports `geometrySource`, `verificationStatus`,
+`areaM2`, `geometryAvailable` and a `reason`, so provenance travels with the shape.
+
+A failed read is reported as **failed** — the planner shows the error and draws nothing, rather
+than falling back to a candidate because the network blinked. A failed *write* is shown too.
+
+### Importing geometry traced before the server existed
+
+If this browser's legacy `localStorage` store holds a shape for the selected asset, the planner
+offers to import it: the asset, the area and the provenance are shown, and a reviewer confirms.
+If the server already holds a record for that asset the two are reported as a **conflict** with
+the areas of both, rather than one silently overwriting what every other browser sees. The local
+copy is kept until the server read confirms the import.
+
+### Three provenance tiers, three appearances
+
+| Tier | Geometry | Drawn as |
+|---|---|---|
+| `CONFIRMED` | footprints a reviewer linked (several allowed) | blue envelope, **cyan** perimeter |
+| `TRACED` | a shape a reviewer drew | blue envelope, **amber** perimeter, label says user-defined |
+| `CANDIDATE` | the footprint the address fronts onto | amber outline and roof, **no walls** |
+
+A candidate never gets a solid envelope, so an unendorsed guess cannot read as a highlighted
+building. Proposed floors are drawn only on `CONFIRMED` or `TRACED` geometry.
+
+### Why Garage A needed this
+
+The audit: **OBJECTID 794643 alone is not Garage A.** Garage A and Cruise Terminal A share the
+published address *2000 N Cruise Blvd*, so the address-side frontage reading returns the same
+1,769 m² polygon for both, and that one polygon is a fraction of the structure. The county file
+has no single "Garage A" feature at all: the 2023 planimetric features there are fragments, and
+seen over the tiles several of them run across the quay and a moored ship.
+
+What settled it was **measuring the mesh instead of looking at the polygons.** For each candidate
+the Google photorealistic mesh was sampled inside the ring (the roof) and on a ring 25 m outside
+it (what surrounds the structure). Six features at this address — 794636, 794637, 794638, 794643,
+794649 and 794650 — stand about **26 m above the apron**, which is a multi-storey structure, not a
+shed or a canopy; the rest are 6–8 m. Those six, 11,869 m² combined, are recorded as Garage A's
+geometry (`BUILDING_GEOJSON` / `USER_CONFIRMED`, all six OBJECTIDs listed on the record).
+**Garage B** was established the same way: 794483, 794484, 794485 and 794486, about 22 m above the
+apron, 5,374 m² combined.
+
+Two things this does **not** claim. The garage and its cruise terminal are one structure at a
+shared address, and the whole structure is taken as the garage envelope — at the user's explicit
+direction, and the record's `sourceReference` says so in those words. And a height read off the
+rendered tiles is a visualisation estimate, which is what the panel calls it; no source publishes
+a surveyed height for these buildings.
+
+A garage recorded as several footprints is handled as several footprints throughout: the envelope
+covers all of them, added floors are stacked on all of them (drawing them on the first part alone
+raised a storey over a sixth of the building), and the panel reads *"6 confirmed footprints ·
+11,869 m² combined"* rather than naming one part as though it were the whole.
+
+Where no such evidence exists, the asset keeps **no** geometry and the panel says so. The frontage
+candidate is reported as a candidate and never promoted on its own. The picking and tracing modes
+(`sitePicker.js`, `footprintDraw.js`, `assetGeometryStore.js`) are still in the code and still
+write `MANUALLY_DIGITIZED` / `USER_DEFINED` — **never into the building GeoJSON** and never called
+verified — but their buttons were taken out of the planner panel at the user's request, so
+geometry is now established outside it and recorded through `server/portmiami/api.mjs`.
+
+### Published capacity is an asset record, not a number in a formula
+
+A facility's capacity lives on the asset (`attributes.capacity`) with its source, its date and a
+**verification state** — never inside the simulation engine. Selecting a garage copies that figure
+into the scenario's `existingCapacity` and records where it came from, so the capacity card, the
+simulation, the demand comparison and Ask the Twin all read one record. Selecting a facility with
+no published figure restores the placeholder rather than leaving the previous garage's number
+behind wearing the word "assumed".
+
+| State | Meaning |
+|---|---|
+| `VERIFIED` | read directly from the cited source |
+| `REPORTED` | supplied to the project; **not found** in the source it was attributed to |
+| `NONE` | no source publishes one |
+
+**Capacities come from Table 1-3 "Port Parking Facilities", PortMiami 2050 Master Plan (2024)**,
+reproduced in the MDTPO *PortMiami–MIA transit study*. The table is an **image** in that PDF, so
+it could not be extracted from the document text — the figures were read from the table itself and
+transcribed into `TABLE_1_3`.
+
+| Garage | | Surface lot | |
+|---|---|---|---|
+| A | 1,046 | D | 135 |
+| B | 809 | E | 511 |
+| C | 1,355 | RCG | 1,173 |
+| D | 822 | Under Bridge / Admin & Tenant | 335 |
+| V-G | 1,735 | | |
+| J | 703 | **Total** | **10,842** |
+| K | 2,218 | | |
+
+The rows sum to the table's own stated total of 10,842, and a test asserts it — that reconciliation
+is the check that the transcription is complete.
+
+Two rows are **not** registry assets (RCG, and the combined "Under Bridge / Admin and Tenant Lots");
+they are carried only so the total reconciles, and a test asserts no asset is invented from them.
+**Garage AA and Surface Lot C do not appear in the table**, so they keep no published capacity
+rather than being given one. The table labels one row **"V-G"** where the county parking page says
+Garage G; the mapping is made explicit in that record's note.
+
+This supersedes an earlier state in which 1,046 was carried as `REPORTED` because it could not be
+found in the study's text. With the table in hand it is `VERIFIED`.
+
+The county **parking page** still publishes no capacity, and a test asserts no capacity is ever
+attributed to it.
+
+### Sites are chosen, never invented
+
+Scenario A needs a registered garage from the infrastructure registry. B and C need a point picked
+on the map. If a garage has no **confirmed** footprint the planner says "Building footprint not
+linked", calculates the arithmetic anyway, and offers a button that hands you to the Explorer's
+existing linking workflow, armed on that asset. It never picks the nearest polygon — in this data
+the nearest candidate to three different terminals is the same 14-part aggregate.
+
+A candidate site once had no footprint of its own, so one was **derived from the assumptions**:
+spaces × gross area per space ÷ floors gave a pad area, drawn as an axis-aligned square. Both
+B and C are positioned by hand now; the derived pad remains only for a scenario type that has
+neither a registered asset nor a placement.
+
+**Scenarios B and C** no longer work that way — see below.
+
+### Placing a proposed garage (Scenario B)
+
+Scenario B proposes a building where none exists, so it gets an editor rather than a derived pad:
+pick a location, then move, rotate and resize the result until it is where you mean it.
+
+**What was wrong before.** The volume came from `padFootprint`: it took spaces × gross-area-per-
+space ÷ floors, square-rooted it, and stepped that many metres off the picked longitude and
+latitude. Three separate problems. The shape was always an **axis-aligned square**, so it never
+lined up with a quay, a road or anything else on the ground — which is what "not properly aligned
+with the selected site" was. The size was a **function of the capacity target**, so resizing the
+building was not something a user could do; only changing the target was. And the corners were
+made by **adding degrees to degrees** with a fixed metres-per-degree constant, which is neither a
+rectangle on the ellipsoid nor the frame Cesium draws in.
+
+**The model.** `src/scenarios/garagePlacement.js` stores a proposal as what it is — a centre, a
+heading, a length, a width, floors and a floor height — and derives every polygon from that one
+record. Corners are laid out in **metres in a local East-North-Up frame** at the centre and
+converted through the WGS-84 ellipsoid (ENU → ECEF → geodetic), the same chain
+`Cesium.Transforms.eastNorthUpToFixedFrame` uses. It is plain JavaScript so the geometry is
+unit-testable without a viewer, and `verify-placement.mjs` asserts in the browser that it agrees
+with Cesium's own transform — measured **0.00 mm** worst case over offsets up to a kilometre.
+
+**Heading** is clockwise degrees from geographic north and points down the **length** axis; the
+width axis is 90° clockwise of it. One function, `placementRing`, produces the ring that the
+walls, roof, floor lines, handles, saved record, area and conflict check all read, so none of
+them can disagree about where the building is.
+
+**Dragging** (`src/cesium/garagePlacementEditor.js`) resolves the cursor by intersecting the
+camera ray with **one horizontal plane** — the plane the base sits in — not by picking the scene.
+`scene.pickPosition` over a building returns its *roof*, so dragging across one would make the
+garage climb onto it; and a screen-space angle is not a ground angle under an oblique camera, so
+the same drag would read as a different rotation at a different tilt. A plane intersection has
+neither problem. The editor owns its own `ScreenSpaceEventHandler` and its own data source, and
+disables camera control only between pointer-down and pointer-up.
+
+**Arrow buttons, not only dragging.** A 4-way pad moves the building by an exact 1, 5, 10 or 25
+metres, in the building's **own** frame — forward is down the length axis, right is 90° clockwise
+of it. Its own frame rather than compass directions because that is what "move it forward a bit"
+means once the thing has been rotated: a rotated garage nudged "north" slides diagonally across
+its own footprint. Exact metres also make a nudge reversible — forward then back returns it to
+where it started, which a drag cannot promise. Floors have a `−`/`+` stepper beside the number,
+clamped at the editor's limits since a button press has nowhere to go below one floor.
+
+**Ground elevation** is sampled on a ring **outside** the footprint, at the low quartile of the
+samples — the Garage K lesson: a sample on the perimeter lies on the structure, and taking it as
+ground once started an envelope at roof level. It is sampled when a drag *ends*, never during
+one, and it is labelled a visualisation estimate. A manual override is available and says it was
+entered by hand.
+
+**Capacity is reported, never reconciled.** Gross floor area ÷ gross area per space gives the
+spaces the geometry supports. Resizing changes that estimate and **never** changes the 2,000-space
+target: the point of the editor is to show whether a shape can hold the number that was asked
+for, and quietly rewriting the number would answer the question by erasing it. Where the geometry
+falls short, the panel says so and says plainly that **the simulation still runs on the requested
+figure**.
+
+**Site constraints** (`src/scenarios/siteConflicts.js`) test the footprint against the two layers
+this twin holds — county building footprints and road centrelines — and report everything else as
+**Not evaluated**: parcel boundaries, water, utilities, ownership and zoning. A layer that has not
+loaded is `NOT_EVALUATED`, never `CLEAR`. The road test uses an assumed ±6 m clearance because the
+centreline file publishes no carriageway width, and says so in both the conflict and the clear
+result. Finding no overlap does not mean a garage can be built there, and nothing is ever moved
+automatically.
+
+### The same editor for Scenario C, as an area
+
+Scenario C gets every positioning control Scenario B has — pick, move by arrow or drag, rotate,
+resize length and width, save, reset — because "where exactly, and how big?" is the same question
+for a lot being re-laid out as for a garage being built. What it does **not** get is a structure,
+and that is enforced on the record rather than hidden in the UI:
+
+- the placement carries `kind: 'SURFACE_LOT'`, and `createPlacement` zeroes `floors` and
+  `floorHeightM` on it — a disabled input still holding a 6 would be a number waiting to be used;
+- the editor draws a **flat polygon and one ground outline**: no walls, no roof, no vertical
+  edges, no floor lines, and the on-map label reads *"… m² surface — no structure proposed"*;
+- `grossFloorAreaM2` returns the footprint itself rather than footprint × floors, because a lot
+  does not stack. Multiplying by a floor count of zero would report no capacity at all, and by one
+  would quietly pretend a lot is a single-storey building;
+- it starts at 160 × 90 m rather than 60 × 40 m, since the same cars on the ground need the
+  garage's whole floor area.
+
+Capacity uses its own assumption, **`surfaceAreaPerSpaceM2` (28 m²)**, deliberately not the 32 m²
+gross figure: a lot carries no ramps, cores or structure behind each stall, but it still has drive
+aisles and circulation, so it is well above a bare stall either way. Both are in the assumption
+register with their basis, and both are editable.
+
+**Limits are clamped on a drag and reported on a typed value.** Dragging past the maximum is the
+pointer running on, so the building stops at the limit; a number someone typed means something,
+so it comes back as an error they can see and the save is refused.
+
+### The recommendation
+
+Not hardcoded. Four metrics — demand served (0.4), remaining deficit (0.25), access V/C (0.25),
+construction disruption (0.1) — normalised across the runs that exist, weighted, and shown with
+the arithmetic and the reason. Two rules:
+
+- **A missing metric is not a zero.** A scenario with no access road has no V/C; scoring it 0 would
+  make it the best traffic performer by not having been modelled. It is excluded from that metric,
+  the weights are renormalised, and the exclusion is reported by name.
+- **Too little to compare is an answer.** Fewer than two scored scenarios → "Recommendation
+  unavailable — additional assumptions required".
+
+Cost, revenue and site feasibility are **not modelled**, and are listed as such rather than
+silently omitted. A test proves the ranking is computed: re-weighting to traffic alone changes the
+winner.
+
+### Key findings
+
+Calculated, not the slide's claims. Nothing says "reduces congestion", "improves terminal access"
+or "supports 62% cruise growth". When a scenario adds peak-hour vehicles the finding says so —
+**more parking means more trips**, and a planning tool that reported the opposite would be worse
+than useless. The 62% figure is not used anywhere: no source for it has been supplied or checked,
+and cruise passenger growth is not parking demand growth. The growth assumption is a stated annual
+rate whose basis sentence says exactly that.
+
+### FL511 stays separate
+
+FL511 reports what has been *observed* and the scenario engine models what is *hypothetical*. They
+are never combined into one traffic number. The planner's baseline road volume is an explicit
+assumption, because this twin holds no traffic counts — FL511 publishes events, not volumes, and
+using event presence as a volume proxy would be inventing a measurement.
+
+### Traffic is a single-approach sensitivity test
+
+The county centreline file has no topology, turn restrictions or connectivity, so there is no
+network to route over. Trips are assigned to **one road you nominate** — that is the whole
+assignment step — and every traffic result carries the sentence saying so. V/C is a ratio of
+assumed demand to assumed capacity on one approach: it is not a speed, a delay or a level of
+service, and nothing converts it into one.
+
+### What persists, and what does not
+
+| | Scope | Where |
+|---|---|---|
+| Garage footprints | **shared by every browser** | the server's geometry store |
+| Confirmed asset→building links | per browser | the registry's link store |
+| Which workspace was last open | per browser | `localStorage` |
+| **A saved Scenario B placement** | per browser | `localStorage` (`portmiami.scenario.placement.v1`) |
+| **Scenarios, assumptions, candidate sites, runs** | **this page visit only** | memory |
+
+Scenario working state is deliberately **not** persisted. Reloading a half-configured scenario
+meant the planner opened on a previous visitor's work-in-progress with no indication of where it
+came from — a selected garage, edited spaces and floors, and a candidate site someone else had
+dropped. A refresh now re-seeds the three alternatives, selects no garage and draws nothing, and
+the panel says so on screen.
+
+What survives a refresh is narrower on purpose: a garage's **footprint**, which is a fact about
+the port, stored on the server against the asset and shared by every browser. A half-edited
+scenario is not a fact about the port.
+
+The one addition is a **saved garage placement**. A proposal someone positioned, checked and
+pressed *Save placement* on is a deliberate act rather than a half-edited form, and losing it on
+a refresh would make the editor useless — so it is written, on its own, under its own key. Nothing
+else goes with it: not the scenario's name, its assumptions, its runs or which scenario was
+selected. Dragging writes nothing; only *Save placement* does. It is keyed by the seed **key**
+(`B`), not the scenario id, because ids are minted fresh when the alternatives re-seed on load; a
+scenario you add yourself therefore has no stable name to save under, and the panel says so.
+
+Within a session, a run still carries the assumptions **as they were**, so editing a scenario
+afterwards never changes what a saved run says it used, and runs from a different `modelVersion`
+are reported rather than silently compared. Deleting a scenario deletes its runs — an orphan run
+is unreadable.
+
+### Ask the Twin
+
+Four scenario questions, reading **saved runs only**: "What is the capacity increase in Scenario
+A?", "Compare Scenario A and Scenario B", "What assumptions were used?", "Why is Scenario B ranked
+higher?". The assistant never runs the model, never adjusts a figure and never produces a number of
+its own, so an answer and the Compare tab cannot disagree. An unrun scenario is reported as unrun
+rather than simulated on the spot. `SHOW_SCENARIO` is a validated action like every other.
+
+### Known limitations
+
+- Every assumption is a placeholder. **No existing capacity, occupancy or traffic count for any
+  PortMiami facility is available to this twin**, so base demand, existing capacity and baseline
+  road volume must all be replaced with the operator's own figures before a result means anything.
+- No confirmed footprint ships with the app, so the massing needs a footprint linked first.
+- Traffic is one approach, not a network. No routing, no turn movements, no signal timing.
+- Construction disruption is a ranking index, not a programme.
+- The queue is deterministic-service, not a microsimulation: no platooning, no signals, no
+  metering.
+- Persistence is per browser.
+
+### Client walkthrough
+
+1. **Parking Scenario Planner** in the rail. Three alternatives are seeded from the concept slide,
+   each labelled an assumption, none marked "recommended".
+2. **Plan** — pick *Garage B*. The camera flies to it; the panel separates verified identity from
+   assumed capacity, and reports the footprint as not linked. Link one from there.
+3. The proposed massing appears **above** the real garage. Toggle **Existing / Proposed / Both**.
+4. Nominate an access road, then **Simulate → Run Simulation**: capacity, demand coverage, added
+   peak-hour vehicles, V/C and a queue, with the model version and `SYNTHETIC` stamped on the run.
+5. Change *Additional spaces* and re-run — every number moves.
+6. **Compare** — the table, three charts and a ranking with its weights, exclusions and reason.
+7. Ask the Twin: *"Compare Scenario A and Scenario B."*

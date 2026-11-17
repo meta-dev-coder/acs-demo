@@ -10,9 +10,15 @@
  * because none of those is in here.
  */
 import { distanceMetres } from '../infrastructure/assetGeocode.js';
+import { loadScenarios } from '../scenarios/scenarioStore.js';
 import { anchorFor } from './tools.js';
 
-export function createDataView({ assets, segments, buildings, roadsById, buildingsById, linksFor, traffic }) {
+export function createDataView({
+  assets, segments, buildings, roadsById, buildingsById, linksFor, traffic, planner,
+}) {
+  // The scenario planner persists every change, so the saved store IS the current state. Reading
+  // it here means an answer and the Compare tab can never be looking at different runs.
+  const saved = planner ?? loadScenarios();
   const view = {
     assets: assets ?? [],
     segments: segments ?? [],
@@ -25,6 +31,8 @@ export function createDataView({ assets, segments, buildings, roadsById, buildin
       eventsById: new Map(), camerasById: new Map(), signsById: new Map(),
       eventsPayload: null, camerasPayload: null, signsPayload: null,
     },
+    scenarios: saved.scenarios ?? [],
+    scenarioRuns: saved.runs ?? [],
     distanceMetres,
   };
   /** An asset's position and the tier that produced it, bound to this view. */

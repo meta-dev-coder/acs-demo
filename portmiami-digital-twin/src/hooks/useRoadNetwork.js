@@ -18,7 +18,9 @@ export function useRoadNetwork(viewerRef, pickerRef) {
   const [validation, setValidation] = useState(null);
   const [error, setError] = useState('');
   const [selectedId, setSelectedId] = useState(null);
-  const [visible, setVisible] = useState(true);
+  // Off by default, like the building layer: 2,362 polylines over the photorealistic mesh is
+  // clutter until someone asks for it.
+  const [visible, setVisible] = useState(false);
   const layerRef = useRef(null);
 
   // Load and validate. BASE_URL rather than a leading slash, so the app still works under a
@@ -52,8 +54,13 @@ export function useRoadNetwork(viewerRef, pickerRef) {
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!viewer || viewer.isDestroyed() || segments.length === 0 || layerRef.current) return undefined;
-    layerRef.current = installRoadNetworkLayer(viewer, segments, { picker: pickerRef.current });
+    layerRef.current = installRoadNetworkLayer(viewer, segments, {
+      picker: pickerRef.current, visible,
+    });
     return () => { layerRef.current?.destroy(); layerRef.current = null; };
+    // `visible` is the INITIAL value for the layer; the effect below drives it afterwards, so it
+    // is deliberately not a dependency — a toggle must not rebuild 2,362 polylines.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewerRef, pickerRef, segments]);
 
   useEffect(() => { layerRef.current?.select(selectedId); }, [selectedId]);

@@ -26,9 +26,32 @@ import { LiveTrafficWorkspace } from './components/LiveTrafficWorkspace.jsx';
 import { AskTwinPanel } from './components/AskTwinPanel.jsx';
 import { useAskTwin } from './hooks/useAskTwin.js';
 import { ACTION } from './ask/actions.js';
+import { WorkspaceSidebar } from './components/WorkspaceSidebar.jsx';
+import { ScenarioPlanner } from './components/ScenarioPlanner.jsx';
+import { useScenarioPlanner } from './hooks/useScenarioPlanner.js';
 import { LiveEventDetailsPanel } from './components/LiveEventDetailsPanel.jsx';
 import { CameraDetailsPanel } from './components/CameraDetailsPanel.jsx';
 import { MessageSignDetailsPanel } from './components/MessageSignDetailsPanel.jsx';
+
+/**
+ * The two workspaces, over ONE Cesium viewer.
+ *
+ * Switching changes which panels are mounted over the map; `usePortTwin` keeps the viewer, its
+ * camera and every layer exactly as they were, so a switch costs no reload and no re-fly. Two
+ * viewers would mean two tile budgets and a camera that silently diverges between them.
+ */
+const WORKSPACE = Object.freeze({ EXPLORER: 'EXPLORER', PLANNER: 'PLANNER' });
+
+/** Which workspace was last open. Remembered so a refresh returns where you were. */
+const WORKSPACE_KEY = 'portmiami.workspace.v1';
+const rememberedWorkspace = () => {
+  try {
+    const saved = globalThis.localStorage?.getItem(WORKSPACE_KEY);
+    return saved === WORKSPACE.PLANNER ? WORKSPACE.PLANNER : WORKSPACE.EXPLORER;
+  } catch {
+    return WORKSPACE.EXPLORER;
+  }
+};
 
 /** Which explorer is open. One at a time: two 330px columns would crowd the map. */
 const EXPLORER = Object.freeze({
@@ -37,6 +60,8 @@ const EXPLORER = Object.freeze({
 
 /** The selection kinds the live-traffic layer owns. */
 const TRAFFIC_KINDS = Object.freeze(['traffic-event', 'traffic-camera', 'traffic-sign']);
+/** A stable empty list, so the emphasis effect does not see a new array every render. */
+const EMPTY_IDS = Object.freeze([]);
 
 /**
  * The PortMiami shell.
@@ -78,10 +103,16 @@ export function App() {
   // Holds the live map-click handler; the shared picker is built once and reads through it.
   const selectFromMapRef = useRef(() => {});
   const { status, notice, viewerRef, resetView, zoom, nudge, northUp } = usePortTwin(containerRef);
+  /** Open state lives here, because the map-control column has to know to step aside. */
+  const [plannerOpen, setPlannerOpen] = useState(false);
 
   const [selection, setSelection] = useState(null);
   const [explorer, setExplorer] = useState(EXPLORER.NONE);
   const [weatherOpen, setWeatherOpen] = useState(false);
+  const [workspace, setWorkspace] = useState(rememberedWorkspace);
+  useEffect(() => {
+    try { globalThis.localStorage?.setItem(WORKSPACE_KEY, workspace); } catch { /* storage off */ }
+  }, [workspace]);
   /**
    * What an Ask the Twin answer is highlighting, by layer. Held here rather than pushed straight
    * into the layers so that ONE effect still owns emphasis: the registry's links and the
@@ -108,6 +139,26 @@ export function App() {
   const streetView = useStreetView(viewerRef, { segments: roads.segments });
   const streetViewOn = streetView.enabled && streetView.available;
 
+  /**
+   * The camera controls, in one place.
+   *
+   * Shared by the map-control column and the scenario panel's own header, so the two can never
+   * drift into doing different things to the same camera.
+   */
+  const cameraHandlers = useMemo(() => ({
+    onStreetView: streetViewOn ? streetView.togglePlacement : undefined,
+    streetViewArmed: streetView.isPlacing,
+    onZoomIn: () => zoom(0.75),
+    onZoomOut: () => zoom(1 / 0.75),
+    onRotateLeft: () => nudge(-15, 0),
+    onRotateRight: () => nudge(15, 0),
+    onTiltUp: () => nudge(0, -6),
+    onTiltDown: () => nudge(0, 6),
+    onNorthUp: northUp,
+    onReset: resetView,
+    onWeather: () => setWeatherOpen(true),
+  }), [streetViewOn, streetView.togglePlacement, streetView.isPlacing, zoom, nudge, northUp, resetView]);
+
   // Marks whichever asset is selected. Its own data source, so it is visible whether or not the
   // Road Network and Building layers happen to be switched on.
   const assetMarkerRef = useRef(null);
@@ -120,17 +171,60 @@ export function App() {
 
   // Indexes by OBJECTID, built once per dataset, so a panel never scans 6,000 records to name one.
   const roadsById = useMemo(() => new Map(roads.segments.map(s => [s.objectId, s])), [roads.segments]);
+  /** Set once `flyToAssetById` exists; the planner is declared before it. */
+  const flyToAssetRef = useRef(() => {});
   const buildingsById = useMemo(() => new Map(buildings.buildings.map(b => [b.objectId, b])), [buildings.buildings]);
+
+  // ---- the Parking Scenario Planner -------------------------------------------------------------
+
+  const planner = useScenarioPlanner({
+    viewerRef, infra, buildingsById, roadsById, active: workspace === WORKSPACE.PLANNER,
+    // Through a ref: the planner is declared before the fly-to helper, because the pick
+    // dispatcher above it needs the planner's picking mode.
+    onFocusAsset: assetId => flyToAssetRef.current(assetId),
+  });
+
+  /**
+   * "Link a footprint" from the planner: hand the user to the Explorer's existing linking
+   * workflow, armed and pointed at the right asset. The planner never links one itself.
+   */
+  // Footprints have to be drawn to be clicked. Switching the layer on when picking starts is the
+  // same courtesy "View on map" already does for a confirmed footprint.
+  useEffect(() => {
+    if (planner.geometryMode === 'SELECT') buildings.setVisible(true);
+  }, [planner.geometryMode, buildings]);
+
+  const linkFootprintFor = useCallback(assetId => {
+    setWorkspace(WORKSPACE.EXPLORER);
+    setSelection(null);
+    infra.select(assetId);
+    infra.setLinkMode(true);
+    setExplorer(EXPLORER.INFRA);
+    buildings.setVisible(true);
+    flyToAssetRef.current(assetId);
+  }, [infra, buildings]);
+  /** Only registered parking assets may be expanded; the planner never invents a garage. */
+  const garages = useMemo(
+    () => infra.assets.filter(asset => asset.category === 'PARKING'), [infra.assets]);
 
   // While "Link building" is armed, a map click on a footprint links it to the selected asset
   // instead of selecting it. Held in a ref so the one shared picker never has to be rebuilt.
   selectFromMapRef.current = hit => {
+    // While the planner is picking footprints, a building click goes into its selection set
+    // instead of selecting the building — the same interception the Explorer's link mode uses.
+    if (planner.geometryMode === 'SELECT' && hit?.kind === 'building') {
+      planner.togglePicked(hit.id);
+      return;
+    }
     if (infra.linkMode && hit?.kind === 'building' && infra.selectedAssetId) {
       infra.linkBuilding(infra.selectedAssetId, hit.id);
       return;
     }
     selectFromMap(hit);
   };
+
+  // What the planner has picked but not yet confirmed, emphasised like any other candidate.
+  const plannerPicked = planner.geometryMode === 'SELECT' ? planner.picked : EMPTY_IDS;
 
   // Emphasise the selected asset's links on the two existing layers, plus whatever the last Ask
   // the Twin answer highlighted. No third layer, no second selection engine — the layers already
@@ -143,8 +237,9 @@ export function App() {
       return merged;
     };
     roads.layerRef.current?.setEmphasis(merge(infra.emphasis.roads, askEmphasis.roads));
-    buildings.layerRef.current?.setEmphasis(merge(infra.emphasis.buildings, askEmphasis.buildings));
-  }, [infra.emphasis, askEmphasis, roads.layerRef, buildings.layerRef, roads.state, buildings.state]);
+    buildings.layerRef.current?.setEmphasis(
+      merge(infra.emphasis.buildings, [...askEmphasis.buildings, ...plannerPicked]));
+  }, [infra.emphasis, askEmphasis, plannerPicked, roads.layerRef, buildings.layerRef, roads.state, buildings.state]);
 
   /**
    * Mark the selected asset. Driven by selection rather than by "View on map", so choosing an
@@ -153,6 +248,9 @@ export function App() {
   useEffect(() => {
     const marker = assetMarkerRef.current;
     if (!marker) return;
+    // The planner draws its own highlight and label for the same asset; two would be clutter and
+    // two labels in one place read as two different claims.
+    if (workspace !== WORKSPACE.EXPLORER) { marker.clear(); return; }
     const asset = infra.selected;
     if (!asset) { marker.clear(); return; }
     // One definition of "where is this asset", shared by the marker, the camera and the details
@@ -161,7 +259,7 @@ export function App() {
     const where = representativePoint(asset, infra.linksFor(asset.id), buildingsById);
     if (!where.point) { marker.clear(); return; }
     marker.show({ name: asset.name, point: where.point }, { status: where.status });
-  }, [infra, buildingsById]);
+  }, [infra, buildingsById, workspace]);
 
   /**
    * Fly to an asset. The same three tiers the marker uses, so the camera and the pin can never
@@ -238,7 +336,7 @@ export function App() {
   // ---- Ask the Twin ----------------------------------------------------------------------------
 
   const ask = useAskTwin({
-    selection, infra, roads, buildings, traffic, explorer, viewerRef, buildingsById,
+    selection, infra, roads, buildings, traffic, explorer, viewerRef, buildingsById, planner,
   });
 
   /** Fly to an asset by id, using the same three tiers the marker and "View on map" use. */
@@ -254,6 +352,9 @@ export function App() {
     const where = representativePoint(asset, infra.linksFor(assetId), buildingsById);
     if (where.point) flyToPoint(viewerRef.current, where.point);
   }, [infra, buildings, buildingsById, viewerRef]);
+  // The planner is declared above this (its picking mode is needed by the pick dispatcher), so it
+  // reaches the fly-to helper through this ref rather than by closing over it.
+  flyToAssetRef.current = flyToAssetById;
 
   /**
    * The ONE place an Ask the Twin action touches the map.
@@ -315,6 +416,14 @@ export function App() {
           .filter(Boolean).map(camera => [camera.longitude, camera.latitude]));
         break;
       }
+      case ACTION.SHOW_SCENARIO: {
+        // Hand the user to the planner on that scenario. The assistant reports saved runs; the
+        // planner remains the only thing that runs the model.
+        setWorkspace(WORKSPACE.PLANNER);
+        planner.select(action.scenarioId);
+        setTimeout(() => planner.flyToScenario(), 350);
+        break;
+      }
       case ACTION.SHOW_TRAFFIC_EVENTS: {
         const events = action.eventIds.map(id => traffic.eventsById.get(id)).filter(Boolean);
         for (const event of events) traffic.revealFor(event.type);
@@ -327,7 +436,7 @@ export function App() {
       default:
         break;
     }
-  }, [infra, roads, buildings, traffic, roadsById, buildingsById, viewerRef, openRoad, selectTraffic, flyToAssetById]);
+  }, [infra, roads, buildings, traffic, roadsById, buildingsById, viewerRef, openRoad, selectTraffic, flyToAssetById, planner]);
 
   const selectedTrafficEvent = selection?.kind === 'traffic-event'
     ? traffic.eventsById.get(selection.id) ?? null : null;
@@ -342,8 +451,12 @@ export function App() {
   const viewBuilding = useCallback(id => buildings.layerRef.current?.flyTo(id), [buildings.layerRef]);
   const toggleExplorer = next => setExplorer(current => (current === next ? EXPLORER.NONE : next));
 
+  const isExplorer = workspace === WORKSPACE.EXPLORER;
+
   return (
-    <div className="app">
+    <div className="app has-rail">
+      <WorkspaceSidebar workspace={workspace} onChange={setWorkspace} />
+      <div className="app-main">
       <TopNav project={PROJECT} askOpen={ask.open} onToggleAsk={ask.toggle} />
       {/* `has-ask` shifts the contextual detail column left so the assistant never covers it. */}
       <main className={`app-viewport${ask.open ? ' has-ask' : ''}`}>
@@ -352,6 +465,9 @@ export function App() {
         {/* The left column: the layer rail with whichever explorer is open stacked under it. A
             flex column rather than two absolutely-positioned panels, so adding a fourth layer row
             cannot push the rail under the explorer again. */}
+        {/* The explorer's own chrome. Hidden in the planner, which has its own column — the
+            layers themselves keep their state, so switching back restores exactly what was on. */}
+        {isExplorer && (
         <div className="map-left">
           <LayerControls
             roads={roads}
@@ -390,10 +506,11 @@ export function App() {
           />
         )}
         </div>
+        )}
 
-        {/* One contextual panel at a time. A traffic marker is read first: picking one clears the
-            asset selection, so these cannot both be true. */}
-        {selectedTrafficEvent && (
+        {/* One contextual panel at a time, and only in the Explorer: the planner owns the right
+            column there, and selecting a garage for a scenario must not pop a panel over it. */}
+        {isExplorer && selectedTrafficEvent && (
           <LiveEventDetailsPanel
             event={selectedTrafficEvent}
             onViewOnMap={viewTraffic}
@@ -401,7 +518,7 @@ export function App() {
             onClear={clearSelection}
           />
         )}
-        {selectedCamera && (
+        {isExplorer && selectedCamera && (
           <CameraDetailsPanel
             camera={selectedCamera}
             detail={traffic.cameraDetails[selectedCamera.id]}
@@ -414,7 +531,7 @@ export function App() {
             onClear={clearSelection}
           />
         )}
-        {selectedSign && (
+        {isExplorer && selectedSign && (
           <MessageSignDetailsPanel
             sign={selectedSign}
             detail={traffic.signDetails[selectedSign.id]}
@@ -424,7 +541,7 @@ export function App() {
           />
         )}
 
-        {!trafficSelected && infra.selected ? (
+        {isExplorer && !trafficSelected && infra.selected ? (
           <AssetDetailsPanel
             asset={infra.selected}
             infra={infra}
@@ -439,7 +556,7 @@ export function App() {
           />
         ) : null}
 
-        {!trafficSelected && !infra.selected && selection?.kind === 'road' && roads.selected && (
+        {isExplorer && !trafficSelected && !infra.selected && selection?.kind === 'road' && roads.selected && (
           <RoadDetailsPanel
             road={roads.selected}
             traffic={traffic}
@@ -452,7 +569,7 @@ export function App() {
             onClear={clearSelection}
           />
         )}
-        {!trafficSelected && !infra.selected && selection?.kind === 'building' && buildings.selected && (
+        {isExplorer && !trafficSelected && !infra.selected && selection?.kind === 'building' && buildings.selected && (
           <BuildingDetailsPanel
             building={buildings.selected}
             linkedAsset={assetForBuilding(infra.assets, infra.index, buildings.selected.objectId)}
@@ -467,19 +584,9 @@ export function App() {
           <AskTwinPanel ask={ask} onRunAction={runAskAction} onClose={() => ask.setOpen(false)} />
         )}
 
-        <MapControls
-          onStreetView={streetViewOn ? streetView.togglePlacement : undefined}
-          streetViewArmed={streetView.isPlacing}
-          onZoomIn={() => zoom(0.75)}
-          onZoomOut={() => zoom(1 / 0.75)}
-          onRotateLeft={() => nudge(-15, 0)}
-          onRotateRight={() => nudge(15, 0)}
-          onTiltUp={() => nudge(0, -6)}
-          onTiltDown={() => nudge(0, 6)}
-          onNorthUp={northUp}
-          onReset={resetView}
-          onWeather={() => setWeatherOpen(true)}
-        />
+        {/* The scenario panel sits where this column sits, so while it is open the column steps
+            aside and the panel carries the camera buttons in its own header instead. */}
+        {!plannerOpen && <MapControls {...cameraHandlers} />}
 
         <WeatherDialog open={weatherOpen} onClose={() => setWeatherOpen(false)} />
 
@@ -488,11 +595,26 @@ export function App() {
         <StreetViewHint streetView={streetView} />
         <StreetViewOverlay streetView={streetView} />
 
+        {workspace === WORKSPACE.PLANNER && (
+          <ScenarioPlanner
+            planner={planner}
+            garages={garages}
+            roadsById={roadsById}
+            buildingsById={buildingsById}
+            onOpenAssistant={() => ask.setOpen(true)}
+            onLinkFootprint={linkFootprintFor}
+            open={plannerOpen}
+            onOpenChange={setPlannerOpen}
+            cameraHandlers={cameraHandlers}
+          />
+        )}
+
         {status === TWIN_STATUS.INITIALISING && <LoadingOverlay />}
         {notice && <p className="app-notice" role="status">{notice}</p>}
         {roads.state === LOAD_STATE.FAILED && <p className="app-notice is-second" role="status">{roads.error}</p>}
         {buildings.state === LOAD_STATE.FAILED && <p className="app-notice is-third" role="status">{buildings.error}</p>}
       </main>
+      </div>
     </div>
   );
 }

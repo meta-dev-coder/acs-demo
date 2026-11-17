@@ -20,6 +20,16 @@ export const LIVE_TRAFFIC_API = Object.freeze({
 });
 
 /**
+ * Asset geometry: the server-side store that replaced per-browser localStorage.
+ *
+ * The browser holds NO credential. Whether writing is allowed is the server's decision — it
+ * enables editing only on a trusted local machine — and the browser simply reads `writable` off
+ * the geometry response and shows a read-only state when it is false. Nothing secret is shipped
+ * in this bundle.
+ */
+export const GEOMETRY_API = Object.freeze({ base: '/api/portmiami/assets' });
+
+/**
  * How often the browser re-reads our own API. The SERVER's FL511 cadence is separate (60 s for
  * events, 300 s for cameras and signs) and is published on every response, so a page that polls
  * faster than the server refreshes still reports the true age of the data rather than its own.

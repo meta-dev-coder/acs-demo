@@ -27,6 +27,9 @@ export const INTENT = Object.freeze({
   CONGESTION: 'CONGESTION',
   CONSTRUCTION: 'CONSTRUCTION',
   NEARBY_ASSETS: 'NEARBY_ASSETS',
+  SCENARIO_RESULT: 'SCENARIO_RESULT',
+  SCENARIO_COMPARE: 'SCENARIO_COMPARE',
+  SCENARIO_ASSUMPTIONS: 'SCENARIO_ASSUMPTIONS',
   SHOW_LAST: 'SHOW_LAST',
   SELECTION: 'SELECTION',
   UNSUPPORTED: 'UNSUPPORTED',
@@ -114,6 +117,27 @@ export function routeIntent(question) {
   if (/^(?:now\s+)?(?:show|highlight|display|map|plot)\s+(?:me\s+)?(?:them|those|these|it|that)\b/i.test(q)
     || /\b(?:show|highlight|put)\s+(?:them|those|these|it)\s+on\s+the\s+map\b/i.test(q)) {
     return { intent: INTENT.SHOW_LAST, slots };
+  }
+
+  // --- the scenario planner ---------------------------------------------------------------------
+  // Checked first: "compare Scenario A and Scenario B" is a scenario question, not a request for
+  // nearby assets called A and B, and "which scenario serves the most demand" is not a road query.
+  const scenarioNamed = /\bscenario\s+([a-z])\b/i.exec(q);
+  if (/\bproposed garage\b/i.test(q)) {
+    return { intent: INTENT.SCENARIO_RESULT, slots: { ...slots, scenario: scenarioNamed?.[1]?.toUpperCase() ?? null } };
+  }
+  if (/\bscenario|simulation|simulated\b/i.test(q) || scenarioNamed) {
+    const scenarioSlots = { ...slots, scenario: scenarioNamed ? scenarioNamed[1].toUpperCase() : null };
+    if (/\bassumption|assumed|inputs?\b/i.test(q)) {
+      return { intent: INTENT.SCENARIO_ASSUMPTIONS, slots: scenarioSlots };
+    }
+    if (/\bcompare|versus|vs\b|which (scenario|one|option)|rank|recommend|why is|best\b/i.test(q)) {
+      return { intent: INTENT.SCENARIO_COMPARE, slots: scenarioSlots };
+    }
+    return { intent: INTENT.SCENARIO_RESULT, slots: scenarioSlots };
+  }
+  if (/\b(v\/c|volume.to.capacity)\b/i.test(q)) {
+    return { intent: INTENT.SCENARIO_COMPARE, slots: { ...slots, scenario: null } };
   }
 
   // --- what is selected -----------------------------------------------------------------------

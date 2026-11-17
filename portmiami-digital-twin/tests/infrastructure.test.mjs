@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   ASSET_CATEGORIES, ASSET_SOURCES, INFRASTRUCTURE_ASSETS, PARKING_POLICIES, PARKING_RATES,
+  PORT_PARKING_TOTALS, TABLE_1_3,
 } from '../src/config/infrastructure.js';
 import { buildRoadSegments } from '../src/roads/roadModel.js';
 import { buildBuildings } from '../src/buildings/buildingModel.js';
@@ -63,13 +64,87 @@ test('no asset ships a sourced coordinate, because no source publishes one', () 
   }
 });
 
-test('no asset records a capacity, height, floor count or berth', () => {
-  const banned = /capacit|height|floors?|storeys?|berth|spaces/i;
+test('no asset invents a height, floor count or berth', () => {
+  // Capacity is allowed ONLY as a sourced record (see the test below); everything else in this
+  // list has no source at all and must not appear as an attribute.
+  const banned = /height|floors?|storeys?|berth/i;
   for (const a of INFRASTRUCTURE_ASSETS) {
     for (const key of Object.keys(a.attributes)) {
       assert.ok(!banned.test(key), `${a.id} has a fabricated-looking attribute "${key}"`);
     }
   }
+});
+
+test('a capacity exists only as a record with a source and a verification state', () => {
+  for (const a of INFRASTRUCTURE_ASSETS) {
+    const capacity = a.attributes.capacity;
+    if (capacity === null || capacity === undefined) continue;
+    assert.ok(Number.isFinite(capacity.spaces), `${a.id} capacity has no number`);
+    assert.ok(ASSET_SOURCES[capacity.sourceId], `${a.id} capacity cites no known source`);
+    assert.ok(['VERIFIED', 'REPORTED'].includes(capacity.verification),
+      `${a.id} capacity has no verification state`);
+    // A figure that is not VERIFIED has to say why, in its own note.
+    if (capacity.verification !== 'VERIFIED') {
+      assert.ok(capacity.note && capacity.note.length > 60,
+        `${a.id} reports an unverified capacity without explaining it`);
+    }
+    // And the asset must cite the source it leans on.
+    assert.ok(a.sources.includes(capacity.sourceId), `${a.id} does not cite its capacity source`);
+  }
+});
+
+test('every capacity comes from Table 1-3, and the rows reconcile to its own total', () => {
+  // The table was supplied as an image from the PortMiami 2050 Master Plan. Summing the rows to
+  // the total the table itself states is the check that the transcription is complete.
+  const summed = TABLE_1_3.rows.reduce((total, row) => total + row.spaces, 0);
+  assert.equal(summed, TABLE_1_3.statedTotal);
+  assert.equal(summed, 10842);
+
+  const garageA = INFRASTRUCTURE_ASSETS.find(a => a.id === 'parking-garage-a');
+  assert.equal(garageA.attributes.capacity.spaces, 1046);
+  assert.equal(garageA.attributes.capacity.verification, 'VERIFIED',
+    'the table confirms the figure that was previously only reported');
+  assert.match(garageA.attributes.capacity.note, /Table 1-3/);
+});
+
+test('each registry facility carries the table\u2019s figure for its own row', () => {
+  const expected = {
+    'parking-garage-a': 1046, 'parking-garage-b': 809, 'parking-garage-c': 1355,
+    'parking-garage-d': 822, 'parking-garage-g': 1735, 'parking-garage-j': 703,
+    'parking-garage-k': 2218, 'parking-surface-lot-d': 135, 'parking-surface-lot-e': 511,
+  };
+  for (const [assetId, spaces] of Object.entries(expected)) {
+    const asset = INFRASTRUCTURE_ASSETS.find(a => a.id === assetId);
+    assert.equal(asset.attributes.capacity?.spaces, spaces, `${assetId}`);
+    assert.equal(asset.attributes.capacity?.verification, 'VERIFIED', `${assetId}`);
+  }
+  // Facilities the table does not list get no capacity rather than a guessed one.
+  for (const assetId of ['parking-garage-aa', 'parking-surface-lot-c']) {
+    const asset = INFRASTRUCTURE_ASSETS.find(a => a.id === assetId);
+    assert.equal(asset.attributes.capacity, null, `${assetId} is not in Table 1-3`);
+  }
+});
+
+test('the table\u2019s "V-G" row is mapped to Garage G, and the difference is stated', () => {
+  const garageG = INFRASTRUCTURE_ASSETS.find(a => a.id === 'parking-garage-g');
+  assert.equal(garageG.attributes.capacity.spaces, 1735);
+  assert.match(garageG.attributes.capacity.note, /labels this row .V-G./);
+});
+
+test('rows that are not registry assets are carried for the total, not invented as assets', () => {
+  const orphans = TABLE_1_3.rows.filter(row => row.assetId === null).map(row => row.facility);
+  assert.deepEqual(orphans, ['RCG', 'Under Bridge / Admin and Tenant Lots']);
+  for (const facility of orphans) {
+    assert.equal(INFRASTRUCTURE_ASSETS.some(a => a.name.includes(facility)), false);
+  }
+});
+
+test('the port-wide totals quote the study’s own prose', () => {
+  assert.equal(PORT_PARKING_TOTALS.todaySpaces, 10000);
+  assert.match(PORT_PARKING_TOTALS.todayQuote, /more than 10,000 public parking spaces/);
+  assert.equal(PORT_PARKING_TOTALS.forecast2050Low, 13000);
+  assert.equal(PORT_PARKING_TOTALS.forecast2050High, 17000);
+  assert.ok(ASSET_SOURCES[PORT_PARKING_TOTALS.sourceId]);
 });
 
 test('the registry does not touch the GIS: no asset holds an OBJECTID as its key', () => {
@@ -572,11 +647,19 @@ test('what the county does NOT publish is recorded, not silently omitted', () =>
   for (const missing of [/[Cc]apacity/, /rental/i, /[Ee]lectric-vehicle charging/, /[Vv]alet/]) {
     assert.match(text, missing);
   }
-  // And no facility quietly carries one anyway.
+  // The county page itself still publishes no capacity for any facility. Where a capacity does
+  // exist it comes from a DIFFERENT cited source and says so — it is never attributed to the
+  // parking page, and every other facility carries none.
   for (const facility of assets.filter(a => a.category === 'PARKING')) {
-    assert.equal(facility.attributes.capacity, undefined);
     assert.equal(facility.attributes.evCharging, undefined);
+    const capacity = facility.attributes.capacity;
+    if (capacity) {
+      assert.notEqual(capacity.sourceId, 'mdc-parking', 'the parking page publishes no capacity');
+    }
   }
+  // Nine of the eleven facilities are in Table 1-3; Garage AA and Surface Lot C are not.
+  const withCapacity = assets.filter(a => a.category === 'PARKING' && a.attributes.capacity);
+  assert.equal(withCapacity.length, 9);
 });
 
 test('the 471,000 sq ft figure is carried as a COMBINED area, never as each terminal’s own', () => {

@@ -21,6 +21,8 @@ export const ACTION = Object.freeze({
   SHOW_ROADS: 'SHOW_ROADS',
   SHOW_CAMERAS: 'SHOW_CAMERAS',
   SHOW_TRAFFIC_EVENTS: 'SHOW_TRAFFIC_EVENTS',
+  /** Open the Parking Scenario Planner on one saved scenario and frame it. */
+  SHOW_SCENARIO: 'SHOW_SCENARIO',
 });
 
 /** How many features one action may highlight. A hundred emphasised roads is not a highlight. */
@@ -45,6 +47,7 @@ export const showBuildings = objectIds => ({ type: ACTION.SHOW_BUILDINGS, object
 export const showRoads = objectIds => ({ type: ACTION.SHOW_ROADS, objectIds: ints(objectIds) });
 export const showCameras = cameraIds => ({ type: ACTION.SHOW_CAMERAS, cameraIds: strings(cameraIds) });
 export const showTrafficEvents = eventIds => ({ type: ACTION.SHOW_TRAFFIC_EVENTS, eventIds: strings(eventIds) });
+export const showScenario = scenarioId => ({ type: ACTION.SHOW_SCENARIO, scenarioId });
 
 /** A short label for the button that runs the action. */
 export function actionLabel(action, { count } = {}) {
@@ -58,6 +61,8 @@ export function actionLabel(action, { count } = {}) {
     case ACTION.SHOW_ROADS: return `Highlight ${count ?? action.objectIds.length} roads`;
     case ACTION.SHOW_CAMERAS: return `Show ${count ?? action.cameraIds.length} cameras`;
     case ACTION.SHOW_TRAFFIC_EVENTS: return `Show ${count ?? action.eventIds.length} events`;
+    case ACTION.SHOW_SCENARIO:
+      return action.label ? `Open ${shortLabel(action.label)}` : 'Open in the planner';
     default: return 'Show on map';
   }
 }
@@ -119,6 +124,13 @@ export function validateAction(action, view) {
       return cameraIds.length
         ? { ok: true, action: { type, cameraIds } }
         : { ok: false, reason: 'None of those camera ids are in the current FL511 camera list.' };
+    }
+    case ACTION.SHOW_SCENARIO: {
+      // Validated against the SAVED scenarios, so an answer can only point at one that exists.
+      const scenario = view.scenarios?.find(s => s.id === action.scenarioId);
+      return scenario
+        ? { ok: true, action: { type, scenarioId: scenario.id, label: scenario.name } }
+        : { ok: false, reason: `No saved scenario ${JSON.stringify(action.scenarioId)}.` };
     }
     case ACTION.SHOW_TRAFFIC_EVENTS: {
       const eventIds = keepEvents(action.eventIds);

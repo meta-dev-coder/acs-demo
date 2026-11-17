@@ -21,7 +21,14 @@ const STREET_VIEW_ICON = (
   </svg>
 );
 
-const BUTTONS = [
+/**
+ * Every control the column can show, in order.
+ *
+ * Exported because the scenario planner shows a subset of them in its own header: the panel
+ * covers the column, so the camera controls move INTO the panel rather than being duplicated
+ * there. One definition, one set of handlers, two places that render them.
+ */
+export const MAP_CONTROL_BUTTONS = [
   { key: 'zoomIn', label: 'Zoom in', glyph: '+', prop: 'onZoomIn' },
   { key: 'zoomOut', label: 'Zoom out', glyph: '−', prop: 'onZoomOut' },
   { key: 'rotateLeft', label: 'Rotate left', glyph: '↺', prop: 'onRotateLeft', group: true },
@@ -34,27 +41,42 @@ const BUTTONS = [
   { key: 'streetView', label: 'Street View — drop onto the map', icon: STREET_VIEW_ICON, prop: 'onStreetView' },
 ];
 
+/** The camera controls the scenario panel carries in its own header: zoom, orbit and tilt. */
+export const PANEL_CAMERA_KEYS = Object.freeze(
+  ['zoomIn', 'zoomOut', 'rotateLeft', 'rotateRight', 'tiltUp', 'tiltDown']);
+
+/**
+ * Render a set of these buttons.
+ *
+ * `keys` picks which, and `grouped` says whether to keep the column's separator rules — a row in
+ * a panel header has no columns to separate, so it drops them.
+ */
+export function MapControlButtons({ handlers, keys = null, grouped = true }) {
+  const wanted = keys ? MAP_CONTROL_BUTTONS.filter(b => keys.includes(b.key)) : MAP_CONTROL_BUTTONS;
+  return wanted
+    // A button with no handler is not rendered: Street View is absent when it is switched off
+    // or has no key, rather than present and dead.
+    .filter(button => typeof handlers[button.prop] === 'function')
+    .map(button => (
+      <button
+        key={button.key}
+        type="button"
+        className={`${grouped && button.group ? 'is-group-start' : ''}${button.icon ? ' has-icon' : ''}`.trim() || undefined}
+        title={button.label}
+        aria-label={button.label}
+        aria-haspopup={button.key === 'weather' ? 'dialog' : undefined}
+        aria-pressed={button.key === 'streetView' ? Boolean(handlers.streetViewArmed) : undefined}
+        onClick={handlers[button.prop]}
+      >
+        {button.icon ?? <span aria-hidden="true">{button.glyph}</span>}
+      </button>
+    ));
+}
+
 export function MapControls(handlers) {
   return (
     <div className="map-controls" role="group" aria-label="Map navigation">
-      {BUTTONS
-        // A button with no handler is not rendered: Street View is absent when it is switched off
-        // or has no key, rather than present and dead.
-        .filter(button => typeof handlers[button.prop] === 'function')
-        .map(button => (
-        <button
-          key={button.key}
-          type="button"
-          className={`${button.group ? 'is-group-start' : ''}${button.icon ? ' has-icon' : ''}`.trim() || undefined}
-          title={button.label}
-          aria-label={button.label}
-          aria-haspopup={button.key === 'weather' ? 'dialog' : undefined}
-          aria-pressed={button.key === 'streetView' ? Boolean(handlers.streetViewArmed) : undefined}
-          onClick={handlers[button.prop]}
-        >
-          {button.icon ?? <span aria-hidden="true">{button.glyph}</span>}
-        </button>
-      ))}
+      <MapControlButtons handlers={handlers} />
     </div>
   );
 }

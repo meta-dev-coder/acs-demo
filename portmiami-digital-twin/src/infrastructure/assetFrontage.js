@@ -148,6 +148,20 @@ function poleOfInaccessibility(ring, building) {
  * entered. And a part is usually not convex, so the marker is placed at the point furthest inside
  * it — holes excluded — rather than at a centroid that may fall outside the walls altogether.
  */
+/**
+ * The best point to anchor a label on a footprint, without a probe to start from.
+ *
+ * The largest ring is the building's main part; its pole of inaccessibility is the point furthest
+ * from any wall. Not the mean of the vertices — a U-shaped garage's vertex mean sits in the gap
+ * between its arms, and a MultiPolygon's mean can fall between two parts entirely.
+ */
+export function interiorAnchor(building) {
+  const rings = (building?.rings ?? []).filter(ring => ring.length > 3);
+  if (rings.length === 0) return building?.centroid ?? null;
+  const largest = rings.reduce((a, b) => (ringArea(a) >= ringArea(b) ? a : b));
+  return poleOfInaccessibility(largest, building) ?? building?.centroid ?? null;
+}
+
 export function interiorPoint(building, probe) {
   const containing = (building.rings ?? []).filter(ring => pointInRing(probe, ring));
   if (containing.length === 0) return probe;

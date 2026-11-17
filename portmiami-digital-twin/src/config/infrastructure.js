@@ -39,6 +39,91 @@ export const ASSET_CATEGORIES = Object.freeze([
   Object.freeze({ id: 'BRIDGE', label: 'Bridge', group: 'TRANSPORT' }),
 ]);
 
+/**
+ * How firmly a published capacity is established.
+ *
+ * VERIFIED is reserved for a figure read directly from a cited source. A number supplied by the
+ * project team that could not be found in the document it was attributed to is REPORTED — usable,
+ * clearly labelled, and never shown as though the source confirmed it.
+ */
+export const CAPACITY_VERIFICATION = Object.freeze({
+  VERIFIED: 'VERIFIED',
+  REPORTED: 'REPORTED',
+  NONE: 'NONE',
+});
+
+export const CAPACITY_VERIFICATION_LABEL = Object.freeze({
+  VERIFIED: 'Read from the cited source',
+  REPORTED: 'Reported to the project — not confirmed in the cited source',
+  NONE: 'No published capacity',
+});
+
+/**
+ * Port-wide parking capacity, from the MDTPO study's own text.
+ *
+ * These two ARE verifiable: the report states them in prose, and the extracted text carries them.
+ * They are the only parking-capacity figures in it that a machine can read — Table 1-3 "Port
+ * Parking Facilities", where any per-garage count would live, is an embedded image.
+ */
+/**
+ * Table 1-3 "Port Parking Facilities", PortMiami 2050 Master Plan (2024).
+ *
+ * Read from the table, facility by facility. The rows sum to the table's own stated total of
+ * 10,842, which is the check that the transcription is complete — a test asserts it.
+ *
+ * Two rows are NOT registry assets and are carried here only so the total reconciles: RCG, and
+ * the combined "Under Bridge / Admin and Tenant Lots". Garage AA and Surface Lot C do not appear
+ * in the table at all, so they keep no published capacity rather than being given one.
+ */
+export const TABLE_1_3 = Object.freeze({
+  sourceId: 'portmiami-2050-master-plan',
+  statedTotal: 10842,
+  rows: Object.freeze([
+    Object.freeze({ type: 'Garage', facility: 'A', spaces: 1046, uses: 'Cruise', assetId: 'parking-garage-a' }),
+    Object.freeze({ type: 'Garage', facility: 'B', spaces: 809, uses: 'Cruise / Govt Agency', assetId: 'parking-garage-b' }),
+    Object.freeze({ type: 'Garage', facility: 'C', spaces: 1355, uses: 'Cruise / Port staff', assetId: 'parking-garage-c' }),
+    Object.freeze({ type: 'Garage', facility: 'D', spaces: 822, uses: 'Cruise / Govt Agency', assetId: 'parking-garage-d' }),
+    // The table labels this row "V-G"; the county parking page calls the facility Garage G.
+    Object.freeze({ type: 'Garage', facility: 'V-G', spaces: 1735, uses: 'Cruise / Tenants', assetId: 'parking-garage-g' }),
+    Object.freeze({ type: 'Garage', facility: 'J', spaces: 703, uses: 'Cruise', assetId: 'parking-garage-j' }),
+    Object.freeze({ type: 'Garage', facility: 'K', spaces: 2218, uses: 'Tenants / Cruise', assetId: 'parking-garage-k' }),
+    Object.freeze({ type: 'Surface Lot', facility: 'D', spaces: 135, uses: 'Cruise / Govt Agency', assetId: 'parking-surface-lot-d' }),
+    Object.freeze({ type: 'Surface Lot', facility: 'E', spaces: 511, uses: 'Cruise', assetId: 'parking-surface-lot-e' }),
+    Object.freeze({ type: 'Surface Lot', facility: 'RCG', spaces: 1173, uses: 'Tenants', assetId: null }),
+    Object.freeze({ type: 'Surface Lot', facility: 'Under Bridge / Admin and Tenant Lots', spaces: 335, uses: 'POM / Visitor', assetId: null }),
+  ]),
+});
+
+/** The published capacity for one registry asset, or null where the table does not list it. */
+export const publishedCapacityFor = assetId => {
+  const row = TABLE_1_3.rows.find(entry => entry.assetId === assetId);
+  if (!row) return null;
+  return Object.freeze({
+    spaces: row.spaces,
+    verification: 'VERIFIED',
+    sourceId: TABLE_1_3.sourceId,
+    asOf: '2024',
+    uses: row.uses,
+    note: `Read from Table 1-3 "Port Parking Facilities" in the PortMiami 2050 Master Plan (2024), `
+      + `row "${row.facility}" (${row.type}), used for ${row.uses}.`
+      + (row.facility === 'V-G'
+        ? ' The table labels this row “V-G”; the county parking page calls the facility Garage G.'
+        : ''),
+  });
+};
+
+export const PORT_PARKING_TOTALS = Object.freeze({
+  todaySpaces: 10000,
+  todayQualifier: 'more than',
+  todayQuote: 'There are more than 10,000 public parking spaces at the Port for cruise ship '
+    + 'passengers, visitors, and employees to use (Table 1-3).',
+  forecast2050Low: 13000,
+  forecast2050High: 17000,
+  forecastQuote: 'The Master Plan estimates that by 2050 the Port will need a total of between '
+    + '13,000 and 17,000 parking spaces to meet demand.',
+  sourceId: 'mdtpo-port-mia-transit',
+});
+
 /** The filter groups the explorer offers, in order. */
 export const ASSET_GROUPS = Object.freeze([
   Object.freeze({ id: 'ALL', label: 'All assets' }),
@@ -57,6 +142,27 @@ export const ASSET_SOURCES = Object.freeze({
     publisher: 'Miami-Dade County',
     url: 'https://www.miamidade.gov/portmiami/cruise-terminals.page',
     retrieved: '2026-11-13',
+    authority: 'OFFICIAL',
+  }),
+  'portmiami-2050-master-plan': Object.freeze({
+    id: 'portmiami-2050-master-plan',
+    title: 'PortMiami 2050 Master Plan — Table 1-3 Port Parking Facilities',
+    publisher: 'PortMiami (Miami-Dade County)',
+    url: 'https://www.miamidadetpo.org/library/studies/mdtpo-feasibility-of-implementing-direct-transit-service-connecting-mia-with-portmiami-final-report-2025-09.pdf',
+    retrieved: '2026-11-17',
+    published: '2024',
+    authority: 'OFFICIAL',
+    note: 'Capacity per facility is read from Table 1-3, reproduced in the MDTPO PortMiami–MIA '
+      + 'transit study (September 2025). The table is an image in that PDF, so the figures were '
+      + 'read from the table itself rather than extracted from the document text.',
+  }),
+  'mdtpo-port-mia-transit': Object.freeze({
+    id: 'mdtpo-port-mia-transit',
+    title: 'Feasibility of Implementing Direct Transit Service Connecting MIA with PortMiami — Final Report',
+    publisher: 'Miami-Dade Transportation Planning Organization',
+    url: 'https://www.miamidadetpo.org/library/studies/mdtpo-feasibility-of-implementing-direct-transit-service-connecting-mia-with-portmiami-final-report-2025-09.pdf',
+    retrieved: '2026-11-17',
+    published: '2025-09',
     authority: 'OFFICIAL',
   }),
   'mdc-parking': Object.freeze({
@@ -464,9 +570,17 @@ export const INFRASTRUCTURE_ASSETS = Object.freeze([
     operationalStatus: operational('LISTED',
       'Listed on the county parking page with an address; the page states no closure or opening date.',
       'mdc-parking'),
-    sources: p.mapAddress ? ['mdc-parking', 'mdc-cruise-street-map'] : ['mdc-parking'],
+    sources: [
+      'mdc-parking',
+      ...(p.mapAddress ? ['mdc-cruise-street-map'] : []),
+      ...(publishedCapacityFor(`parking-${p.kind.toLowerCase().replace(/\s+/g, '-')}-${p.code.toLowerCase()}`)
+        ? [TABLE_1_3.sourceId] : []),
+    ],
     supports: {
       'mdc-parking': `Facility designation, the street address, and the clearance, rate, contact and reservation details recorded here. The page publishes no coordinate and no capacity.`,
+      ...((cap => (cap ? {
+        [cap.sourceId]: `Published capacity of ${cap.spaces.toLocaleString()} spaces. ${cap.note}`,
+      } : {}))(publishedCapacityFor(`parking-${p.kind.toLowerCase().replace(/\s+/g, '-')}-${p.code.toLowerCase()}`))),
       ...(p.mapAddress ? { 'mdc-cruise-street-map': `Street address "${p.mapAddress}" \u2014 the parking page writes the same number without the "N", which does not geocode.` } : {}),
     },
     attributes: {
@@ -488,6 +602,13 @@ export const INFRASTRUCTURE_ASSETS = Object.freeze([
       phoneNote: p.phoneNote ?? null,
       operatorNote: p.operatorNote ?? null,
       oversizedVehicles: p.oversized ?? null,
+      /**
+       * Published capacity, as an asset-level record rather than a number inside a formula.
+       * `null` where no source publishes one, which is the case for every facility but Garage A —
+       * the county parking page states no space count at all.
+       */
+      // From Table 1-3, by asset id. Null for a facility the table does not list.
+      capacity: publishedCapacityFor(`parking-${p.kind.toLowerCase().replace(/\s+/g, '-')}-${p.code.toLowerCase()}`),
     },
   })),
 

@@ -26,9 +26,12 @@ import { INTENT, routeIntent } from './intents.js';
 import { SUBJECT, createSession, rememberAnswer, resolveSubject } from './session.js';
 import { readableMetres } from './spatial.js';
 import {
-  flyToAsset, openAssetDetails, selectRoad, showBuildings, showCameras, showRoads,
+  flyToAsset, openAssetDetails, selectRoad, showBuildings, showCameras, showRoads, showScenario,
   showTrafficEvents, validateActions,
 } from './actions.js';
+import {
+  getRunAssumptions, getScenarioComparison, getScenarioResult, listScenarios,
+} from './scenarioTools.js';
 import {
   GAP, getAssetCounts, getBuildingsForAsset, getConstructionEvents, getLiveTrafficEvents,
   getNearbyBuildings, getNearbyCameras, getNearbyRoads, getRoadClosures, getRoadsForAsset,
@@ -143,6 +146,14 @@ function answerFindAsset(view, slots) {
     : `No confirmed footprint; ${plural(detail.ok ? detail.candidates.length : 0, 'candidate', 'candidates')} offered for review.`);
   const roadLinks = (links.roadLinks ?? []).filter(l => l.status === 'CONFIRMED').length;
   if (roadLinks) parts.push(`${plural(roadLinks, 'confirmed access road', 'confirmed access roads')}.`);
+  // The published capacity, from the asset record the planner uses — one figure, one provenance.
+  const capacity = asset.attributes?.capacity ?? null;
+  if (capacity) {
+    parts.push(`Published capacity ${capacity.spaces.toLocaleString()} spaces`
+      + `${capacity.verification === 'VERIFIED' ? '' : ' (reported, not confirmed in the cited source)'}.`);
+  } else if (asset.category === 'PARKING') {
+    parts.push('No source publishes a space count for it.');
+  }
 
   return reply(INTENT.FIND_ASSET, parts.join(' '), {
     data: { asset: { id: asset.id, name: asset.name, category: asset.category }, point: anchor?.point ?? null, pointStatus: anchor?.status ?? null },
@@ -386,6 +397,107 @@ function answerLiveEvents(view, intent, slots, subject) {
   });
 }
 
+// ---- the scenario planner --------------------------------------------------------------------
+
+const num = value => (Number.isFinite(value) ? Math.round(value).toLocaleString() : 'not calculated');
+
+/**
+ * One scenario's saved results.
+ *
+ * Every figure is read from the run. Nothing is recomputed here, so the assistant and the Compare
+ * tab cannot drift apart, and no model touches the arithmetic.
+ */
+function answerScenarioResult(view, slots) {
+  const query = slots.scenario ?? slots.name ?? slots.raw;
+  const found = getScenarioResult(view, query);
+  if (!found.ok) {
+    // An unrun or unknown scenario: say which, and list what there is.
+    const listed = listScenarios(view);
+    const names = listed.ok ? listed.scenarios.map(s => `${s.name}${s.hasRun ? '' : ' (not run)'}`).join(', ') : null;
+    return reply(INTENT.SCENARIO_RESULT,
+      `${found.message}${names ? ` Scenarios in the planner: ${names}.` : ''}`,
+      { data: { gap: found.gap }, ...confidenceOf('REGISTRY_EXACT') });
+  }
+
+  const m = found.metrics;
+  const r = found.run.results;
+  const parts = [
+    `${found.scenario.name}: ${num(m.addedSpaces)} additional spaces for a proposed total of `
+    + `${num(m.capacity)} (${Number.isFinite(r.capacity.increasePct) ? `+${r.capacity.increasePct.toFixed(0)}%` : 'increase not calculated'}).`,
+    `At the ${found.run.inputSnapshot.assumptions.forecastYear} forecast it serves ${num(m.demandServed)} of `
+    + `${num(m.forecastDemand)} spaces of peak demand`
+    + `${Number.isFinite(m.unmetDemand) && m.unmetDemand > 0 ? `, leaving ${num(m.unmetDemand)} unserved` : ''}.`,
+  ];
+  if (Number.isFinite(m.addedVehicles)) {
+    parts.push(`It adds ${num(m.addedVehicles)} peak-hour vehicle movements`
+      + `${Number.isFinite(m.accessVc) ? ` and a modelled V/C of ${m.accessVc.toFixed(2)} on ${r.traffic.road?.name}` : ' and no road was nominated, so no V/C was modelled'}.`);
+  }
+  parts.push('Every figure is from the saved run, on synthetic assumptions.');
+
+  return reply(INTENT.SCENARIO_RESULT, parts.join(' '), {
+    data: { scenarioId: found.scenario.id, runId: found.run.id, metrics: m },
+    sources: [{ name: found.source.name, timestamp: found.run.executedAt, reference: found.run.modelVersion }],
+    actions: [showScenario(found.scenario.id)],
+    warnings: [
+      'These are modelled outputs of a conceptual planning model, not measurements, a county '
+      + 'forecast or an approved project.',
+      ...(found.run.warnings ?? []),
+    ],
+    ...confidenceOf('REGISTRY_EXACT'),
+  });
+}
+
+/** The comparison and the ranking, as the planner computed them. */
+function answerScenarioCompare(view, slots) {
+  const compared = getScenarioComparison(view);
+  if (!compared.ok) {
+    return reply(INTENT.SCENARIO_COMPARE, compared.message,
+      { data: { gap: compared.gap }, ...confidenceOf('REGISTRY_EXACT') });
+  }
+  const rows = compared.rows.filter(row => row.type !== 'BASELINE');
+  const lines = rows.map(row =>
+    `${row.name}: ${num(row.metrics.capacity)} spaces, serves ${num(row.metrics.demandServed)} of `
+    + `${num(row.metrics.forecastDemand)}, ${num(row.metrics.addedVehicles)} added peak-hour vehicles`
+    + `${Number.isFinite(row.metrics.accessVc) ? `, V/C ${row.metrics.accessVc.toFixed(2)}` : ', V/C not modelled'}.`);
+
+  const rec = compared.recommendation;
+  const message = [lines.join(' '), rec.available ? rec.reason : rec.reason].filter(Boolean).join(' ');
+
+  return reply(INTENT.SCENARIO_COMPARE, message, {
+    data: { rows: rows.map(r => ({ name: r.name, metrics: r.metrics })), ranking: rec.ranking?.map(r => ({ name: r.name, score: r.score })) ?? [] },
+    sources: [{ name: compared.source.name }],
+    actions: rows.slice(0, 4).map(row => showScenario(row.scenarioId)),
+    warnings: [
+      'The ranking is a weighted score over synthetic metrics; cost and site feasibility are not '
+      + 'modelled at all. Change the weights and the order can change.',
+    ],
+    ...confidenceOf('REGISTRY_EXACT'),
+  });
+}
+
+/** What a run actually used — from its own snapshot, not from the scenario as it stands now. */
+function answerScenarioAssumptions(view, slots) {
+  const query = slots.scenario ?? slots.name ?? slots.raw;
+  const found = getRunAssumptions(view, query);
+  if (!found.ok) {
+    return reply(INTENT.SCENARIO_ASSUMPTIONS, found.message,
+      { data: { gap: found.gap }, ...confidenceOf('REGISTRY_EXACT') });
+  }
+  const head = found.assumptions
+    .filter(a => ['existingCapacity', 'additionalSpaces', 'baseDemandSpaces', 'annualGrowthPct', 'forecastYear', 'utilisationPct', 'peakArrivalSharePct', 'roadCapacityPerLane'].includes(a.key))
+    .map(a => `${a.label} ${a.value}${a.unit ? ` ${a.unit}` : ''}`);
+  return reply(INTENT.SCENARIO_ASSUMPTIONS,
+    `${found.scenario.name} was run on ${found.modelVersion} (${found.dataMode}) with: ${head.join('; ')}. `
+    + 'All of them are assumptions — none is a PortMiami measurement. The full list with each one’s '
+    + 'basis is in the planner’s Assumptions panel.',
+    {
+      data: { assumptions: found.assumptions },
+      sources: [{ name: found.source.name, timestamp: found.executedAt, reference: found.modelVersion }],
+      actions: [showScenario(found.scenario.id)],
+      ...confidenceOf('REGISTRY_EXACT'),
+    });
+}
+
 function answerSelection(view, context) {
   const result = getSelectedFeatureDetails(view, context);
   if (!result.ok) {
@@ -496,6 +608,15 @@ export function answerQuestion({ question, context, view, memory = createSession
   }
   if (intent === INTENT.SHOW_LAST) {
     return finish(answerShowLast(view, memory), intent, view, memory);
+  }
+  if (intent === INTENT.SCENARIO_RESULT) {
+    return finish(answerScenarioResult(view, slots), intent, view, memory);
+  }
+  if (intent === INTENT.SCENARIO_COMPARE) {
+    return finish(answerScenarioCompare(view, slots), intent, view, memory);
+  }
+  if (intent === INTENT.SCENARIO_ASSUMPTIONS) {
+    return finish(answerScenarioAssumptions(view, slots), intent, view, memory);
   }
   if (intent === INTENT.ASSET_SUMMARY) {
     return finish(answerAssetSummary(view, slots), intent, view, memory);
