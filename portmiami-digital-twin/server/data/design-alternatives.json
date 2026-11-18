@@ -753,77 +753,6 @@
       "updatedAt": "2026-11-18T05:51:01.816Z"
     },
     {
-      "id": "road-demo-widening",
-      "name": "Design A — Road Widening",
-      "description": "Widen an existing access road.",
-      "source": "SYNTHETIC_DEMO",
-      "verificationStatus": "CONCEPTUAL",
-      "revision": "02",
-      "domain": "ROAD_INFRASTRUCTURE",
-      "organisation": null,
-      "sourceFile": null,
-      "importedAt": null,
-      "crs": "EPSG:4326",
-      "units": "metre",
-      "elements": [
-        {
-          "id": "widen-40642-0-30",
-          "type": "ROAD",
-          "changeType": "MODIFIED",
-          "operation": "WIDEN",
-          "baselineRef": {
-            "kind": "ROAD",
-            "source": "MIAMI_DADE_ROADS",
-            "objectId": 40642,
-            "name": "S CRUISE BLVD",
-            "fingerprint": "4:173:-80.1673,25.77348:-80.16574,25.77282"
-          },
-          "section": {
-            "startMeasureM": 0,
-            "endMeasureM": 30.17984969274439,
-            "lengthM": 30.17984969274439
-          },
-          "proposal": {
-            "totalWidthM": 16.5,
-            "laneCount": 3,
-            "wideningSide": "BOTH",
-            "baselineWidthM": null,
-            "baselineWidthSource": "UNKNOWN"
-          },
-          "geometry": {
-            "type": "LineString",
-            "coordinates": [
-              [
-                -80.16730314996047,
-                25.77347868577745
-              ],
-              [
-                -80.16703148547853,
-                25.773361605176135
-              ]
-            ]
-          },
-          "properties": {
-            "name": "S CRUISE BLVD — proposed widening",
-            "widthM": 16.5,
-            "lanes": 3,
-            "roadType": "WIDENING"
-          },
-          "provenance": {
-            "source": "USER_CONCEPTUAL_DESIGN",
-            "status": "DRAFT"
-          },
-          "domain": "ROAD_INFRASTRUCTURE"
-        }
-      ],
-      "purpose": "WIDENING",
-      "allowedOperation": "WIDEN",
-      "demoTemplate": "WIDENING",
-      "limitation": "Existing width and lanes are Unknown: the county file publishes neither.",
-      "createdAt": "2026-11-18T05:51:01.591Z",
-      "updatedAt": "2026-11-18T06:42:26.393Z"
-    },
-    {
       "id": "road-demo-realignment",
       "name": "Design C — Road Realignment",
       "description": "Modify an existing road alignment.",
@@ -911,6 +840,244 @@
       "limitation": "Generated: the section is bowed sideways and tied in at both ends. Conceptual only.",
       "createdAt": "2026-11-18T05:51:01.984Z",
       "updatedAt": "2026-11-18T09:04:22.035Z"
+    },
+    {
+      "id": "road-demo-widening",
+      "name": "Design A — Road Widening",
+      "description": "Widen an existing access road.",
+      "source": "SYNTHETIC_DEMO",
+      "verificationStatus": "CONCEPTUAL",
+      "revision": "03",
+      "domain": "ROAD_INFRASTRUCTURE",
+      "organisation": null,
+      "sourceFile": null,
+      "importedAt": null,
+      "crs": "EPSG:4326",
+      "units": "metre",
+      "elements": [
+        {
+          "id": "widen-39394-all",
+          "type": "ROAD",
+          "changeType": "MODIFIED",
+          "operation": "WIDEN",
+          "baselineRef": {
+            "kind": "ROAD",
+            "source": "MIAMI_DADE_ROADS",
+            "objectId": 39394,
+            "name": "S CRUISE BLVD",
+            "fingerprint": "3:60:-80.16929,25.77435:-80.16874,25.77413"
+          },
+          "section": null,
+          "proposal": {
+            "totalWidthM": 16.5,
+            "laneCount": 3,
+            "wideningSide": "BOTH",
+            "baselineWidthM": null,
+            "baselineWidthSource": "UNKNOWN"
+          },
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -80.16928507164295,
+                25.77435009947794
+              ],
+              [
+                -80.16910327881669,
+                25.77427530531687
+              ],
+              [
+                -80.1687411090289,
+                25.774134190441636
+              ]
+            ]
+          },
+          "properties": {
+            "name": "S CRUISE BLVD — proposed widening (1 of 4)",
+            "widthM": 16.5,
+            "lanes": 3,
+            "roadType": "WIDENING"
+          },
+          "provenance": {
+            "source": "SYNTHETIC_DEMO_GENERATED",
+            "status": "CONCEPTUAL",
+            "basis": "Segment 1 of a continuous 4-segment stretch of the county centreline"
+          },
+          "domain": "ROAD_INFRASTRUCTURE"
+        },
+        {
+          "id": "widen-40073-all",
+          "type": "ROAD",
+          "changeType": "MODIFIED",
+          "operation": "WIDEN",
+          "baselineRef": {
+            "kind": "ROAD",
+            "source": "MIAMI_DADE_ROADS",
+            "objectId": 40073,
+            "name": "S CRUISE BLVD",
+            "fingerprint": "4:162:-80.16874,25.77413:-80.1673,25.77348"
+          },
+          "section": null,
+          "proposal": {
+            "totalWidthM": 16.5,
+            "laneCount": 3,
+            "wideningSide": "BOTH",
+            "baselineWidthM": null,
+            "baselineWidthSource": "UNKNOWN"
+          },
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -80.1687411090289,
+                25.774134190441636
+              ],
+              [
+                -80.16846523628642,
+                25.773988928347986
+              ],
+              [
+                -80.16746354619858,
+                25.773562140628908
+              ],
+              [
+                -80.16730314996047,
+                25.77347868577745
+              ]
+            ]
+          },
+          "properties": {
+            "name": "S CRUISE BLVD — proposed widening (2 of 4)",
+            "widthM": 16.5,
+            "lanes": 3,
+            "roadType": "WIDENING"
+          },
+          "provenance": {
+            "source": "SYNTHETIC_DEMO_GENERATED",
+            "status": "CONCEPTUAL",
+            "basis": "Segment 2 of a continuous 4-segment stretch of the county centreline"
+          },
+          "domain": "ROAD_INFRASTRUCTURE"
+        },
+        {
+          "id": "widen-40642-all",
+          "type": "ROAD",
+          "changeType": "MODIFIED",
+          "operation": "WIDEN",
+          "baselineRef": {
+            "kind": "ROAD",
+            "source": "MIAMI_DADE_ROADS",
+            "objectId": 40642,
+            "name": "S CRUISE BLVD",
+            "fingerprint": "4:173:-80.1673,25.77348:-80.16574,25.77282"
+          },
+          "section": null,
+          "proposal": {
+            "totalWidthM": 16.5,
+            "laneCount": 3,
+            "wideningSide": "BOTH",
+            "baselineWidthM": null,
+            "baselineWidthSource": "UNKNOWN"
+          },
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -80.16730314996047,
+                25.77347868577745
+              ],
+              [
+                -80.1659485994822,
+                25.772894901037287
+              ],
+              [
+                -80.16581776522389,
+                25.772837865756006
+              ],
+              [
+                -80.1657373031251,
+                25.772820727213517
+              ]
+            ]
+          },
+          "properties": {
+            "name": "S CRUISE BLVD — proposed widening (3 of 4)",
+            "widthM": 16.5,
+            "lanes": 3,
+            "roadType": "WIDENING"
+          },
+          "provenance": {
+            "source": "SYNTHETIC_DEMO_GENERATED",
+            "status": "CONCEPTUAL",
+            "basis": "Segment 3 of a continuous 4-segment stretch of the county centreline"
+          },
+          "domain": "ROAD_INFRASTRUCTURE"
+        },
+        {
+          "id": "widen-40964-all",
+          "type": "ROAD",
+          "changeType": "MODIFIED",
+          "operation": "WIDEN",
+          "baselineRef": {
+            "kind": "ROAD",
+            "source": "MIAMI_DADE_ROADS",
+            "objectId": 40964,
+            "name": "S CRUISE BLVD",
+            "fingerprint": "5:208:-80.16574,25.77282:-80.16385,25.77217"
+          },
+          "section": null,
+          "proposal": {
+            "totalWidthM": 16.5,
+            "laneCount": 3,
+            "wideningSide": "BOTH",
+            "baselineWidthM": null,
+            "baselineWidthSource": "UNKNOWN"
+          },
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -80.1657373031251,
+                25.772820727213517
+              ],
+              [
+                -80.16417391884882,
+                25.772141308376643
+              ],
+              [
+                -80.16401178585113,
+                25.77212963015246
+              ],
+              [
+                -80.16392069007516,
+                25.772143436358256
+              ],
+              [
+                -80.16384531990606,
+                25.772171662401227
+              ]
+            ]
+          },
+          "properties": {
+            "name": "S CRUISE BLVD — proposed widening (4 of 4)",
+            "widthM": 16.5,
+            "lanes": 3,
+            "roadType": "WIDENING"
+          },
+          "provenance": {
+            "source": "SYNTHETIC_DEMO_GENERATED",
+            "status": "CONCEPTUAL",
+            "basis": "Segment 4 of a continuous 4-segment stretch of the county centreline"
+          },
+          "domain": "ROAD_INFRASTRUCTURE"
+        }
+      ],
+      "purpose": "WIDENING",
+      "allowedOperation": "WIDEN",
+      "demoTemplate": "WIDENING",
+      "limitation": "Existing width and lanes are Unknown: the county file publishes neither.",
+      "createdAt": "2026-11-18T05:51:01.591Z",
+      "updatedAt": "2026-11-18T09:22:32.865Z"
     }
   ]
 }

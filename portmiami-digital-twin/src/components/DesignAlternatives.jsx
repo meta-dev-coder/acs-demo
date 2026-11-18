@@ -38,6 +38,8 @@ const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const opOf = element => roadOperationOf(element) ?? 'MODIFY';
 const opLabel = element => ROAD_OPERATION_LABEL[opOf(element)] ?? 'Change';
 const opColour = element => ROAD_OPERATION_STYLE[opOf(element)]?.line ?? '#657184';
+/** The same hue, dark enough to read as text on white. */
+const opText = element => ROAD_OPERATION_STYLE[opOf(element)]?.text ?? '#4a5568';
 
 /** One line describing a change: its section, width and lanes, as stored. */
 function changeDetail(element) {
@@ -155,7 +157,7 @@ function ChangeRow({ element, viewer, onEdit, onDuplicate, onRemove, showId }) {
     <li className={`rd-change${selected ? ' is-selected' : ''}`}>
       <button type="button" className="rd-change-head" aria-pressed={selected}
         onClick={() => viewer.setSelectedElementId(selected ? null : element.id)}>
-        <span className="rd-op" style={{ color: opColour(element), background: `${opColour(element)}1F` }}>
+        <span className="rd-op" style={{ color: opText(element), background: `${opColour(element)}2E` }}>
           <i aria-hidden="true" style={{ background: opColour(element) }} />{opLabel(element)}
         </span>
         <span className="rd-change-name">{element.properties?.name ?? element.id}</span>
@@ -388,9 +390,14 @@ function OverviewTab({ viewer, studio, askConfirm }) {
 function CompareTab({ viewer }) {
   const { designs, comparison, compareLeftId, setCompareLeftId, compareRightId, setCompareRightId,
     compareView } = viewer;
-  const options = designs.filter(design => !isBaseline(design));
-  /** "Design A — Road Widening" reads as "Design A" where width is short; the full name is the tooltip. */
-  const shortName = name => String(name ?? '').split('—')[0].trim() || name;
+  /*
+   * The alternatives the selector shows — normally the three primary ones — not every stored
+   * record: the original Design A/B/C are also "Design A/B/C", and listing both made each name
+   * appear twice. A short name is used only where it is unique; otherwise the full name.
+   */
+  const options = viewer.visibleDesigns.filter(design => !isBaseline(design));
+  const shortOf = name => String(name ?? '').split('—')[0].trim() || name;
+  const shortName = name => (options.filter(d => shortOf(d.name) === shortOf(name)).length > 1 ? name : shortOf(name));
   const sides = [comparison.left, comparison.right];
   const warnings = side => side?.connectivity?.filter(row => row.functionalStatus !== 'CONNECTED').length ?? 0;
   const rows = [
@@ -497,6 +504,14 @@ function cardSummary(design, purpose) {
     if (op === 'REALIGN') return `Realign ${road} on a new ${m(roadMeasure(only)?.lengthM)} alignment.`;
     if (op === 'CLOSE') return `Close ${only.section ? m(only.section.lengthM) : 'all'} of ${road}.`;
   }
+  // Several widenings of one named road are one stretch: say so in a sentence, not as a list.
+  const widenings = elements.filter(e => opOf(e) === 'WIDEN');
+  const names = new Set(widenings.map(e => e.baselineRef?.name));
+  if (widenings.length === elements.length && names.size === 1) {
+    const first = widenings[0];
+    const length = widenings.reduce((sum, e) => sum + (wideningMeasure(e)?.proposed.affectedLengthM.value ?? 0), 0);
+    return `Widen ${[...names][0]} to ${first.proposal?.totalWidthM ?? '—'} m (${plural(first.proposal?.laneCount ?? 0, 'lane')}) over ${m(length)}.`;
+  }
   const bits = [];
   if (groups.existingRoads.length) {
     const ops = groups.existingRoads.reduce((n, r) => n + r.operations.length, 0);
@@ -510,7 +525,9 @@ function AlternativeCard({ design, active, onSelect, roadsById }) {
   const purpose = purposeOf(design);
   const info = purpose.purpose ? PURPOSE_INFO[purpose.purpose] : null;
   const summary = useMemo(() => designSummary(design), [design]);
-  const roadsTouched = summary.existingRoadsAffected + summary.uniqueNewRoadCount;
+  // Roads by name: a stretch the county file splits into four segments is still one road.
+  const roadsTouched = new Set(design.elements.map(e => e.baselineRef?.name ?? e.baselineRef?.objectId)
+    .filter(v => v !== undefined && v !== null)).size + summary.uniqueNewRoadCount;
   const stored = Boolean(design.updatedAt);
   const title = /—/.test(design.name) || !info ? design.name : `${design.name} — ${info.label}`;
   const ops = [...new Set(design.elements.map(opOf))];
@@ -526,7 +543,7 @@ function AlternativeCard({ design, active, onSelect, roadsById }) {
           <span className="rd-chips">
             <i className="rd-chip is-count">{plural(roadsTouched, 'road')}</i>
             {ops.slice(0, 2).map(op => (
-              <i key={op} className="rd-chip" style={{ color: ROAD_OPERATION_STYLE[op]?.line, background: `${ROAD_OPERATION_STYLE[op]?.line}1F` }}>
+              <i key={op} className="rd-chip" style={{ color: ROAD_OPERATION_STYLE[op]?.text, background: `${ROAD_OPERATION_STYLE[op]?.line}2E` }}>
                 {ROAD_OPERATION_LABEL[op]}
               </i>
             ))}

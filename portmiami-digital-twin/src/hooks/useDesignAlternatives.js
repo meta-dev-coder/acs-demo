@@ -306,8 +306,7 @@ export function useDesignAlternatives({ viewerRef, roadsById, buildingsById, act
 
   /**
    * Dodge Island's road network from a low oblique: close enough to read individual roads, with the
-   * cruise terminals and the downtown skyline behind them. Used by Focus Road Network and, once,
-   * when the studio opens from a camera too far out to see a road.
+   * cruise terminals behind them. Used by Focus Road Network and whenever the studio is opened.
    */
   const focusRoadNetwork = useCallback(() => {
     const viewer = viewerRef.current;
@@ -316,8 +315,10 @@ export function useDesignAlternatives({ viewerRef, roadsById, buildingsById, act
     viewer.camera.flyToBoundingSphere(
       // Aimed south-east of S CRUISE BLVD on purpose: the panel and the dashboard cover the
       // right and the bottom of the canvas, so this puts the roads in the open part of the map.
-      { center: Cartesian3.fromDegrees(-80.16538, 25.77305, -24.8), radius: 300 },
-      { duration: 1.6, offset: new HeadingPitchRange(CesiumMath.toRadians(-35), CesiumMath.toRadians(-30), 780) });
+      { center: Cartesian3.fromDegrees(-80.16618, 25.77325, -24.8), radius: 300 },
+      // Two zoom steps closer than the first version (780 m × 0.75²), with the aim point's offset
+      // from S CRUISE BLVD scaled by the same factor so the road stays in the open part of the map.
+      { duration: 1.6, offset: new HeadingPitchRange(CesiumMath.toRadians(-35), CesiumMath.toRadians(-30), 440) });
     return true;
   }, [viewerRef]);
 
@@ -325,9 +326,9 @@ export function useDesignAlternatives({ viewerRef, roadsById, buildingsById, act
     if (!active) return;
     const viewer = viewerRef.current;
     if (!viewer || viewer.isDestroyed?.()) return;
-    const height = viewer.camera.positionCartographic?.height ?? 0;
-    // Only from far out: a camera someone has already placed near the port is left where it is.
-    if (height > 2500) focusRoadNetwork();
+    // Every time the studio is opened: entering it is a deliberate act, and its proposals are only
+    // legible from this close. Within the studio the camera is then left to the user.
+    focusRoadNetwork();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 
@@ -492,7 +493,7 @@ export function useDesignAlternatives({ viewerRef, roadsById, buildingsById, act
    */
   const loadDemoTemplates = useCallback(async ({ archiveLegacy = false } = {}) => {
     const templates = demoTemplates({
-      roadsById, buildingsById, legacyDesigns: LEGACY_ROAD_IDS.map(id => designById.get(id)).filter(Boolean),
+      roadsById, buildingsById,
     });
     const created = [], skipped = [], failed = [], archived = [];
     for (const [id, template] of Object.entries(templates)) {
@@ -536,7 +537,7 @@ export function useDesignAlternatives({ viewerRef, roadsById, buildingsById, act
     ensured.current = true;
     (async () => {
       const templates = demoTemplates({
-        roadsById, buildingsById, legacyDesigns: LEGACY_ROAD_IDS.map(id => designById.get(id)).filter(Boolean),
+        roadsById, buildingsById,
       });
       const made = [];
       for (const [id, template] of Object.entries(templates)) {

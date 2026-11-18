@@ -40,14 +40,14 @@
  * kind, so what is on the map can always be traced to the record that put it there.
  */
 import {
-  Cartesian3, Cartographic, Color, CustomDataSource,
+  Cartesian3, Cartographic, ClassificationType, Color, CustomDataSource,
   HeadingPitchRange, PolygonHierarchy,
   PolylineDashMaterialProperty, SceneTransforms, ScreenSpaceEventHandler, ScreenSpaceEventType,
 } from 'cesium';
 import { enuToLonLat, lonLatToEnu } from '../scenarios/garagePlacement.js';
 import { CHANGE_TYPE, ELEMENT_TYPE } from '../designs/designModel.js';
 import { roadCorridorRing } from '../designs/roadCorridor.js';
-import { sectionBetweenMeasures } from '../designs/roadWidening.js';
+import { offsetCentreline, sectionBetweenMeasures } from '../designs/roadWidening.js';
 import {
   ROAD_OPERATION_LABEL, elementRing, roadOperationOf,
 } from '../designs/designQuantities.js';
@@ -83,11 +83,13 @@ export const DESIGN_STYLE = Object.freeze({
  * blindness, where a second warm hue would not have been.
  */
 export const ROAD_OPERATION_STYLE = Object.freeze({
-  CREATE: { line: '#00BFEA', fill: '#00BFEA', fillOpacity: 0.3, dash: 18 },
-  WIDEN: { line: '#B76A12', fill: '#B76A12', fillOpacity: 0.28, dash: 18 },
-  REALIGN: { line: '#7B4FD3', fill: '#7B4FD3', fillOpacity: 0.26, dash: 26 },
-  CLOSE: { line: '#C73E3E', fill: '#C73E3E', fillOpacity: 0.18, dash: 10 },
-  MODIFY: { line: '#B76A12', fill: '#B76A12', fillOpacity: 0.22, dash: 18 },
+  // Bright, near-opaque surfaces with a glow at the edge: the approved Road Design Studio look.
+  // `text` is the same hue darkened enough to read on white, for chips and legends.
+  CREATE: { line: '#18E0FF', fill: '#18E0FF', fillOpacity: 0.72, dash: 18, text: '#0B7C93' },
+  WIDEN: { line: '#FFB300', fill: '#FFC21A', fillOpacity: 0.74, dash: 18, text: '#9A6400' },
+  REALIGN: { line: '#B15CFF', fill: '#A855F7', fillOpacity: 0.7, dash: 26, text: '#7330C0' },
+  CLOSE: { line: '#FF3B3B', fill: '#FF3B3B', fillOpacity: 0.22, dash: 10, text: '#C02626' },
+  MODIFY: { line: '#FFB300', fill: '#FFC21A', fillOpacity: 0.6, dash: 18, text: '#9A6400' },
 });
 
 /** What a piece of drawn geometry IS, so an entity can be traced to its purpose. */
@@ -147,6 +149,8 @@ export function installDesignOverlay(viewer, { onSelect, domain = 'ROAD_INFRASTR
   };
   /** Where each element's map label is anchored, filled during a draw. */
   const anchors = new Map();
+  /** The elements that get a map label in the current draw; see `chooseLabelled`. */
+  let labelledIds = new Set();
 
   /**
    * Stable ownership for one entity.
@@ -259,7 +263,14 @@ export function installDesignOverlay(viewer, { onSelect, domain = 'ROAD_INFRASTR
     }
   }
 
-  /** A road: corridor deck, bright edges, dashed centreline. */
+  /**
+   * A proposed road, drawn as a road: a bright painted deck in its operation's colour, a soft glow
+   * along its edges, white edge lines, and white dashed lane dividers — one per lane boundary,
+   * from the lane count the proposal states. Every line is the corridor of the stored centreline;
+   * nothing here is decoration that the geometry does not support.
+   *
+   * A closure stays what it was: the stretch struck through in a dashed red line, no surface.
+   */
   function drawRoad(element) {
     const centreline = element.geometry?.type === 'LineString' ? element.geometry.coordinates : null;
     if (!centreline?.length) return;
@@ -271,51 +282,86 @@ export function installDesignOverlay(viewer, { onSelect, domain = 'ROAD_INFRASTR
     // With a change selected, the others step back so the one being reviewed is unmistakable.
     const fade = selectedId && !selected ? 0.35 : 1;
     // A change in a potential conflict is outlined red, so it can be found without the panel.
-    const edge = selected ? DESIGN_STYLE.selected
+    const glow = selected ? DESIGN_STYLE.selected
       : context.conflicts.has(element.id) ? CONFLICT_LINE : style.line;
-    const ring = roadCorridorRing(centreline, element.properties?.widthM);
+    const width = element.proposal?.totalWidthM ?? element.properties?.widthM;
+    const ring = roadCorridorRing(centreline, width);
+    const at = (line, lift) => Cartesian3.fromDegreesArrayHeights(line.flatMap(([lon, lat]) => [lon, lat, base + lift]));
 
     if (ring && element.changeType !== CHANGE_TYPE.REMOVED) {
       track(ring);
+      /*
+       * DRAPED, NOT FLOATED. Every part of a proposed road is painted onto the photogrammetry
+       * (`classificationType`), not placed at a sampled height. A flat deck at one height went
+       * under the mesh wherever the tiles sit higher — on a stretch of several county segments
+       * that left grey gaps in the colour. Draped, the colour follows the ground everywhere.
+       *
+       * The edges are the two SIDES of the corridor, not its closed outline, so the joints of a
+       * stretch drawn segment by segment are seamless instead of crossed by white bars.
+       */
+      const drape = { classificationType: ClassificationType.BOTH };
       source.entities.add({
         id: `design-${element.id}-surface`,
         properties: own(element, GEOMETRY_ROLE.ROAD_SURFACE),
         polygon: {
-          hierarchy: hierarchyAt(ring, base), height: base,
-          material: css(style.fill, style.fillOpacity * fade), outline: false,
+          hierarchy: new PolygonHierarchy(Cartesian3.fromDegreesArray(ring.flat())),
+          material: css(style.fill, style.fillOpacity * fade), outline: false, ...drape,
         },
       });
+      const sides = Number.isFinite(width)
+        ? [offsetCentreline(centreline, width / 2), offsetCentreline(centreline, -width / 2)].filter(l => l?.length >= 2)
+        : [];
+      const ground = line => Cartesian3.fromDegreesArray(line.flat());
+      sides.forEach((side, i) => {
+        // A soft band in the operation's colour under a crisp white edge line: the glow.
+        source.entities.add({
+          id: `design-${element.id}-glow-${i}`,
+          properties: own(element, selected ? GEOMETRY_ROLE.SELECTION : GEOMETRY_ROLE.ROAD_BOUNDARY),
+          polyline: {
+            positions: ground(side), width: selected ? 12 : 9, clampToGround: true, ...drape,
+            material: css(glow, (selected ? 0.75 : 0.55) * fade),
+          },
+        });
+        source.entities.add({
+          id: `design-${element.id}-edge-${i}`,
+          properties: own(element, GEOMETRY_ROLE.ROAD_BOUNDARY),
+          polyline: {
+            positions: ground(side), width: 2.5, clampToGround: true, ...drape,
+            material: css('#ffffff', 0.95 * fade),
+          },
+        });
+      });
+      // Lane dividers: n lanes over the stated width put n − 1 dashed lines across it.
+      const lanes = Math.round(element.proposal?.laneCount ?? element.properties?.lanes ?? 0);
+      if (Number.isFinite(width) && lanes >= 2 && lanes <= 8) {
+        for (let i = 1; i < lanes; i += 1) {
+          const offset = -width / 2 + (width * i) / lanes;
+          const divider = Math.abs(offset) < 1e-6 ? centreline : offsetCentreline(centreline, offset);
+          if (!(divider?.length >= 2)) continue;
+          source.entities.add({
+            id: `design-${element.id}-lane-${i}`,
+            properties: own(element, GEOMETRY_ROLE.ROAD_CENTERLINE),
+            polyline: {
+              positions: ground(divider), width: 2.5, clampToGround: true, ...drape,
+              material: new PolylineDashMaterialProperty({ color: css('#ffffff', 0.95 * fade), dashLength: 16 }),
+            },
+          });
+        }
+      }
+    } else {
+      // A closure, or a road with no stated width: the alignment itself, dashed in its colour.
       source.entities.add({
-        id: `design-${element.id}-edge`,
-        properties: own(element,
-          selected ? GEOMETRY_ROLE.SELECTION : GEOMETRY_ROLE.ROAD_BOUNDARY),
+        id: `design-${element.id}-centreline`,
+        properties: own(element, GEOMETRY_ROLE.ROAD_CENTERLINE),
         polyline: {
-          positions: Cartesian3.fromDegreesArrayHeights(ring.flatMap(([lon, lat]) => [lon, lat, base])),
-          width: selected ? 4.5 : 3, material: css(edge, fade),
-          depthFailMaterial: css(edge, 0.4 * fade),
+          positions: at(centreline, 0.2),
+          width: element.changeType === CHANGE_TYPE.REMOVED ? 6 : 3,
+          material: new PolylineDashMaterialProperty({ color: css(glow, fade), dashLength: style.dash ?? 18 }),
+          depthFailMaterial: css(glow, 0.35),
         },
       });
+      track(centreline);
     }
-
-    // The alignment itself: dashed for a proposal, struck through for a removal.
-    const positions = Cartesian3.fromDegreesArrayHeights(
-      centreline.flatMap(([lon, lat]) => [lon, lat, base + 0.2]));
-    source.entities.add({
-      id: `design-${element.id}-centreline`,
-      properties: own(element, GEOMETRY_ROLE.ROAD_CENTERLINE),
-      polyline: {
-        positions,
-        width: element.changeType === CHANGE_TYPE.REMOVED ? 5 : 2,
-        material: new PolylineDashMaterialProperty({
-          color: css(edge, fade),
-          // Dash length carries the operation as well as colour: a long dash for a new road, a
-          // looser one for a realignment, a tight one for a closure.
-          dashLength: style.dash ?? 18,
-        }),
-        depthFailMaterial: css(edge, 0.35),
-      },
-    });
-    if (!ring) track(centreline);
     annotate(element, centreline[Math.floor(centreline.length / 2)], base + 14);
   }
 
@@ -406,6 +452,9 @@ export function installDesignOverlay(viewer, { onSelect, domain = 'ROAD_INFRASTR
       position,
       properties: own(element, GEOMETRY_ROLE.ANNOTATION),
       point: {
+        // Only the labelled or selected change shows its anchor: a stretch drawn segment by
+        // segment would otherwise carry a dot at every segment. The surface stays clickable.
+        show: selected || labelledIds.has(element.id),
         pixelSize: selected ? 11 : 8,
         color: css(selected ? DESIGN_STYLE.selected : style.line),
         outlineColor: Color.WHITE,
@@ -484,8 +533,11 @@ export function installDesignOverlay(viewer, { onSelect, domain = 'ROAD_INFRASTR
       if (element === selected || context.diff?.get(element.id) === 'SAME') continue;
       const objectId = element.baselineRef?.objectId;
       if (Number.isFinite(objectId)) {
-        if (seenRoads.has(objectId)) continue;
-        seenRoads.add(objectId);
+        // One label per named road and operation: a stretch widened segment by segment is one
+        // proposal on the map, not four identical plates.
+        const key = `${roadOperationOf(element)}|${element.baselineRef?.name ?? objectId}`;
+        if (seenRoads.has(key)) continue;
+        seenRoads.add(key);
       } else {
         const line = element.geometry?.coordinates ?? [];
         const key = line.length ? `${line[0].map(v => v.toFixed(4))}|${line[line.length - 1].map(v => v.toFixed(4))}` : element.id;
@@ -504,7 +556,7 @@ export function installDesignOverlay(viewer, { onSelect, domain = 'ROAD_INFRASTR
       const colour = (ROAD_OPERATION_STYLE[op] ?? ROAD_OPERATION_STYLE.MODIFY).line;
       const node = document.createElement('div');
       node.className = `rd-maplabel${element.id === selectedId ? ' is-selected' : ''}`;
-      node.innerHTML = `<span class="rd-maplabel-icon" style="background:${colour}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${GLYPH[op] ?? GLYPH.MODIFY}</svg></span><span class="rd-maplabel-text"><b></b><em></em></span>`;
+      node.innerHTML = `<span class="rd-maplabel-icon" style="background:${colour}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="${op === 'WIDEN' || op === 'CREATE' || op === 'MODIFY' ? '#0B1B33' : '#fff'}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${GLYPH[op] ?? GLYPH.MODIFY}</svg></span><span class="rd-maplabel-text"><b></b><em></em></span>`;
       node.querySelector('b').textContent = name;
       node.querySelector('em').textContent = detail;
       labelHost.appendChild(node);
@@ -643,7 +695,10 @@ export function installDesignOverlay(viewer, { onSelect, domain = 'ROAD_INFRASTR
       const objectId = element.baselineRef?.kind === 'ROAD' ? element.baselineRef.objectId : null;
       if (!Number.isFinite(objectId) || wanted.has(objectId)) continue;
       const op = roadOperationOf(element);
-      if (context.mode === VIEW_MODE.OVERLAY || op === 'WIDEN' || op === 'REALIGN') wanted.set(objectId, element);
+      // A widening's own centreline runs down the middle of the widened road, where it only paints
+      // a grey band; it is drawn in Overlay. A realignment's original is a different line, so it
+      // is always drawn beside the proposal.
+      if (context.mode === VIEW_MODE.OVERLAY || op === 'REALIGN') wanted.set(objectId, element);
     }
     for (const [objectId, element] of wanted) {
       const coordinates = context.baseline.get(objectId);
@@ -682,13 +737,18 @@ export function installDesignOverlay(viewer, { onSelect, domain = 'ROAD_INFRASTR
       const op = roadOperationOf(element);
       const colour = (ROAD_OPERATION_STYLE[op] ?? ROAD_OPERATION_STYLE.MODIFY).line;
       const height = baseOf(element) + SURFACE_LIFT_M;
-      const ofOp = elements.filter(e => roadOperationOf(e) === op).length;
-      // New-road ends and realignment tie-ins always; a widening's section ends when it is the
-      // change being looked at — selected, or the only widening in the alternative.
-      const show = op === 'CREATE' || op === 'REALIGN' || (op === 'WIDEN' && (element.id === selectedId || ofOp === 1));
-      if (!show) continue;
-      marker(`design-${element.id}-start`, element, line[0], height, colour);
-      marker(`design-${element.id}-end`, element, line[line.length - 1], height, colour);
+      // New-road ends and realignment tie-ins always. For widenings, the ends of the widened
+      // STRETCH: an end that meets another widening's end is a joint inside it and is not marked,
+      // unless that segment is the one selected.
+      const ends = [line[0], line[line.length - 1]];
+      const joint = point => op === 'WIDEN' && element.id !== selectedId && elements.some(other => other !== element
+        && roadOperationOf(other) === 'WIDEN' && other.geometry?.coordinates?.length
+        && [other.geometry.coordinates[0], other.geometry.coordinates[other.geometry.coordinates.length - 1]]
+          .some(p => Math.hypot(...lonLatToEnu(p, point)) < 3));
+      if (!['CREATE', 'REALIGN', 'WIDEN'].includes(op)) continue;
+      ends.forEach((point, i) => {
+        if (!joint(point)) marker(`design-${element.id}-${i ? 'end' : 'start'}`, element, point, height, colour);
+      });
     }
   }
 
@@ -698,6 +758,7 @@ export function installDesignOverlay(viewer, { onSelect, domain = 'ROAD_INFRASTR
     source.entities.removeAll();
     anchors.clear();
     bounds = null;
+    labelledIds = new Set(chooseLabelled().map(element => element.id));
     drawNetwork();
     if (context.mode !== VIEW_MODE.EXISTING) {
       drawBaselineContext();

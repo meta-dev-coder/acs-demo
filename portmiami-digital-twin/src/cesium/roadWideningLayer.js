@@ -28,7 +28,7 @@ import { roadCorridorRing } from '../designs/roadCorridor.js';
 export const WIDENING_STYLE = Object.freeze({
   existing: '#657184',      // the published centreline: muted, always visible
   selected: '#1769E0',      // the road under edit
-  proposed: '#B76A12',      // the proposed surface and its boundary
+  proposed: '#FFB300',      // the proposed surface and its boundary: the studio's widening amber
   section: '#00BFEA',       // the marked portion
   conflict: '#C73E3E',
   label: '#071B35',
@@ -226,7 +226,7 @@ export function installRoadWideningLayer(viewer, { roadsById, onPick, onState } 
           id: 'draw-surface',
           polygon: {
             hierarchy: hierarchyAt(ring, height), height,
-            material: css(colour, 0.34), outline: false,
+            material: css(colour, 0.6), outline: false,
           },
         });
         source.entities.add({
@@ -321,7 +321,7 @@ export function installRoadWideningLayer(viewer, { roadsById, onPick, onState } 
         id: 'widening-surface',
         polygon: {
           hierarchy: hierarchyAt(corridor.ring, height), height,
-          material: css(WIDENING_STYLE.proposed, 0.34), outline: false,
+          material: css(WIDENING_STYLE.proposed, 0.62), outline: false,
         },
       });
       source.entities.add({

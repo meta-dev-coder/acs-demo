@@ -158,6 +158,8 @@ test('demo templates use their own ids and invent no alignment', () => {
 
   const widening = templates[DEMO_IDS.WIDENING];
   assert.equal(widening.purpose, 'WIDENING');
+  assert.equal(widening.allowedOperation, 'WIDEN');
+  // One segment in this fixture, widened along its whole length.
   assert.equal(widening.elements.length, 1);
   const [element] = widening.elements;
   assert.equal(element.baselineRef.objectId, 40642);
@@ -165,7 +167,7 @@ test('demo templates use their own ids and invent no alignment', () => {
   assert.equal(element.proposal.laneCount, 2);
   assert.equal(element.proposal.baselineWidthM, null);
   assert.equal(element.proposal.baselineWidthSource, 'UNKNOWN');
-  assert.ok(Math.abs(element.section.lengthM - 60) < 0.01);
+  assert.equal(element.section, null);
 
   assert.equal(templates[DEMO_IDS.NEW_ROAD].elements.length, 0);
   assert.equal(templates[DEMO_IDS.REALIGNMENT].elements.length, 0);
@@ -181,7 +183,7 @@ test('without the road loaded, the widening template is empty and says why', () 
 
 import {
   DEMO_FOCUS, constraintViolations, generateNewRoad, generateRealignment, operationRejection,
-  realignmentMetrics, resampleLine, validateRealignmentGeometry,
+  realignmentMetrics, resampleLine, roadRun, validateRealignmentGeometry,
 } from '../src/designs/designReview.js';
 
 const at = (e, n) => enuToLonLat(DEMO_FOCUS, e, n);
@@ -255,4 +257,19 @@ test('the generated realignment keeps both tie-ins on the road and never uses S 
     section: { startMeasureM: result.startM, endMeasureM: result.endM } }, result.road);
   assert.ok(metrics.tiedIn);
   assert.ok(metrics.maxLateralM >= 13);
+});
+
+test('the widening run follows joined segments of the same road until it is long enough', () => {
+  const seg = (id, a, b, name = 'S CRUISE BLVD') => portRoad(id, [a, b], { name });
+  const roadsById = new Map([
+    [40642, seg(40642, [0, 0], [200, 0])],
+    [1, seg(1, [200, 0], [400, 0])],
+    [2, seg(2, [-250, 0], [0, 0])],
+    [3, seg(3, [400, 0], [700, 0])],
+    [4, seg(4, [200, 0], [200, 300], 'OTHER ROAD')],
+  ]);
+  const ids = roadRun(roadsById, 40642, { minM: 600 }).map(r => r.objectId);
+  assert.deepEqual(ids, [2, 40642, 1]);
+  assert.ok(!ids.includes(4));
+  assert.deepEqual(roadRun(roadsById, 40642, { minM: 100 }).map(r => r.objectId), [40642]);
 });

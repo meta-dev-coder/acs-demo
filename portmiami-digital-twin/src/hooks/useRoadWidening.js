@@ -28,7 +28,7 @@ import {
 } from '../designs/designReview.js';
 
 /** The preview colours, matching the overlay: cyan for a new road, purple for a realignment. */
-const DRAW_COLOUR = Object.freeze({ CREATE: '#00BFEA', REALIGN: '#7B4FD3' });
+const DRAW_COLOUR = Object.freeze({ CREATE: '#18E0FF', REALIGN: '#A855F7' });
 
 export { alignmentFingerprint };
 

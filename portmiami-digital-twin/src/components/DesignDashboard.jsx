@@ -198,7 +198,18 @@ export function DesignDashboard({ viewer, open, onToggle, onCompare }) {
     const lanes = element.proposal?.laneCount ?? element.properties?.lanes;
 
     if (op === 'WIDEN') {
-      const w = wideningMeasure(element);
+      // A stretch widened segment by segment is reported as one stretch: lengths and areas are
+      // summed over the widenings, unless one is selected, when it is that one alone.
+      const group = selectedElement && roadOperationOf(selectedElement) === 'WIDEN'
+        ? [selectedElement] : activeDesign.elements.filter(e => roadOperationOf(e) === 'WIDEN');
+      const measures = group.map(e => wideningMeasure(e)).filter(Boolean);
+      const total = key => measures.reduce((sum, m) => sum + (m.proposed[key].value ?? 0), 0);
+      const w = measures.length ? {
+        proposed: { affectedLengthM: { value: total('affectedLengthM') }, corridorAreaM2: { value: total('corridorAreaM2') } },
+        difference: { incrementalPavementM2: { value: measures.every(m => Number.isFinite(m.difference.incrementalPavementM2.value))
+          ? measures.reduce((sum, m) => sum + m.difference.incrementalPavementM2.value, 0) : null } },
+      } : null;
+      const segments = new Set(group.map(e => e.baselineRef?.objectId)).size;
       const check = road ? validateWidening({
         coordinates: road.coordinates, startM: element.section?.startMeasureM ?? null, endM: element.section?.endMeasureM ?? null,
         totalWidthM: width, laneCount: lanes, side: element.proposal?.wideningSide, baselineWidthM: element.proposal?.baselineWidthM ?? null,
@@ -206,16 +217,18 @@ export function DesignDashboard({ viewer, open, onToggle, onCompare }) {
       const baselineWidth = element.proposal?.baselineWidthM;
       return {
         quantities: [
-          ['Affected road', `${element.baselineRef?.name ?? '—'} · ${element.baselineRef?.objectId ?? ''}`],
+          ['Affected road', segments > 1 ? `${element.baselineRef?.name ?? '—'} · ${segments} segments` : `${element.baselineRef?.name ?? '—'} · ${element.baselineRef?.objectId ?? ''}`],
           ['Widened length', m(w?.proposed.affectedLengthM.value)],
           ['Proposed width · lanes', `${width ?? '—'} m · ${lanes ?? '—'}`],
           ['Proposed corridor area', m2(w?.proposed.corridorAreaM2.value)],
         ],
         connectivity: [
           { tone: 'ok', text: 'Original centreline unchanged — road continuity kept' },
-          element.section
-            ? { tone: 'ok', text: `Section ends on the road at ${Math.round(element.section.startMeasureM)} m and ${Math.round(element.section.endMeasureM)} m` }
-            : { tone: 'ok', text: 'Whole road widened, ends unchanged' },
+          segments > 1
+            ? { tone: 'ok', text: `${segments} joined segments widened end to end` }
+            : element.section
+              ? { tone: 'ok', text: `Section ends on the road at ${Math.round(element.section.startMeasureM)} m and ${Math.round(element.section.endMeasureM)} m` }
+              : { tone: 'ok', text: 'Whole road widened, ends unchanged' },
           { tone: 'info', text: 'Junction capacity: not evaluated' },
         ],
         validation: [
@@ -229,7 +242,7 @@ export function DesignDashboard({ viewer, open, onToggle, onCompare }) {
           rows: [
             ['Width', baselineWidth == null ? 'Unknown' : `${baselineWidth} m*`, `${width ?? '—'} m`],
             ['Lanes', 'Unknown', `${lanes ?? '—'}`],
-            ['Section length', m(w?.proposed.affectedLengthM.value), m(w?.proposed.affectedLengthM.value)],
+            ['Widened length', m(w?.proposed.affectedLengthM.value), m(w?.proposed.affectedLengthM.value)],
             ['Added pavement', '—', w?.difference.incrementalPavementM2.value == null ? 'Not calculable' : m2(w.difference.incrementalPavementM2.value)],
           ],
         },

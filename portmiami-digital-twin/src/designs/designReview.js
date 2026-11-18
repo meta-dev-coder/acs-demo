@@ -29,7 +29,7 @@ import {
 import { CHANGE_TYPE, DESIGN_SOURCE, ELEMENT_TYPE, VERIFICATION, createDesign } from './designModel.js';
 import { DESIGN_DOMAIN } from './designDomain.js';
 import {
-  measuresAlong, nearestMeasureTo, pointAtMeasure, sectionBetweenMeasures, wideningCorridor,
+  nearestMeasureTo, pointAtMeasure, sectionBetweenMeasures, wideningCorridor,
   wideningElement,
 } from './roadWidening.js';
 
@@ -496,7 +496,47 @@ export const DEMO_IDS = Object.freeze({
   REALIGNMENT: 'road-demo-realignment',
 });
 
-export const DEMO_WIDENING_ROAD = Object.freeze({ objectId: 40642, name: 'S CRUISE BLVD', sectionM: 60 });
+export const DEMO_WIDENING_ROAD = Object.freeze({ objectId: 40642, name: 'S CRUISE BLVD', sectionM: 60, stretchM: 600 });
+
+/**
+ * A continuous run of county segments of one named road, grown outward from `startId`.
+ *
+ * The county file cuts S CRUISE BLVD into short segments (40642 alone is 173 m), so a widening a
+ * reviewer can actually see along the terminals spans several. From the starting segment the run
+ * extends at each open end onto the next segment of the SAME name whose end meets it (within
+ * 3 m), preferring the longest where it branches, until it reaches `minM` or runs out. Returns
+ * the segments in order along the road.
+ */
+export function roadRun(roadsById, startId, { minM = DEMO_WIDENING_ROAD.stretchM, touchM = 3 } = {}) {
+  const start = roadsById?.get?.(startId);
+  if (!start) return [];
+  const siblings = [...roadsById.values()].filter(r => r.name === start.name && !r.isTunnel && r.coordinates?.length >= 2);
+  const ends = road => [road.coordinates[0], road.coordinates[road.coordinates.length - 1]];
+  const near = (a, b) => Math.hypot(...lonLatToEnu(a, b)) <= touchM;
+  const run = [start];
+  const used = new Set([start.objectId]);
+  let total = centrelineLengthM(start.coordinates);
+  // Each open end of the run: the point, and which side of the array it grows on.
+  let open = [{ point: ends(start)[0], front: true }, { point: ends(start)[1], front: false }];
+  while (total < minM && open.length) {
+    const next = [];
+    for (const end of open) {
+      if (total >= minM) break;
+      const candidates = siblings
+        .filter(r => !used.has(r.objectId) && ends(r).some(p => near(p, end.point)))
+        .sort((a, b) => centrelineLengthM(b.coordinates) - centrelineLengthM(a.coordinates));
+      const pick = candidates[0];
+      if (!pick) continue;
+      used.add(pick.objectId);
+      total += centrelineLengthM(pick.coordinates);
+      if (end.front) run.unshift(pick); else run.push(pick);
+      const [a, b] = ends(pick);
+      next.push({ point: near(a, end.point) ? b : a, front: end.front });
+    }
+    open = next;
+  }
+  return run;
+}
 
 /**
  * Where the demonstration looks: S CRUISE BLVD by the cruise terminals. Candidates nearer it rank
@@ -658,8 +698,8 @@ const provenance = basis => ({ source: 'SYNTHETIC_DEMO_GENERATED', status: 'CONC
 /**
  * The three demonstration alternatives: one operation each, all on real county geometry.
  *
- * A — S CRUISE BLVD (OBJECTID 40642), widened to 10 m and 2 lanes over a measured section. The
- *     30 m section someone already saved in the original Design A is reused when it is present.
+ * A — S CRUISE BLVD, widened to 10 m and 2 lanes along a continuous ~600 m stretch: OBJECTID
+ *     40642 and the segments that join it (`roadRun`), each widened along its full length.
  * B — a new 10 m, 2-lane link generated between two points on the port network (see
  *     `generateNewRoad`), with the roads at each end recorded.
  * C — a realignment of a real road's middle section, tied in at both ends (`generateRealignment`).
@@ -667,19 +707,18 @@ const provenance = basis => ({ source: 'SYNTHETIC_DEMO_GENERATED', status: 'CONC
  * Any of the three that cannot be built from the loaded data is returned EMPTY with the reason, so
  * nothing is invented to fill a card.
  */
-export function demoTemplates({ roadsById, buildingsById, legacyDesigns = [] } = {}) {
-  const road = roadsById?.get?.(DEMO_WIDENING_ROAD.objectId) ?? null;
-  const totalM = road ? measuresAlong(road.coordinates).totalM : 0;
-  const saved = legacyDesigns.flatMap(d => d?.elements ?? [])
-    .find(e => e.operation === 'WIDEN' && e.baselineRef?.objectId === DEMO_WIDENING_ROAD.objectId && e.section);
-  const section = saved && saved.section.endMeasureM <= totalM + 0.5
-    ? [saved.section.startMeasureM, saved.section.endMeasureM]
-    : [0, Math.min(DEMO_WIDENING_ROAD.sectionM, totalM)];
-  const widening = road && totalM > 10 ? {
-    ...wideningElement({ road, startM: section[0], endM: section[1], totalWidthM: DEMO_WIDTH_M, laneCount: DEMO_LANES }),
-    provenance: provenance(saved ? `Section reused from ${saved.id}` : 'Measured section of the county centreline'),
+export function demoTemplates({ roadsById, buildingsById } = {}) {
+  // A whole stretch of S CRUISE BLVD, segment by segment, each widened along its full length.
+  const run = roadRun(roadsById, DEMO_WIDENING_ROAD.objectId);
+  const widenings = run.map((segment, i) => ({
+    ...wideningElement({ road: segment, totalWidthM: DEMO_WIDTH_M, laneCount: DEMO_LANES }),
+    properties: {
+      name: `${segment.name || `Road ${segment.objectId}`} — proposed widening (${i + 1} of ${run.length})`,
+      widthM: DEMO_WIDTH_M, lanes: DEMO_LANES, roadType: 'WIDENING',
+    },
+    provenance: provenance(`Segment ${i + 1} of a continuous ${run.length}-segment stretch of the county centreline`),
     domain: DESIGN_DOMAIN.ROAD_INFRASTRUCTURE,
-  } : null;
+  }));
 
   const link = roadsById && buildingsById ? generateNewRoad({ roadsById, buildingsById }) : null;
   const newRoad = link ? {
@@ -730,8 +769,8 @@ export function demoTemplates({ roadsById, buildingsById, legacyDesigns = [] } =
       purpose: DESIGN_PURPOSE.WIDENING,
       allowedOperation: 'WIDEN',
       description: 'Widen an existing access road.',
-      elements: widening ? [widening] : [],
-      limitation: widening ? 'Existing width and lanes are Unknown: the county file publishes neither.'
+      elements: widenings,
+      limitation: widenings.length ? 'Existing width and lanes are Unknown: the county file publishes neither.'
         : `${DEMO_WIDENING_ROAD.name} (OBJECTID ${DEMO_WIDENING_ROAD.objectId}) is not in the loaded road data, so no widening was added.`,
     }),
     [DEMO_IDS.NEW_ROAD]: demo({
