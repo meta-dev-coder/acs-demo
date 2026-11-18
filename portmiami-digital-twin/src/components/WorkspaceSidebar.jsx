@@ -29,6 +29,12 @@ const ITEMS = Object.freeze([
     hint: 'Plan, simulate and compare expansion options',
     glyph: <><rect x="4" y="4" width="16" height="16" rx="3" /><path d="M9.5 16V8h3.2a2.6 2.6 0 0 1 0 5.2H9.5" /></>,
   },
+  {
+    id: 'DESIGNS',
+    label: 'Road Design Studio',
+    hint: 'Plan, visualize and compare proposed road infrastructure changes',
+    glyph: <><path d="M3 20h18" /><path d="M6 20V8l6-4 6 4v12" /><path d="M9.5 20v-5h5v5" /><path d="M3 11l3-2M21 11l-3-2" /></>,
+  },
 ]);
 
 /** The remembered state. A browser that refuses storage simply starts expanded. */

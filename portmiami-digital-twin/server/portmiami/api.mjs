@@ -26,6 +26,7 @@ import { interpretQuestion } from './askInterpreter.mjs';
 import {
   GEOMETRY_SOURCE, VERIFICATION_STATUS, assetExists, createGeometryStore, validateGeometry,
 } from './geometryStore.mjs';
+import { createDesignStore, validateDesign } from './designStore.mjs';
 
 export const API_BASE = '/api/portmiami';
 
@@ -88,7 +89,7 @@ export function isLoopback(address) {
 export function createLiveTrafficApi({
   config = loadFl511Config(), region = DEFAULT_REGION, roadsPath = DEFAULT_ROADS_PATH,
   service, network, logger = console, fetchImpl = fetch,
-  geometryStore = createGeometryStore(), env = process.env,
+  geometryStore = createGeometryStore(), designStore = createDesignStore(), env = process.env,
 } = {}) {
   let ready = null, roadNetwork = network ?? null;
   /** camera id -> its detail, once read. Also the snapshot proxy's scope guard. */
@@ -368,6 +369,88 @@ export function createLiveTrafficApi({
       const body = await readBody(request);
       const { status, body: payload } = await interpretQuestion(body?.question, { fetchImpl });
       sendJson(response, status, payload);
+      return true;
+    }
+
+    /*
+     * ---- design alternatives -----------------------------------------------------------------
+     *
+     * The same write guard as asset geometry: reads are open, writes need
+     * PORTMIAMI_GEOMETRY_EDIT=local AND a loopback connection. No frontend credential exists and
+     * none is introduced — the browser holds nothing secret, and a deployment that has not opted
+     * in is read-only rather than protected by a token anyone could copy out of the bundle.
+     */
+    const designRoute = /^\/api\/portmiami\/designs(?:\/([^/]{1,200}))?$/.exec(pathname);
+    if (designRoute) {
+      const designId = designRoute[1] ? decodeURIComponent(designRoute[1]) : null;
+
+      if (request.method === 'GET') {
+        // Classify older records before serving them, once. A store written before infrastructure
+        // domains existed holds road changes mixed into parking sketches, and the road studio
+        // cannot tell them apart until this has run. It is a no-op after the first call.
+        const migration = await designStore.migrateOnce();
+        if (migration.migrated) {
+          logger.info?.(`[PortMiami] design store migrated: ${migration.report} `
+            + `(original kept at ${migration.backup})`);
+        } else if (!migration.ok) {
+          logger.error?.(`[PortMiami] design store migration refused: ${migration.reason}`);
+        }
+        const payload = designId
+          ? { ok: true, design: await designStore.get(designId) }
+          : { ok: true, designs: await designStore.list() };
+        sendJson(response, 200, { ...payload, ...writeStatus(request) });
+        return true;
+      }
+
+      const allowed = mayWrite(request);
+      if (!allowed.ok) {
+        sendJson(response, allowed.status, { ok: false, reason: allowed.reason });
+        return true;
+      }
+
+      if (request.method === 'PUT' || request.method === 'POST') {
+        const body = await readBody(request, { maxBytes: 2 * 1024 * 1024 });
+        if (!body?.design) {
+          sendJson(response, 400, { ok: false, reason: 'A design package is required.' });
+          return true;
+        }
+        if (designId && body.design.id !== designId) {
+          sendJson(response, 400, { ok: false, reason: 'The design id in the body and the path differ.' });
+          return true;
+        }
+        // Validated HERE, not only in the browser: anything that can reach this endpoint can
+        // send whatever it likes.
+        const check = validateDesign(body.design);
+        if (!check.ok) {
+          sendJson(response, 422, { ok: false, reason: check.errors[0], errors: check.errors });
+          return true;
+        }
+        // `ifRevision` is optional: a client that sends it is asking to be refused when the
+        // stored record has moved on. One that omits it forces the write, which is what a first
+        // save and a deliberate overwrite both do.
+        const result = await designStore.save(body.design, body.ifRevision === undefined
+          ? {} : { ifRevision: body.ifRevision });
+        if (!result.ok) {
+          sendJson(response, 409, {
+            ok: false, conflict: true, reason: result.reason, design: result.current,
+          });
+          return true;
+        }
+        sendJson(response, 200, { ok: true, design: result.design });
+        return true;
+      }
+
+      if (request.method === 'DELETE') {
+        if (!designId) {
+          sendJson(response, 400, { ok: false, reason: 'A design id is required to delete one.' });
+          return true;
+        }
+        const result = await designStore.remove(designId);
+        sendJson(response, 200, { ok: true, ...result });
+        return true;
+      }
+
+      sendJson(response, 405, { ok: false, reason: 'Designs accept GET, PUT, POST and DELETE.' });
       return true;
     }
 

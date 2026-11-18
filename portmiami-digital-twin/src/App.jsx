@@ -28,6 +28,9 @@ import { useAskTwin } from './hooks/useAskTwin.js';
 import { ACTION } from './ask/actions.js';
 import { WorkspaceSidebar } from './components/WorkspaceSidebar.jsx';
 import { ScenarioPlanner } from './components/ScenarioPlanner.jsx';
+import { DesignAlternatives } from './components/DesignAlternatives.jsx';
+import { useDesignAlternatives } from './hooks/useDesignAlternatives.js';
+import { useRoadWidening } from './hooks/useRoadWidening.js';
 import { useScenarioPlanner } from './hooks/useScenarioPlanner.js';
 import { LiveEventDetailsPanel } from './components/LiveEventDetailsPanel.jsx';
 import { CameraDetailsPanel } from './components/CameraDetailsPanel.jsx';
@@ -40,14 +43,16 @@ import { MessageSignDetailsPanel } from './components/MessageSignDetailsPanel.js
  * camera and every layer exactly as they were, so a switch costs no reload and no re-fly. Two
  * viewers would mean two tile budgets and a camera that silently diverges between them.
  */
-const WORKSPACE = Object.freeze({ EXPLORER: 'EXPLORER', PLANNER: 'PLANNER' });
+const WORKSPACE = Object.freeze({
+  EXPLORER: 'EXPLORER', PLANNER: 'PLANNER', DESIGNS: 'DESIGNS',
+});
 
 /** Which workspace was last open. Remembered so a refresh returns where you were. */
 const WORKSPACE_KEY = 'portmiami.workspace.v1';
 const rememberedWorkspace = () => {
   try {
     const saved = globalThis.localStorage?.getItem(WORKSPACE_KEY);
-    return saved === WORKSPACE.PLANNER ? WORKSPACE.PLANNER : WORKSPACE.EXPLORER;
+    return WORKSPACE[saved] ?? WORKSPACE.EXPLORER;
   } catch {
     return WORKSPACE.EXPLORER;
   }
@@ -62,6 +67,12 @@ const EXPLORER = Object.freeze({
 const TRAFFIC_KINDS = Object.freeze(['traffic-event', 'traffic-camera', 'traffic-sign']);
 /** A stable empty list, so the emphasis effect does not see a new array every render. */
 const EMPTY_IDS = Object.freeze([]);
+
+/** The name bar while the Road Design Studio is open. The selected alternative is in its panel. */
+const STUDIO_HEADER = Object.freeze({
+  name: 'PortMiami — Road Design Studio',
+  subtitle: 'Plan. Visualize. Evaluate road infrastructure alternatives.',
+});
 
 /**
  * The PortMiami shell.
@@ -342,6 +353,23 @@ export function App() {
 
   // ---- Ask the Twin ----------------------------------------------------------------------------
 
+  /**
+   * The Design Alternatives Viewer reads the same baseline and draws its own overlay.
+   *
+   * `active` gates both the layer and the overlay, so leaving the workspace takes the proposals
+   * off the map without unmounting anything or disturbing the planner's saved state.
+   */
+  const designs = useDesignAlternatives({
+    viewerRef, roadsById, buildingsById, active: workspace === WORKSPACE.DESIGNS,
+  });
+
+  /** The Road Design Studio: picks a road on the map and saves a widening into the alternative. */
+  const roadStudio = useRoadWidening({
+    viewerRef, roadsById, buildingsById,
+    active: workspace === WORKSPACE.DESIGNS,
+    onSave: element => designs.saveElement(element),
+  });
+
   const ask = useAskTwin({
     selection, infra, roads, buildings, traffic, explorer, viewerRef, buildingsById, planner,
   });
@@ -461,10 +489,11 @@ export function App() {
   const isExplorer = workspace === WORKSPACE.EXPLORER;
 
   return (
-    <div className={`app has-rail${presenting ? ' is-presenting' : ''}`}>
+    <div className={`app has-rail${presenting ? ' is-presenting' : ''}${workspace === WORKSPACE.DESIGNS ? ' is-studio' : ''}`}>
       <WorkspaceSidebar workspace={workspace} onChange={setWorkspace} forceCollapsed={presenting} />
       <div className="app-main">
-      <TopNav project={PROJECT} askOpen={ask.open} onToggleAsk={ask.toggle}
+      <TopNav project={workspace === WORKSPACE.DESIGNS ? STUDIO_HEADER : PROJECT}
+        askOpen={ask.open} onToggleAsk={ask.toggle}
         scenario={workspace === WORKSPACE.PLANNER ? planner.selected?.name : null}
         presenting={presenting} onPresent={() => setPresenting(value => !value)} />
       {/* `has-ask` shifts the contextual detail column left so the assistant never covers it. */}
@@ -595,7 +624,8 @@ export function App() {
 
         {/* The scenario panel sits where this column sits, so while it is open the column steps
             aside and the panel carries the camera buttons in its own header instead. */}
-        {!plannerOpen && <MapControls {...cameraHandlers} />}
+        {/* The Road Design Studio carries its own map tools; the column would sit under its panel. */}
+        {!plannerOpen && workspace !== WORKSPACE.DESIGNS && <MapControls {...cameraHandlers} />}
 
         <WeatherDialog open={weatherOpen} onClose={() => setWeatherOpen(false)} />
 
@@ -603,6 +633,11 @@ export function App() {
             The overlay replaces the map entirely once a panorama is open. */}
         <StreetViewHint streetView={streetView} />
         <StreetViewOverlay streetView={streetView} />
+
+        {workspace === WORKSPACE.DESIGNS && (
+          <DesignAlternatives viewer={designs} studio={roadStudio} cameraHandlers={cameraHandlers}
+            roadsById={roadsById} presenting={presenting} />
+        )}
 
         {workspace === WORKSPACE.PLANNER && (
           <ScenarioPlanner

@@ -153,6 +153,8 @@ export function useScenarioPlanner({ viewerRef, infra, buildingsById, roadsById,
   const drawRef = useRef(null);
   /** The asset whose envelope should be framed as soon as it is drawn. */
   const pendingFrameRef = useRef(null);
+  /** Set when a scenario's saved placement is loaded, so the map frames it once it is drawn. */
+  const pendingPlacementFrameRef = useRef(false);
   /**
    * `useInfrastructure` returns a fresh object every render, so anything that closes over it has
    * a new identity every render too. Putting those in an effect's dependency array runs the
@@ -208,6 +210,29 @@ export function useScenarioPlanner({ viewerRef, infra, buildingsById, roadsById,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewerRef, active]);
+
+  /**
+   * Entering the workspace refreshes it, as opening it fresh would.
+   *
+   * The garage's geometry is read from the server again (another tab or reviewer may have traced
+   * or confirmed it meanwhile), and the camera is framed on the selected scenario — the garage for
+   * one on a registered asset, the saved site for a new garage or a surface lot — rather than left
+   * wherever the explorer or the road studio put it. Declared before the drawing effects so the
+   * frame requests are in place when they run.
+   */
+  const wasActive = useRef(active);
+  useEffect(() => {
+    if (active && !wasActive.current) {
+      setGeometryRefresh(n => n + 1);
+      if (selected?.site?.kind === SITE_KIND.REGISTERED_ASSET && selected.site.assetId) {
+        pendingFrameRef.current = selected.site.assetId;
+      } else if (PLACEABLE_TYPES.has(selected?.type)) {
+        pendingPlacementFrameRef.current = true;
+      }
+    }
+    wasActive.current = active;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
 
   // ---- what the map should show for the selected scenario ------------------------------------
   /**
@@ -461,9 +486,10 @@ export function useScenarioPlanner({ viewerRef, infra, buildingsById, roadsById,
     return null;
   }, [infra, buildingsById]);
 
-  /** Frame a candidate site as soon as one is picked — the massing is drawn there. */
+  /** Frame a candidate site as soon as one is picked — the massing is drawn there. A placed
+   *  scenario (B, C) draws no massing; the placement editor frames those instead. */
   useEffect(() => {
-    if (!active || !selected?.site?.point) return;
+    if (!active || !selected?.site?.point || PLACEABLE_TYPES.has(selected.type)) return;
     const timer = setTimeout(() => layerRef.current?.flyTo(), 250);
     return () => clearTimeout(timer);
   }, [active, selected?.site?.point]);
@@ -565,16 +591,16 @@ export function useScenarioPlanner({ viewerRef, infra, buildingsById, roadsById,
     const proposedTop = Number.isFinite(envelopeTopRefValue)
       ? envelopeTopRefValue + floors * (Number(current.assumptions.floorToFloorM) || 0) : null;
     const lines = confirmedTier
-      ? [`[P]  ${asset.name}`,
+      ? [asset.name,
         isProposal ? 'Proposed expansion' : 'Existing parking structure',
         ...(isProposal ? [`+${added.toLocaleString()} parking spaces`] : []),
         ...(footprints.length > 1 ? [`${footprints.length} linked footprints`] : [])]
       : tier === GEOMETRY_TIER.CONFIRMED_TRACED
-        ? [`[P]  ${asset.name}`,
+        ? [asset.name,
           isProposal ? 'Proposed expansion' : 'Existing parking structure',
           ...(isProposal ? [`+${added.toLocaleString()} parking spaces`] : []),
           'Traced outline — user-defined, not a survey']
-        : [`[P]  ${asset.name}`, 'Footprint not confirmed',
+        : [asset.name, 'Footprint not confirmed',
           `Candidate OBJECTID ${footprints[0].objectId}`];
 
     void highlight.highlightGarage({
@@ -781,6 +807,14 @@ export function useScenarioPlanner({ viewerRef, infra, buildingsById, roadsById,
   const placementKey = selected?.key ?? null;
   const isPlaceable = PLACEABLE_TYPES.has(selected?.type);
 
+  /** Switching to a scenario that already has a registered garage frames it, as choosing one does. */
+  useEffect(() => {
+    if (selected?.site?.kind === SITE_KIND.REGISTERED_ASSET && selected.site.assetId) {
+      pendingFrameRef.current = selected.site.assetId;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.id]);
+
   /**
    * The draft follows the SELECTED SCENARIO: its own saved placement, or nothing.
    *
@@ -802,6 +836,22 @@ export function useScenarioPlanner({ viewerRef, infra, buildingsById, roadsById,
     const saved = loadPlacements().placements[placementKey] ?? null;
     setPlacementSaved(saved);
     setDraftPlacement(saved);
+    if (!saved) return;
+    // Selecting a scenario with a saved site frames it, as choosing a garage does for Scenario A.
+    pendingPlacementFrameRef.current = true;
+    // The saved placement outlives a reload but the scenario's site does not, so put the site
+    // back from it. Without this the Simulate tab asks for a site that is already on the map.
+    if (!selected.site.point && !selected.site.assetId) {
+      update({
+        ...selected,
+        site: {
+          ...selected.site,
+          kind: SITE_KIND.CANDIDATE_SITE,
+          point: [saved.centerLongitude, saved.centerLatitude],
+          label: 'Candidate site',
+        },
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.id, isPlaceable, placementKey]);
 
@@ -811,6 +861,10 @@ export function useScenarioPlanner({ viewerRef, infra, buildingsById, roadsById,
     if (!editor) return;
     if (!active || !isPlaceable || !draftPlacement) { editor.clear(); return; }
     editor.show(draftPlacement);
+    if (pendingPlacementFrameRef.current) {
+      pendingPlacementFrameRef.current = false;
+      editor.flyTo();
+    }
     if (interactionMode === INTERACTION_MODE.EDIT_PLACEMENT) editor.startEditing();
     else editor.stopEditing();
   }, [active, isPlaceable, draftPlacement, interactionMode]);

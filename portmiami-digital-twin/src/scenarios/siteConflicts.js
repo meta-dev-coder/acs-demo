@@ -19,6 +19,12 @@
  */
 import { lonLatToEnu } from './garagePlacement.js';
 
+/*
+ * The predicates below are exported so the Design Alternatives module can reuse them. They are
+ * the same tests, on the same metric-plane convention: callers project both shapes into one
+ * local ENU frame first, because an overlap test on raw degrees is a test on a stretched plane.
+ */
+
 export const CONFLICT_STATUS = Object.freeze({
   CONFLICT: 'CONFLICT',
   CLEAR: 'CLEAR',
@@ -40,7 +46,7 @@ export const CONFLICT_SEVERITY = Object.freeze({
 export const ROAD_CLEARANCE_M = 6;
 
 /** Segment-against-segment intersection in a plane. */
-function segmentsCross([ax, ay], [bx, by], [cx, cy], [dx, dy]) {
+export function segmentsCross([ax, ay], [bx, by], [cx, cy], [dx, dy]) {
   const d1 = (dx - cx) * (ay - cy) - (dy - cy) * (ax - cx);
   const d2 = (dx - cx) * (by - cy) - (dy - cy) * (bx - cx);
   const d3 = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
@@ -50,7 +56,7 @@ function segmentsCross([ax, ay], [bx, by], [cx, cy], [dx, dy]) {
 }
 
 /** Even-odd point-in-ring, in a plane. */
-function pointInRing([x, y], ring) {
+export function pointInRing([x, y], ring) {
   let inside = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
     const [xi, yi] = ring[i], [xj, yj] = ring[j];
@@ -60,7 +66,7 @@ function pointInRing([x, y], ring) {
 }
 
 /** The shortest distance from a point to a segment, in a plane. */
-function distanceToSegment([px, py], [ax, ay], [bx, by]) {
+export function distanceToSegment([px, py], [ax, ay], [bx, by]) {
   const dx = bx - ax, dy = by - ay;
   const lengthSquared = dx * dx + dy * dy;
   const t = lengthSquared === 0 ? 0
@@ -75,17 +81,28 @@ function distanceToSegment([px, py], [ax, ay], [bx, by]) {
  * frame — because an overlap test on raw degrees is a test on a stretched plane, and at this
  * latitude a degree of longitude is about a tenth shorter than a degree of latitude.
  */
-function ringsOverlap(a, b) {
+export function ringsOverlap(a, b) {
   for (let i = 0; i < a.length - 1; i += 1) {
     for (let j = 0; j < b.length - 1; j += 1) {
       if (segmentsCross(a[i], a[i + 1], b[j], b[j + 1])) return true;
     }
   }
-  return pointInRing(a[0], b) || pointInRing(b[0], a);
+  // Containment is probed with an INTERIOR point, not a vertex. Two identical rings — a
+  // copy-pasted footprint, say — have no strictly crossing edges, and every vertex of one lies
+  // exactly on the boundary of the other, where even-odd containment is a coin toss. A centroid
+  // is unambiguous for the convex shapes this module deals in.
+  return pointInRing(centroidOf(a), b) || pointInRing(centroidOf(b), a);
+}
+
+/** The mean of a ring's distinct vertices. */
+function centroidOf(ring) {
+  const points = ring.slice(0, Math.max(1, ring.length - 1));
+  const sum = points.reduce((total, [x, y]) => [total[0] + x, total[1] + y], [0, 0]);
+  return [sum[0] / points.length, sum[1] / points.length];
 }
 
 /** Does a polyline come within `clearance` of a ring, or run through it? */
-function lineNearRing(line, ring, clearance) {
+export function lineNearRing(line, ring, clearance) {
   for (const point of line) if (pointInRing(point, ring)) return true;
   for (let i = 0; i < line.length - 1; i += 1) {
     for (let j = 0; j < ring.length - 1; j += 1) {

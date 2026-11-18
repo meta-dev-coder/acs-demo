@@ -28,7 +28,7 @@
  */
 import {
   BoundingSphere, Cartesian2, Cartesian3, Cartographic, Color, CustomDataSource,
-  HeadingPitchRange, HorizontalOrigin, LabelStyle, NearFarScalar, PolygonHierarchy, VerticalOrigin,
+  HeadingPitchRange, HorizontalOrigin, PolygonHierarchy, SceneTransforms,
 } from 'cesium';
 import { interiorAnchor } from '../infrastructure/assetFrontage.js';
 
@@ -71,8 +71,9 @@ export const ENVELOPE_MARGIN_M = 1.2;
  *  enough to still be its own apron. */
 export const GROUND_OFFSET_M = 10;
 
-/** How far the camera sits from a garage when it frames one. Same for every garage; see below. */
-export const FRAME_RANGE_M = 1250;
+/** How far the camera sits from a garage when it frames one. Same for every garage; see below.
+ *  1250 m brought in by three zoom-in steps (x0.75 each), so the garage fills the view. */
+export const FRAME_RANGE_M = Math.round(1250 * 0.75 ** 3);
 /** Where the base sits when the ground cannot be sampled at all; reported, never silent. */
 const BASE_FALLBACK_M = 0;
 const LABEL_LIFT_M = 34;
@@ -131,8 +132,31 @@ export function installGarageHighlight(viewer, { onDiagnostic = () => {} } = {})
   let token = 0;
   let framed = null;
 
+  /**
+   * The label card: a DOM node over the canvas, not a Cesium label or billboard. The scene renders
+   * at CSS resolution and is upscaled on high-density screens, which blurs anything drawn into it;
+   * HTML text stays sharp. It follows the leader's top point after every render.
+   */
+  const card = document.createElement('div');
+  card.className = 'garage-label';
+  card.hidden = true;
+  viewer.container.appendChild(card);
+  let cardAt = null;   // Cartesian3 of the leader's top, or null when no label is shown
+
+  const placeCard = () => {
+    if (!cardAt) return;
+    const at = SceneTransforms.worldToWindowCoordinates(viewer.scene, cardAt);
+    const shown = !!at && viewer.camera.position
+      && Cartesian3.distance(viewer.camera.position, cardAt) < 16000;
+    card.hidden = !shown;
+    if (shown) card.style.transform = `translate(${Math.round(at.x)}px, ${Math.round(at.y)}px)`;
+  };
+  viewer.scene.postRender.addEventListener(placeCard);
+
   function clearHighlight() {
     token += 1;
+    cardAt = null;
+    card.hidden = true;
     if (source.entities.values.length === 0) return;
     source.entities.removeAll();
     if (!viewer.isDestroyed()) viewer.scene.requestRender();
@@ -279,29 +303,32 @@ export function installGarageHighlight(viewer, { onDiagnostic = () => {} } = {})
         material: css(style.outline, 0.9),
       },
     });
+    cardAt = Cartesian3.fromDegrees(lon, lat, height + LABEL_LIFT_M);
+    const [title, ...details] = lines;
+    card.style.setProperty('--tile', style.fill);
+    card.replaceChildren();
+    const tile = document.createElement('span');
+    tile.className = 'garage-label-tile';
+    tile.textContent = 'P';
+    const text = document.createElement('span');
+    text.className = 'garage-label-text';
+    const name = document.createElement('b');
+    name.textContent = title;
+    text.append(name, ...details.map(line => {
+      const row = document.createElement('span');
+      row.textContent = line;
+      return row;
+    }));
+    card.append(tile, text);
     source.entities.add({
       id: `${id}-label`,
-      position: Cartesian3.fromDegrees(lon, lat, height + LABEL_LIFT_M),
+      position: cardAt,
       point: {
         pixelSize: 11,
         color: Color.fromCssColorString(style.outline),
         outlineColor: Color.WHITE,
         outlineWidth: 2,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
-      },
-      label: {
-        text: lines.join('\n'),
-        font: '600 14px system-ui, -apple-system, Segoe UI, sans-serif',
-        fillColor: Color.WHITE,
-        showBackground: true,
-        backgroundColor: Color.fromCssColorString(style.labelBackground).withAlpha(0.93),
-        backgroundPadding: new Cartesian2(13, 9),
-        style: LabelStyle.FILL,
-        verticalOrigin: VerticalOrigin.BOTTOM,
-        pixelOffset: new Cartesian2(0, -12),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        scaleByDistance: new NearFarScalar(400, 1, 7000, 0.6),
-        translucencyByDistance: new NearFarScalar(7000, 1, 16000, 0),
       },
     });
   }
@@ -485,7 +512,11 @@ export function installGarageHighlight(viewer, { onDiagnostic = () => {} } = {})
     entityCount: () => source.entities.values.length,
     destroy() {
       clearHighlight();
-      if (!viewer.isDestroyed()) viewer.dataSources.remove(source, true);
+      card.remove();
+      if (!viewer.isDestroyed()) {
+        viewer.scene.postRender.removeEventListener(placeCard);
+        viewer.dataSources.remove(source, true);
+      }
     },
   };
 }

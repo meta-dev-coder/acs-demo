@@ -23,8 +23,19 @@ import { MapControlButtons, PANEL_CAMERA_KEYS } from './MapControls.jsx';
 import { PLANNER_TAB, VIEW_MODE } from '../hooks/useScenarioPlanner.js';
 import { compareRuns } from '../scenarios/comparison.js';
 import { CapacityChart, DemandChart, TrafficChart } from './ScenarioCharts.jsx';
+import { CompareDock } from './CompareDock.jsx';
 
 const fmt = value => (Number.isFinite(value) ? Math.round(value).toLocaleString() : 'Not calculated');
+
+/**
+ * Findings worth reading first.
+ *
+ * A caution outranks a neutral note, and a material shortfall outranks both. Order only — no
+ * finding is dropped, and the count of any that do not fit is shown beside them.
+ */
+const FINDING_WEIGHT = { bad: 0, warn: 1, info: 2 };
+const rankedFindings = findings => [...findings].sort(
+  (a, b) => (FINDING_WEIGHT[a.tone] ?? 3) - (FINDING_WEIGHT[b.tone] ?? 3));
 
 /**
  * How a volume-to-capacity ratio should read.
@@ -655,7 +666,7 @@ function PlanTab({ planner, garages, roadsById, onLinkFootprint, buildingsById }
       {/* Collapsible, but its SUMMARY still carries the claim: who this is, how firm the
           footprint is, and whether the capacity is published or assumed. Collapsing hides the
           detail, never the fact that a figure is an assumption. */}
-      <Collapsible title="What this scenario is built on" summary={provenanceSummary} defaultOpen>
+      <Collapsible title="What this scenario is built on" summary={provenanceSummary}>
       <div className="scenario-provenance">
         <dl>
           <dt>Garage identity</dt>
@@ -760,9 +771,6 @@ function SimulateTab({ planner }) {
           {validation.blocking.map(reason => <li key={reason}>{reason}</li>)}
         </ul>
       )}
-      {validation?.warnings?.map(warning => (
-        <p key={warning} className="scenario-warn">{warning}</p>
-      ))}
 
       <button type="button" className="scenario-run" disabled={!validation?.ok || busy}
         onClick={planner.run}>
@@ -827,11 +835,21 @@ function SimulateTab({ planner }) {
           {planner.findings.length > 0 && (
             <section className="scenario-keyfindings">
               <h5>Key findings</h5>
+              {/* Three at a time, but ORDERED BY WEIGHT first: taking the first three as they
+                  came dropped "this generates N additional peak-hour movements" below the fold,
+                  which is the one finding a reader most needs. Anything beyond three is counted,
+                  not hidden. */}
               <ul>
-                {planner.findings.slice(0, 3).map(finding => (
+                {rankedFindings(planner.findings).slice(0, 3).map(finding => (
                   <li key={finding.text} className={`is-${finding.tone}`}>{finding.text}</li>
                 ))}
               </ul>
+              {planner.findings.length > 3 && (
+                <p className="scenario-field-note">
+                  {planner.findings.length - 3} further finding
+                  {planner.findings.length - 3 === 1 ? '' : 's'} in the calculation details below.
+                </p>
+              )}
             </section>
           )}
 
@@ -871,10 +889,14 @@ function SimulateTab({ planner }) {
               {fmt(r.geometryCheck.additionalSpaces)} spaces at {selected.assumptions.grossAreaPerSpaceM2} m² gross each.
             </p>
           )}
+          {planner.findings.length > 3 && (
+            <ul className="scenario-findings">
+              {rankedFindings(planner.findings).slice(3).map(finding => (
+                <li key={finding.text} className={`is-${finding.tone}`}>{finding.text}</li>
+              ))}
+            </ul>
+          )}
           </Collapsible>
-          {/* Warnings stay OUTSIDE the disclosure: a limitation someone has to open a section to
-              find is a limitation that will not be read. */}
-          {latest.warnings.map(warning => <p key={warning} className="scenario-warn">{warning}</p>)}
         </>
       ) : (
         <p className="scenario-empty">Not run yet. Nothing is shown until the model has produced it.</p>
@@ -1028,6 +1050,78 @@ const scenarioTitle = scenario => String(scenario?.name ?? '').replace(/^[A-Z]\.
 /** The same for a comparison row, which carries the run's recorded scenario name. */
 
 
+/**
+ * A small illustration of what each alternative builds, for the scenario cards.
+ *
+ * Drawings, not photographs: there are no images of these garages to show, and a stock photo of a
+ * garage would read as the proposal itself. Added or new structure is drawn in the accent blue.
+ */
+function isoBox({ x = 14, base = 50, w = 44, d = 28, h, fill, side, top, stroke, floors = 0, dash }) {
+  const fl = [x, base], fr = [x + w, base + 6], br = [x + w + d, base - 6];
+  const up = ([px, py], k) => `${px},${py - k}`;
+  const face = `${up(fl, h)} ${up(fr, h)} ${fr.join(',')} ${fl.join(',')}`;
+  const sideFace = `${up(fr, h)} ${up(br, h)} ${br.join(',')} ${fr.join(',')}`;
+  const topFace = `${up(fl, h)} ${x + d},${base - 12 - h} ${up(br, h)} ${up(fr, h)}`;
+  const bands = [];
+  for (let i = 1; i < floors; i += 1) {
+    const k = (h / floors) * i;
+    bands.push(<polyline key={i} points={`${up(fl, k)} ${up(fr, k)} ${up(br, k)}`} fill="none" stroke={stroke} strokeWidth="0.8" opacity="0.7" />);
+  }
+  const strokeProps = { stroke, strokeWidth: 1, strokeLinejoin: 'round', strokeDasharray: dash };
+  return (
+    <g>
+      <polygon points={face} fill={fill} {...strokeProps} />
+      <polygon points={sideFace} fill={side} {...strokeProps} />
+      <polygon points={topFace} fill={top} {...strokeProps} />
+      {bands}
+    </g>
+  );
+}
+
+function ScenarioThumb({ type }) {
+  const ground = (
+    <>
+      <rect width="96" height="64" fill="url(#pm-thumb-sky)" />
+      <polygon points="0,44 96,30 96,64 0,64" fill="#dfe6dc" />
+      <polygon points="0,56 96,40 96,46 0,62" fill="#c9ced6" />
+    </>
+  );
+  const grey = { fill: '#e9edf2', side: '#cfd6df', top: '#f6f8fa', stroke: '#8a95a5' };
+  const blue = { fill: '#d6e5ff', side: '#b3cdfb', top: '#eaf2ff', stroke: '#1769e0' };
+  return (
+    <svg className="scenario-thumb" viewBox="0 0 96 64" width="96" height="64" aria-hidden="true">
+      <defs>
+        <linearGradient id="pm-thumb-sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#eaf3fb" /><stop offset="1" stopColor="#f6f8fb" />
+        </linearGradient>
+      </defs>
+      {ground}
+      {type === 'EXPAND_EXISTING' && (
+        <>
+          {isoBox({ ...grey, h: 20, floors: 4 })}
+          {isoBox({ ...blue, base: 30, h: 12, floors: 2, dash: '2 1.5' })}
+        </>
+      )}
+      {type === 'NEW_GARAGE' && isoBox({ ...blue, h: 28, floors: 5 })}
+      {type === 'OPTIMIZE_SURFACE' && (
+        <>
+          <polygon points="10,50 52,58 88,44 46,38" fill="#9aa3ad" stroke="#7d8692" strokeWidth="0.8" />
+          {[0, 1, 2].map(row => (
+            <g key={row}>
+              {[0, 1, 2, 3, 4, 5].map(i => {
+                const x = 20 + i * 9 + row * 9, y = 47 + i * 1.7 - row * 4.5;
+                const car = ['#1769e0', '#f3f4f6', '#374151', '#dc2626', '#f3f4f6', '#6b7280'][(i + row) % 6];
+                return <rect key={i} x={x} y={y} width="5" height="2.6" rx="0.8" fill={car} transform={`rotate(-12 ${x} ${y})`} />;
+              })}
+            </g>
+          ))}
+          <polyline points="16,48 84,42" stroke="#fff" strokeWidth="0.6" strokeDasharray="2 2" />
+        </>
+      )}
+    </svg>
+  );
+}
+
 export function ScenarioPlanner({
   planner, garages, roadsById, buildingsById, onOpenAssistant, onLinkFootprint,
   open, onOpenChange, cameraHandlers,
@@ -1040,6 +1134,12 @@ export function ScenarioPlanner({
       map-control column has to step aside while it is open. */
   const setOpen = onOpenChange;
   const r = latest?.results;
+  const recommendedId = planner.recommendation?.available
+    ? planner.recommendation.ranking[0]?.scenarioId ?? null : null;
+  /** On the Compare tab the dock compares every simulated alternative instead of the latest run. */
+  const compareRunsShown = tab === PLANNER_TAB.COMPARE
+    ? (planner.comparable ?? []).filter(run => run.scenarioType !== 'BASELINE') : [];
+  const comparing = compareRunsShown.length > 0;
 
   return (
     <>
@@ -1099,21 +1199,17 @@ export function ScenarioPlanner({
                 <label className={`scenario-choice${selected?.id === scenario.id ? ' is-selected' : ''}`}>
                   <input type="radio" name="scenario" checked={selected?.id === scenario.id}
                     onChange={() => planner.select(scenario.id)} />
-                  <span className="scenario-choice-mark" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-                      strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{meta.glyph}</svg>
-                  </span>
+                  <ScenarioThumb type={scenario.type} />
                   <span className="scenario-choice-body">
-                    <span className="scenario-choice-head">
-                      {scenario.key && <b>Scenario {scenario.key}</b>}
-                      <span className="scenario-choice-name">{scenarioTitle(scenario)}</span>
+                    <span className="scenario-choice-name">
+                      {scenario.key ? `${scenario.key}. ` : ''}{scenarioTitle(scenario)}
+                      {/* Only when the model has ranked it first from simulated runs — never a fixed badge. */}
+                      {recommendedId === scenario.id && <small> (Recommended)</small>}
                     </span>
-                    <span className="scenario-choice-note">{meta.blurb}</span>
-                    <span className="scenario-choice-meta">
-                      <em>+{Number(scenario.assumptions.additionalSpaces).toLocaleString()} spaces</em>
-                      {/* Never dropped, however compact the card gets: the figure is from a
-                          concept slide, not from a PortMiami proposal. */}
-                      <i>assumption</i>
+                    <span className="scenario-choice-meta" title={meta.blurb}>
+                      +{Number(scenario.assumptions.additionalSpaces).toLocaleString()} spaces
+                      {/* Kept, quietly: the figure is a stated assumption, not a PortMiami proposal. */}
+                      <i>assumed</i>
                     </span>
                   </span>
                 </label>
@@ -1144,12 +1240,18 @@ export function ScenarioPlanner({
         <button type="button" className="scenario-dock-toggle" aria-expanded={dockOpen}
           onClick={() => setDockOpen(value => !value)}>
           <span>Results</span>
-          {r ? (
+          {comparing ? (
+            <em>Comparing {compareRunsShown.length} simulated alternative{compareRunsShown.length === 1 ? '' : 's'}</em>
+          ) : r ? (
             <em>{fmt(r.capacity.proposedTotalCapacity)} spaces proposed · {fmt(r.trips.total)} added peak-hour vehicles</em>
           ) : <em>Not run yet</em>}
           <i aria-hidden="true">{dockOpen ? '▾' : '▴'}</i>
         </button>
-        {dockOpen && (
+        {dockOpen && comparing && (
+          <CompareDock runs={compareRunsShown} recommendation={planner.recommendation}
+            selectedId={selected?.id} />
+        )}
+        {dockOpen && !comparing && (
         <div className="scenario-dock-cards">
           <article className="scenario-card">
             <h3>Parking Capacity</h3>

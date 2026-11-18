@@ -1,0 +1,916 @@
+{
+  "version": 1,
+  "designs": [
+    {
+      "id": "design-c",
+      "name": "Design C — Surface Parking and Road Reconfiguration",
+      "description": "Re-lay out an existing surface area and widen its approach. No structure proposed.",
+      "source": "SYNTHETIC_DEMO",
+      "verificationStatus": "CONCEPTUAL",
+      "revision": "08",
+      "organisation": null,
+      "sourceFile": null,
+      "importedAt": null,
+      "crs": "EPSG:4326",
+      "units": "metre",
+      "elements": [
+        {
+          "id": "design-c-surface-01",
+          "type": "SURFACE_PARKING",
+          "changeType": "MODIFIED",
+          "baselineRef": {
+            "kind": "AREA",
+            "note": "Existing surface parking south of the cruise terminals."
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  -80.16649130535612,
+                  25.7744120948163
+                ],
+                [
+                  -80.16562392547026,
+                  25.774045873648767
+                ],
+                [
+                  -80.16650869449201,
+                  25.77232790503395
+                ],
+                [
+                  -80.1673760646042,
+                  25.772694121014727
+                ],
+                [
+                  -80.16649130535612,
+                  25.7744120948163
+                ]
+              ]
+            ]
+          },
+          "properties": {
+            "name": "South Lot — proposed re-layout",
+            "targetSpaces": 1500,
+            "surfaceAreaPerSpaceM2": 28,
+            "note": "Restriping and aisle rearrangement. No structure is proposed in this alternative."
+          },
+          "domain": "PARKING_INFRASTRUCTURE"
+        },
+        {
+          "id": "design-c-road-01",
+          "type": "ROAD",
+          "changeType": "MODIFIED",
+          "baselineRef": {
+            "kind": "AREA",
+            "note": "Approach serving the south lot."
+          },
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -80.16779600180892,
+                25.774001851367423
+              ],
+              [
+                -80.16659969280889,
+                25.774435130538354
+              ],
+              [
+                -80.16530368339724,
+                25.774723974597126
+              ]
+            ]
+          },
+          "properties": {
+            "name": "South Lot approach — proposed widening",
+            "widthM": 11,
+            "baselineWidthM": 7,
+            "lanes": 3,
+            "baselineLanes": 2,
+            "roadType": "ACCESS_ROAD"
+          },
+          "domain": "PARKING_INFRASTRUCTURE"
+        }
+      ],
+      "createdAt": "2026-11-17T20:23:36.937Z",
+      "updatedAt": "2026-11-17T21:33:19.174Z",
+      "domain": "PARKING_INFRASTRUCTURE"
+    },
+    {
+      "id": "design-a",
+      "name": "Design A — Garage Expansion",
+      "description": "Add floors to a registered garage. Access roads unchanged.",
+      "source": "SYNTHETIC_DEMO",
+      "verificationStatus": "CONCEPTUAL",
+      "revision": "24",
+      "organisation": null,
+      "sourceFile": null,
+      "importedAt": null,
+      "crs": "EPSG:4326",
+      "units": "metre",
+      "elements": [
+        {
+          "id": "design-a-garage-01",
+          "type": "PARKING_GARAGE",
+          "changeType": "MODIFIED",
+          "baselineRef": {
+            "kind": "ASSET",
+            "assetId": "parking-garage-k"
+          },
+          "geometry": null,
+          "properties": {
+            "name": "Garage K — proposed vertical expansion",
+            "addedFloors": 3,
+            "floorHeightM": 3.2,
+            "targetSpaces": 1000,
+            "note": "Added floors only. The footprint is the registry’s confirmed geometry and is not changed by this alternative."
+          },
+          "domain": "PARKING_INFRASTRUCTURE"
+        }
+      ],
+      "createdAt": "2026-11-17T20:05:25.093Z",
+      "updatedAt": "2026-11-17T21:34:16.089Z",
+      "domain": "PARKING_INFRASTRUCTURE"
+    },
+    {
+      "id": "road-design-c",
+      "name": "Design C",
+      "description": "Proposed road changes.",
+      "source": "USER_DRAWN",
+      "verificationStatus": "CONCEPTUAL",
+      "revision": "10",
+      "crs": "EPSG:4326",
+      "units": "metre",
+      "updatedAt": "2026-11-18T02:37:00.346Z",
+      "migratedFrom": "design-c",
+      "elements": [
+        {
+          "id": "road-mwl53y79",
+          "type": "ROAD",
+          "changeType": "NEW",
+          "operation": "CREATE",
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -80.16834999210191,
+                25.773925874113438
+              ],
+              [
+                -80.16763333158856,
+                25.773471434393173
+              ],
+              [
+                -80.16677244333816,
+                25.773211739223573
+              ]
+            ]
+          },
+          "properties": {
+            "name": "Proposed Terminal Link",
+            "widthM": 9,
+            "lanes": 2,
+            "roadType": "ACCESS_ROAD"
+          },
+          "provenance": {
+            "source": "USER_CONCEPTUAL_DESIGN",
+            "status": "DRAFT"
+          },
+          "domain": "ROAD_INFRASTRUCTURE"
+        },
+        {
+          "id": "road-mwl553eg",
+          "type": "ROAD",
+          "changeType": "NEW",
+          "operation": "CREATE",
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -80.16834905966464,
+                25.773925609065692
+              ],
+              [
+                -80.16763236385573,
+                25.773471373412995
+              ],
+              [
+                -80.16677239865048,
+                25.7732117700942
+              ]
+            ]
+          },
+          "properties": {
+            "name": "Proposed Terminal Link",
+            "widthM": 9,
+            "lanes": 2,
+            "roadType": "ACCESS_ROAD"
+          },
+          "provenance": {
+            "source": "USER_CONCEPTUAL_DESIGN",
+            "status": "DRAFT"
+          },
+          "domain": "ROAD_INFRASTRUCTURE"
+        },
+        {
+          "id": "road-mwl69zjr",
+          "type": "ROAD",
+          "changeType": "NEW",
+          "operation": "CREATE",
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -80.16834905966464,
+                25.773925609065692
+              ],
+              [
+                -80.16763236385573,
+                25.773471373412995
+              ],
+              [
+                -80.16677223752679,
+                25.773211881443473
+              ]
+            ]
+          },
+          "properties": {
+            "name": "Proposed Terminal Link",
+            "widthM": 9,
+            "lanes": 2,
+            "roadType": "ACCESS_ROAD"
+          },
+          "provenance": {
+            "source": "USER_CONCEPTUAL_DESIGN",
+            "status": "DRAFT"
+          },
+          "domain": "ROAD_INFRASTRUCTURE"
+        },
+        {
+          "id": "road-mwl6dj7g",
+          "type": "ROAD",
+          "changeType": "NEW",
+          "operation": "CREATE",
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -80.16834905966464,
+                25.773925609065692
+              ],
+              [
+                -80.16763236215158,
+                25.77347137331237
+              ],
+              [
+                -80.16677223752679,
+                25.773211881443473
+              ]
+            ]
+          },
+          "properties": {
+            "name": "Proposed Terminal Link",
+            "widthM": 9,
+            "lanes": 2,
+            "roadType": "ACCESS_ROAD"
+          },
+          "provenance": {
+            "source": "USER_CONCEPTUAL_DESIGN",
+            "status": "DRAFT"
+          },
+          "domain": "ROAD_INFRASTRUCTURE"
+        },
+        {
+          "id": "road-mwl6g4n1",
+          "type": "ROAD",
+          "changeType": "NEW",
+          "operation": "CREATE",
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -80.16834905966464,
+                25.773925609065692
+              ],
+              [
+                -80.16763236215158,
+                25.77347137331237
+              ],
+              [
+                -80.16677223752679,
+                25.773211881443473
+              ]
+            ]
+          },
+          "properties": {
+            "name": "Proposed Terminal Link",
+            "widthM": 9,
+            "lanes": 2,
+            "roadType": "ACCESS_ROAD"
+          },
+          "provenance": {
+            "source": "USER_CONCEPTUAL_DESIGN",
+            "status": "DRAFT"
+          },
+          "domain": "ROAD_INFRASTRUCTURE"
+        },
+        {
+          "id": "road-mwl758hg",
+          "type": "ROAD",
+          "changeType": "NEW",
+          "operation": "CREATE",
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -80.16834905966464,
+                25.773925609065692
+              ],
+              [
+                -80.16763236215158,
+                25.77347137331237
+              ],
+              [
+                -80.16677223752679,
+                25.773211881443473
+              ]
+            ]
+          },
+          "properties": {
+            "name": "Proposed Terminal Link",
+            "widthM": 9,
+            "lanes": 2,
+            "roadType": "ACCESS_ROAD"
+          },
+          "provenance": {
+            "source": "USER_CONCEPTUAL_DESIGN",
+            "status": "DRAFT"
+          },
+          "domain": "ROAD_INFRASTRUCTURE"
+        },
+        {
+          "id": "road-mwl7c8hb",
+          "type": "ROAD",
+          "changeType": "NEW",
+          "operation": "CREATE",
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -80.16834905966464,
+                25.773925609065692
+              ],
+              [
+                -80.16763236215158,
+                25.77347137331237
+              ],
+              [
+                -80.16677223752679,
+                25.773211881443473
+              ]
+            ]
+          },
+          "properties": {
+            "name": "Proposed Terminal Link",
+            "widthM": 9,
+            "lanes": 2,
+            "roadType": "ACCESS_ROAD"
+          },
+          "provenance": {
+            "source": "USER_CONCEPTUAL_DESIGN",
+            "status": "DRAFT"
+          },
+          "domain": "ROAD_INFRASTRUCTURE"
+        },
+        {
+          "id": "road-mwl7ll8f",
+          "type": "ROAD",
+          "changeType": "NEW",
+          "operation": "CREATE",
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -80.16834905966464,
+                25.773925609065692
+              ],
+              [
+                -80.16763236215158,
+                25.77347137331237
+              ],
+              [
+                -80.16677223752679,
+                25.773211881443473
+              ]
+            ]
+          },
+          "properties": {
+            "name": "Proposed Terminal Link",
+            "widthM": 9,
+            "lanes": 2,
+            "roadType": "ACCESS_ROAD"
+          },
+          "provenance": {
+            "source": "USER_CONCEPTUAL_DESIGN",
+            "status": "DRAFT"
+          },
+          "domain": "ROAD_INFRASTRUCTURE"
+        },
+        {
+          "id": "road-mwliaj6r",
+          "type": "ROAD",
+          "changeType": "NEW",
+          "operation": "CREATE",
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -80.1683490929571,
+                25.773925618526587
+              ],
+              [
+                -80.16763238253938,
+                25.773471374590102
+              ],
+              [
+                -80.16677240355311,
+                25.773211766710855
+              ]
+            ]
+          },
+          "properties": {
+            "name": "Proposed Terminal Link",
+            "widthM": 9,
+            "lanes": 2,
+            "roadType": "ACCESS_ROAD"
+          },
+          "provenance": {
+            "source": "USER_CONCEPTUAL_DESIGN",
+            "status": "DRAFT"
+          },
+          "domain": "ROAD_INFRASTRUCTURE"
+        },
+        {
+          "id": "road-mwlig4s3",
+          "type": "ROAD",
+          "changeType": "NEW",
+          "operation": "CREATE",
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -80.16834909110209,
+                25.773925618012917
+              ],
+              [
+                -80.16763238367093,
+                25.773471374661465
+              ],
+              [
+                -80.16677240368935,
+                25.773211766619138
+              ]
+            ]
+          },
+          "properties": {
+            "name": "Proposed Terminal Link",
+            "widthM": 9,
+            "lanes": 2,
+            "roadType": "ACCESS_ROAD"
+          },
+          "provenance": {
+            "source": "USER_CONCEPTUAL_DESIGN",
+            "status": "DRAFT"
+          },
+          "domain": "ROAD_INFRASTRUCTURE"
+        }
+      ],
+      "domain": "ROAD_INFRASTRUCTURE",
+      "createdAt": "2026-11-18T02:32:39.084Z"
+    },
+    {
+      "id": "road-design-a",
+      "name": "Design A",
+      "description": "Proposed road changes.",
+      "source": "USER_DRAWN",
+      "verificationStatus": "CONCEPTUAL",
+      "revision": "30",
+      "crs": "EPSG:4326",
+      "units": "metre",
+      "updatedAt": "2026-11-18T02:37:57.629Z",
+      "migratedFrom": "design-a",
+      "elements": [
+        {
+          "id": "road-mwl5gxqk",
+          "type": "ROAD",
+          "changeType": "NEW",
+          "operation": "CREATE",
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -80.16749029289132,
+                25.773601415262668
+              ],
+              [
+                -80.16691614045745,
+                25.77334152867168
+              ],
+              [
+                -80.16634214974216,
+                25.773114147452016
+              ]
+            ]
+          },
+          "properties": {
+            "name": "Proposed road",
+            "widthM": 10,
+            "lanes": 2,
+            "roadType": "ACCESS_ROAD"
+          },
+          "provenance": {
+            "source": "USER_CONCEPTUAL_DESIGN",
+            "status": "DRAFT"
+          },
+          "domain": "ROAD_INFRASTRUCTURE"
+        },
+        {
+          "id": "realign-40642-all",
+          "type": "ROAD",
+          "changeType": "MODIFIED",
+          "operation": "REALIGN",
+          "baselineRef": {
+            "kind": "ROAD",
+            "source": "MIAMI_DADE_ROADS",
+            "objectId": 40642,
+            "name": "S CRUISE BLVD",
+            "fingerprint": "4:173:-80.1673,25.77348:-80.16574,25.77282"
+          },
+          "section": null,
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -80.16748965615112,
+                25.773601285753987
+              ],
+              [
+                -80.1669159417367,
+                25.77334155657808
+              ],
+              [
+                -80.16634219522612,
+                25.77311422983601
+              ]
+            ]
+          },
+          "properties": {
+            "name": "S CRUISE BLVD — proposed realignment",
+            "widthM": 10,
+            "lanes": 2,
+            "roadType": "REALIGNMENT"
+          },
+          "provenance": {
+            "source": "USER_CONCEPTUAL_DESIGN",
+            "status": "DRAFT"
+          },
+          "domain": "ROAD_INFRASTRUCTURE"
+        },
+        {
+          "id": "close-40642-all",
+          "type": "ROAD",
+          "changeType": "REMOVED",
+          "operation": "CLOSE",
+          "baselineRef": {
+            "kind": "ROAD",
+            "source": "MIAMI_DADE_ROADS",
+            "objectId": 40642,
+            "name": "S CRUISE BLVD",
+            "fingerprint": "4:173:-80.1673,25.77348:-80.16574,25.77282"
+          },
+          "section": null,
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -80.16730314996047,
+                25.77347868577745
+              ],
+              [
+                -80.1659485994822,
+                25.772894901037287
+              ],
+              [
+                -80.16581776522389,
+                25.772837865756006
+              ],
+              [
+                -80.1657373031251,
+                25.772820727213517
+              ]
+            ]
+          },
+          "properties": {
+            "name": "S CRUISE BLVD — proposed closure",
+            "reason": null,
+            "roadType": "CLOSURE"
+          },
+          "provenance": {
+            "source": "USER_CONCEPTUAL_DESIGN",
+            "status": "DRAFT"
+          },
+          "domain": "ROAD_INFRASTRUCTURE"
+        },
+        {
+          "id": "widen-40642-0-30",
+          "type": "ROAD",
+          "changeType": "MODIFIED",
+          "operation": "WIDEN",
+          "baselineRef": {
+            "kind": "ROAD",
+            "source": "MIAMI_DADE_ROADS",
+            "objectId": 40642,
+            "name": "S CRUISE BLVD",
+            "fingerprint": "4:173:-80.1673,25.77348:-80.16574,25.77282"
+          },
+          "section": {
+            "startMeasureM": 0,
+            "endMeasureM": 30.17984969274439,
+            "lengthM": 30.17984969274439
+          },
+          "proposal": {
+            "totalWidthM": 10,
+            "laneCount": 2,
+            "wideningSide": "BOTH",
+            "baselineWidthM": null,
+            "baselineWidthSource": "UNKNOWN"
+          },
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -80.16730314996047,
+                25.77347868577745
+              ],
+              [
+                -80.16703148547853,
+                25.773361605176138
+              ]
+            ]
+          },
+          "properties": {
+            "name": "S CRUISE BLVD — proposed widening",
+            "widthM": 10,
+            "lanes": 2,
+            "roadType": "WIDENING"
+          },
+          "provenance": {
+            "source": "USER_CONCEPTUAL_DESIGN",
+            "status": "DRAFT"
+          },
+          "domain": "ROAD_INFRASTRUCTURE"
+        }
+      ],
+      "domain": "ROAD_INFRASTRUCTURE",
+      "createdAt": "2026-11-18T02:31:37.171Z"
+    },
+    {
+      "id": "road-demo-new-access",
+      "name": "Design B — New Access Road",
+      "description": "Create a new road connection.",
+      "source": "SYNTHETIC_DEMO",
+      "verificationStatus": "CONCEPTUAL",
+      "revision": "01",
+      "domain": "ROAD_INFRASTRUCTURE",
+      "organisation": null,
+      "sourceFile": null,
+      "importedAt": null,
+      "crs": "EPSG:4326",
+      "units": "metre",
+      "elements": [
+        {
+          "id": "demo-new-access-road",
+          "type": "ROAD",
+          "changeType": "NEW",
+          "operation": "CREATE",
+          "domain": "ROAD_INFRASTRUCTURE",
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -80.16795604238416,
+                25.772983325970667
+              ],
+              [
+                -80.1675698749116,
+                25.772925958315458
+              ],
+              [
+                -80.16718391793682,
+                25.772903316837038
+              ],
+              [
+                -80.16679825811347,
+                25.772929786015567
+              ],
+              [
+                -80.16641280802074,
+                25.772990981374623
+              ]
+            ]
+          },
+          "properties": {
+            "name": "New Terminal Access Road",
+            "widthM": 10,
+            "lanes": 2,
+            "roadType": "ACCESS_ROAD",
+            "startRole": "ROAD_NETWORK_CONNECTION",
+            "endRole": "ROAD_NETWORK_CONNECTION",
+            "connects": {
+              "start": {
+                "objectId": 14302,
+                "name": "PORT BLVD"
+              },
+              "end": {
+                "objectId": 14452,
+                "name": "S CRUISE BLVD"
+              }
+            }
+          },
+          "provenance": {
+            "source": "SYNTHETIC_DEMO_GENERATED",
+            "status": "CONCEPTUAL",
+            "basis": "Generated between PORT BLVD and S CRUISE BLVD"
+          }
+        }
+      ],
+      "purpose": "NEW_ROAD",
+      "allowedOperation": "CREATE",
+      "demoTemplate": "NEW_ROAD",
+      "limitation": "Generated between two points on the county network; not an engineering alignment.",
+      "createdAt": "2026-11-18T05:51:01.816Z",
+      "updatedAt": "2026-11-18T05:51:01.816Z"
+    },
+    {
+      "id": "road-demo-widening",
+      "name": "Design A — Road Widening",
+      "description": "Widen an existing access road.",
+      "source": "SYNTHETIC_DEMO",
+      "verificationStatus": "CONCEPTUAL",
+      "revision": "02",
+      "domain": "ROAD_INFRASTRUCTURE",
+      "organisation": null,
+      "sourceFile": null,
+      "importedAt": null,
+      "crs": "EPSG:4326",
+      "units": "metre",
+      "elements": [
+        {
+          "id": "widen-40642-0-30",
+          "type": "ROAD",
+          "changeType": "MODIFIED",
+          "operation": "WIDEN",
+          "baselineRef": {
+            "kind": "ROAD",
+            "source": "MIAMI_DADE_ROADS",
+            "objectId": 40642,
+            "name": "S CRUISE BLVD",
+            "fingerprint": "4:173:-80.1673,25.77348:-80.16574,25.77282"
+          },
+          "section": {
+            "startMeasureM": 0,
+            "endMeasureM": 30.17984969274439,
+            "lengthM": 30.17984969274439
+          },
+          "proposal": {
+            "totalWidthM": 16.5,
+            "laneCount": 3,
+            "wideningSide": "BOTH",
+            "baselineWidthM": null,
+            "baselineWidthSource": "UNKNOWN"
+          },
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -80.16730314996047,
+                25.77347868577745
+              ],
+              [
+                -80.16703148547853,
+                25.773361605176135
+              ]
+            ]
+          },
+          "properties": {
+            "name": "S CRUISE BLVD — proposed widening",
+            "widthM": 16.5,
+            "lanes": 3,
+            "roadType": "WIDENING"
+          },
+          "provenance": {
+            "source": "USER_CONCEPTUAL_DESIGN",
+            "status": "DRAFT"
+          },
+          "domain": "ROAD_INFRASTRUCTURE"
+        }
+      ],
+      "purpose": "WIDENING",
+      "allowedOperation": "WIDEN",
+      "demoTemplate": "WIDENING",
+      "limitation": "Existing width and lanes are Unknown: the county file publishes neither.",
+      "createdAt": "2026-11-18T05:51:01.591Z",
+      "updatedAt": "2026-11-18T06:42:26.393Z"
+    },
+    {
+      "id": "road-demo-realignment",
+      "name": "Design C — Road Realignment",
+      "description": "Modify an existing road alignment.",
+      "source": "SYNTHETIC_DEMO",
+      "verificationStatus": "CONCEPTUAL",
+      "revision": "02",
+      "domain": "ROAD_INFRASTRUCTURE",
+      "organisation": null,
+      "sourceFile": null,
+      "importedAt": null,
+      "crs": "EPSG:4326",
+      "units": "metre",
+      "elements": [
+        {
+          "id": "realign-12103-37",
+          "type": "ROAD",
+          "changeType": "MODIFIED",
+          "operation": "REALIGN",
+          "baselineRef": {
+            "kind": "ROAD",
+            "source": "MIAMI_DADE_ROADS",
+            "objectId": 12103,
+            "name": "N CRUISE BLVD",
+            "fingerprint": "3:187:-80.16675,25.77419:-80.16509,25.77343"
+          },
+          "section": {
+            "startMeasureM": 37,
+            "endMeasureM": 150,
+            "lengthM": 113
+          },
+          "tieIns": {
+            "locked": true
+          },
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -80.16644894563258,
+                25.774001587809327
+              ],
+              [
+                -80.1662492599926,
+                25.773987353374007
+              ],
+              [
+                -80.16605744453514,
+                25.773957760762823
+              ],
+              [
+                -80.16587926068115,
+                25.773901567249254
+              ],
+              [
+                -80.16571681733544,
+                25.773814657750023
+              ],
+              [
+                -80.16556800578128,
+                25.773701147447426
+              ],
+              [
+                -80.16542706470088,
+                25.773572279122334
+              ]
+            ]
+          },
+          "properties": {
+            "name": "N CRUISE BLVD — proposed realignment",
+            "widthM": 10,
+            "lanes": 4,
+            "roadType": "REALIGNMENT",
+            "startRole": "ROAD_NETWORK_CONNECTION",
+            "endRole": "ROAD_NETWORK_CONNECTION"
+          },
+          "provenance": {
+            "source": "USER_CONCEPTUAL_DESIGN",
+            "status": "DRAFT"
+          },
+          "domain": "ROAD_INFRASTRUCTURE"
+        }
+      ],
+      "purpose": "REALIGNMENT",
+      "allowedOperation": "REALIGN",
+      "demoTemplate": "REALIGNMENT",
+      "limitation": "Generated: the section is bowed sideways and tied in at both ends. Conceptual only.",
+      "createdAt": "2026-11-18T05:51:01.984Z",
+      "updatedAt": "2026-11-18T09:04:22.035Z"
+    }
+  ]
+}
