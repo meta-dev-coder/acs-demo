@@ -1,0 +1,1307 @@
+{
+  "metadata": {
+    "port": "PortMiami",
+    "period_start": "2026-11-01",
+    "period_end": "2026-11-30",
+    "timezone": "America/New_York",
+    "dock_report": "User-provided DailyDockRpt.pdf (31 pages)",
+    "capacity_source": "User-provided Carnival Corporation fleet report (2026-05-31) via existing cruise JSON",
+    "itinerary_source": "Previously supplied partial November sailing schedule, November 18-30",
+    "dock_report_records": 149,
+    "capacity_verified_records": 29,
+    "data_notes": [
+      "Dock Report covers November 1-30 but not necessarily every vessel movement at the port.",
+      "Dock report records are not equivalent to unique voyage departures or passenger embarkations.",
+      "Passenger capacity is missing for ships not covered by provided fleet reference.",
+      "No capacity is invented or inferred from tonnage or vessel length.",
+      "Terminal AAA is retained as printed in the Dock Report, not silently remapped to AA.",
+      "Voyage options are attached only for exact matching ship and departure date."
+    ],
+    "capacity_filter": "passenger_capacity != null",
+    "retained_calls": 29
+  },
+  "cruise_calls": [
+    {
+      "dock_request_number": "98268",
+      "ship_name": "Carnival Celebration",
+      "arrival_date": "2026-11-01",
+      "arrival_time_local": "05:55",
+      "departure_date": "2026-11-01",
+      "departure_time_local": "16:25",
+      "source_pdf_page": 3,
+      "terminal_code": "F",
+      "passenger_capacity": 5360,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "F",
+          "berth_position": "9.5-E",
+          "berthing_side_code": "SST",
+          "berth_arrival_local": "2026-11-01T05:55:00",
+          "berth_departure_local": "2026-11-01T16:25:00",
+          "raw_label": "F (9.5-E) SST 11/01/26"
+        }
+      ],
+      "cruise_line": null,
+      "voyage_options": [],
+      "itinerary_match_status": "not_in_supplied_sailing_list",
+      "scheduled_terminal_code": null,
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-01T05:55:00",
+      "departure_datetime_local": "2026-11-01T16:25:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98268",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 630
+    },
+    {
+      "dock_request_number": "98263",
+      "ship_name": "Carnival Horizon",
+      "arrival_date": "2026-11-01",
+      "arrival_time_local": "06:20",
+      "departure_date": "2026-11-01",
+      "departure_time_local": "16:15",
+      "source_pdf_page": 4,
+      "terminal_code": "D",
+      "passenger_capacity": 3960,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "D",
+          "berth_position": "27.5-E",
+          "berthing_side_code": "PST",
+          "berth_arrival_local": "2026-11-01T06:20:00",
+          "berth_departure_local": "2026-11-01T16:15:00",
+          "raw_label": "D (27.5-E) PST 11/01/26"
+        }
+      ],
+      "cruise_line": null,
+      "voyage_options": [],
+      "itinerary_match_status": "not_in_supplied_sailing_list",
+      "scheduled_terminal_code": null,
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-01T06:20:00",
+      "departure_datetime_local": "2026-11-01T16:15:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98263",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 595
+    },
+    {
+      "dock_request_number": "98250",
+      "ship_name": "Carnival Sunrise",
+      "arrival_date": "2026-11-05",
+      "arrival_time_local": "05:55",
+      "departure_date": "2026-11-05",
+      "departure_time_local": "15:25",
+      "source_pdf_page": 10,
+      "terminal_code": "F",
+      "passenger_capacity": 2980,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "F",
+          "berth_position": "11.25-E",
+          "berthing_side_code": "SST",
+          "berth_arrival_local": "2026-11-05T05:55:00",
+          "berth_departure_local": "2026-11-05T15:25:00",
+          "raw_label": "F (11.25-E) SST 11/05/26"
+        }
+      ],
+      "cruise_line": null,
+      "voyage_options": [],
+      "itinerary_match_status": "not_in_supplied_sailing_list",
+      "scheduled_terminal_code": null,
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-05T05:55:00",
+      "departure_datetime_local": "2026-11-05T15:25:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98250",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 570
+    },
+    {
+      "dock_request_number": "98322",
+      "ship_name": "Queen Elizabeth",
+      "arrival_date": "2026-11-05",
+      "arrival_time_local": "06:10",
+      "departure_date": "2026-11-05",
+      "departure_time_local": "17:15",
+      "source_pdf_page": 10,
+      "terminal_code": "D",
+      "passenger_capacity": 2070,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "D",
+          "berth_position": "26.75-E",
+          "berthing_side_code": "PST",
+          "berth_arrival_local": "2026-11-05T06:10:00",
+          "berth_departure_local": "2026-11-05T17:15:00",
+          "raw_label": "D (26.75-E) PST 11/05/26"
+        }
+      ],
+      "cruise_line": null,
+      "voyage_options": [],
+      "itinerary_match_status": "not_in_supplied_sailing_list",
+      "scheduled_terminal_code": null,
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-05T06:10:00",
+      "departure_datetime_local": "2026-11-05T17:15:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98322",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 665
+    },
+    {
+      "dock_request_number": "98266",
+      "ship_name": "Carnival Horizon",
+      "arrival_date": "2026-11-07",
+      "arrival_time_local": "05:55",
+      "departure_date": "2026-11-07",
+      "departure_time_local": "15:35",
+      "source_pdf_page": 4,
+      "terminal_code": "F",
+      "passenger_capacity": 3960,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "F",
+          "berth_position": "9.25-E",
+          "berthing_side_code": "SST",
+          "berth_arrival_local": "2026-11-07T05:55:00",
+          "berth_departure_local": "2026-11-07T15:35:00",
+          "raw_label": "F (9.25-E) SST 11/07/26"
+        }
+      ],
+      "cruise_line": null,
+      "voyage_options": [],
+      "itinerary_match_status": "not_in_supplied_sailing_list",
+      "scheduled_terminal_code": null,
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-07T05:55:00",
+      "departure_datetime_local": "2026-11-07T15:35:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98266",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 580
+    },
+    {
+      "dock_request_number": "98246",
+      "ship_name": "Carnival Magic",
+      "arrival_date": "2026-11-08",
+      "arrival_time_local": "05:45",
+      "departure_date": "2026-11-08",
+      "departure_time_local": "16:20",
+      "source_pdf_page": 14,
+      "terminal_code": "D",
+      "passenger_capacity": 3690,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "D",
+          "berth_position": "38-W",
+          "berthing_side_code": "SST",
+          "berth_arrival_local": "2026-11-08T05:45:00",
+          "berth_departure_local": "2026-11-08T16:20:00",
+          "raw_label": "D (38-W) SST 11/08/26"
+        }
+      ],
+      "cruise_line": null,
+      "voyage_options": [],
+      "itinerary_match_status": "not_in_supplied_sailing_list",
+      "scheduled_terminal_code": null,
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-08T05:45:00",
+      "departure_datetime_local": "2026-11-08T16:20:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98246",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 635
+    },
+    {
+      "dock_request_number": "98269",
+      "ship_name": "Carnival Celebration",
+      "arrival_date": "2026-11-08",
+      "arrival_time_local": "06:05",
+      "departure_date": "2026-11-08",
+      "departure_time_local": "15:50",
+      "source_pdf_page": 4,
+      "terminal_code": "F",
+      "passenger_capacity": 5360,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "F",
+          "berth_position": "9.5-E",
+          "berthing_side_code": "SST",
+          "berth_arrival_local": "2026-11-08T06:05:00",
+          "berth_departure_local": "2026-11-08T15:50:00",
+          "raw_label": "F (9.5-E) SST 11/08/26"
+        }
+      ],
+      "cruise_line": null,
+      "voyage_options": [],
+      "itinerary_match_status": "not_in_supplied_sailing_list",
+      "scheduled_terminal_code": null,
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-08T06:05:00",
+      "departure_datetime_local": "2026-11-08T15:50:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98269",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 585
+    },
+    {
+      "dock_request_number": "98252",
+      "ship_name": "Carnival Sunrise",
+      "arrival_date": "2026-11-09",
+      "arrival_time_local": "05:50",
+      "departure_date": "2026-11-09",
+      "departure_time_local": "15:35",
+      "source_pdf_page": 10,
+      "terminal_code": "D",
+      "passenger_capacity": 2980,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "D",
+          "berth_position": "36-W",
+          "berthing_side_code": "SST",
+          "berth_arrival_local": "2026-11-09T05:50:00",
+          "berth_departure_local": "2026-11-09T15:35:00",
+          "raw_label": "D (36-W) SST 11/09/26"
+        }
+      ],
+      "cruise_line": null,
+      "voyage_options": [],
+      "itinerary_match_status": "not_in_supplied_sailing_list",
+      "scheduled_terminal_code": null,
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-09T05:50:00",
+      "departure_datetime_local": "2026-11-09T15:35:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98252",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 585
+    },
+    {
+      "dock_request_number": "98316",
+      "ship_name": "Zuiderdam",
+      "arrival_date": "2026-11-11",
+      "arrival_time_local": "06:55",
+      "departure_date": "2026-11-11",
+      "departure_time_local": "16:05",
+      "source_pdf_page": 16,
+      "terminal_code": "D",
+      "passenger_capacity": 1990,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "D",
+          "berth_position": "37.75-W",
+          "berthing_side_code": "SST",
+          "berth_arrival_local": "2026-11-11T06:55:00",
+          "berth_departure_local": "2026-11-11T16:05:00",
+          "raw_label": "D (37.75-W) SST 11/11/26"
+        }
+      ],
+      "cruise_line": null,
+      "voyage_options": [],
+      "itinerary_match_status": "not_in_supplied_sailing_list",
+      "scheduled_terminal_code": null,
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-11T06:55:00",
+      "departure_datetime_local": "2026-11-11T16:05:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98316",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 550
+    },
+    {
+      "dock_request_number": "98319",
+      "ship_name": "Seabourn Ovation",
+      "arrival_date": "2026-11-13",
+      "arrival_time_local": "05:15",
+      "departure_date": "2026-11-13",
+      "departure_time_local": "18:30",
+      "source_pdf_page": 16,
+      "terminal_code": "D",
+      "passenger_capacity": 600,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "D",
+          "berth_position": "28.5-E",
+          "berthing_side_code": "SST",
+          "berth_arrival_local": "2026-11-13T05:15:00",
+          "berth_departure_local": "2026-11-13T18:30:00",
+          "raw_label": "D (28.5-E) SST 11/13/26"
+        }
+      ],
+      "cruise_line": null,
+      "voyage_options": [],
+      "itinerary_match_status": "not_in_supplied_sailing_list",
+      "scheduled_terminal_code": null,
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-13T05:15:00",
+      "departure_datetime_local": "2026-11-13T18:30:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98319",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 795
+    },
+    {
+      "dock_request_number": "98253",
+      "ship_name": "Carnival Sunrise",
+      "arrival_date": "2026-11-13",
+      "arrival_time_local": "23:50",
+      "departure_date": "2026-11-14",
+      "departure_time_local": "17:50",
+      "source_pdf_page": 10,
+      "terminal_code": "F",
+      "passenger_capacity": 2980,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "F",
+          "berth_position": "11.25-E",
+          "berthing_side_code": "SST",
+          "berth_arrival_local": "2026-11-13T23:50:00",
+          "berth_departure_local": "2026-11-14T17:50:00",
+          "raw_label": "F (11.25-E) SST 11/13/26"
+        }
+      ],
+      "cruise_line": null,
+      "voyage_options": [],
+      "itinerary_match_status": "not_in_supplied_sailing_list",
+      "scheduled_terminal_code": null,
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-13T23:50:00",
+      "departure_datetime_local": "2026-11-14T17:50:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98253",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 1080
+    },
+    {
+      "dock_request_number": "98248",
+      "ship_name": "Carnival Magic",
+      "arrival_date": "2026-11-14",
+      "arrival_time_local": "06:25",
+      "departure_date": "2026-11-14",
+      "departure_time_local": "17:35",
+      "source_pdf_page": 14,
+      "terminal_code": "D",
+      "passenger_capacity": 3690,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "D",
+          "berth_position": "27.5-E",
+          "berthing_side_code": "PST",
+          "berth_arrival_local": "2026-11-14T06:25:00",
+          "berth_departure_local": "2026-11-14T17:35:00",
+          "raw_label": "D (27.5-E) PST 11/14/26"
+        }
+      ],
+      "cruise_line": null,
+      "voyage_options": [],
+      "itinerary_match_status": "not_in_supplied_sailing_list",
+      "scheduled_terminal_code": null,
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-14T06:25:00",
+      "departure_datetime_local": "2026-11-14T17:35:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98248",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 670
+    },
+    {
+      "dock_request_number": "98264",
+      "ship_name": "Carnival Horizon",
+      "arrival_date": "2026-11-15",
+      "arrival_time_local": "05:25",
+      "departure_date": "2026-11-15",
+      "departure_time_local": "16:10",
+      "source_pdf_page": 4,
+      "terminal_code": "D",
+      "passenger_capacity": 3960,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "D",
+          "berth_position": "38-W",
+          "berthing_side_code": "SST",
+          "berth_arrival_local": "2026-11-15T05:25:00",
+          "berth_departure_local": "2026-11-15T16:10:00",
+          "raw_label": "D (38-W) SST 11/15/26"
+        }
+      ],
+      "cruise_line": null,
+      "voyage_options": [],
+      "itinerary_match_status": "not_in_supplied_sailing_list",
+      "scheduled_terminal_code": null,
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-15T05:25:00",
+      "departure_datetime_local": "2026-11-15T16:10:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98264",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 645
+    },
+    {
+      "dock_request_number": "98270",
+      "ship_name": "Carnival Celebration",
+      "arrival_date": "2026-11-15",
+      "arrival_time_local": "05:45",
+      "departure_date": "2026-11-15",
+      "departure_time_local": "16:40",
+      "source_pdf_page": 4,
+      "terminal_code": "F",
+      "passenger_capacity": 5360,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "F",
+          "berth_position": "9.5-E",
+          "berthing_side_code": "SST",
+          "berth_arrival_local": "2026-11-15T05:45:00",
+          "berth_departure_local": "2026-11-15T16:40:00",
+          "raw_label": "F (9.5-E) SST 11/15/26"
+        }
+      ],
+      "cruise_line": null,
+      "voyage_options": [],
+      "itinerary_match_status": "not_in_supplied_sailing_list",
+      "scheduled_terminal_code": null,
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-15T05:45:00",
+      "departure_datetime_local": "2026-11-15T16:40:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98270",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 655
+    },
+    {
+      "dock_request_number": "98323",
+      "ship_name": "Queen Elizabeth",
+      "arrival_date": "2026-11-17",
+      "arrival_time_local": "06:35",
+      "departure_date": "2026-11-17",
+      "departure_time_local": "17:05",
+      "source_pdf_page": 10,
+      "terminal_code": "D",
+      "passenger_capacity": 2070,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "D",
+          "berth_position": "26.75-E",
+          "berthing_side_code": "PST",
+          "berth_arrival_local": "2026-11-17T06:35:00",
+          "berth_departure_local": "2026-11-17T17:05:00",
+          "raw_label": "D (26.75-E) PST 11/17/26"
+        }
+      ],
+      "cruise_line": null,
+      "voyage_options": [],
+      "itinerary_match_status": "not_in_supplied_sailing_list",
+      "scheduled_terminal_code": null,
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-17T06:35:00",
+      "departure_datetime_local": "2026-11-17T17:05:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98323",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 630
+    },
+    {
+      "dock_request_number": "98251",
+      "ship_name": "Carnival Sunrise",
+      "arrival_date": "2026-11-19",
+      "arrival_time_local": "06:00",
+      "departure_date": "2026-11-19",
+      "departure_time_local": "15:30",
+      "source_pdf_page": 18,
+      "terminal_code": "D",
+      "passenger_capacity": 2980,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "D",
+          "berth_position": "36-W",
+          "berthing_side_code": "SST",
+          "berth_arrival_local": "2026-11-19T06:00:00",
+          "berth_departure_local": "2026-11-19T15:30:00",
+          "raw_label": "D (36-W) SST 11/19/26"
+        }
+      ],
+      "cruise_line": "Carnival Cruise Line",
+      "voyage_options": [
+        {
+          "duration_nights": 4,
+          "itinerary_name": "4-Night Bahamas",
+          "destinations": [
+            "Half Moon Cay (Bahamas)",
+            "Celebration Key (Bahamas)"
+          ],
+          "end_date": "2026-11-23",
+          "returns_to_miami": true,
+          "ends_in": null,
+          "scheduled_return_date": "2026-11-23"
+        }
+      ],
+      "itinerary_match_status": "matched_sailing_list",
+      "scheduled_terminal_code": "D",
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-19T06:00:00",
+      "departure_datetime_local": "2026-11-19T15:30:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98251",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 570
+    },
+    {
+      "dock_request_number": "98320",
+      "ship_name": "Seabourn Ovation",
+      "arrival_date": "2026-11-20",
+      "arrival_time_local": "06:00",
+      "departure_date": "2026-11-20",
+      "departure_time_local": "18:00",
+      "source_pdf_page": 21,
+      "terminal_code": "D",
+      "passenger_capacity": 600,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "D",
+          "berth_position": "28.25-E",
+          "berthing_side_code": "PST",
+          "berth_arrival_local": "2026-11-20T06:00:00",
+          "berth_departure_local": "2026-11-20T18:00:00",
+          "raw_label": "D (28.25-E) PST 11/20/26"
+        }
+      ],
+      "cruise_line": "Seabourn",
+      "voyage_options": [
+        {
+          "duration_nights": 8,
+          "itinerary_name": "8-Night Eastern Caribbean",
+          "destinations": [
+            "San Juan (Puerto Rico)",
+            "Great Harbor (Peter Island, BVI)",
+            "Basseterre (St. Kitts)",
+            "Roseau (Dominica)",
+            "Bequia (St. Vincent and the Grenadines)"
+          ],
+          "end_date": "2026-11-28",
+          "returns_to_miami": false,
+          "ends_in": "Bridgetown (Barbados)"
+        },
+        {
+          "duration_nights": 15,
+          "itinerary_name": "15-Night Eastern Caribbean",
+          "destinations": [
+            "San Juan (Puerto Rico)",
+            "Great Harbor (Peter Island, BVI)",
+            "Basseterre (St. Kitts)",
+            "Roseau (Dominica)",
+            "Bequia (St. Vincent and the Grenadines)",
+            "Bridgetown (Barbados)",
+            "Rodney Bay (St. Lucia)",
+            "Little Bay (Montserrat)",
+            "St. John's (Antigua)",
+            "Basseterre (St. Kitts)",
+            "Virgin Gorda (British Virgin Islands)"
+          ],
+          "end_date": "2026-12-05",
+          "returns_to_miami": false,
+          "ends_in": "Philipsburg (St. Maarten)"
+        }
+      ],
+      "itinerary_match_status": "matched_sailing_list",
+      "scheduled_terminal_code": "D",
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-20T06:00:00",
+      "departure_datetime_local": "2026-11-20T18:00:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98320",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 720
+    },
+    {
+      "dock_request_number": "98267",
+      "ship_name": "Carnival Horizon",
+      "arrival_date": "2026-11-21",
+      "arrival_time_local": "06:00",
+      "departure_date": "2026-11-21",
+      "departure_time_local": "15:30",
+      "source_pdf_page": 24,
+      "terminal_code": "F",
+      "passenger_capacity": 3960,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "F",
+          "berth_position": "9.25-E",
+          "berthing_side_code": "SST",
+          "berth_arrival_local": "2026-11-21T06:00:00",
+          "berth_departure_local": "2026-11-21T15:30:00",
+          "raw_label": "F (9.25-E) SST 11/21/26"
+        }
+      ],
+      "cruise_line": "Carnival Cruise Line",
+      "voyage_options": [
+        {
+          "duration_nights": 8,
+          "itinerary_name": "8-Night Southern Caribbean",
+          "destinations": [
+            "Aruba",
+            "Bonaire",
+            "Curaçao"
+          ],
+          "end_date": "2026-11-29",
+          "returns_to_miami": true,
+          "ends_in": null,
+          "scheduled_return_date": "2026-11-29"
+        }
+      ],
+      "itinerary_match_status": "matched_sailing_list",
+      "scheduled_terminal_code": "F",
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-21T06:00:00",
+      "departure_datetime_local": "2026-11-21T15:30:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98267",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 570
+    },
+    {
+      "dock_request_number": "98317",
+      "ship_name": "Zuiderdam",
+      "arrival_date": "2026-11-21",
+      "arrival_time_local": "07:15",
+      "departure_date": "2026-11-21",
+      "departure_time_local": "21:30",
+      "source_pdf_page": 25,
+      "terminal_code": "D",
+      "passenger_capacity": 1990,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "D",
+          "berth_position": "37-W",
+          "berthing_side_code": "SST",
+          "berth_arrival_local": "2026-11-21T07:15:00",
+          "berth_departure_local": "2026-11-21T21:30:00",
+          "raw_label": "D (37-W) SST 11/21/26"
+        }
+      ],
+      "cruise_line": null,
+      "voyage_options": [],
+      "itinerary_match_status": "not_in_supplied_sailing_list",
+      "scheduled_terminal_code": null,
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-21T07:15:00",
+      "departure_datetime_local": "2026-11-21T21:30:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98317",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 855
+    },
+    {
+      "dock_request_number": "98247",
+      "ship_name": "Carnival Magic",
+      "arrival_date": "2026-11-22",
+      "arrival_time_local": "05:45",
+      "departure_date": "2026-11-22",
+      "departure_time_local": "15:30",
+      "source_pdf_page": 28,
+      "terminal_code": "D",
+      "passenger_capacity": 3690,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "D",
+          "berth_position": "27.5-E",
+          "berthing_side_code": "PST",
+          "berth_arrival_local": "2026-11-22T05:45:00",
+          "berth_departure_local": "2026-11-22T15:30:00",
+          "raw_label": "D (27.5-E) PST 11/22/26"
+        }
+      ],
+      "cruise_line": null,
+      "voyage_options": [],
+      "itinerary_match_status": "not_in_supplied_sailing_list",
+      "scheduled_terminal_code": null,
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-22T05:45:00",
+      "departure_datetime_local": "2026-11-22T15:30:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98247",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 585
+    },
+    {
+      "dock_request_number": "98271",
+      "ship_name": "Carnival Celebration",
+      "arrival_date": "2026-11-22",
+      "arrival_time_local": "06:00",
+      "departure_date": "2026-11-22",
+      "departure_time_local": "15:30",
+      "source_pdf_page": 28,
+      "terminal_code": "F",
+      "passenger_capacity": 5360,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "F",
+          "berth_position": "9.5-E",
+          "berthing_side_code": "SST",
+          "berth_arrival_local": "2026-11-22T06:00:00",
+          "berth_departure_local": "2026-11-22T15:30:00",
+          "raw_label": "F (9.5-E) SST 11/22/26"
+        }
+      ],
+      "cruise_line": null,
+      "voyage_options": [],
+      "itinerary_match_status": "not_in_supplied_sailing_list",
+      "scheduled_terminal_code": null,
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-22T06:00:00",
+      "departure_datetime_local": "2026-11-22T15:30:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98271",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 570
+    },
+    {
+      "dock_request_number": "98321",
+      "ship_name": "Seabourn Quest",
+      "arrival_date": "2026-11-22",
+      "arrival_time_local": "06:30",
+      "departure_date": "2026-11-22",
+      "departure_time_local": "16:00",
+      "source_pdf_page": 28,
+      "terminal_code": "E",
+      "passenger_capacity": 460,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "E",
+          "berth_position": "25.25-W",
+          "berthing_side_code": "SST",
+          "berth_arrival_local": "2026-11-22T06:30:00",
+          "berth_departure_local": "2026-11-22T16:00:00",
+          "raw_label": "E (25.25-W) SST 11/22/26"
+        }
+      ],
+      "cruise_line": "Seabourn",
+      "voyage_options": [
+        {
+          "duration_nights": 14,
+          "itinerary_name": "14-Night Eastern Caribbean",
+          "destinations": [
+            "San Juan (Puerto Rico)",
+            "Road Bay (Anguilla)",
+            "Basseterre (St. Kitts)",
+            "Roseau (Dominica)",
+            "Fort-de-France (Martinique)",
+            "Little Bay (Montserrat)",
+            "Iles des Saintes (Guadeloupe)",
+            "Virgin Gorda (British Virgin Islands)",
+            "Great Harbor (Peter Island, BVI)"
+          ],
+          "end_date": "2026-12-06",
+          "returns_to_miami": true,
+          "ends_in": null,
+          "scheduled_return_date": "2026-12-06"
+        }
+      ],
+      "itinerary_match_status": "matched_sailing_list",
+      "scheduled_terminal_code": "E",
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-22T06:30:00",
+      "departure_datetime_local": "2026-11-22T16:00:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98321",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 570
+    },
+    {
+      "dock_request_number": "98254",
+      "ship_name": "Carnival Sunrise",
+      "arrival_date": "2026-11-23",
+      "arrival_time_local": "06:15",
+      "departure_date": "2026-11-23",
+      "departure_time_local": "15:30",
+      "source_pdf_page": 19,
+      "terminal_code": "D",
+      "passenger_capacity": 2980,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "D",
+          "berth_position": "35-W",
+          "berthing_side_code": "PST",
+          "berth_arrival_local": "2026-11-23T06:15:00",
+          "berth_departure_local": "2026-11-23T15:30:00",
+          "raw_label": "D (35-W) PST 11/23/26"
+        }
+      ],
+      "cruise_line": null,
+      "voyage_options": [],
+      "itinerary_match_status": "not_in_supplied_sailing_list",
+      "scheduled_terminal_code": null,
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-23T06:15:00",
+      "departure_datetime_local": "2026-11-23T15:30:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98254",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 555
+    },
+    {
+      "dock_request_number": "98324",
+      "ship_name": "Queen Elizabeth",
+      "arrival_date": "2026-11-26",
+      "arrival_time_local": "06:00",
+      "departure_date": "2026-11-26",
+      "departure_time_local": "18:00",
+      "source_pdf_page": 30,
+      "terminal_code": "D",
+      "passenger_capacity": 2070,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "D",
+          "berth_position": "37.75-W",
+          "berthing_side_code": "SST",
+          "berth_arrival_local": "2026-11-26T06:00:00",
+          "berth_departure_local": "2026-11-26T18:00:00",
+          "raw_label": "D (37.75-W) SST 11/26/26"
+        }
+      ],
+      "cruise_line": "Cunard",
+      "voyage_options": [
+        {
+          "duration_nights": 12,
+          "itinerary_name": "12-Night Southern Caribbean",
+          "destinations": [
+            "San Juan (Puerto Rico)",
+            "St. John's (Antigua)",
+            "St. Lucia",
+            "Bridgetown (Barbados)",
+            "Philipsburg (St. Maarten)",
+            "Tortola (British Virgin Islands)"
+          ],
+          "end_date": "2026-12-08",
+          "returns_to_miami": true,
+          "ends_in": null,
+          "scheduled_return_date": "2026-12-08"
+        },
+        {
+          "duration_nights": 21,
+          "itinerary_name": "21-Night Southern Caribbean",
+          "destinations": [
+            "San Juan (Puerto Rico)",
+            "St. John's (Antigua)",
+            "St. Lucia",
+            "Bridgetown (Barbados)",
+            "Philipsburg (St. Maarten)",
+            "Tortola (British Virgin Islands)",
+            "Georgetown (Grand Cayman, Cayman Islands)",
+            "Montego Bay (Jamaica)",
+            "Roatan (Honduras)",
+            "Costa Maya (Mexico)",
+            "Cozumel (Mexico)"
+          ],
+          "end_date": "2026-12-17",
+          "returns_to_miami": true,
+          "ends_in": null,
+          "scheduled_return_date": "2026-12-17"
+        }
+      ],
+      "itinerary_match_status": "matched_sailing_list",
+      "scheduled_terminal_code": "D",
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-26T06:00:00",
+      "departure_datetime_local": "2026-11-26T18:00:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98324",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 720
+    },
+    {
+      "dock_request_number": "98249",
+      "ship_name": "Carnival Magic",
+      "arrival_date": "2026-11-28",
+      "arrival_time_local": "05:45",
+      "departure_date": "2026-11-28",
+      "departure_time_local": "15:30",
+      "source_pdf_page": 28,
+      "terminal_code": "F",
+      "passenger_capacity": 3690,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "F",
+          "berth_position": "10.25-E",
+          "berthing_side_code": "SST",
+          "berth_arrival_local": "2026-11-28T05:45:00",
+          "berth_departure_local": "2026-11-28T15:30:00",
+          "raw_label": "F (10.25-E) SST 11/28/26"
+        }
+      ],
+      "cruise_line": "Carnival Cruise Line",
+      "voyage_options": [
+        {
+          "duration_nights": 8,
+          "itinerary_name": "8-Night Eastern Caribbean",
+          "destinations": [
+            "Half Moon Cay (Bahamas)",
+            "San Juan (Puerto Rico)",
+            "Philipsburg (St. Maarten)",
+            "St. Thomas (U.S. Virgin Islands)"
+          ],
+          "end_date": "2026-12-06",
+          "returns_to_miami": true,
+          "ends_in": null,
+          "scheduled_return_date": "2026-12-06"
+        }
+      ],
+      "itinerary_match_status": "matched_sailing_list",
+      "scheduled_terminal_code": "F",
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-28T05:45:00",
+      "departure_datetime_local": "2026-11-28T15:30:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98249",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 585
+    },
+    {
+      "dock_request_number": "98318",
+      "ship_name": "Zuiderdam",
+      "arrival_date": "2026-11-28",
+      "arrival_time_local": "06:00",
+      "departure_date": "2026-11-28",
+      "departure_time_local": "17:00",
+      "source_pdf_page": 26,
+      "terminal_code": "D",
+      "passenger_capacity": 1990,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "D",
+          "berth_position": "37.75-W",
+          "berthing_side_code": "SST",
+          "berth_arrival_local": "2026-11-28T06:00:00",
+          "berth_departure_local": "2026-11-28T17:00:00",
+          "raw_label": "D (37.75-W) SST 11/28/26"
+        }
+      ],
+      "cruise_line": "Holland America Line",
+      "voyage_options": [
+        {
+          "duration_nights": 7,
+          "itinerary_name": "7-Night Eastern Caribbean",
+          "destinations": [
+            "Half Moon Cay (Bahamas)",
+            "Amber Cove (Dominican Republic)",
+            "Grand Turk (Turks and Caicos)",
+            "Nassau (Bahamas)"
+          ],
+          "end_date": "2026-12-05",
+          "returns_to_miami": true,
+          "ends_in": null,
+          "scheduled_return_date": "2026-12-05"
+        },
+        {
+          "duration_nights": 14,
+          "itinerary_name": "14-Night Eastern Caribbean",
+          "destinations": [
+            "Half Moon Cay (Bahamas)",
+            "Amber Cove (Dominican Republic)",
+            "Grand Turk (Turks and Caicos)",
+            "Nassau (Bahamas)",
+            "Grand Turk (Turks and Caicos)",
+            "San Juan (Puerto Rico)",
+            "St. Thomas (U.S. Virgin Islands)",
+            "Half Moon Cay (Bahamas)"
+          ],
+          "end_date": "2026-12-12",
+          "returns_to_miami": true,
+          "ends_in": null,
+          "scheduled_return_date": "2026-12-12"
+        }
+      ],
+      "itinerary_match_status": "matched_sailing_list",
+      "scheduled_terminal_code": "D",
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-28T06:00:00",
+      "departure_datetime_local": "2026-11-28T17:00:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98318",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 660
+    },
+    {
+      "dock_request_number": "98272",
+      "ship_name": "Carnival Celebration",
+      "arrival_date": "2026-11-29",
+      "arrival_time_local": "05:30",
+      "departure_date": "2026-11-29",
+      "departure_time_local": "15:30",
+      "source_pdf_page": 28,
+      "terminal_code": "F",
+      "passenger_capacity": 5360,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "F",
+          "berth_position": "9.5-E",
+          "berthing_side_code": "SST",
+          "berth_arrival_local": "2026-11-29T05:30:00",
+          "berth_departure_local": "2026-11-29T15:30:00",
+          "raw_label": "F (9.5-E) SST 11/29/26"
+        }
+      ],
+      "cruise_line": "Carnival Cruise Line",
+      "voyage_options": [
+        {
+          "duration_nights": 7,
+          "itinerary_name": "7-Night Western Caribbean",
+          "destinations": [
+            "Roatan (Honduras)",
+            "Cozumel (Mexico)",
+            "Celebration Key (Bahamas)"
+          ],
+          "end_date": "2026-12-06",
+          "returns_to_miami": true,
+          "ends_in": null,
+          "scheduled_return_date": "2026-12-06"
+        }
+      ],
+      "itinerary_match_status": "matched_sailing_list",
+      "scheduled_terminal_code": "F",
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-29T05:30:00",
+      "departure_datetime_local": "2026-11-29T15:30:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98272",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 600
+    },
+    {
+      "dock_request_number": "98265",
+      "ship_name": "Carnival Horizon",
+      "arrival_date": "2026-11-29",
+      "arrival_time_local": "06:00",
+      "departure_date": "2026-11-29",
+      "departure_time_local": "15:30",
+      "source_pdf_page": 24,
+      "terminal_code": "D",
+      "passenger_capacity": 3960,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "D",
+          "berth_position": "36.75-W",
+          "berthing_side_code": "SST",
+          "berth_arrival_local": "2026-11-29T06:00:00",
+          "berth_departure_local": "2026-11-29T15:30:00",
+          "raw_label": "D (36.75-W) SST 11/29/26"
+        }
+      ],
+      "cruise_line": "Carnival Cruise Line",
+      "voyage_options": [
+        {
+          "duration_nights": 6,
+          "itinerary_name": "6-Night Western Caribbean",
+          "destinations": [
+            "Celebration Key (Bahamas)",
+            "Ocho Rios (Jamaica)",
+            "Georgetown (Grand Cayman, Cayman Islands)"
+          ],
+          "end_date": "2026-12-05",
+          "returns_to_miami": true,
+          "ends_in": null,
+          "scheduled_return_date": "2026-12-05"
+        }
+      ],
+      "itinerary_match_status": "matched_sailing_list",
+      "scheduled_terminal_code": "D",
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-29T06:00:00",
+      "departure_datetime_local": "2026-11-29T15:30:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98265",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 570
+    },
+    {
+      "dock_request_number": "98255",
+      "ship_name": "Carnival Sunrise",
+      "arrival_date": "2026-11-29",
+      "arrival_time_local": "08:00",
+      "departure_date": "2026-11-29",
+      "departure_time_local": "15:30",
+      "source_pdf_page": 19,
+      "terminal_code": "E",
+      "passenger_capacity": 2980,
+      "passenger_capacity_source": "Carnival Corporation fleet report, 2026-05-31",
+      "berth_movements": [
+        {
+          "terminal_code": "E",
+          "berth_position": "27.5-E",
+          "berthing_side_code": "SST",
+          "berth_arrival_local": "2026-11-29T08:00:00",
+          "berth_departure_local": "2026-11-29T15:30:00",
+          "raw_label": "E (27.5-E) SST 11/29/26"
+        }
+      ],
+      "cruise_line": "Carnival Cruise Line",
+      "voyage_options": [
+        {
+          "duration_nights": 4,
+          "itinerary_name": "4-Night Bahamas",
+          "destinations": [
+            "Half Moon Cay (Bahamas)",
+            "Celebration Key (Bahamas)"
+          ],
+          "end_date": "2026-12-03",
+          "returns_to_miami": true,
+          "ends_in": null,
+          "scheduled_return_date": "2026-12-03"
+        }
+      ],
+      "itinerary_match_status": "matched_sailing_list",
+      "scheduled_terminal_code": "E",
+      "terminal_assignment_source": "PortMiami November 2026 Dock Report",
+      "arrival_datetime_local": "2026-11-29T08:00:00",
+      "departure_datetime_local": "2026-11-29T15:30:00",
+      "timezone": "America/New_York",
+      "actual_passengers": null,
+      "id": "PMIA-DOCK-98255",
+      "notes": [
+        "Inbound/outbound are reported dock times, not verified AIS timestamps.",
+        "Passenger capacity is published ship capacity, not passengers actually onboard."
+      ],
+      "reported_port_stay_minutes": 450
+    }
+  ]
+}

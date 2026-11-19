@@ -1,0 +1,714 @@
+{
+  "generated": "2026-11-19",
+  "inputs": {
+    "dock_report": "data/cruise/source/portmiami_november_2026_dock_enriched_all.json",
+    "research_records": 41
+  },
+  "before": {
+    "capacity_source": "User-provided Carnival Corporation fleet report (2026-05-31) via existing cruise JSON",
+    "modelled_calls": 29,
+    "modelled_vessels": 8,
+    "nov22": {
+      "calls": 10,
+      "modelled": 3
+    }
+  },
+  "after": {
+    "total_calls": 149,
+    "unique_vessels": 41,
+    "modelled_calls": 109,
+    "modelled_vessels": 27,
+    "calls_by_status": {
+      "VALIDATED": 109,
+      "NOT_YET_SOURCED": 3,
+      "DEFINITION_NOT_COMPARABLE": 37,
+      "CONFLICT": 0,
+      "UNMATCHED_VESSEL": 0
+    },
+    "vessels_by_status": {
+      "VALIDATED": 27,
+      "NOT_YET_SOURCED": 2,
+      "DEFINITION_NOT_COMPARABLE": 12,
+      "CONFLICT": 0,
+      "UNMATCHED_VESSEL": 0
+    },
+    "unresolved_vessels": [
+      {
+        "ship_name": "Scarlet Lady",
+        "vessel_id": "imo-9804801",
+        "status": "DEFINITION_NOT_COMPARABLE",
+        "published_capacity": 2770,
+        "capacity_type": "unspecified",
+        "calls_affected": 7,
+        "call_ids": [
+          "PMIA-DOCK-98194",
+          "PMIA-DOCK-98195",
+          "PMIA-DOCK-98196",
+          "PMIA-DOCK-99424",
+          "PMIA-DOCK-98197",
+          "PMIA-DOCK-98198",
+          "PMIA-DOCK-98199"
+        ]
+      },
+      {
+        "ship_name": "Resilient Lady",
+        "vessel_id": "imo-9805348",
+        "status": "DEFINITION_NOT_COMPARABLE",
+        "published_capacity": 2770,
+        "capacity_type": "unspecified",
+        "calls_affected": 5,
+        "call_ids": [
+          "PMIA-DOCK-98200",
+          "PMIA-DOCK-98201",
+          "PMIA-DOCK-98202",
+          "PMIA-DOCK-98203",
+          "PMIA-DOCK-98204"
+        ]
+      },
+      {
+        "ship_name": "MSC WORLD AMERICA",
+        "vessel_id": "imo-9837432",
+        "status": "DEFINITION_NOT_COMPARABLE",
+        "published_capacity": 6762,
+        "capacity_type": "maximum",
+        "calls_affected": 4,
+        "call_ids": [
+          "PMIA-DOCK-98219",
+          "PMIA-DOCK-98220",
+          "PMIA-DOCK-98221",
+          "PMIA-DOCK-98222"
+        ]
+      },
+      {
+        "ship_name": "Celebrity Xcel",
+        "vessel_id": "imo-9884136",
+        "status": "DEFINITION_NOT_COMPARABLE",
+        "published_capacity": 3260,
+        "capacity_type": "unspecified",
+        "calls_affected": 4,
+        "call_ids": [
+          "PMIA-DOCK-98190",
+          "PMIA-DOCK-98191",
+          "PMIA-DOCK-98192",
+          "PMIA-DOCK-98193"
+        ]
+      },
+      {
+        "ship_name": "Ilma",
+        "vessel_id": "imo-9967586",
+        "status": "DEFINITION_NOT_COMPARABLE",
+        "published_capacity": 448,
+        "capacity_type": "maximum",
+        "calls_affected": 4,
+        "call_ids": [
+          "PMIA-DOCK-98360",
+          "PMIA-DOCK-98363",
+          "PMIA-DOCK-98361",
+          "PMIA-DOCK-98362"
+        ]
+      },
+      {
+        "ship_name": "Silver Shadow",
+        "vessel_id": "imo-9192167",
+        "status": "DEFINITION_NOT_COMPARABLE",
+        "published_capacity": 392,
+        "capacity_type": "unspecified",
+        "calls_affected": 3,
+        "call_ids": [
+          "PMIA-DOCK-98366",
+          "PMIA-DOCK-98367",
+          "PMIA-DOCK-98368"
+        ]
+      },
+      {
+        "ship_name": "Explora Iii",
+        "vessel_id": "imo-9869899",
+        "status": "NOT_YET_SOURCED",
+        "published_capacity": null,
+        "capacity_type": "unspecified",
+        "calls_affected": 2,
+        "call_ids": [
+          "PMIA-DOCK-99282",
+          "PMIA-DOCK-99283"
+        ]
+      },
+      {
+        "ship_name": "Oceania Vista",
+        "vessel_id": "imo-9876957",
+        "status": "DEFINITION_NOT_COMPARABLE",
+        "published_capacity": 1200,
+        "capacity_type": "unspecified",
+        "calls_affected": 2,
+        "call_ids": [
+          "PMIA-DOCK-98356",
+          "PMIA-DOCK-98357"
+        ]
+      },
+      {
+        "ship_name": "Brilliant Lady",
+        "vessel_id": "imo-9870654",
+        "status": "DEFINITION_NOT_COMPARABLE",
+        "published_capacity": 2770,
+        "capacity_type": "unspecified",
+        "calls_affected": 2,
+        "call_ids": [
+          "PMIA-DOCK-98205",
+          "PMIA-DOCK-98206"
+        ]
+      },
+      {
+        "ship_name": "Seven Seas Grandeur",
+        "vessel_id": "imo-9877444",
+        "status": "DEFINITION_NOT_COMPARABLE",
+        "published_capacity": 746,
+        "capacity_type": "unspecified",
+        "calls_affected": 2,
+        "call_ids": [
+          "PMIA-DOCK-98353",
+          "PMIA-DOCK-98354"
+        ]
+      },
+      {
+        "ship_name": "Emerald Sakara",
+        "vessel_id": "imo-9948827",
+        "status": "DEFINITION_NOT_COMPARABLE",
+        "published_capacity": 100,
+        "capacity_type": "unspecified",
+        "calls_affected": 2,
+        "call_ids": [
+          "PMIA-DOCK-98364",
+          "PMIA-DOCK-98365"
+        ]
+      },
+      {
+        "ship_name": "Regent Mariner",
+        "vessel_id": "name-regent-mariner",
+        "status": "NOT_YET_SOURCED",
+        "published_capacity": null,
+        "capacity_type": null,
+        "calls_affected": 1,
+        "call_ids": [
+          "PMIA-DOCK-98352"
+        ]
+      },
+      {
+        "ship_name": "Seven Seas Splendor",
+        "vessel_id": "imo-9807085",
+        "status": "DEFINITION_NOT_COMPARABLE",
+        "published_capacity": 746,
+        "capacity_type": "unspecified",
+        "calls_affected": 1,
+        "call_ids": [
+          "PMIA-DOCK-98355"
+        ]
+      },
+      {
+        "ship_name": "Oceania Insignia",
+        "vessel_id": "imo-9156462",
+        "status": "DEFINITION_NOT_COMPARABLE",
+        "published_capacity": 670,
+        "capacity_type": "unspecified",
+        "calls_affected": 1,
+        "call_ids": [
+          "PMIA-DOCK-98358"
+        ]
+      }
+    ],
+    "conflicts": [],
+    "by_arrival_date": {
+      "2026-11-01": {
+        "calls": 8,
+        "modelled": 7
+      },
+      "2026-11-02": {
+        "calls": 3,
+        "modelled": 3
+      },
+      "2026-11-03": {
+        "calls": 2,
+        "modelled": 2
+      },
+      "2026-11-05": {
+        "calls": 4,
+        "modelled": 3
+      },
+      "2026-11-06": {
+        "calls": 4,
+        "modelled": 4
+      },
+      "2026-11-07": {
+        "calls": 7,
+        "modelled": 5
+      },
+      "2026-11-08": {
+        "calls": 8,
+        "modelled": 5
+      },
+      "2026-11-09": {
+        "calls": 6,
+        "modelled": 3
+      },
+      "2026-11-11": {
+        "calls": 5,
+        "modelled": 4
+      },
+      "2026-11-13": {
+        "calls": 6,
+        "modelled": 5
+      },
+      "2026-11-14": {
+        "calls": 6,
+        "modelled": 4
+      },
+      "2026-11-15": {
+        "calls": 10,
+        "modelled": 7
+      },
+      "2026-11-16": {
+        "calls": 6,
+        "modelled": 4
+      },
+      "2026-11-17": {
+        "calls": 2,
+        "modelled": 2
+      },
+      "2026-11-18": {
+        "calls": 3,
+        "modelled": 1
+      },
+      "2026-11-19": {
+        "calls": 4,
+        "modelled": 3
+      },
+      "2026-11-20": {
+        "calls": 6,
+        "modelled": 5
+      },
+      "2026-11-21": {
+        "calls": 7,
+        "modelled": 5
+      },
+      "2026-11-22": {
+        "calls": 10,
+        "modelled": 7
+      },
+      "2026-11-23": {
+        "calls": 7,
+        "modelled": 6
+      },
+      "2026-11-24": {
+        "calls": 1,
+        "modelled": 0
+      },
+      "2026-11-25": {
+        "calls": 3,
+        "modelled": 1
+      },
+      "2026-11-26": {
+        "calls": 1,
+        "modelled": 1
+      },
+      "2026-11-27": {
+        "calls": 4,
+        "modelled": 4
+      },
+      "2026-11-28": {
+        "calls": 10,
+        "modelled": 6
+      },
+      "2026-11-29": {
+        "calls": 10,
+        "modelled": 8
+      },
+      "2026-11-30": {
+        "calls": 6,
+        "modelled": 4
+      }
+    },
+    "nov22": {
+      "calls": 10,
+      "modelled": 7,
+      "modelled_ships": [
+        "Allure Of The Seas",
+        "Norwegian Aqua",
+        "Carnival Magic",
+        "Carnival Celebration",
+        "Seabourn Quest",
+        "Independence Of The Seas",
+        "MSC POESIA"
+      ]
+    }
+  },
+  "unmatched_ship_names": [],
+  "newly_enriched": [
+    {
+      "ship": "Adventure of the Seas",
+      "imo": "9167227",
+      "capacity": 3114,
+      "capacity_type": "double_occupancy",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.royalcaribbeanpresscenter.com/fact_sheets/1737474287_RCC-0367-Ship-Fact-Sheet-ADVENTURE.pdf"
+    },
+    {
+      "ship": "AIDAdiva",
+      "imo": "9334856",
+      "capacity": 2050,
+      "capacity_type": "double_occupancy",
+      "status": "VERIFIED_SECONDARY",
+      "source": "https://cruisedig.com/cruise-lines/aida-cruises"
+    },
+    {
+      "ship": "Allure of the Seas",
+      "imo": "9383948",
+      "capacity": 5718,
+      "capacity_type": "double_occupancy",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.royalcaribbeanpresscenter.com/fact_sheets/1765910231_ALLURE-Fact-Sheet.pdf"
+    },
+    {
+      "ship": "Brilliant Lady",
+      "imo": "9870654",
+      "capacity": 2770,
+      "capacity_type": "unspecified",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.virginvoyages.com/dam/jcr%3A059a20a4-67b6-49e4-9c3b-7198d4f76b1d/Virgin%2520Voyages%2520Full%2520Fact%2520Sheet.pdf"
+    },
+    {
+      "ship": "Carnival Conquest",
+      "imo": "9198355",
+      "capacity": 2980,
+      "capacity_type": "lower_berth",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.carnivalcorp.com/wp-content/uploads/2026/06/Ships-in-our-Fleet-as-of-May-31-2026.pdf"
+    },
+    {
+      "ship": "Celebrity Beyond",
+      "imo": "9838395",
+      "capacity": 3260,
+      "capacity_type": "double_occupancy",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.celebritycruises.com/cruise-ships/celebrity-beyond"
+    },
+    {
+      "ship": "Celebrity Xcel",
+      "imo": "9884136",
+      "capacity": 3260,
+      "capacity_type": "unspecified",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.rclinvestor.com/financial-info/key-statistics"
+    },
+    {
+      "ship": "Emerald Sakara",
+      "imo": "9948827",
+      "capacity": 100,
+      "capacity_type": "unspecified",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://emerald.cruises/US/en-US/yacht/yacht-cruising-experience/yacht-experience/our-yachts"
+    },
+    {
+      "ship": "EXPLORA I",
+      "imo": "9869875",
+      "capacity": 922,
+      "capacity_type": "double_occupancy",
+      "status": "VERIFIED_SECONDARY",
+      "source": "https://www.imaginecruising.com.au/?p=247766"
+    },
+    {
+      "ship": "Freedom of the Seas",
+      "imo": "9304033",
+      "capacity": 3926,
+      "capacity_type": "double_occupancy",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.royalcaribbeanpresscenter.com/fact_sheets/1766505670_FREEDOM-Fact-Sheet.pdf"
+    },
+    {
+      "ship": "Icon of the Seas",
+      "imo": "9829930",
+      "capacity": 5610,
+      "capacity_type": "double_occupancy",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.royalcaribbeanpresscenter.com/fact_sheets/Icon_of_the_Seas_Fact_Sheet.pdf"
+    },
+    {
+      "ship": "Ilma",
+      "imo": "9967586",
+      "capacity": 448,
+      "capacity_type": "maximum",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://cdn.ritzcarltonyachtcollection.com/2024-09/The%20Ritz-Carlton%20Yacht%20Collection%20Launches%20Ilma_FINAL.pdf?VersionId=eTTaS3OOG23T9b_CQH4tZsMjK102WcCH"
+    },
+    {
+      "ship": "Independence of the Seas",
+      "imo": "9349681",
+      "capacity": 3858,
+      "capacity_type": "double_occupancy",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.royalcaribbean.com/guides/ships-by-age"
+    },
+    {
+      "ship": "Insignia",
+      "imo": "9156462",
+      "capacity": 670,
+      "capacity_type": "unspecified",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.nclhltd.com/news-media/press-releases/detail/626"
+    },
+    {
+      "ship": "MSC Grandiosa",
+      "imo": "9803613",
+      "capacity": 4842,
+      "capacity_type": "lower_berth",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://mscpressarea.com/press-releases/2365/"
+    },
+    {
+      "ship": "MSC Meraviglia",
+      "imo": "9760512",
+      "capacity": 4488,
+      "capacity_type": "double_occupancy",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.mscpressarea.com/en_US/press-releases/1452"
+    },
+    {
+      "ship": "MSC Poesia",
+      "imo": "9387073",
+      "capacity": 2550,
+      "capacity_type": "double_occupancy",
+      "status": "VERIFIED_SECONDARY",
+      "source": "https://cruisespotlight.com/ship/msc/poesia"
+    },
+    {
+      "ship": "MSC Seaside",
+      "imo": "9745366",
+      "capacity": 4140,
+      "capacity_type": "double_occupancy",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.mscpressarea.com/en_US/press-releases/644/"
+    },
+    {
+      "ship": "MSC World America",
+      "imo": "9837432",
+      "capacity": 6762,
+      "capacity_type": "maximum",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.mscpressarea.com/en_US/press-releases/msc-cruises-takes-delivery-of-msc-world-america-celebrates-additional-world-class/"
+    },
+    {
+      "ship": "Norwegian Aqua",
+      "imo": "9824007",
+      "capacity": 3565,
+      "capacity_type": "double_occupancy",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.ncl.com/cruise-ships/norwegian-aqua"
+    },
+    {
+      "ship": "Norwegian Jewel",
+      "imo": "9304045",
+      "capacity": 2368,
+      "capacity_type": "double_occupancy",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.ncl.com/cruise-ships/norwegian-jewel"
+    },
+    {
+      "ship": "Norwegian Joy",
+      "imo": "9703796",
+      "capacity": 3776,
+      "capacity_type": "double_occupancy",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.ncl.com/cruise-ships/norwegian-joy"
+    },
+    {
+      "ship": "Norwegian Luna",
+      "imo": "9824019",
+      "capacity": 3565,
+      "capacity_type": "double_occupancy",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.ncl.com/cruise-ships/norwegian-luna"
+    },
+    {
+      "ship": "Norwegian Sun",
+      "imo": "9218131",
+      "capacity": 1878,
+      "capacity_type": "double_occupancy",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.ncl.com/cruise-ships/norwegian-sun"
+    },
+    {
+      "ship": "Resilient Lady",
+      "imo": "9805348",
+      "capacity": 2770,
+      "capacity_type": "unspecified",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.virginvoyages.com/dam/jcr%3A059a20a4-67b6-49e4-9c3b-7198d4f76b1d/Virgin%2520Voyages%2520Full%2520Fact%2520Sheet.pdf"
+    },
+    {
+      "ship": "Scarlet Lady",
+      "imo": "9804801",
+      "capacity": 2770,
+      "capacity_type": "unspecified",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.virginvoyages.com/dam/jcr%3A059a20a4-67b6-49e4-9c3b-7198d4f76b1d/Virgin%2520Voyages%2520Full%2520Fact%2520Sheet.pdf"
+    },
+    {
+      "ship": "Seven Seas Grandeur",
+      "imo": "9877444",
+      "capacity": 746,
+      "capacity_type": "unspecified",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.nclhltd.com/news-media/press-releases/detail/576/regent-takes-delivery-of-the-highly-anticipated-seven-seas"
+    },
+    {
+      "ship": "Seven Seas Splendor",
+      "imo": "9807085",
+      "capacity": 746,
+      "capacity_type": "unspecified",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.nclhltd.com/news-media/press-releases/detail/710/regent-seven-seas-cruises-unveils-133-night-2028-world"
+    },
+    {
+      "ship": "Silver Shadow",
+      "imo": "9192167",
+      "capacity": 392,
+      "capacity_type": "unspecified",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.silversea.com/ships/silver-shadow.html"
+    },
+    {
+      "ship": "Vista",
+      "imo": "9876957",
+      "capacity": 1200,
+      "capacity_type": "unspecified",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.nclhltd.com/news-media/press-releases/detail/544"
+    },
+    {
+      "ship": "Wonder of the Seas",
+      "imo": "9838345",
+      "capacity": 5734,
+      "capacity_type": "double_occupancy",
+      "status": "VERIFIED_OFFICIAL",
+      "source": "https://www.royalcaribbeanpresscenter.com/fact_sheets/1765910837_WONDER-Fact-Sheet.pdf"
+    }
+  ],
+  "review_queue": [
+    {
+      "ship": "AIDAdiva",
+      "status": "VERIFIED_SECONDARY",
+      "capacity": 2050,
+      "capacity_type": "double_occupancy",
+      "notes": "The official AIDA pages (aida.de ship page, fleet FAQ, press PDFs) and Meyer Werft's delivery release all returned 403/404 to automated fetches, so no official figure was read. A search snippet suggests Meyer Werft's 2007 delivery release lists 2,050 passengers, but this was not verified. The quote is a cell-by-cell transcription of a table row joined with ' | ', not a continuous verbatim sentence; only the berths note is verbatim. AIDA's 23 Mar 2025 press release on the AIDA Evolution refit (via presseportal.de) says some cabins went from 3- to 4-person occupancy, which changes the maximum but not double occupancy. It states no guest total. Crew figures vary (587 to 646)."
+    },
+    {
+      "ship": "Brilliant Lady",
+      "status": "VERIFIED_OFFICIAL",
+      "capacity": 2770,
+      "capacity_type": "unspecified",
+      "notes": "The fact sheet lists Brilliant Lady in the fleet ('Virgin Voyages' fleet includes Scarlet Lady, Valiant Lady, Resilient Lady and Brilliant Lady') and gives a single fleet-wide capacity with no stated definition. The fact sheet has no date. VesselFinder: IMO 9870654, MMSI 311001167, Bahamas flag, GT 108,232."
+    },
+    {
+      "ship": "Celebrity Xcel",
+      "status": "VERIFIED_OFFICIAL",
+      "capacity": 3260,
+      "capacity_type": "unspecified",
+      "notes": "celebritycruises.com/cruise-ships/celebrity-xcel redirects to a /xcel landing page with no capacity figure. The Celebrity press-center fact sheet (royalcaribbeangrouppresscenter.com/celebritycruises/fact-sheet/celebrity-xcel) is a JS app; its content API was not fetched. The investor table labels the figure 'Estimated Capacity' with no definition on the page (RCL's 10-K defines berths at double occupancy, but I did not fetch the 10-K), hence 'unspecified'. Same value 3,260 as sister ships Beyond/Ascent on official pages. Search snippets mentioned 3,248 (Costco Travel), 3,250 and 3,276 (secondary sites); not opened, not recorded. IMO 9884136 per Wikipedia infobox and VesselFinder/MarineLink search results; one comparison site listed 9916913, which I treat as an error."
+    },
+    {
+      "ship": "Emerald Sakara",
+      "status": "VERIFIED_OFFICIAL",
+      "capacity": 100,
+      "capacity_type": "unspecified",
+      "notes": "Official page sentence describes Emerald Sakara (sister to Emerald Azzurra, launched 2023) as 'Hosting just 100 guests'. Search snippets (not fetched) from Baird Maritime say 100 passengers in 50 cabins, consistent with double occupancy. Emerald's own pages give conflicting crew counts (64 vs 76) - irrelevant to passengers. IMO: VesselFinder shows EMERALD SAKARA, IMO 9948827, MMSI 311001261, built 2023; secondary sites listing 9770000 or 9870881 conflict and were not used."
+    },
+    {
+      "ship": "EXPLORA I",
+      "status": "VERIFIED_SECONDARY",
+      "capacity": 922,
+      "capacity_type": "double_occupancy",
+      "notes": "No official guest count was found. Explora's official Ship Guide PDF (January 2026, hosted at bute.co.jp: https://www.bute.co.jp/wp/wp-content/uploads/2026/06/EXPLORA1_ship-guide.pdf) gives 'NUMBER OF SUITES 461' and GT 63,900 but no guest total. 922 = 2 x 461 suites, consistent with double occupancy. The Explora and Fincantieri delivery releases (20 Jul 2023) give no guest count. cruiseline.co.uk says 'Carrying up to 922 guests'. Crew figures vary between sources (640 and 700)."
+    },
+    {
+      "ship": "EXPLORA III",
+      "status": "UNRESOLVED",
+      "capacity": null,
+      "capacity_type": "unspecified",
+      "notes": "Official sources (the Explora delivery release of 23 Jul 2026, the Fincantieri delivery release, and Jan 2026 trade coverage of Explora's announcement) give no number. They say only 'similar'/'the same' number of guests as Explora I/II, with 463 suites (2 more than Explora I). Secondary figures disagree and look copied from Explora I: cruiseline.co.uk says 922 'guests', and cruisingjournal.com says 'Passengers 1,473' next to Explora I's 63,900 GT, which is wrong for this ship. 463 x 2 would be 926, but that is a calculation, not a published figure, so it was not used. IMO 9869899 (MMSI 248098000, call sign 9HA6513, Malta, built 2026) comes from MaritimeOptima, which shows the name as 'EXPLORA 3'. MagicPort and MarineLink, seen only in search results, agree. Cruise Ship Tracking lists a conflicting IMO, 9939815. The IMO check digit is valid. It is worth confirming in Equasis or GISIS."
+    },
+    {
+      "ship": "Ilma",
+      "status": "VERIFIED_OFFICIAL",
+      "capacity": 448,
+      "capacity_type": "maximum",
+      "notes": "Official press release (Fort Lauderdale, September 3, 2024) also says 'offering 224 airy and intuitive suites', so 448 = 2 per suite (effectively double occupancy), but the source words it as 'up to', so typed as maximum. The yacht page on ritzcarltonyachtcollection.com did not render for fetching. IMO: VesselFinder shows ILMA, IMO 9967586, MMSI 256343000, built 2024 (also CruiseMapper/CruiseDig per search)."
+    },
+    {
+      "ship": "Insignia",
+      "status": "VERIFIED_OFFICIAL",
+      "capacity": 670,
+      "capacity_type": "unspecified",
+      "notes": "684 was Oceania's own older figure (OceaniaNEXT releases around 2018, seen only in search snippets). The 2024 official release says 670, and a search snippet (not fetched) says oceaniacruises.com lists 670 at double occupancy. oceaniacruises.com returned 403, so the basis is unconfirmed and left unspecified. Wikipedia: 698 lower berths / 824 all berths. Cruise Industry News (2026-11-16): sold to Phoenix Reisen in October 2026, Oceania farewell cruise 2 September 2027, then becomes 'Alvara'. It is still an Oceania ship on the verification date. Do not confuse it with any later ship named Insignia."
+    },
+    {
+      "ship": "MSC Poesia",
+      "status": "VERIFIED_SECONDARY",
+      "capacity": 2550,
+      "capacity_type": "double_occupancy",
+      "notes": "No official double-occupancy figure was found. The MSC Israel official site lists 'Number of passengers: 3223' and 'Numbers of cabins: 1,223' (GT 92,627, crew about 1,039), with no definition. 2,550 is the widely repeated as-built double-occupancy figure (1,275 cabins x 2). CAUTION: MSC Poesia was refurbished in spring 2026 and gained an MSC Yacht Club (MSC press photo story, 15 Apr 2026, which gives no capacity). The official site's 1,223 cabin count suggests the current double-occupancy figure may be lower than 2,550, so treat 2,550 as possibly out of date. The MSC press area had no capacity figure for Poesia. Note the IMO is 9387073, not 9387085."
+    },
+    {
+      "ship": "MSC World America",
+      "status": "VERIFIED_OFFICIAL",
+      "capacity": 6762,
+      "capacity_type": "maximum",
+      "notes": "The official figure is not labelled, but it is effectively an all-berths or maximum count: the same release gives 2,614 cabins, and 2 x 2,614 = 5,228, which is below 6,762. Do NOT treat 6,762 as double occupancy. No official double-occupancy figure was found. Search-engine snippets (pages not fetched, so not verified) attributed secondary double-occupancy values of 5,240 (cruiseable.com), 5,264 (travelvient.com) and 5,252 (cruisetimetables.com, pre-launch); these disagree. Crew 2,138 and GT 216,638 are in the same release. Note: cruisedeck.de tags an MSC World Asia gallery with 'imo-9837432', but VesselFinder lists 9837432 as MSC WORLD AMERICA (2025, 216,638 GT, MMSI 249193000), and MSC World Asia is listed elsewhere as 9901556."
+    },
+    {
+      "ship": "Regent Mariner",
+      "status": "UNRESOLVED",
+      "capacity": null,
+      "capacity_type": null,
+      "notes": "IDENTITY NOT CONFIRMED. 'Regent Mariner' is not an official or former ship name. Research suggests Seven Seas Mariner (IMO 9210139, Regent Seven Seas; 700 guests, definition not stated, NCLH press release 2026-03-25) with medium-high confidence, but the match rests on a similar name only. Confirm with the Dock Report's IMO or call sign before linking."
+    },
+    {
+      "ship": "Resilient Lady",
+      "status": "VERIFIED_OFFICIAL",
+      "capacity": 2770,
+      "capacity_type": "unspecified",
+      "notes": "Checked by reading the fact sheet PDF directly. 'Sailors' is not defined as double occupancy or maximum; the sentence says only 'can host', so the type is recorded as unspecified. The figure is fleet-wide. The fact sheet gives 1,330 cabins + 78 RockStar Quarters for Valiant, Resilient and Brilliant Lady. 2 x 1,408 = 2,816, which does not equal 2,770, so the figure's basis cannot be worked out from the cabin count. The fact sheet has no date (circa 2025). VesselFinder gives build year 2022 and GT 108,232."
+    },
+    {
+      "ship": "Scarlet Lady",
+      "status": "VERIFIED_OFFICIAL",
+      "capacity": 2770,
+      "capacity_type": "unspecified",
+      "notes": "The fact sheet gives one fleet-wide figure ('Our ships'), not a figure per ship, and does not say whether it is double occupancy or maximum. The fact sheet has no date (its content refers to Brilliant Lady's Sept 2025 debut and to summer/fall 2025 deployments). The same fact sheet says that after her refit Scarlet Lady has 1,290 cabins plus 102 RockStar Quarters (1,392 in total), against 1,330 + 78 (1,408) on her sisters, so her real capacity may differ slightly from the fleet-wide 2,770. Do not confuse this ship with the bulk carrier SCARLET LADY, IMO 9225043."
+    },
+    {
+      "ship": "Seven Seas Grandeur",
+      "status": "VERIFIED_OFFICIAL",
+      "capacity": 746,
+      "capacity_type": "unspecified",
+      "notes": "rssc.com ship pages returned HTTP 403 to the fetcher. A pre-delivery figure of 750 guests appeared in search snippets (Cruise Industry News naming article), but that page was not fetched and the figure is superseded by the delivery release. VesselFinder: IMO 9877444, MMSI 538010706, built 2023, Marshall Islands flag. One cruiseshiptracking.com page reportedly shows IMO 9811286, which looks like an error (not fetched)."
+    },
+    {
+      "ship": "Seven Seas Splendor",
+      "status": "VERIFIED_OFFICIAL",
+      "capacity": 746,
+      "capacity_type": "unspecified",
+      "notes": "Two official figures from different dates. The delivery release (2020-01-31) says 'caring for 750 guests in 375 beautifully appointed suites'. The later 2025 release says 'no more than 746 guests', so the more recent official 746 is used. The 'no more than' wording reads like a ceiling, but no basis is defined, so the type is left unspecified. The release title is paraphrased from its URL slug. rssc.com returned 403. VesselFinder: IMO 9807085, MMSI 538007673, built 2020."
+    },
+    {
+      "ship": "Silver Shadow",
+      "status": "VERIFIED_OFFICIAL",
+      "capacity": 392,
+      "capacity_type": "unspecified",
+      "notes": "Official page also states 'Built: 2000', 'Last refurbishment: 2019', 'Crew capacity: 302' (crew not used). Search snippets from secondary sites (CruiseMapper, adventure-life 'Max Passengers: 388') show 388, likely the pre-2019-refit figure; not fetched, so not listed in other_values_seen. IMO: VesselFinder shows SILVER SHADOW, IMO 9192167, MMSI 308628000, built 2000; one secondary site (luxurycruiseconnections) lists 9176692, which conflicts and was not used."
+    },
+    {
+      "ship": "Vista",
+      "status": "VERIFIED_OFFICIAL",
+      "capacity": 1200,
+      "capacity_type": "unspecified",
+      "notes": "Official NCLH (parent) press release; it does not define the basis. oceaniacruises.com ship pages returned HTTP 403 to the fetcher and could not be checked. A search snippet attributed '1,200 guests at double occupancy' to Baird Maritime, but that page was not fetched, so the type is left unspecified. VesselFinder: name 'VISTA', IMO 9876957, MMSI 538009952, built 2023, Marshall Islands flag. The NCLH FY2025 10-K lists 'Oceania Vista' built 2023 but gives no per-ship berths. Press releases are classed as official_fact_sheet because the schema has no press-release kind."
+    }
+  ]
+}

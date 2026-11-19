@@ -1,0 +1,51 @@
+{
+  "about": "Reviewer decisions applied by tools/build-cruise-data.mjs on top of data/cruise/vessel-research/*.json. Each decision names the ship, the fields it sets and why. Research records are never edited by hand.",
+  "decisions": [
+    {
+      "dock_report_name": "Carnival Conquest",
+      "set": {
+        "capacity_type": "lower_berth",
+        "capacity_source_url": "https://www.carnivalcorp.com/wp-content/uploads/2026/06/Ships-in-our-Fleet-as-of-May-31-2026.pdf",
+        "capacity_source_title": "Carnival Corporation fleet report, 2026-05-31",
+        "capacity_source_kind": "investor_report",
+        "source_date": "2026-05-31",
+        "quote": "Carnival Conquest 2002 2,980"
+      },
+      "reason": "The same 2,980 appears in Carnival Corporation's fleet report (passenger capacity = lower berths, as for every other Carnival Corporation ship in this dataset). carnival.com's page states the same number without a definition. One consistent definition and source for the brand."
+    },
+    {
+      "dock_report_name": "Carnival Sunrise",
+      "set": {
+        "aliases": [
+          "Carnival Triumph"
+        ]
+      },
+      "reason": "Former name recorded as a plain alias (the research note said 'former name' in the alias text)."
+    },
+    {
+      "dock_report_name": "Regent Mariner",
+      "set": {
+        "canonical_name": "Regent Mariner",
+        "aliases": [],
+        "imo": null,
+        "imo_source_url": null,
+        "passenger_capacity": null,
+        "capacity_type": null,
+        "capacity_source_url": null,
+        "capacity_source_title": null,
+        "capacity_source_kind": null,
+        "quote": null,
+        "status": "UNRESOLVED",
+        "notes": "IDENTITY NOT CONFIRMED. 'Regent Mariner' is not an official or former ship name. Research suggests Seven Seas Mariner (IMO 9210139, Regent Seven Seas; 700 guests, definition not stated, NCLH press release 2026-03-25) with medium-high confidence, but the match rests on a similar name only. Confirm with the Dock Report's IMO or call sign before linking."
+      },
+      "reason": "Matching a Dock Report name to a ship only because the names are similar is not allowed. Kept as an unresolved record with the candidate in the notes until the identity is confirmed."
+    },
+    {
+      "dock_report_name": "MSC WORLD AMERICA",
+      "set": {
+        "capacity_type": "maximum"
+      },
+      "reason": "MSC's only figure (6,762 guests) carries no definition, but the same release gives 2,614 cabins: double occupancy would be 5,228, so 6,762 counts upper berths and is a maximum. Labelled maximum so it is not used as a double-occupancy capacity."
+    }
+  ]
+}

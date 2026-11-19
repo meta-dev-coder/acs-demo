@@ -1,0 +1,283 @@
+[
+  {
+    "dock_report_name": "Norwegian Joy",
+    "canonical_name": "Norwegian Joy",
+    "aliases": [],
+    "imo": "9703796",
+    "imo_source_url": "https://en.wikipedia.org/wiki/Norwegian_Joy",
+    "operator": "Norwegian Cruise Line",
+    "passenger_capacity": 3776,
+    "capacity_type": "double_occupancy",
+    "capacity_source_url": "https://www.ncl.com/cruise-ships/norwegian-joy",
+    "capacity_source_title": "Norwegian Joy ship page, ncl.com (title not captured verbatim)",
+    "capacity_source_kind": "official_fleet_page",
+    "source_date": null,
+    "verified_on": "2026-11-19",
+    "quote": "Guest Capacity (Double Occupancy) 3,776",
+    "other_values_seen": [
+      {
+        "value": 4622,
+        "type": "unspecified",
+        "url": "https://en.wikipedia.org/wiki/Norwegian_Joy"
+      }
+    ],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "ncl.com shows 'Year Refurbished (Built in 2017)' 2024. Quote is the label/value pair as rendered on the page. Wikipedia 'Capacity: 4,622' is undefined (likely maximum); not used."
+  },
+  {
+    "dock_report_name": "Norwegian Jewel",
+    "canonical_name": "Norwegian Jewel",
+    "aliases": [],
+    "imo": "9304045",
+    "imo_source_url": "https://en.wikipedia.org/wiki/Norwegian_Jewel",
+    "operator": "Norwegian Cruise Line",
+    "passenger_capacity": 2368,
+    "capacity_type": "double_occupancy",
+    "capacity_source_url": "https://www.ncl.com/cruise-ships/norwegian-jewel",
+    "capacity_source_title": "Norwegian Jewel ship page, ncl.com (title not captured verbatim)",
+    "capacity_source_kind": "official_fleet_page",
+    "source_date": null,
+    "verified_on": "2026-11-19",
+    "quote": "Guest Capacity (Double Occupancy) 2,368",
+    "other_values_seen": [
+      {
+        "value": 2376,
+        "type": "unspecified",
+        "url": "https://en.wikipedia.org/wiki/Norwegian_Jewel"
+      },
+      {
+        "value": 2394,
+        "type": "unspecified",
+        "url": "https://en.wikipedia.org/wiki/Norwegian_Jewel"
+      }
+    ],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "Built 2005, refurbished 2025 per ncl.com. Wikipedia infobox 2,376 and body text 'later grew to 2,394 passengers' are undefined; the official double-occupancy figure is used."
+  },
+  {
+    "dock_report_name": "Norwegian Aqua",
+    "canonical_name": "Norwegian Aqua",
+    "aliases": [],
+    "imo": "9824007",
+    "imo_source_url": "https://www.vesselfinder.com/vessels/details/9824007",
+    "operator": "Norwegian Cruise Line",
+    "passenger_capacity": 3565,
+    "capacity_type": "double_occupancy",
+    "capacity_source_url": "https://www.ncl.com/cruise-ships/norwegian-aqua",
+    "capacity_source_title": "Norwegian Aqua ship page, ncl.com (title not captured verbatim)",
+    "capacity_source_kind": "official_fleet_page",
+    "source_date": null,
+    "verified_on": "2026-11-19",
+    "quote": "Guest Capacity (Double Occupancy) 3,565",
+    "other_values_seen": [
+      {
+        "value": 3571,
+        "type": "unspecified",
+        "url": "https://en.wikipedia.org/wiki/Norwegian_Aqua"
+      }
+    ],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "Anchor value confirmed on ncl.com (Year Built 2025). VesselFinder: 'IMO 9824007', MMSI 311001559, built 2025; matches the Wikimedia Commons category IMO_9824007 linked from Wikipedia. First Prima Plus ship."
+  },
+  {
+    "dock_report_name": "Norwegian Luna",
+    "canonical_name": "Norwegian Luna",
+    "aliases": [],
+    "imo": "9824019",
+    "imo_source_url": "https://www.vesselfinder.com/vessels/details/9824019",
+    "operator": "Norwegian Cruise Line",
+    "passenger_capacity": 3565,
+    "capacity_type": "double_occupancy",
+    "capacity_source_url": "https://www.ncl.com/cruise-ships/norwegian-luna",
+    "capacity_source_title": "Norwegian Luna ship page, ncl.com (title not captured verbatim)",
+    "capacity_source_kind": "official_fleet_page",
+    "source_date": null,
+    "verified_on": "2026-11-19",
+    "quote": "Guest Capacity (Double Occupancy) 3,565",
+    "other_values_seen": [
+      {
+        "value": 3565,
+        "type": "unspecified",
+        "url": "https://en.wikipedia.org/wiki/Norwegian_Luna"
+      }
+    ],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "Sister of Norwegian Aqua (Prima Plus). ncl.com Year Built 2026. VesselFinder: IMO 9824019, MMSI 311001781, built 2026, in service in the Caribbean. The NCLH FY2025 10-K (filed 2026-03-02) still listed it as 'expected to be delivered in 2026'; Wikipedia cites a Fincantieri delivery release dated 2026-03-05."
+  },
+  {
+    "dock_report_name": "Norwegian Sun",
+    "canonical_name": "Norwegian Sun",
+    "aliases": [],
+    "imo": "9218131",
+    "imo_source_url": "https://en.wikipedia.org/wiki/Norwegian_Sun",
+    "operator": "Norwegian Cruise Line",
+    "passenger_capacity": 1878,
+    "capacity_type": "double_occupancy",
+    "capacity_source_url": "https://www.ncl.com/cruise-ships/norwegian-sun",
+    "capacity_source_title": "Norwegian Sun ship page, ncl.com (title not captured verbatim)",
+    "capacity_source_kind": "official_fleet_page",
+    "source_date": null,
+    "verified_on": "2026-11-19",
+    "quote": "Guest Capacity (Double Occupancy) 1,878",
+    "other_values_seen": [
+      {
+        "value": 1976,
+        "type": "unspecified",
+        "url": "https://en.wikipedia.org/wiki/Norwegian_Sun"
+      },
+      {
+        "value": 2400,
+        "type": "maximum",
+        "url": "https://en.wikipedia.org/wiki/Norwegian_Sun"
+      }
+    ],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "Built 2001, refurbished 2024 per ncl.com. Wikipedia: '1,976 passengers (2,400 maximum)'. The official 1,878 double-occupancy figure is used; the Wikipedia figures are older or differently defined."
+  },
+  {
+    "dock_report_name": "Oceania Vista",
+    "canonical_name": "Vista",
+    "aliases": [
+      "Oceania Vista"
+    ],
+    "imo": "9876957",
+    "imo_source_url": "https://www.vesselfinder.com/vessels/details/9876957",
+    "operator": "Oceania Cruises",
+    "passenger_capacity": 1200,
+    "capacity_type": "unspecified",
+    "capacity_source_url": "https://www.nclhltd.com/news-media/press-releases/detail/544",
+    "capacity_source_title": "Oceania Cruises Takes Delivery of and Announces Leadership Team for Newest Ship Vista",
+    "capacity_source_kind": "official_fact_sheet",
+    "source_date": "2023-05-01",
+    "verified_on": "2026-11-19",
+    "quote": "The 1,200-guest Vista boasts the most spacious standard staterooms at sea",
+    "other_values_seen": [],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "Official NCLH (parent) press release; it does not define the basis. oceaniacruises.com ship pages returned HTTP 403 to the fetcher and could not be checked. A search snippet attributed '1,200 guests at double occupancy' to Baird Maritime, but that page was not fetched, so the type is left unspecified. VesselFinder: name 'VISTA', IMO 9876957, MMSI 538009952, built 2023, Marshall Islands flag. The NCLH FY2025 10-K lists 'Oceania Vista' built 2023 but gives no per-ship berths. Press releases are classed as official_fact_sheet because the schema has no press-release kind."
+  },
+  {
+    "dock_report_name": "Oceania Insignia",
+    "canonical_name": "Insignia",
+    "aliases": [
+      "Oceania Insignia",
+      "R One (1998-2003)",
+      "Columbus 2 (2012-2014)"
+    ],
+    "imo": "9156462",
+    "imo_source_url": "https://en.wikipedia.org/wiki/MS_Insignia",
+    "operator": "Oceania Cruises",
+    "passenger_capacity": 670,
+    "capacity_type": "unspecified",
+    "capacity_source_url": "https://www.nclhltd.com/news-media/press-releases/detail/626",
+    "capacity_source_title": "Oceania Cruises Becomes First Ultra-Premium Line to Sail Out of Tampa",
+    "capacity_source_kind": "official_fact_sheet",
+    "source_date": "2024-08-28",
+    "verified_on": "2026-11-19",
+    "quote": "The stylish and charming Insignia, which accommodates just 670 guests,",
+    "other_values_seen": [
+      {
+        "value": 684,
+        "type": "unspecified",
+        "url": "https://cruiseindustrynews.com/cruise-news/2026/11/the-next-chapter-for-oceanias-original-r-class-ships/"
+      },
+      {
+        "value": 698,
+        "type": "lower_berth",
+        "url": "https://en.wikipedia.org/wiki/MS_Insignia"
+      },
+      {
+        "value": 824,
+        "type": "maximum",
+        "url": "https://en.wikipedia.org/wiki/MS_Insignia"
+      }
+    ],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "684 was Oceania's own older figure (OceaniaNEXT releases around 2018, seen only in search snippets). The 2024 official release says 670, and a search snippet (not fetched) says oceaniacruises.com lists 670 at double occupancy. oceaniacruises.com returned 403, so the basis is unconfirmed and left unspecified. Wikipedia: 698 lower berths / 824 all berths. Cruise Industry News (2026-11-16): sold to Phoenix Reisen in October 2026, Oceania farewell cruise 2 September 2027, then becomes 'Alvara'. It is still an Oceania ship on the verification date. Do not confuse it with any later ship named Insignia."
+  },
+  {
+    "dock_report_name": "Seven Seas Grandeur",
+    "canonical_name": "Seven Seas Grandeur",
+    "aliases": [],
+    "imo": "9877444",
+    "imo_source_url": "https://www.vesselfinder.com/vessels/details/9877444",
+    "operator": "Regent Seven Seas Cruises",
+    "passenger_capacity": 746,
+    "capacity_type": "unspecified",
+    "capacity_source_url": "https://www.nclhltd.com/news-media/press-releases/detail/576/regent-takes-delivery-of-the-highly-anticipated-seven-seas",
+    "capacity_source_title": "Regent Takes Delivery of the Highly Anticipated Seven Seas Grandeur - A Heritage of Perfection",
+    "capacity_source_kind": "official_fact_sheet",
+    "source_date": "2023-11-14",
+    "verified_on": "2026-11-19",
+    "quote": "With gross tonnage of 55,500, staff of 548, and holding only 746 guests",
+    "other_values_seen": [],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "rssc.com ship pages returned HTTP 403 to the fetcher. A pre-delivery figure of 750 guests appeared in search snippets (Cruise Industry News naming article), but that page was not fetched and the figure is superseded by the delivery release. VesselFinder: IMO 9877444, MMSI 538010706, built 2023, Marshall Islands flag. One cruiseshiptracking.com page reportedly shows IMO 9811286, which looks like an error (not fetched)."
+  },
+  {
+    "dock_report_name": "Seven Seas Splendor",
+    "canonical_name": "Seven Seas Splendor",
+    "aliases": [],
+    "imo": "9807085",
+    "imo_source_url": "https://www.vesselfinder.com/vessels/details/9807085",
+    "operator": "Regent Seven Seas Cruises",
+    "passenger_capacity": 746,
+    "capacity_type": "unspecified",
+    "capacity_source_url": "https://www.nclhltd.com/news-media/press-releases/detail/710/regent-seven-seas-cruises-unveils-133-night-2028-world",
+    "capacity_source_title": "Regent Seven Seas Cruises Unveils 133-Night 2028 World Cruise (NCLH press release)",
+    "capacity_source_kind": "official_fact_sheet",
+    "source_date": "2025-04-23",
+    "verified_on": "2026-11-19",
+    "quote": "one of Regent's Explorer-Class ships holding no more than 746 guests",
+    "other_values_seen": [
+      {
+        "value": 750,
+        "type": "unspecified",
+        "url": "https://www.nclhltd.com/news-media/press-releases/detail/354"
+      }
+    ],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "Two official figures from different dates. The delivery release (2020-01-31) says 'caring for 750 guests in 375 beautifully appointed suites'. The later 2025 release says 'no more than 746 guests', so the more recent official 746 is used. The 'no more than' wording reads like a ceiling, but no basis is defined, so the type is left unspecified. The release title is paraphrased from its URL slug. rssc.com returned 403. VesselFinder: IMO 9807085, MMSI 538007673, built 2020."
+  },
+  {
+    "dock_report_name": "Regent Mariner",
+    "canonical_name": "Seven Seas Mariner",
+    "aliases": [
+      "Regent Mariner (informal, used by cruisemapper.com)"
+    ],
+    "imo": "9210139",
+    "imo_source_url": "https://en.wikipedia.org/wiki/Seven_Seas_Mariner",
+    "operator": "Regent Seven Seas Cruises",
+    "passenger_capacity": 700,
+    "capacity_type": "unspecified",
+    "capacity_source_url": "https://www.nclhltd.com/news-media/press-releases/detail/784/regent-seven-seas-cruises-unveils-epic-150-night-2029",
+    "capacity_source_title": "Regent Seven Seas Cruises Unveils Epic 150-Night 2029 World Cruise (NCLH press release)",
+    "capacity_source_kind": "official_fact_sheet",
+    "source_date": "2026-03-25",
+    "verified_on": "2026-11-19",
+    "quote": "Seven Seas Mariner will become an intimate home away from home for 700 luxury travelers",
+    "other_values_seen": [
+      {
+        "value": 720,
+        "type": "unspecified",
+        "url": "https://cruiseindustrynews.com/cruise-news/2026/10/seven-seas-mariner-celebrating-25-years-with-regent/"
+      },
+      {
+        "value": 708,
+        "type": "unspecified",
+        "url": "https://www.cruisemapper.com/ships/Seven-Seas-Mariner-605"
+      },
+      {
+        "value": 700,
+        "type": "double_occupancy",
+        "url": "https://www.cruisemapper.com/ships/Seven-Seas-Mariner-605"
+      },
+      {
+        "value": 700,
+        "type": "unspecified",
+        "url": "https://en.wikipedia.org/wiki/Seven_Seas_Mariner"
+      }
+    ],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "IDENTIFICATION (medium-high confidence, please confirm against the dock report's IMO or call sign if it has one): 'Regent Mariner' is not an official or former name. It is shorthand that cruisemapper.com uses for Seven Seas Mariner ('Although Regent Mariner debuted in 2001...'; IMO 9210139). Regent's only ship with 'Mariner' in its name is Seven Seas Mariner, and no other vessel named 'Regent Mariner' was found. The defunct Regency Cruises 'Regent' ships had no Mariner. Seven Seas Mariner sails the Caribbean in 2026-27 (Cruise Industry News, 2026-10-31) and the 2029 world cruise starts in Miami, which fits a PortMiami call. Caveat: the same dock report prints the other Regent ships with their full names, so this name may come from a different feed. Capacity: the official 700 figure is stated as travelers for that voyage without a basis. Cruise Industry News says '720-passenger vessel'. CruiseMapper's spec gives 'Passengers: 708 - 779' and its review says 'a double-occupancy capacity of about 700'. rssc.com returned 403."
+  }
+]

@@ -1,0 +1,277 @@
+[
+  {
+    "dock_report_name": "Wonder Of The Seas",
+    "canonical_name": "Wonder of the Seas",
+    "aliases": [],
+    "imo": "9838345",
+    "imo_source_url": "https://en.wikipedia.org/wiki/Wonder_of_the_Seas",
+    "operator": "Royal Caribbean International",
+    "passenger_capacity": 5734,
+    "capacity_type": "double_occupancy",
+    "capacity_source_url": "https://www.royalcaribbeanpresscenter.com/fact_sheets/1765910837_WONDER-Fact-Sheet.pdf",
+    "capacity_source_title": "Wonder of the Seas Fast Facts (Royal Caribbean Press Center fact sheet)",
+    "capacity_source_kind": "official_fact_sheet",
+    "source_date": "2025-12-16",
+    "verified_on": "2026-11-19",
+    "quote": "5,734 GUESTS (DOUBLE OCCUPANCY) ... Updated 12.16.25",
+    "other_values_seen": [
+      {
+        "value": 5734,
+        "type": "double_occupancy",
+        "url": "https://www.royalcaribbean.com/guides/ships-by-age"
+      },
+      {
+        "value": 5734,
+        "type": "double_occupancy",
+        "url": "https://www.royalcaribbean.com/guides/how-big-is-wonder-of-the-seas"
+      },
+      {
+        "value": 5734,
+        "type": "unspecified",
+        "url": "https://www.rclinvestor.com/financial-info/key-statistics"
+      },
+      {
+        "value": 7084,
+        "type": "maximum",
+        "url": "https://en.wikipedia.org/wiki/Wonder_of_the_Seas"
+      }
+    ],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "Press-center PDF fetched via Wayback snapshot 20260208043854 (live press center returns an SPA shell). Also confirmed on royalcaribbean.com guides: 'Approximate Passenger Capacity (double occupancy): 5,734' (ships-by-age, published 2025-11-04) and 'allows a maximum of 5,734 guests at double occupancy' (how-big-is-wonder, published 2025-09-11). Not confused with Celebrity Beyond (IMO 9838395)."
+  },
+  {
+    "dock_report_name": "Allure Of The Seas",
+    "canonical_name": "Allure of the Seas",
+    "aliases": [],
+    "imo": "9383948",
+    "imo_source_url": "https://en.wikipedia.org/wiki/Allure_of_the_Seas",
+    "operator": "Royal Caribbean International",
+    "passenger_capacity": 5718,
+    "capacity_type": "double_occupancy",
+    "capacity_source_url": "https://www.royalcaribbeanpresscenter.com/fact_sheets/1765910231_ALLURE-Fact-Sheet.pdf",
+    "capacity_source_title": "Allure of the Seas Fast Facts (Royal Caribbean Press Center fact sheet)",
+    "capacity_source_kind": "official_fact_sheet",
+    "source_date": "2025-12-16",
+    "verified_on": "2026-11-19",
+    "quote": "2,859 STATEROOMS 5,718 GUESTS (DOUBLE OCCUPANCY) ... Updated 12.16.25",
+    "other_values_seen": [
+      {
+        "value": 5718,
+        "type": "double_occupancy",
+        "url": "https://www.royalcaribbeanpresscenter.com/fact_sheets/1747166695_Ship-Fact-Sheet-ALLURE.pdf"
+      },
+      {
+        "value": 5718,
+        "type": "double_occupancy",
+        "url": "https://www.royalcaribbean.com/guides/ships-by-age"
+      },
+      {
+        "value": 5450,
+        "type": "unspecified",
+        "url": "https://www.rclinvestor.com/financial-info/key-statistics"
+      },
+      {
+        "value": 5484,
+        "type": "double_occupancy",
+        "url": "https://en.wikipedia.org/wiki/Allure_of_the_Seas"
+      },
+      {
+        "value": 6780,
+        "type": "maximum",
+        "url": "https://en.wikipedia.org/wiki/Allure_of_the_Seas"
+      }
+    ],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "Anchor PDF (1747166695_..., 'Updated 4.8.25') verified via Wayback snapshot 20250914084615: '5,718 GUESTS (DOUBLE OCCUPANCY)'. Newer sheet dated 12.16.25 gives the same figure. Investor 'Estimated Capacity' 5,450 and Wikipedia 5,484 appear to be pre-2025-amplification figures."
+  },
+  {
+    "dock_report_name": "Freedom Of The Seas",
+    "canonical_name": "Freedom of the Seas",
+    "aliases": [],
+    "imo": "9304033",
+    "imo_source_url": "https://www.vesselfinder.com/vessels/details/9304033",
+    "operator": "Royal Caribbean International",
+    "passenger_capacity": 3926,
+    "capacity_type": "double_occupancy",
+    "capacity_source_url": "https://www.royalcaribbeanpresscenter.com/fact_sheets/1766505670_FREEDOM-Fact-Sheet.pdf",
+    "capacity_source_title": "Freedom of the Seas Fast Facts (Royal Caribbean Press Center fact sheet)",
+    "capacity_source_kind": "official_fact_sheet",
+    "source_date": "2025-12-22",
+    "verified_on": "2026-11-19",
+    "quote": "1,963 STATEROOMS 3,926 GUESTS (DOUBLE OCCUPANCY) ... Updated 12.22.25",
+    "other_values_seen": [
+      {
+        "value": 3926,
+        "type": "double_occupancy",
+        "url": "https://www.royalcaribbean.com/guides/ships-by-age"
+      },
+      {
+        "value": 3750,
+        "type": "unspecified",
+        "url": "https://www.rclinvestor.com/financial-info/key-statistics"
+      }
+    ],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "PDF fetched via Wayback snapshot 20260208054604. IMO 9304033 from web search results (VesselFinder, MaritimeOptima listings; MMSI 309906000, call sign C6UZ7); the English Wikipedia page did not expose the IMO in my fetch. Investor 'Estimated Capacity' 3,750 is a rounded/older figure (pre-2020 amplification)."
+  },
+  {
+    "dock_report_name": "Icon Of The Seas",
+    "canonical_name": "Icon of the Seas",
+    "aliases": [],
+    "imo": "9829930",
+    "imo_source_url": "https://en.wikipedia.org/wiki/Icon_of_the_Seas",
+    "operator": "Royal Caribbean International",
+    "passenger_capacity": 5610,
+    "capacity_type": "double_occupancy",
+    "capacity_source_url": "https://www.royalcaribbeanpresscenter.com/fact_sheets/Icon_of_the_Seas_Fact_Sheet.pdf",
+    "capacity_source_title": "Icon of the Seas Fast Facts (Royal Caribbean Press Center fact sheet)",
+    "capacity_source_kind": "official_fact_sheet",
+    "source_date": "2025-12-09",
+    "verified_on": "2026-11-19",
+    "quote": "2,805 STATEROOMS 5,610 GUESTS (DOUBLE OCCUPANCY) ... Updated 12.9.25",
+    "other_values_seen": [
+      {
+        "value": 5610,
+        "type": "double_occupancy",
+        "url": "https://www.royalcaribbean.com/guides/ships-by-age"
+      },
+      {
+        "value": 5610,
+        "type": "unspecified",
+        "url": "https://www.rclinvestor.com/financial-info/key-statistics"
+      },
+      {
+        "value": 7600,
+        "type": "maximum",
+        "url": "https://en.wikipedia.org/wiki/Icon_of_the_Seas"
+      }
+    ],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "PDF fetched via Wayback snapshot 20260311112507. Sister ships Star of the Seas and Legend of the Seas share the 5,610 figure; IMO 9829930 is Icon specifically."
+  },
+  {
+    "dock_report_name": "Independence Of The Seas",
+    "canonical_name": "Independence of the Seas",
+    "aliases": [],
+    "imo": "9349681",
+    "imo_source_url": "https://en.wikipedia.org/wiki/Independence_of_the_Seas",
+    "operator": "Royal Caribbean International",
+    "passenger_capacity": 3858,
+    "capacity_type": "double_occupancy",
+    "capacity_source_url": "https://www.royalcaribbean.com/guides/ships-by-age",
+    "capacity_source_title": "Royal Caribbean Ships by Age (royalcaribbean.com guide)",
+    "capacity_source_kind": "official_fleet_page",
+    "source_date": "2025-11-04",
+    "verified_on": "2026-11-19",
+    "quote": "2008 \u2013 Independence of the Seas (Freedom Class) Gross Tonnage: 154,407 Approximate Passenger Capacity (double occupancy): 3,858 Crew: 1,440 Passenger Decks: 14",
+    "other_values_seen": [
+      {
+        "value": 3850,
+        "type": "unspecified",
+        "url": "https://www.rclinvestor.com/financial-info/key-statistics"
+      }
+    ],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "No Independence press-center fact sheet found (none in Wayback's index of /fact_sheets/). Source is Royal Caribbean's own site but a guide article that labels the figure 'Approximate'. Search snippets mentioned secondary values (US News 3,858 DO / 4,560 max; a UK agent site 3,634) which I did not open and did not record. Same page gave figures matching the fact sheets for Wonder, Allure, Freedom, Icon and Adventure."
+  },
+  {
+    "dock_report_name": "Adventure Of The Seas",
+    "canonical_name": "Adventure of the Seas",
+    "aliases": [],
+    "imo": "9167227",
+    "imo_source_url": "https://en.wikipedia.org/wiki/Adventure_of_the_Seas",
+    "operator": "Royal Caribbean International",
+    "passenger_capacity": 3114,
+    "capacity_type": "double_occupancy",
+    "capacity_source_url": "https://www.royalcaribbeanpresscenter.com/fact_sheets/1737474287_RCC-0367-Ship-Fact-Sheet-ADVENTURE.pdf",
+    "capacity_source_title": "Adventure of the Seas Fast Facts (Royal Caribbean Press Center fact sheet)",
+    "capacity_source_kind": "official_fact_sheet",
+    "source_date": "2025-01-16",
+    "verified_on": "2026-11-19",
+    "quote": "1,557 STATEROOMS 3,114 GUESTS (DOUBLE OCCUPANCY) ... Updated 1.16.25",
+    "other_values_seen": [
+      {
+        "value": 3114,
+        "type": "double_occupancy",
+        "url": "https://www.royalcaribbean.com/guides/ships-by-age"
+      },
+      {
+        "value": 3100,
+        "type": "unspecified",
+        "url": "https://www.rclinvestor.com/financial-info/key-statistics"
+      },
+      {
+        "value": 3807,
+        "type": "maximum",
+        "url": "https://en.wikipedia.org/wiki/Adventure_of_the_Seas"
+      }
+    ],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "PDF fetched via Wayback snapshot 20250914082539; it is the latest Adventure sheet in the archive index (Jan 2025). The royalcaribbean.com ships-by-age guide (2025-11-04) gives the same 3,114, so it is still current."
+  },
+  {
+    "dock_report_name": "Celebrity Xcel",
+    "canonical_name": "Celebrity Xcel",
+    "aliases": [],
+    "imo": "9884136",
+    "imo_source_url": "https://www.vesselfinder.com/vessels/details/9884136",
+    "operator": "Celebrity Cruises",
+    "passenger_capacity": 3260,
+    "capacity_type": "unspecified",
+    "capacity_source_url": "https://www.rclinvestor.com/financial-info/key-statistics",
+    "capacity_source_title": "Royal Caribbean Group Investor Relations - Key Statistics (Fleet Data)",
+    "capacity_source_kind": "investor_report",
+    "source_date": null,
+    "verified_on": "2026-11-19",
+    "quote": "Name Year in Service Estimated Capacity Gross Tons Celebrity Xcel 2025 3,260 141,262",
+    "other_values_seen": [
+      {
+        "value": 3260,
+        "type": "double_occupancy",
+        "url": "https://en.wikipedia.org/wiki/Celebrity_Xcel"
+      },
+      {
+        "value": 3937,
+        "type": "maximum",
+        "url": "https://en.wikipedia.org/wiki/Celebrity_Xcel"
+      }
+    ],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "celebritycruises.com/cruise-ships/celebrity-xcel redirects to a /xcel landing page with no capacity figure. The Celebrity press-center fact sheet (royalcaribbeangrouppresscenter.com/celebritycruises/fact-sheet/celebrity-xcel) is a JS app; its content API was not fetched. The investor table labels the figure 'Estimated Capacity' with no definition on the page (RCL's 10-K defines berths at double occupancy, but I did not fetch the 10-K), hence 'unspecified'. Same value 3,260 as sister ships Beyond/Ascent on official pages. Search snippets mentioned 3,248 (Costco Travel), 3,250 and 3,276 (secondary sites); not opened, not recorded. IMO 9884136 per Wikipedia infobox and VesselFinder/MarineLink search results; one comparison site listed 9916913, which I treat as an error."
+  },
+  {
+    "dock_report_name": "Celebrity Beyond",
+    "canonical_name": "Celebrity Beyond",
+    "aliases": [],
+    "imo": "9838395",
+    "imo_source_url": "https://en.wikipedia.org/wiki/Celebrity_Beyond",
+    "operator": "Celebrity Cruises",
+    "passenger_capacity": 3260,
+    "capacity_type": "double_occupancy",
+    "capacity_source_url": "https://www.celebritycruises.com/cruise-ships/celebrity-beyond",
+    "capacity_source_title": "Celebrity Beyond | Celebrity Cruises (official ship page)",
+    "capacity_source_kind": "official_fleet_page",
+    "source_date": null,
+    "verified_on": "2026-11-19",
+    "quote": "Double Occupancy 3260 Tonnage 141,420 Length 1073 ft Beam 128 ft Draught 27 ft Cruising Speed 22 kts Godmother Simone Biles",
+    "other_values_seen": [
+      {
+        "value": 3260,
+        "type": "unspecified",
+        "url": "https://www.rclinvestor.com/financial-info/key-statistics"
+      },
+      {
+        "value": 3260,
+        "type": "double_occupancy",
+        "url": "https://en.wikipedia.org/wiki/Celebrity_Beyond"
+      },
+      {
+        "value": 3937,
+        "type": "maximum",
+        "url": "https://en.wikipedia.org/wiki/Celebrity_Beyond"
+      }
+    ],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "The official page's spec block shows tonnage 141,420 (the same block appears on the Celebrity Ascent page), while the investor table gives Beyond 140,600 GT. This looks like a shared template value; it does not affect the capacity figure. IMO 9838395 (Wikipedia infobox; also a port-call database listing) is distinct from Wonder of the Seas' 9838345."
+  }
+]

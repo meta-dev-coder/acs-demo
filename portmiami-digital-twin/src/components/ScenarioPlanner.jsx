@@ -1124,7 +1124,7 @@ function ScenarioThumb({ type }) {
 
 export function ScenarioPlanner({
   planner, garages, roadsById, buildingsById, onOpenAssistant, onLinkFootprint,
-  open, onOpenChange, cameraHandlers,
+  open, onOpenChange, cameraHandlers, cruise = null,
 }) {
   /** Minimised keeps the scenario and the map state; only the body folds away. */
   const [minimised, setMinimised] = useState(false);
@@ -1144,17 +1144,27 @@ export function ScenarioPlanner({
   return (
     <>
       {/* The planner opens from a button rather than sitting over the map permanently, so the
-          3D view is the default state of this workspace. */}
-      {!open && (
-      <button
-        type="button"
-        className="scenario-open"
-        aria-expanded={open}
-        onClick={() => setOpen(true)}
-      >
-        Plan &amp; simulate
-      </button>
-      )}
+          3D view is the default state of this workspace. Cruise demand is its own workspace, not
+          part of the planner: its button sits on the map before "Plan & simulate" and opens the
+          Cruise Parking Simulation directly. */}
+      <div className={`scenario-launchers${open ? ' is-panel-open' : ''}`}>
+        {cruise && (
+          <button type="button" className="scenario-open" onClick={cruise.openSimulation}
+            disabled={cruise.data.state !== 'READY'} title="Open the Cruise Parking Simulation">
+            Cruise demand
+          </button>
+        )}
+        {!open && (
+          <button
+            type="button"
+            className="scenario-open"
+            aria-expanded={open}
+            onClick={() => setOpen(true)}
+          >
+            Plan &amp; simulate
+          </button>
+        )}
+      </div>
 
       {open && (
       <>
@@ -1220,11 +1230,17 @@ export function ScenarioPlanner({
 
         <div className="scenario-tabbody">
           {tab === PLANNER_TAB.PLAN && (
-            <PlanTab planner={planner} garages={garages} roadsById={roadsById}
-              onLinkFootprint={onLinkFootprint} buildingsById={buildingsById} />
+            <>
+              <PlanTab planner={planner} garages={garages} roadsById={roadsById}
+                onLinkFootprint={onLinkFootprint} buildingsById={buildingsById} />
+            </>
           )}
           {tab === PLANNER_TAB.SIMULATE && <SimulateTab planner={planner} />}
-          {tab === PLANNER_TAB.COMPARE && <CompareTab planner={planner} />}
+          {tab === PLANNER_TAB.COMPARE && (
+            <>
+              <CompareTab planner={planner} />
+            </>
+          )}
         </div>
 
         {planner.sitePicker.hint && <p className="scenario-hint">{planner.sitePicker.hint}</p>}
@@ -1309,7 +1325,6 @@ export function ScenarioPlanner({
         </div>
         )}
       </section>
-      )}
       )}
       </>
       )}

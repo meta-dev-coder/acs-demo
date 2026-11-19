@@ -1,0 +1,311 @@
+[
+  {
+    "dock_report_name": "MSC SEASIDE",
+    "canonical_name": "MSC Seaside",
+    "aliases": [],
+    "imo": "9745366",
+    "imo_source_url": "https://www.vesselfinder.com/vessels/details/9745366",
+    "operator": "MSC Cruises",
+    "passenger_capacity": 4140,
+    "capacity_type": "double_occupancy",
+    "capacity_source_url": "https://www.mscpressarea.com/en_US/press-releases/644/",
+    "capacity_source_title": "MSC Cruises press release (MSC Seaside coin ceremony), MSC Press Area",
+    "capacity_source_kind": "official_fact_sheet",
+    "source_date": "2016-12-27",
+    "verified_on": "2026-11-19",
+    "quote": "At 1060 feet long with a GRT of 160,000 tons, the ship will accommodate 4,140 guests at double occupancy.",
+    "other_values_seen": [
+      {
+        "value": 5119,
+        "type": "unspecified",
+        "url": "https://mscpressarea.com/press-releases/1698/"
+      },
+      {
+        "value": 5119,
+        "type": "unspecified",
+        "url": "https://www.fincantieri.com/en/media/press-releases/2017/msc-cruises-and-fincantieri-announce-agreement-for-two-seaside-evo-ships-as-msc-cruises-takes-delivery-of-second-new-ship-in-six-months/"
+      },
+      {
+        "value": 5084,
+        "type": "unspecified",
+        "url": "https://msccruises.co.il/en/our-cruises/ships/msc-seaside/"
+      }
+    ],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "The double-occupancy figure is from a pre-delivery MSC release (Dec 2016), which also gives a design GRT of 160,000; the as-built GRT is 153,516. MSC's delivery release (29 Nov 2017, also Fincantieri's) says 'Guests: 5,119' with no definition. The MSC Israel official site currently lists '5,084 guests', also with no definition. No as-built double-occupancy figure was found on an official page. Secondary sites give 4,132/4,134 at double occupancy (4,134 is MSC's own double-occupancy figure for sister ship MSC Seaview, a different ship). msccruisesusa.com and msccruises.com return 401 to automated fetches."
+  },
+  {
+    "dock_report_name": "MSC WORLD AMERICA",
+    "canonical_name": "MSC World America",
+    "aliases": [],
+    "imo": "9837432",
+    "imo_source_url": "https://www.vesselfinder.com/vessels/details/9837432",
+    "operator": "MSC Cruises",
+    "passenger_capacity": 6762,
+    "capacity_type": "unspecified",
+    "capacity_source_url": "https://www.mscpressarea.com/en_US/press-releases/msc-cruises-takes-delivery-of-msc-world-america-celebrates-additional-world-class/",
+    "capacity_source_title": "MSC Cruises takes delivery of MSC World America, celebrates additional World Class milestones (MSC Press Area)",
+    "capacity_source_kind": "official_fact_sheet",
+    "source_date": "2025-03-27",
+    "verified_on": "2026-11-19",
+    "quote": "with a capacity for 6,762 passengers and 2,138 crew,",
+    "other_values_seen": [
+      {
+        "value": 6764,
+        "type": "unspecified",
+        "url": "https://msccruises.co.il/en/?p=49882"
+      },
+      {
+        "value": 6762,
+        "type": "unspecified",
+        "url": "https://en.portnews.ru/news/373767"
+      }
+    ],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "The official figure is not labelled, but it is effectively an all-berths or maximum count: the same release gives 2,614 cabins, and 2 x 2,614 = 5,228, which is below 6,762. Do NOT treat 6,762 as double occupancy. No official double-occupancy figure was found. Search-engine snippets (pages not fetched, so not verified) attributed secondary double-occupancy values of 5,240 (cruiseable.com), 5,264 (travelvient.com) and 5,252 (cruisetimetables.com, pre-launch); these disagree. Crew 2,138 and GT 216,638 are in the same release. Note: cruisedeck.de tags an MSC World Asia gallery with 'imo-9837432', but VesselFinder lists 9837432 as MSC WORLD AMERICA (2025, 216,638 GT, MMSI 249193000), and MSC World Asia is listed elsewhere as 9901556."
+  },
+  {
+    "dock_report_name": "MSC MERAVIGLIA",
+    "canonical_name": "MSC Meraviglia",
+    "aliases": [],
+    "imo": "9760512",
+    "imo_source_url": "https://www.vesselfinder.com/vessels/details/9760512",
+    "operator": "MSC Cruises",
+    "passenger_capacity": 4488,
+    "capacity_type": "double_occupancy",
+    "capacity_source_url": "https://www.mscpressarea.com/en_US/press-releases/1452",
+    "capacity_source_title": "MSC Meraviglia christening press release (MSC Press Area)",
+    "capacity_source_kind": "official_fact_sheet",
+    "source_date": "2017-06-03",
+    "verified_on": "2026-11-19",
+    "quote": "At 171,598 GRT and with guest capacity of 5,714 (4,488 at double occupancy), MSC Meraviglia is the biggest ship",
+    "other_values_seen": [
+      {
+        "value": 5714,
+        "type": "unspecified",
+        "url": "https://www.mscpressarea.com/en_US/press-releases/1452"
+      },
+      {
+        "value": 5700,
+        "type": "unspecified",
+        "url": "https://www.mscpressarea.com/en_US/christening/mscmeraviglia/"
+      },
+      {
+        "value": 4488,
+        "type": "double_occupancy",
+        "url": "https://www.mscpressarea.com/en_US/christening/mscmeraviglia/"
+      },
+      {
+        "value": 5642,
+        "type": "unspecified",
+        "url": "https://msccruises.co.il/en/our-cruises/ships/msc-meraviglia/"
+      }
+    ],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "Two MSC press pages agree on 4,488 at double occupancy. The christening page says 'capacity of 5,700 guests (4,488 at double occupancy)'. The 5,714 'guest capacity' is the total/maximum but is not labelled as such. The MSC Israel site currently lists 'Number of passengers: 5,642' (171,598 GT, 2,214 cabins, 1,608 crew) without a definition."
+  },
+  {
+    "dock_report_name": "MSC POESIA",
+    "canonical_name": "MSC Poesia",
+    "aliases": [],
+    "imo": "9387073",
+    "imo_source_url": "https://www.vesselfinder.com/vessels/details/9387073",
+    "operator": "MSC Cruises",
+    "passenger_capacity": 2550,
+    "capacity_type": "double_occupancy",
+    "capacity_source_url": "https://cruisespotlight.com/ship/msc/poesia",
+    "capacity_source_title": "All about the MSC Poesia (Cruise Spotlight)",
+    "capacity_source_kind": "secondary",
+    "source_date": null,
+    "verified_on": "2026-11-19",
+    "quote": "The Poesia can hold 2,550 passengers based on double occupancy (two people per room)",
+    "other_values_seen": [
+      {
+        "value": 3223,
+        "type": "unspecified",
+        "url": "https://msccruises.co.il/en/?p=45733"
+      },
+      {
+        "value": 3605,
+        "type": "maximum",
+        "url": "https://cruisespotlight.com/ship/msc/poesia"
+      }
+    ],
+    "status": "VERIFIED_SECONDARY",
+    "notes": "No official double-occupancy figure was found. The MSC Israel official site lists 'Number of passengers: 3223' and 'Numbers of cabins: 1,223' (GT 92,627, crew about 1,039), with no definition. 2,550 is the widely repeated as-built double-occupancy figure (1,275 cabins x 2). CAUTION: MSC Poesia was refurbished in spring 2026 and gained an MSC Yacht Club (MSC press photo story, 15 Apr 2026, which gives no capacity). The official site's 1,223 cabin count suggests the current double-occupancy figure may be lower than 2,550, so treat 2,550 as possibly out of date. The MSC press area had no capacity figure for Poesia. Note the IMO is 9387073, not 9387085."
+  },
+  {
+    "dock_report_name": "MSC GRANDIOSA",
+    "canonical_name": "MSC Grandiosa",
+    "aliases": [],
+    "imo": "9803613",
+    "imo_source_url": "https://www.vesselfinder.com/vessels/details/9803613",
+    "operator": "MSC Cruises",
+    "passenger_capacity": 4842,
+    "capacity_type": "lower_berth",
+    "capacity_source_url": "https://mscpressarea.com/press-releases/2365/",
+    "capacity_source_title": "MSC Cruises press release on MSC Grandiosa (MSC Press Area)",
+    "capacity_source_kind": "official_fact_sheet",
+    "source_date": null,
+    "verified_on": "2026-11-19",
+    "quote": "Lower berth capacity: 4,842",
+    "other_values_seen": [
+      {
+        "value": 6334,
+        "type": "maximum",
+        "url": "https://mscpressarea.com/press-releases/2365/"
+      },
+      {
+        "value": 6334,
+        "type": "unspecified",
+        "url": "https://msccruises.co.il/en/our-cruises/ships/msc-grandiosa/"
+      }
+    ],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "The same release lists 'Total number of passengers: 6,334', 'Crew members: 1,704', 'Number of cabins: 2,421' and 'Gross tonnage: 181,000 GT'. The release date is ambiguous: the header reads '07/01/2019' and the dateline '5 January 2019', both before the ship's delivery (31 Oct 2019). The MSC Israel site lists 181,541 GT and 6,334 guests. 4,842 = 2 x 2,421 cabins, consistent with double occupancy."
+  },
+  {
+    "dock_report_name": "Explora I",
+    "canonical_name": "EXPLORA I",
+    "aliases": [
+      "Explora 1"
+    ],
+    "imo": "9869875",
+    "imo_source_url": "https://www.vesselfinder.com/vessels/details/9869875",
+    "operator": "Explora Journeys (MSC Group)",
+    "passenger_capacity": 922,
+    "capacity_type": "double_occupancy",
+    "capacity_source_url": "https://www.imaginecruising.com.au/?p=247766",
+    "capacity_source_title": "Imagine Cruising article on EXPLORA I",
+    "capacity_source_kind": "secondary",
+    "source_date": null,
+    "verified_on": "2026-11-19",
+    "quote": "EXPLORA I will be 63,900 gross tons and carry 922 passengers at double occupancy, with 640 crew.",
+    "other_values_seen": [
+      {
+        "value": 922,
+        "type": "unspecified",
+        "url": "https://www.cruiseline.co.uk/cruise-lines/explora-journeys/explora-i/"
+      }
+    ],
+    "status": "VERIFIED_SECONDARY",
+    "notes": "No official guest count was found. Explora's official Ship Guide PDF (January 2026, hosted at bute.co.jp: https://www.bute.co.jp/wp/wp-content/uploads/2026/06/EXPLORA1_ship-guide.pdf) gives 'NUMBER OF SUITES 461' and GT 63,900 but no guest total. 922 = 2 x 461 suites, consistent with double occupancy. The Explora and Fincantieri delivery releases (20 Jul 2023) give no guest count. cruiseline.co.uk says 'Carrying up to 922 guests'. Crew figures vary between sources (640 and 700)."
+  },
+  {
+    "dock_report_name": "Explora Iii",
+    "canonical_name": "EXPLORA III",
+    "aliases": [
+      "Explora 3",
+      "EXPLORA III"
+    ],
+    "imo": "9869899",
+    "imo_source_url": "https://maritimeoptima.com/public/vessels/pages/imo:9869899/mmsi:248098000/EXPLORA_III.html",
+    "operator": "Explora Journeys (MSC Group)",
+    "passenger_capacity": null,
+    "capacity_type": "unspecified",
+    "capacity_source_url": "https://explorajourneys.com/content/dam/explora/dm/press-release/exiii/delivery/EN-EXIII-Delivery.pdf",
+    "capacity_source_title": "Explora Journeys takes delivery of EXPLORA III (official press release)",
+    "capacity_source_kind": "official_fact_sheet",
+    "source_date": "2026-07-23",
+    "verified_on": "2026-11-19",
+    "quote": "welcoming a similar number of guests as her sister ships Explora I and Explora II",
+    "other_values_seen": [
+      {
+        "value": 922,
+        "type": "unspecified",
+        "url": "https://www.cruiseline.co.uk/cruise-lines/explora-journeys/explora-iii/"
+      },
+      {
+        "value": 1473,
+        "type": "unspecified",
+        "url": "https://www.cruisingjournal.com/en/explora-journeys/explora-iii"
+      }
+    ],
+    "status": "UNRESOLVED",
+    "notes": "Official sources (the Explora delivery release of 23 Jul 2026, the Fincantieri delivery release, and Jan 2026 trade coverage of Explora's announcement) give no number. They say only 'similar'/'the same' number of guests as Explora I/II, with 463 suites (2 more than Explora I). Secondary figures disagree and look copied from Explora I: cruiseline.co.uk says 922 'guests', and cruisingjournal.com says 'Passengers 1,473' next to Explora I's 63,900 GT, which is wrong for this ship. 463 x 2 would be 926, but that is a calculation, not a published figure, so it was not used. IMO 9869899 (MMSI 248098000, call sign 9HA6513, Malta, built 2026) comes from MaritimeOptima, which shows the name as 'EXPLORA 3'. MagicPort and MarineLink, seen only in search results, agree. Cruise Ship Tracking lists a conflicting IMO, 9939815. The IMO check digit is valid. It is worth confirming in Equasis or GISIS."
+  },
+  {
+    "dock_report_name": "Scarlet Lady",
+    "canonical_name": "Scarlet Lady",
+    "aliases": [],
+    "imo": "9804801",
+    "imo_source_url": "https://www.vesselfinder.com/vessels/details/9804801",
+    "operator": "Virgin Voyages",
+    "passenger_capacity": 2770,
+    "capacity_type": "unspecified",
+    "capacity_source_url": "https://www.virginvoyages.com/dam/jcr%3A059a20a4-67b6-49e4-9c3b-7198d4f76b1d/Virgin%2520Voyages%2520Full%2520Fact%2520Sheet.pdf",
+    "capacity_source_title": "Virgin Voyages - Media Fact Sheet",
+    "capacity_source_kind": "official_fact_sheet",
+    "source_date": null,
+    "verified_on": "2026-11-19",
+    "quote": "Our ships can host 2,770 Sailors and 1,160 amazing Crew from around the world.",
+    "other_values_seen": [],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "The fact sheet gives one fleet-wide figure ('Our ships'), not a figure per ship, and does not say whether it is double occupancy or maximum. The fact sheet has no date (its content refers to Brilliant Lady's Sept 2025 debut and to summer/fall 2025 deployments). The same fact sheet says that after her refit Scarlet Lady has 1,290 cabins plus 102 RockStar Quarters (1,392 in total), against 1,330 + 78 (1,408) on her sisters, so her real capacity may differ slightly from the fleet-wide 2,770. Do not confuse this ship with the bulk carrier SCARLET LADY, IMO 9225043."
+  },
+  {
+    "dock_report_name": "Resilient Lady",
+    "canonical_name": "Resilient Lady",
+    "aliases": [],
+    "imo": "9805348",
+    "imo_source_url": "https://www.vesselfinder.com/vessels/details/9805348",
+    "operator": "Virgin Voyages",
+    "passenger_capacity": 2770,
+    "capacity_type": "unspecified",
+    "capacity_source_url": "https://www.virginvoyages.com/dam/jcr%3A059a20a4-67b6-49e4-9c3b-7198d4f76b1d/Virgin%2520Voyages%2520Full%2520Fact%2520Sheet.pdf",
+    "capacity_source_title": "Virgin Voyages - Media Fact Sheet",
+    "capacity_source_kind": "official_fact_sheet",
+    "source_date": null,
+    "verified_on": "2026-11-19",
+    "quote": "Our ships can host 2,770 Sailors and 1,160 amazing Crew from around the world.",
+    "other_values_seen": [],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "Checked by reading the fact sheet PDF directly. 'Sailors' is not defined as double occupancy or maximum; the sentence says only 'can host', so the type is recorded as unspecified. The figure is fleet-wide. The fact sheet gives 1,330 cabins + 78 RockStar Quarters for Valiant, Resilient and Brilliant Lady. 2 x 1,408 = 2,816, which does not equal 2,770, so the figure's basis cannot be worked out from the cabin count. The fact sheet has no date (circa 2025). VesselFinder gives build year 2022 and GT 108,232."
+  },
+  {
+    "dock_report_name": "Brilliant Lady",
+    "canonical_name": "Brilliant Lady",
+    "aliases": [],
+    "imo": "9870654",
+    "imo_source_url": "https://www.vesselfinder.com/vessels/details/9870654",
+    "operator": "Virgin Voyages",
+    "passenger_capacity": 2770,
+    "capacity_type": "unspecified",
+    "capacity_source_url": "https://www.virginvoyages.com/dam/jcr%3A059a20a4-67b6-49e4-9c3b-7198d4f76b1d/Virgin%2520Voyages%2520Full%2520Fact%2520Sheet.pdf",
+    "capacity_source_title": "Virgin Voyages - Media Fact Sheet",
+    "capacity_source_kind": "official_fact_sheet",
+    "source_date": null,
+    "verified_on": "2026-11-19",
+    "quote": "Our ships can host 2,770 Sailors and 1,160 amazing Crew from around the world.",
+    "other_values_seen": [],
+    "status": "VERIFIED_OFFICIAL",
+    "notes": "The fact sheet lists Brilliant Lady in the fleet ('Virgin Voyages' fleet includes Scarlet Lady, Valiant Lady, Resilient Lady and Brilliant Lady') and gives a single fleet-wide capacity with no stated definition. The fact sheet has no date. VesselFinder: IMO 9870654, MMSI 311001167, Bahamas flag, GT 108,232."
+  },
+  {
+    "dock_report_name": "Aidadiva",
+    "canonical_name": "AIDAdiva",
+    "aliases": [
+      "AIDA Diva"
+    ],
+    "imo": "9334856",
+    "imo_source_url": "https://www.vesselfinder.com/vessels/details/9334856",
+    "operator": "AIDA Cruises (Carnival Corporation & plc)",
+    "passenger_capacity": 2050,
+    "capacity_type": "double_occupancy",
+    "capacity_source_url": "https://cruisedig.com/cruise-lines/aida-cruises",
+    "capacity_source_title": "AIDA Cruises fleet table (CruiseDig)",
+    "capacity_source_kind": "secondary",
+    "source_date": null,
+    "verified_on": "2026-11-19",
+    "quote": "AIDAdiva | Sphinx class \u00b7 2007 \u00b7 69,203 GT | 2007 | 69,203 | 13 | 1,033 | 2,050 | 587 \u2014 \"Berths = guests at double occupancy.\"",
+    "other_values_seen": [
+      {
+        "value": 2050,
+        "type": "unspecified",
+        "url": "https://en.wikipedia.org/wiki/AIDAdiva"
+      }
+    ],
+    "status": "VERIFIED_SECONDARY",
+    "notes": "The official AIDA pages (aida.de ship page, fleet FAQ, press PDFs) and Meyer Werft's delivery release all returned 403/404 to automated fetches, so no official figure was read. A search snippet suggests Meyer Werft's 2007 delivery release lists 2,050 passengers, but this was not verified. The quote is a cell-by-cell transcription of a table row joined with ' | ', not a continuous verbatim sentence; only the berths note is verbatim. AIDA's 23 Mar 2025 press release on the AIDA Evolution refit (via presseportal.de) says some cabins went from 3- to 4-person occupancy, which changes the maximum but not double occupancy. It states no guest total. Crew figures vary (587 to 646)."
+  }
+]

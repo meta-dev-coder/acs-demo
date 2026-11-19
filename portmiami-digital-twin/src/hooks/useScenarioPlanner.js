@@ -667,9 +667,11 @@ export function useScenarioPlanner({ viewerRef, infra, buildingsById, roadsById,
 
   const rename = useCallback(name => selected && update({ ...selected, name }), [selected, update]);
 
-  /** Attach a registered garage. The verified record is referenced, never copied. */
-  const setGarage = useCallback(assetId => {
-    if (!selected) return;
+  /**
+   * A scenario with a registered garage attached. The verified record is referenced, never copied.
+   * Pure: used by `setGarage` for the selected scenario and by `applyDesign` for any scenario.
+   */
+  const withGarage = useCallback((scenario, assetId) => {
     const asset = infra.assets.find(a => a.id === assetId) ?? null;
     const confirmed = asset
       ? (infra.linksFor(assetId).buildingLinks ?? []).find(link => link.status === 'CONFIRMED')
@@ -692,15 +694,15 @@ export function useScenarioPlanner({ viewerRef, infra, buildingsById, roadsById,
     const roadLink = (infra.linksFor(assetId).roadLinks ?? [])
       .sort((a, b) => (a.status === 'CONFIRMED' ? -1 : 0) - (b.status === 'CONFIRMED' ? -1 : 0))[0] ?? null;
     const segment = roadLink ? roadsById.get(roadLink.roadObjectId) : null;
-    update({
-      ...selected,
+    return {
+      ...scenario,
       assumptions: published
-        ? { ...selected.assumptions, existingCapacity: published.spaces }
+        ? { ...scenario.assumptions, existingCapacity: published.spaces }
         // Moving to a facility with no published figure must not leave the previous garage's
         // capacity behind wearing the word "assumed": the placeholder comes back instead.
-        : selected.capacitySource
-          ? { ...selected.assumptions, existingCapacity: ASSUMPTIONS.existingCapacity.value }
-          : selected.assumptions,
+        : scenario.capacitySource
+          ? { ...scenario.assumptions, existingCapacity: ASSUMPTIONS.existingCapacity.value }
+          : scenario.assumptions,
       capacitySource: published
         ? {
           assetId,
@@ -727,12 +729,40 @@ export function useScenarioPlanner({ viewerRef, infra, buildingsById, roadsById,
         footprint: null,
         label: asset?.name ?? null,
       },
-    });
+    };
+  }, [infra, roadsById]);
+
+  /** Attach a registered garage to the selected scenario. */
+  const setGarage = useCallback(assetId => {
+    if (!selected) return;
+    update(withGarage(selected, assetId));
     infra.select(assetId);
     // The camera waits for the envelope. Flying to the asset's address point first would land on
     // the kerb and then jump again when the footprint resolved.
     pendingFrameRef.current = assetId;
-  }, [selected, infra, roadsById, update]);
+  }, [selected, withGarage, infra, update]);
+
+  /**
+   * Save a design edited elsewhere (the Cruise Parking Simulation) into the scenario it came from:
+   * the garage or surface lot it builds on, its added spaces and floors, and — for surface-lot
+   * optimisation across several lots — the spaces added to each. The scenario keeps its id, key and
+   * geometry, so the planner, its 3D massing and the simulation keep reading one record.
+   */
+  const applyDesign = useCallback((id, { assetId, additionalSpaces, addedFloors, lotAdditions } = {}) => {
+    const scenario = store.scenarios.find(x => x.id === id);
+    if (!scenario) return;
+    let next = assetId && assetId !== scenario.site?.assetId ? withGarage(scenario, assetId) : scenario;
+    next = {
+      ...next,
+      assumptions: {
+        ...next.assumptions,
+        ...(Number.isFinite(Number(additionalSpaces)) ? { additionalSpaces: Number(additionalSpaces) } : {}),
+        ...(Number.isFinite(Number(addedFloors)) ? { addedFloors: Number(addedFloors) } : {}),
+      },
+      ...(lotAdditions !== undefined ? { lotAdditions } : {}),
+    };
+    update(next);
+  }, [store.scenarios, withGarage, update]);
 
   const setCandidateSite = useCallback(point => {
     setStore(currentStore => {
@@ -1098,7 +1128,7 @@ export function useScenarioPlanner({ viewerRef, infra, buildingsById, roadsById,
   return {
     scenarios, selected, select, tab, setTab, viewMode, setViewMode,
     addScenario, duplicate, remove, reset, resetAll, rename, update,
-    setAssumption, setGarage, setAccessRoad,
+    setAssumption, setGarage, setAccessRoad, applyDesign,
     sitePicker: {
       active: pickerActive,
       toggle: () => {

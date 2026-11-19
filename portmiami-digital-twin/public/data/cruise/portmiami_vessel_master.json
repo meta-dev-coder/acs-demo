@@ -1,0 +1,1244 @@
+{
+  "generated": "2026-11-19",
+  "vessels": [
+    {
+      "vessel_id": "imo-9167227",
+      "imo": "9167227",
+      "imo_source_url": "https://en.wikipedia.org/wiki/Adventure_of_the_Seas",
+      "canonical_name": "Adventure of the Seas",
+      "aliases": [],
+      "operator": "Royal Caribbean International",
+      "passenger_capacity": 3114,
+      "capacity_type": "double_occupancy",
+      "capacity_definition": "Guests at double occupancy (two per cabin) — the same basis as lower berths.",
+      "capacity_source_url": "https://www.royalcaribbeanpresscenter.com/fact_sheets/1737474287_RCC-0367-Ship-Fact-Sheet-ADVENTURE.pdf",
+      "capacity_source_title": "Adventure of the Seas Fast Facts (Royal Caribbean Press Center fact sheet)",
+      "capacity_source_kind": "official_fact_sheet",
+      "source_date": "2025-01-16",
+      "verified_on": "2026-11-19",
+      "quote": "1,557 STATEROOMS 3,114 GUESTS (DOUBLE OCCUPANCY) ... Updated 1.16.25",
+      "other_values_seen": [
+        {
+          "value": 3114,
+          "type": "double_occupancy",
+          "url": "https://www.royalcaribbean.com/guides/ships-by-age"
+        },
+        {
+          "value": 3100,
+          "type": "unspecified",
+          "url": "https://www.rclinvestor.com/financial-info/key-statistics"
+        },
+        {
+          "value": 3807,
+          "type": "maximum",
+          "url": "https://en.wikipedia.org/wiki/Adventure_of_the_Seas"
+        }
+      ],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "PDF fetched via Wayback snapshot 20250914082539; it is the latest Adventure sheet in the archive index (Jan 2025). The royalcaribbean.com ships-by-age guide (2025-11-04) gives the same 3,114, so it is still current.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9334856",
+      "imo": "9334856",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9334856",
+      "canonical_name": "AIDAdiva",
+      "aliases": [
+        "AIDA Diva"
+      ],
+      "operator": "AIDA Cruises (Carnival Corporation & plc)",
+      "passenger_capacity": 2050,
+      "capacity_type": "double_occupancy",
+      "capacity_definition": "Guests at double occupancy (two per cabin) — the same basis as lower berths.",
+      "capacity_source_url": "https://cruisedig.com/cruise-lines/aida-cruises",
+      "capacity_source_title": "AIDA Cruises fleet table (CruiseDig)",
+      "capacity_source_kind": "secondary",
+      "source_date": null,
+      "verified_on": "2026-11-19",
+      "quote": "AIDAdiva | Sphinx class · 2007 · 69,203 GT | 2007 | 69,203 | 13 | 1,033 | 2,050 | 587 — \"Berths = guests at double occupancy.\"",
+      "other_values_seen": [
+        {
+          "value": 2050,
+          "type": "unspecified",
+          "url": "https://en.wikipedia.org/wiki/AIDAdiva"
+        }
+      ],
+      "status": "VERIFIED_SECONDARY",
+      "notes": "The official AIDA pages (aida.de ship page, fleet FAQ, press PDFs) and Meyer Werft's delivery release all returned 403/404 to automated fetches, so no official figure was read. A search snippet suggests Meyer Werft's 2007 delivery release lists 2,050 passengers, but this was not verified. The quote is a cell-by-cell transcription of a table row joined with ' | ', not a continuous verbatim sentence; only the berths note is verbatim. AIDA's 23 Mar 2025 press release on the AIDA Evolution refit (via presseportal.de) says some cabins went from 3- to 4-person occupancy, which changes the maximum but not double occupancy. It states no guest total. Crew figures vary (587 to 646).",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9383948",
+      "imo": "9383948",
+      "imo_source_url": "https://en.wikipedia.org/wiki/Allure_of_the_Seas",
+      "canonical_name": "Allure of the Seas",
+      "aliases": [],
+      "operator": "Royal Caribbean International",
+      "passenger_capacity": 5718,
+      "capacity_type": "double_occupancy",
+      "capacity_definition": "Guests at double occupancy (two per cabin) — the same basis as lower berths.",
+      "capacity_source_url": "https://www.royalcaribbeanpresscenter.com/fact_sheets/1765910231_ALLURE-Fact-Sheet.pdf",
+      "capacity_source_title": "Allure of the Seas Fast Facts (Royal Caribbean Press Center fact sheet)",
+      "capacity_source_kind": "official_fact_sheet",
+      "source_date": "2025-12-16",
+      "verified_on": "2026-11-19",
+      "quote": "2,859 STATEROOMS 5,718 GUESTS (DOUBLE OCCUPANCY) ... Updated 12.16.25",
+      "other_values_seen": [
+        {
+          "value": 5718,
+          "type": "double_occupancy",
+          "url": "https://www.royalcaribbeanpresscenter.com/fact_sheets/1747166695_Ship-Fact-Sheet-ALLURE.pdf"
+        },
+        {
+          "value": 5718,
+          "type": "double_occupancy",
+          "url": "https://www.royalcaribbean.com/guides/ships-by-age"
+        },
+        {
+          "value": 5450,
+          "type": "unspecified",
+          "url": "https://www.rclinvestor.com/financial-info/key-statistics"
+        },
+        {
+          "value": 5484,
+          "type": "double_occupancy",
+          "url": "https://en.wikipedia.org/wiki/Allure_of_the_Seas"
+        },
+        {
+          "value": 6780,
+          "type": "maximum",
+          "url": "https://en.wikipedia.org/wiki/Allure_of_the_Seas"
+        }
+      ],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "Anchor PDF (1747166695_..., 'Updated 4.8.25') verified via Wayback snapshot 20250914084615: '5,718 GUESTS (DOUBLE OCCUPANCY)'. Newer sheet dated 12.16.25 gives the same figure. Investor 'Estimated Capacity' 5,450 and Wikipedia 5,484 appear to be pre-2025-amplification figures.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9870654",
+      "imo": "9870654",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9870654",
+      "canonical_name": "Brilliant Lady",
+      "aliases": [],
+      "operator": "Virgin Voyages",
+      "passenger_capacity": 2770,
+      "capacity_type": "unspecified",
+      "capacity_definition": "The source does not state which definition its figure uses.",
+      "capacity_source_url": "https://www.virginvoyages.com/dam/jcr%3A059a20a4-67b6-49e4-9c3b-7198d4f76b1d/Virgin%2520Voyages%2520Full%2520Fact%2520Sheet.pdf",
+      "capacity_source_title": "Virgin Voyages - Media Fact Sheet",
+      "capacity_source_kind": "official_fact_sheet",
+      "source_date": null,
+      "verified_on": "2026-11-19",
+      "quote": "Our ships can host 2,770 Sailors and 1,160 amazing Crew from around the world.",
+      "other_values_seen": [],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "The fact sheet lists Brilliant Lady in the fleet ('Virgin Voyages' fleet includes Scarlet Lady, Valiant Lady, Resilient Lady and Brilliant Lady') and gives a single fleet-wide capacity with no stated definition. The fact sheet has no date. VesselFinder: IMO 9870654, MMSI 311001167, Bahamas flag, GT 108,232.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9837456",
+      "imo": "9837456",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9837456",
+      "canonical_name": "Carnival Celebration",
+      "aliases": [],
+      "operator": "Carnival Cruise Line",
+      "passenger_capacity": 5360,
+      "capacity_type": "lower_berth",
+      "capacity_definition": "Lower berths: two per cabin, excluding upper berths — the same basis as double occupancy.",
+      "capacity_source_url": "https://www.carnivalcorp.com/wp-content/uploads/2026/06/Ships-in-our-Fleet-as-of-May-31-2026.pdf",
+      "capacity_source_title": "Carnival Corporation fleet report, 2026-05-31",
+      "capacity_source_kind": "investor_report",
+      "source_date": "2026-05-31",
+      "verified_on": "2026-11-19",
+      "quote": "Carnival Celebration 2022 5,360",
+      "other_values_seen": [],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "Fetched the Carnival Corporation 'Ships in our Fleet, As of May 31, 2026' PDF and confirmed the row matches the user-supplied value. The PDF column is headed 'Passenger Capacity' without defining it; Carnival Corporation's 10-K defines passenger capacity as lower berths. IMO confirmed on VesselFinder (name, MMSI, build year match). Some press (Baird Maritime headline) cites ~5,200 guests; not used.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9198355",
+      "imo": "9198355",
+      "imo_source_url": "https://en.wikipedia.org/wiki/Carnival_Conquest",
+      "canonical_name": "Carnival Conquest",
+      "aliases": [],
+      "operator": "Carnival Cruise Line",
+      "passenger_capacity": 2980,
+      "capacity_type": "lower_berth",
+      "capacity_definition": "Lower berths: two per cabin, excluding upper berths — the same basis as double occupancy.",
+      "capacity_source_url": "https://www.carnivalcorp.com/wp-content/uploads/2026/06/Ships-in-our-Fleet-as-of-May-31-2026.pdf",
+      "capacity_source_title": "Carnival Corporation fleet report, 2026-05-31",
+      "capacity_source_kind": "investor_report",
+      "source_date": "2026-05-31",
+      "verified_on": "2026-11-19",
+      "quote": "Carnival Conquest 2002 2,980",
+      "other_values_seen": [
+        {
+          "value": 2980,
+          "type": "lower_berth",
+          "url": "https://www.carnivalcorp.com/wp-content/uploads/2026/06/Ships-in-our-Fleet-as-of-May-31-2026.pdf"
+        },
+        {
+          "value": 2980,
+          "type": "unspecified",
+          "url": "https://en.wikipedia.org/wiki/Carnival_Conquest"
+        }
+      ],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "2002 Conquest-class lead ship, still sailing for Carnival under this name: listed in Carnival Corporation's fleet as of May 31, 2026 ('Carnival Conquest 2002 2,980'); Wikipedia status 'In service', no rename. carnival.com does not define the figure; Carnival Corporation's fleet report gives the same 2,980 as passenger capacity (lower berths per 10-K). IMO 9198355 also on VesselFinder/Gard/MaritimeOptima search results.",
+      "review": [
+        {
+          "set": {
+            "capacity_type": "lower_berth",
+            "capacity_source_url": "https://www.carnivalcorp.com/wp-content/uploads/2026/06/Ships-in-our-Fleet-as-of-May-31-2026.pdf",
+            "capacity_source_title": "Carnival Corporation fleet report, 2026-05-31",
+            "capacity_source_kind": "investor_report",
+            "source_date": "2026-05-31",
+            "quote": "Carnival Conquest 2002 2,980"
+          },
+          "reason": "The same 2,980 appears in Carnival Corporation's fleet report (passenger capacity = lower berths, as for every other Carnival Corporation ship in this dataset). carnival.com's page states the same number without a definition. One consistent definition and source for the brand.",
+          "decided_on": "2026-11-19"
+        }
+      ]
+    },
+    {
+      "vessel_id": "imo-9767091",
+      "imo": "9767091",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9767091",
+      "canonical_name": "Carnival Horizon",
+      "aliases": [],
+      "operator": "Carnival Cruise Line",
+      "passenger_capacity": 3960,
+      "capacity_type": "lower_berth",
+      "capacity_definition": "Lower berths: two per cabin, excluding upper berths — the same basis as double occupancy.",
+      "capacity_source_url": "https://www.carnivalcorp.com/wp-content/uploads/2026/06/Ships-in-our-Fleet-as-of-May-31-2026.pdf",
+      "capacity_source_title": "Carnival Corporation fleet report, 2026-05-31",
+      "capacity_source_kind": "investor_report",
+      "source_date": "2026-05-31",
+      "verified_on": "2026-11-19",
+      "quote": "Carnival Horizon 2018 3,960",
+      "other_values_seen": [],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "Fetched the Carnival Corporation 'Ships in our Fleet, As of May 31, 2026' PDF and confirmed the row matches the user-supplied value. The PDF column is headed 'Passenger Capacity' without defining it; Carnival Corporation's 10-K defines passenger capacity as lower berths. IMO confirmed on VesselFinder (name, MMSI, build year match).",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9378486",
+      "imo": "9378486",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9378486",
+      "canonical_name": "Carnival Magic",
+      "aliases": [],
+      "operator": "Carnival Cruise Line",
+      "passenger_capacity": 3690,
+      "capacity_type": "lower_berth",
+      "capacity_definition": "Lower berths: two per cabin, excluding upper berths — the same basis as double occupancy.",
+      "capacity_source_url": "https://www.carnivalcorp.com/wp-content/uploads/2026/06/Ships-in-our-Fleet-as-of-May-31-2026.pdf",
+      "capacity_source_title": "Carnival Corporation fleet report, 2026-05-31",
+      "capacity_source_kind": "investor_report",
+      "source_date": "2026-05-31",
+      "verified_on": "2026-11-19",
+      "quote": "Carnival Magic 2011 3,690",
+      "other_values_seen": [],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "Fetched the Carnival Corporation 'Ships in our Fleet, As of May 31, 2026' PDF and confirmed the row matches the user-supplied value. The PDF column is headed 'Passenger Capacity' without defining it; Carnival Corporation's 10-K defines passenger capacity as lower berths. IMO confirmed on VesselFinder (name, MMSI, build year match). Note: IMO 9378474 belongs to sister Carnival Dream; Carnival Magic is 9378486 (VesselFinder: CARNIVAL MAGIC, MMSI 370491000, built 2011; also Gard).",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9138850",
+      "imo": "9138850",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9138850",
+      "canonical_name": "Carnival Sunrise",
+      "aliases": [
+        "Carnival Triumph"
+      ],
+      "operator": "Carnival Cruise Line",
+      "passenger_capacity": 2980,
+      "capacity_type": "lower_berth",
+      "capacity_definition": "Lower berths: two per cabin, excluding upper berths — the same basis as double occupancy.",
+      "capacity_source_url": "https://www.carnivalcorp.com/wp-content/uploads/2026/06/Ships-in-our-Fleet-as-of-May-31-2026.pdf",
+      "capacity_source_title": "Carnival Corporation fleet report, 2026-05-31",
+      "capacity_source_kind": "investor_report",
+      "source_date": "2026-05-31",
+      "verified_on": "2026-11-19",
+      "quote": "Carnival Sunrise 1999 2,980",
+      "other_values_seen": [],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "Fetched the Carnival Corporation 'Ships in our Fleet, As of May 31, 2026' PDF and confirmed the row matches the user-supplied value. The PDF column is headed 'Passenger Capacity' without defining it; Carnival Corporation's 10-K defines passenger capacity as lower berths. IMO confirmed on VesselFinder (name, MMSI, build year match). Ex-Carnival Triumph (renamed 2019).",
+      "review": [
+        {
+          "set": {
+            "aliases": [
+              "Carnival Triumph"
+            ]
+          },
+          "reason": "Former name recorded as a plain alias (the research note said 'former name' in the alias text).",
+          "decided_on": "2026-11-19"
+        }
+      ]
+    },
+    {
+      "vessel_id": "imo-9838395",
+      "imo": "9838395",
+      "imo_source_url": "https://en.wikipedia.org/wiki/Celebrity_Beyond",
+      "canonical_name": "Celebrity Beyond",
+      "aliases": [],
+      "operator": "Celebrity Cruises",
+      "passenger_capacity": 3260,
+      "capacity_type": "double_occupancy",
+      "capacity_definition": "Guests at double occupancy (two per cabin) — the same basis as lower berths.",
+      "capacity_source_url": "https://www.celebritycruises.com/cruise-ships/celebrity-beyond",
+      "capacity_source_title": "Celebrity Beyond | Celebrity Cruises (official ship page)",
+      "capacity_source_kind": "official_fleet_page",
+      "source_date": null,
+      "verified_on": "2026-11-19",
+      "quote": "Double Occupancy 3260 Tonnage 141,420 Length 1073 ft Beam 128 ft Draught 27 ft Cruising Speed 22 kts Godmother Simone Biles",
+      "other_values_seen": [
+        {
+          "value": 3260,
+          "type": "unspecified",
+          "url": "https://www.rclinvestor.com/financial-info/key-statistics"
+        },
+        {
+          "value": 3260,
+          "type": "double_occupancy",
+          "url": "https://en.wikipedia.org/wiki/Celebrity_Beyond"
+        },
+        {
+          "value": 3937,
+          "type": "maximum",
+          "url": "https://en.wikipedia.org/wiki/Celebrity_Beyond"
+        }
+      ],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "The official page's spec block shows tonnage 141,420 (the same block appears on the Celebrity Ascent page), while the investor table gives Beyond 140,600 GT. This looks like a shared template value; it does not affect the capacity figure. IMO 9838395 (Wikipedia infobox; also a port-call database listing) is distinct from Wonder of the Seas' 9838345.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9884136",
+      "imo": "9884136",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9884136",
+      "canonical_name": "Celebrity Xcel",
+      "aliases": [],
+      "operator": "Celebrity Cruises",
+      "passenger_capacity": 3260,
+      "capacity_type": "unspecified",
+      "capacity_definition": "The source does not state which definition its figure uses.",
+      "capacity_source_url": "https://www.rclinvestor.com/financial-info/key-statistics",
+      "capacity_source_title": "Royal Caribbean Group Investor Relations - Key Statistics (Fleet Data)",
+      "capacity_source_kind": "investor_report",
+      "source_date": null,
+      "verified_on": "2026-11-19",
+      "quote": "Name Year in Service Estimated Capacity Gross Tons Celebrity Xcel 2025 3,260 141,262",
+      "other_values_seen": [
+        {
+          "value": 3260,
+          "type": "double_occupancy",
+          "url": "https://en.wikipedia.org/wiki/Celebrity_Xcel"
+        },
+        {
+          "value": 3937,
+          "type": "maximum",
+          "url": "https://en.wikipedia.org/wiki/Celebrity_Xcel"
+        }
+      ],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "celebritycruises.com/cruise-ships/celebrity-xcel redirects to a /xcel landing page with no capacity figure. The Celebrity press-center fact sheet (royalcaribbeangrouppresscenter.com/celebritycruises/fact-sheet/celebrity-xcel) is a JS app; its content API was not fetched. The investor table labels the figure 'Estimated Capacity' with no definition on the page (RCL's 10-K defines berths at double occupancy, but I did not fetch the 10-K), hence 'unspecified'. Same value 3,260 as sister ships Beyond/Ascent on official pages. Search snippets mentioned 3,248 (Costco Travel), 3,250 and 3,276 (secondary sites); not opened, not recorded. IMO 9884136 per Wikipedia infobox and VesselFinder/MarineLink search results; one comparison site listed 9916913, which I treat as an error.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9948827",
+      "imo": "9948827",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9948827",
+      "canonical_name": "Emerald Sakara",
+      "aliases": [],
+      "operator": "Emerald Cruises (Emerald Yacht Cruises)",
+      "passenger_capacity": 100,
+      "capacity_type": "unspecified",
+      "capacity_definition": "The source does not state which definition its figure uses.",
+      "capacity_source_url": "https://emerald.cruises/US/en-US/yacht/yacht-cruising-experience/yacht-experience/our-yachts",
+      "capacity_source_title": "Emerald Cruises - Our Luxury Yachts",
+      "capacity_source_kind": "official_fleet_page",
+      "source_date": null,
+      "verified_on": "2026-11-19",
+      "quote": "Hosting just 100 guests,",
+      "other_values_seen": [],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "Official page sentence describes Emerald Sakara (sister to Emerald Azzurra, launched 2023) as 'Hosting just 100 guests'. Search snippets (not fetched) from Baird Maritime say 100 passengers in 50 cabins, consistent with double occupancy. Emerald's own pages give conflicting crew counts (64 vs 76) - irrelevant to passengers. IMO: VesselFinder shows EMERALD SAKARA, IMO 9948827, MMSI 311001261, built 2023; secondary sites listing 9770000 or 9870881 conflict and were not used.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9869875",
+      "imo": "9869875",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9869875",
+      "canonical_name": "EXPLORA I",
+      "aliases": [
+        "Explora 1"
+      ],
+      "operator": "Explora Journeys (MSC Group)",
+      "passenger_capacity": 922,
+      "capacity_type": "double_occupancy",
+      "capacity_definition": "Guests at double occupancy (two per cabin) — the same basis as lower berths.",
+      "capacity_source_url": "https://www.imaginecruising.com.au/?p=247766",
+      "capacity_source_title": "Imagine Cruising article on EXPLORA I",
+      "capacity_source_kind": "secondary",
+      "source_date": null,
+      "verified_on": "2026-11-19",
+      "quote": "EXPLORA I will be 63,900 gross tons and carry 922 passengers at double occupancy, with 640 crew.",
+      "other_values_seen": [
+        {
+          "value": 922,
+          "type": "unspecified",
+          "url": "https://www.cruiseline.co.uk/cruise-lines/explora-journeys/explora-i/"
+        }
+      ],
+      "status": "VERIFIED_SECONDARY",
+      "notes": "No official guest count was found. Explora's official Ship Guide PDF (January 2026, hosted at bute.co.jp: https://www.bute.co.jp/wp/wp-content/uploads/2026/06/EXPLORA1_ship-guide.pdf) gives 'NUMBER OF SUITES 461' and GT 63,900 but no guest total. 922 = 2 x 461 suites, consistent with double occupancy. The Explora and Fincantieri delivery releases (20 Jul 2023) give no guest count. cruiseline.co.uk says 'Carrying up to 922 guests'. Crew figures vary between sources (640 and 700).",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9869899",
+      "imo": "9869899",
+      "imo_source_url": "https://maritimeoptima.com/public/vessels/pages/imo:9869899/mmsi:248098000/EXPLORA_III.html",
+      "canonical_name": "EXPLORA III",
+      "aliases": [
+        "Explora 3"
+      ],
+      "operator": "Explora Journeys (MSC Group)",
+      "passenger_capacity": null,
+      "capacity_type": "unspecified",
+      "capacity_definition": "The source does not state which definition its figure uses.",
+      "capacity_source_url": "https://explorajourneys.com/content/dam/explora/dm/press-release/exiii/delivery/EN-EXIII-Delivery.pdf",
+      "capacity_source_title": "Explora Journeys takes delivery of EXPLORA III (official press release)",
+      "capacity_source_kind": "official_fact_sheet",
+      "source_date": "2026-07-23",
+      "verified_on": "2026-11-19",
+      "quote": "welcoming a similar number of guests as her sister ships Explora I and Explora II",
+      "other_values_seen": [
+        {
+          "value": 922,
+          "type": "unspecified",
+          "url": "https://www.cruiseline.co.uk/cruise-lines/explora-journeys/explora-iii/"
+        },
+        {
+          "value": 1473,
+          "type": "unspecified",
+          "url": "https://www.cruisingjournal.com/en/explora-journeys/explora-iii"
+        }
+      ],
+      "status": "UNRESOLVED",
+      "notes": "Official sources (the Explora delivery release of 23 Jul 2026, the Fincantieri delivery release, and Jan 2026 trade coverage of Explora's announcement) give no number. They say only 'similar'/'the same' number of guests as Explora I/II, with 463 suites (2 more than Explora I). Secondary figures disagree and look copied from Explora I: cruiseline.co.uk says 922 'guests', and cruisingjournal.com says 'Passengers 1,473' next to Explora I's 63,900 GT, which is wrong for this ship. 463 x 2 would be 926, but that is a calculation, not a published figure, so it was not used. IMO 9869899 (MMSI 248098000, call sign 9HA6513, Malta, built 2026) comes from MaritimeOptima, which shows the name as 'EXPLORA 3'. MagicPort and MarineLink, seen only in search results, agree. Cruise Ship Tracking lists a conflicting IMO, 9939815. The IMO check digit is valid. It is worth confirming in Equasis or GISIS.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9304033",
+      "imo": "9304033",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9304033",
+      "canonical_name": "Freedom of the Seas",
+      "aliases": [],
+      "operator": "Royal Caribbean International",
+      "passenger_capacity": 3926,
+      "capacity_type": "double_occupancy",
+      "capacity_definition": "Guests at double occupancy (two per cabin) — the same basis as lower berths.",
+      "capacity_source_url": "https://www.royalcaribbeanpresscenter.com/fact_sheets/1766505670_FREEDOM-Fact-Sheet.pdf",
+      "capacity_source_title": "Freedom of the Seas Fast Facts (Royal Caribbean Press Center fact sheet)",
+      "capacity_source_kind": "official_fact_sheet",
+      "source_date": "2025-12-22",
+      "verified_on": "2026-11-19",
+      "quote": "1,963 STATEROOMS 3,926 GUESTS (DOUBLE OCCUPANCY) ... Updated 12.22.25",
+      "other_values_seen": [
+        {
+          "value": 3926,
+          "type": "double_occupancy",
+          "url": "https://www.royalcaribbean.com/guides/ships-by-age"
+        },
+        {
+          "value": 3750,
+          "type": "unspecified",
+          "url": "https://www.rclinvestor.com/financial-info/key-statistics"
+        }
+      ],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "PDF fetched via Wayback snapshot 20260208054604. IMO 9304033 from web search results (VesselFinder, MaritimeOptima listings; MMSI 309906000, call sign C6UZ7); the English Wikipedia page did not expose the IMO in my fetch. Investor 'Estimated Capacity' 3,750 is a rounded/older figure (pre-2020 amplification).",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9829930",
+      "imo": "9829930",
+      "imo_source_url": "https://en.wikipedia.org/wiki/Icon_of_the_Seas",
+      "canonical_name": "Icon of the Seas",
+      "aliases": [],
+      "operator": "Royal Caribbean International",
+      "passenger_capacity": 5610,
+      "capacity_type": "double_occupancy",
+      "capacity_definition": "Guests at double occupancy (two per cabin) — the same basis as lower berths.",
+      "capacity_source_url": "https://www.royalcaribbeanpresscenter.com/fact_sheets/Icon_of_the_Seas_Fact_Sheet.pdf",
+      "capacity_source_title": "Icon of the Seas Fast Facts (Royal Caribbean Press Center fact sheet)",
+      "capacity_source_kind": "official_fact_sheet",
+      "source_date": "2025-12-09",
+      "verified_on": "2026-11-19",
+      "quote": "2,805 STATEROOMS 5,610 GUESTS (DOUBLE OCCUPANCY) ... Updated 12.9.25",
+      "other_values_seen": [
+        {
+          "value": 5610,
+          "type": "double_occupancy",
+          "url": "https://www.royalcaribbean.com/guides/ships-by-age"
+        },
+        {
+          "value": 5610,
+          "type": "unspecified",
+          "url": "https://www.rclinvestor.com/financial-info/key-statistics"
+        },
+        {
+          "value": 7600,
+          "type": "maximum",
+          "url": "https://en.wikipedia.org/wiki/Icon_of_the_Seas"
+        }
+      ],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "PDF fetched via Wayback snapshot 20260311112507. Sister ships Star of the Seas and Legend of the Seas share the 5,610 figure; IMO 9829930 is Icon specifically.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9967586",
+      "imo": "9967586",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9967586",
+      "canonical_name": "Ilma",
+      "aliases": [
+        "Ritz-Carlton Ilma"
+      ],
+      "operator": "The Ritz-Carlton Yacht Collection",
+      "passenger_capacity": 448,
+      "capacity_type": "maximum",
+      "capacity_definition": "Maximum passengers including upper berths. Not comparable with double occupancy.",
+      "capacity_source_url": "https://cdn.ritzcarltonyachtcollection.com/2024-09/The%20Ritz-Carlton%20Yacht%20Collection%20Launches%20Ilma_FINAL.pdf?VersionId=eTTaS3OOG23T9b_CQH4tZsMjK102WcCH",
+      "capacity_source_title": "The Ritz-Carlton Yacht Collection press release: Ilma, the newest superyacht ... makes its debut",
+      "capacity_source_kind": "official_fact_sheet",
+      "source_date": "2024-09-03",
+      "verified_on": "2026-11-19",
+      "quote": "The purposefully designed yacht accommodates up to 448 guests",
+      "other_values_seen": [],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "Official press release (Fort Lauderdale, September 3, 2024) also says 'offering 224 airy and intuitive suites', so 448 = 2 per suite (effectively double occupancy), but the source words it as 'up to', so typed as maximum. The yacht page on ritzcarltonyachtcollection.com did not render for fetching. IMO: VesselFinder shows ILMA, IMO 9967586, MMSI 256343000, built 2024 (also CruiseMapper/CruiseDig per search).",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9349681",
+      "imo": "9349681",
+      "imo_source_url": "https://en.wikipedia.org/wiki/Independence_of_the_Seas",
+      "canonical_name": "Independence of the Seas",
+      "aliases": [],
+      "operator": "Royal Caribbean International",
+      "passenger_capacity": 3858,
+      "capacity_type": "double_occupancy",
+      "capacity_definition": "Guests at double occupancy (two per cabin) — the same basis as lower berths.",
+      "capacity_source_url": "https://www.royalcaribbean.com/guides/ships-by-age",
+      "capacity_source_title": "Royal Caribbean Ships by Age (royalcaribbean.com guide)",
+      "capacity_source_kind": "official_fleet_page",
+      "source_date": "2025-11-04",
+      "verified_on": "2026-11-19",
+      "quote": "2008 – Independence of the Seas (Freedom Class) Gross Tonnage: 154,407 Approximate Passenger Capacity (double occupancy): 3,858 Crew: 1,440 Passenger Decks: 14",
+      "other_values_seen": [
+        {
+          "value": 3850,
+          "type": "unspecified",
+          "url": "https://www.rclinvestor.com/financial-info/key-statistics"
+        }
+      ],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "No Independence press-center fact sheet found (none in Wayback's index of /fact_sheets/). Source is Royal Caribbean's own site but a guide article that labels the figure 'Approximate'. Search snippets mentioned secondary values (US News 3,858 DO / 4,560 max; a UK agent site 3,634) which I did not open and did not record. Same page gave figures matching the fact sheets for Wonder, Allure, Freedom, Icon and Adventure.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9156462",
+      "imo": "9156462",
+      "imo_source_url": "https://en.wikipedia.org/wiki/MS_Insignia",
+      "canonical_name": "Insignia",
+      "aliases": [
+        "Oceania Insignia",
+        "R One (1998-2003)",
+        "Columbus 2 (2012-2014)"
+      ],
+      "operator": "Oceania Cruises",
+      "passenger_capacity": 670,
+      "capacity_type": "unspecified",
+      "capacity_definition": "The source does not state which definition its figure uses.",
+      "capacity_source_url": "https://www.nclhltd.com/news-media/press-releases/detail/626",
+      "capacity_source_title": "Oceania Cruises Becomes First Ultra-Premium Line to Sail Out of Tampa",
+      "capacity_source_kind": "official_fact_sheet",
+      "source_date": "2024-08-28",
+      "verified_on": "2026-11-19",
+      "quote": "The stylish and charming Insignia, which accommodates just 670 guests,",
+      "other_values_seen": [
+        {
+          "value": 684,
+          "type": "unspecified",
+          "url": "https://cruiseindustrynews.com/cruise-news/2026/11/the-next-chapter-for-oceanias-original-r-class-ships/"
+        },
+        {
+          "value": 698,
+          "type": "lower_berth",
+          "url": "https://en.wikipedia.org/wiki/MS_Insignia"
+        },
+        {
+          "value": 824,
+          "type": "maximum",
+          "url": "https://en.wikipedia.org/wiki/MS_Insignia"
+        }
+      ],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "684 was Oceania's own older figure (OceaniaNEXT releases around 2018, seen only in search snippets). The 2024 official release says 670, and a search snippet (not fetched) says oceaniacruises.com lists 670 at double occupancy. oceaniacruises.com returned 403, so the basis is unconfirmed and left unspecified. Wikipedia: 698 lower berths / 824 all berths. Cruise Industry News (2026-11-16): sold to Phoenix Reisen in October 2026, Oceania farewell cruise 2 September 2027, then becomes 'Alvara'. It is still an Oceania ship on the verification date. Do not confuse it with any later ship named Insignia.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9803613",
+      "imo": "9803613",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9803613",
+      "canonical_name": "MSC Grandiosa",
+      "aliases": [],
+      "operator": "MSC Cruises",
+      "passenger_capacity": 4842,
+      "capacity_type": "lower_berth",
+      "capacity_definition": "Lower berths: two per cabin, excluding upper berths — the same basis as double occupancy.",
+      "capacity_source_url": "https://mscpressarea.com/press-releases/2365/",
+      "capacity_source_title": "MSC Cruises press release on MSC Grandiosa (MSC Press Area)",
+      "capacity_source_kind": "official_fact_sheet",
+      "source_date": null,
+      "verified_on": "2026-11-19",
+      "quote": "Lower berth capacity: 4,842",
+      "other_values_seen": [
+        {
+          "value": 6334,
+          "type": "maximum",
+          "url": "https://mscpressarea.com/press-releases/2365/"
+        },
+        {
+          "value": 6334,
+          "type": "unspecified",
+          "url": "https://msccruises.co.il/en/our-cruises/ships/msc-grandiosa/"
+        }
+      ],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "The same release lists 'Total number of passengers: 6,334', 'Crew members: 1,704', 'Number of cabins: 2,421' and 'Gross tonnage: 181,000 GT'. The release date is ambiguous: the header reads '07/01/2019' and the dateline '5 January 2019', both before the ship's delivery (31 Oct 2019). The MSC Israel site lists 181,541 GT and 6,334 guests. 4,842 = 2 x 2,421 cabins, consistent with double occupancy.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9760512",
+      "imo": "9760512",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9760512",
+      "canonical_name": "MSC Meraviglia",
+      "aliases": [],
+      "operator": "MSC Cruises",
+      "passenger_capacity": 4488,
+      "capacity_type": "double_occupancy",
+      "capacity_definition": "Guests at double occupancy (two per cabin) — the same basis as lower berths.",
+      "capacity_source_url": "https://www.mscpressarea.com/en_US/press-releases/1452",
+      "capacity_source_title": "MSC Meraviglia christening press release (MSC Press Area)",
+      "capacity_source_kind": "official_fact_sheet",
+      "source_date": "2017-06-03",
+      "verified_on": "2026-11-19",
+      "quote": "At 171,598 GRT and with guest capacity of 5,714 (4,488 at double occupancy), MSC Meraviglia is the biggest ship",
+      "other_values_seen": [
+        {
+          "value": 5714,
+          "type": "unspecified",
+          "url": "https://www.mscpressarea.com/en_US/press-releases/1452"
+        },
+        {
+          "value": 5700,
+          "type": "unspecified",
+          "url": "https://www.mscpressarea.com/en_US/christening/mscmeraviglia/"
+        },
+        {
+          "value": 4488,
+          "type": "double_occupancy",
+          "url": "https://www.mscpressarea.com/en_US/christening/mscmeraviglia/"
+        },
+        {
+          "value": 5642,
+          "type": "unspecified",
+          "url": "https://msccruises.co.il/en/our-cruises/ships/msc-meraviglia/"
+        }
+      ],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "Two MSC press pages agree on 4,488 at double occupancy. The christening page says 'capacity of 5,700 guests (4,488 at double occupancy)'. The 5,714 'guest capacity' is the total/maximum but is not labelled as such. The MSC Israel site currently lists 'Number of passengers: 5,642' (171,598 GT, 2,214 cabins, 1,608 crew) without a definition.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9387073",
+      "imo": "9387073",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9387073",
+      "canonical_name": "MSC Poesia",
+      "aliases": [],
+      "operator": "MSC Cruises",
+      "passenger_capacity": 2550,
+      "capacity_type": "double_occupancy",
+      "capacity_definition": "Guests at double occupancy (two per cabin) — the same basis as lower berths.",
+      "capacity_source_url": "https://cruisespotlight.com/ship/msc/poesia",
+      "capacity_source_title": "All about the MSC Poesia (Cruise Spotlight)",
+      "capacity_source_kind": "secondary",
+      "source_date": null,
+      "verified_on": "2026-11-19",
+      "quote": "The Poesia can hold 2,550 passengers based on double occupancy (two people per room)",
+      "other_values_seen": [
+        {
+          "value": 3223,
+          "type": "unspecified",
+          "url": "https://msccruises.co.il/en/?p=45733"
+        },
+        {
+          "value": 3605,
+          "type": "maximum",
+          "url": "https://cruisespotlight.com/ship/msc/poesia"
+        }
+      ],
+      "status": "VERIFIED_SECONDARY",
+      "notes": "No official double-occupancy figure was found. The MSC Israel official site lists 'Number of passengers: 3223' and 'Numbers of cabins: 1,223' (GT 92,627, crew about 1,039), with no definition. 2,550 is the widely repeated as-built double-occupancy figure (1,275 cabins x 2). CAUTION: MSC Poesia was refurbished in spring 2026 and gained an MSC Yacht Club (MSC press photo story, 15 Apr 2026, which gives no capacity). The official site's 1,223 cabin count suggests the current double-occupancy figure may be lower than 2,550, so treat 2,550 as possibly out of date. The MSC press area had no capacity figure for Poesia. Note the IMO is 9387073, not 9387085.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9745366",
+      "imo": "9745366",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9745366",
+      "canonical_name": "MSC Seaside",
+      "aliases": [],
+      "operator": "MSC Cruises",
+      "passenger_capacity": 4140,
+      "capacity_type": "double_occupancy",
+      "capacity_definition": "Guests at double occupancy (two per cabin) — the same basis as lower berths.",
+      "capacity_source_url": "https://www.mscpressarea.com/en_US/press-releases/644/",
+      "capacity_source_title": "MSC Cruises press release (MSC Seaside coin ceremony), MSC Press Area",
+      "capacity_source_kind": "official_fact_sheet",
+      "source_date": "2016-12-27",
+      "verified_on": "2026-11-19",
+      "quote": "At 1060 feet long with a GRT of 160,000 tons, the ship will accommodate 4,140 guests at double occupancy.",
+      "other_values_seen": [
+        {
+          "value": 5119,
+          "type": "unspecified",
+          "url": "https://mscpressarea.com/press-releases/1698/"
+        },
+        {
+          "value": 5119,
+          "type": "unspecified",
+          "url": "https://www.fincantieri.com/en/media/press-releases/2017/msc-cruises-and-fincantieri-announce-agreement-for-two-seaside-evo-ships-as-msc-cruises-takes-delivery-of-second-new-ship-in-six-months/"
+        },
+        {
+          "value": 5084,
+          "type": "unspecified",
+          "url": "https://msccruises.co.il/en/our-cruises/ships/msc-seaside/"
+        }
+      ],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "The double-occupancy figure is from a pre-delivery MSC release (Dec 2016), which also gives a design GRT of 160,000; the as-built GRT is 153,516. MSC's delivery release (29 Nov 2017, also Fincantieri's) says 'Guests: 5,119' with no definition. The MSC Israel official site currently lists '5,084 guests', also with no definition. No as-built double-occupancy figure was found on an official page. Secondary sites give 4,132/4,134 at double occupancy (4,134 is MSC's own double-occupancy figure for sister ship MSC Seaview, a different ship). msccruisesusa.com and msccruises.com return 401 to automated fetches.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9837432",
+      "imo": "9837432",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9837432",
+      "canonical_name": "MSC World America",
+      "aliases": [],
+      "operator": "MSC Cruises",
+      "passenger_capacity": 6762,
+      "capacity_type": "maximum",
+      "capacity_definition": "Maximum passengers including upper berths. Not comparable with double occupancy.",
+      "capacity_source_url": "https://www.mscpressarea.com/en_US/press-releases/msc-cruises-takes-delivery-of-msc-world-america-celebrates-additional-world-class/",
+      "capacity_source_title": "MSC Cruises takes delivery of MSC World America, celebrates additional World Class milestones (MSC Press Area)",
+      "capacity_source_kind": "official_fact_sheet",
+      "source_date": "2025-03-27",
+      "verified_on": "2026-11-19",
+      "quote": "with a capacity for 6,762 passengers and 2,138 crew,",
+      "other_values_seen": [
+        {
+          "value": 6764,
+          "type": "unspecified",
+          "url": "https://msccruises.co.il/en/?p=49882"
+        },
+        {
+          "value": 6762,
+          "type": "unspecified",
+          "url": "https://en.portnews.ru/news/373767"
+        }
+      ],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "The official figure is not labelled, but it is effectively an all-berths or maximum count: the same release gives 2,614 cabins, and 2 x 2,614 = 5,228, which is below 6,762. Do NOT treat 6,762 as double occupancy. No official double-occupancy figure was found. Search-engine snippets (pages not fetched, so not verified) attributed secondary double-occupancy values of 5,240 (cruiseable.com), 5,264 (travelvient.com) and 5,252 (cruisetimetables.com, pre-launch); these disagree. Crew 2,138 and GT 216,638 are in the same release. Note: cruisedeck.de tags an MSC World Asia gallery with 'imo-9837432', but VesselFinder lists 9837432 as MSC WORLD AMERICA (2025, 216,638 GT, MMSI 249193000), and MSC World Asia is listed elsewhere as 9901556.",
+      "review": [
+        {
+          "set": {
+            "capacity_type": "maximum"
+          },
+          "reason": "MSC's only figure (6,762 guests) carries no definition, but the same release gives 2,614 cabins: double occupancy would be 5,228, so 6,762 counts upper berths and is a maximum. Labelled maximum so it is not used as a double-occupancy capacity.",
+          "decided_on": "2026-11-19"
+        }
+      ]
+    },
+    {
+      "vessel_id": "imo-9824007",
+      "imo": "9824007",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9824007",
+      "canonical_name": "Norwegian Aqua",
+      "aliases": [],
+      "operator": "Norwegian Cruise Line",
+      "passenger_capacity": 3565,
+      "capacity_type": "double_occupancy",
+      "capacity_definition": "Guests at double occupancy (two per cabin) — the same basis as lower berths.",
+      "capacity_source_url": "https://www.ncl.com/cruise-ships/norwegian-aqua",
+      "capacity_source_title": "Norwegian Aqua ship page, ncl.com (title not captured verbatim)",
+      "capacity_source_kind": "official_fleet_page",
+      "source_date": null,
+      "verified_on": "2026-11-19",
+      "quote": "Guest Capacity (Double Occupancy) 3,565",
+      "other_values_seen": [
+        {
+          "value": 3571,
+          "type": "unspecified",
+          "url": "https://en.wikipedia.org/wiki/Norwegian_Aqua"
+        }
+      ],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "Anchor value confirmed on ncl.com (Year Built 2025). VesselFinder: 'IMO 9824007', MMSI 311001559, built 2025; matches the Wikimedia Commons category IMO_9824007 linked from Wikipedia. First Prima Plus ship.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9304045",
+      "imo": "9304045",
+      "imo_source_url": "https://en.wikipedia.org/wiki/Norwegian_Jewel",
+      "canonical_name": "Norwegian Jewel",
+      "aliases": [],
+      "operator": "Norwegian Cruise Line",
+      "passenger_capacity": 2368,
+      "capacity_type": "double_occupancy",
+      "capacity_definition": "Guests at double occupancy (two per cabin) — the same basis as lower berths.",
+      "capacity_source_url": "https://www.ncl.com/cruise-ships/norwegian-jewel",
+      "capacity_source_title": "Norwegian Jewel ship page, ncl.com (title not captured verbatim)",
+      "capacity_source_kind": "official_fleet_page",
+      "source_date": null,
+      "verified_on": "2026-11-19",
+      "quote": "Guest Capacity (Double Occupancy) 2,368",
+      "other_values_seen": [
+        {
+          "value": 2376,
+          "type": "unspecified",
+          "url": "https://en.wikipedia.org/wiki/Norwegian_Jewel"
+        },
+        {
+          "value": 2394,
+          "type": "unspecified",
+          "url": "https://en.wikipedia.org/wiki/Norwegian_Jewel"
+        }
+      ],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "Built 2005, refurbished 2025 per ncl.com. Wikipedia infobox 2,376 and body text 'later grew to 2,394 passengers' are undefined; the official double-occupancy figure is used.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9703796",
+      "imo": "9703796",
+      "imo_source_url": "https://en.wikipedia.org/wiki/Norwegian_Joy",
+      "canonical_name": "Norwegian Joy",
+      "aliases": [],
+      "operator": "Norwegian Cruise Line",
+      "passenger_capacity": 3776,
+      "capacity_type": "double_occupancy",
+      "capacity_definition": "Guests at double occupancy (two per cabin) — the same basis as lower berths.",
+      "capacity_source_url": "https://www.ncl.com/cruise-ships/norwegian-joy",
+      "capacity_source_title": "Norwegian Joy ship page, ncl.com (title not captured verbatim)",
+      "capacity_source_kind": "official_fleet_page",
+      "source_date": null,
+      "verified_on": "2026-11-19",
+      "quote": "Guest Capacity (Double Occupancy) 3,776",
+      "other_values_seen": [
+        {
+          "value": 4622,
+          "type": "unspecified",
+          "url": "https://en.wikipedia.org/wiki/Norwegian_Joy"
+        }
+      ],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "ncl.com shows 'Year Refurbished (Built in 2017)' 2024. Quote is the label/value pair as rendered on the page. Wikipedia 'Capacity: 4,622' is undefined (likely maximum); not used.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9824019",
+      "imo": "9824019",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9824019",
+      "canonical_name": "Norwegian Luna",
+      "aliases": [],
+      "operator": "Norwegian Cruise Line",
+      "passenger_capacity": 3565,
+      "capacity_type": "double_occupancy",
+      "capacity_definition": "Guests at double occupancy (two per cabin) — the same basis as lower berths.",
+      "capacity_source_url": "https://www.ncl.com/cruise-ships/norwegian-luna",
+      "capacity_source_title": "Norwegian Luna ship page, ncl.com (title not captured verbatim)",
+      "capacity_source_kind": "official_fleet_page",
+      "source_date": null,
+      "verified_on": "2026-11-19",
+      "quote": "Guest Capacity (Double Occupancy) 3,565",
+      "other_values_seen": [
+        {
+          "value": 3565,
+          "type": "unspecified",
+          "url": "https://en.wikipedia.org/wiki/Norwegian_Luna"
+        }
+      ],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "Sister of Norwegian Aqua (Prima Plus). ncl.com Year Built 2026. VesselFinder: IMO 9824019, MMSI 311001781, built 2026, in service in the Caribbean. The NCLH FY2025 10-K (filed 2026-03-02) still listed it as 'expected to be delivered in 2026'; Wikipedia cites a Fincantieri delivery release dated 2026-03-05.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9218131",
+      "imo": "9218131",
+      "imo_source_url": "https://en.wikipedia.org/wiki/Norwegian_Sun",
+      "canonical_name": "Norwegian Sun",
+      "aliases": [],
+      "operator": "Norwegian Cruise Line",
+      "passenger_capacity": 1878,
+      "capacity_type": "double_occupancy",
+      "capacity_definition": "Guests at double occupancy (two per cabin) — the same basis as lower berths.",
+      "capacity_source_url": "https://www.ncl.com/cruise-ships/norwegian-sun",
+      "capacity_source_title": "Norwegian Sun ship page, ncl.com (title not captured verbatim)",
+      "capacity_source_kind": "official_fleet_page",
+      "source_date": null,
+      "verified_on": "2026-11-19",
+      "quote": "Guest Capacity (Double Occupancy) 1,878",
+      "other_values_seen": [
+        {
+          "value": 1976,
+          "type": "unspecified",
+          "url": "https://en.wikipedia.org/wiki/Norwegian_Sun"
+        },
+        {
+          "value": 2400,
+          "type": "maximum",
+          "url": "https://en.wikipedia.org/wiki/Norwegian_Sun"
+        }
+      ],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "Built 2001, refurbished 2024 per ncl.com. Wikipedia: '1,976 passengers (2,400 maximum)'. The official 1,878 double-occupancy figure is used; the Wikipedia figures are older or differently defined.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9477438",
+      "imo": "9477438",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9477438",
+      "canonical_name": "Queen Elizabeth",
+      "aliases": [
+        "MS Queen Elizabeth"
+      ],
+      "operator": "Cunard",
+      "passenger_capacity": 2070,
+      "capacity_type": "lower_berth",
+      "capacity_definition": "Lower berths: two per cabin, excluding upper berths — the same basis as double occupancy.",
+      "capacity_source_url": "https://www.carnivalcorp.com/wp-content/uploads/2026/06/Ships-in-our-Fleet-as-of-May-31-2026.pdf",
+      "capacity_source_title": "Carnival Corporation fleet report, 2026-05-31",
+      "capacity_source_kind": "investor_report",
+      "source_date": "2026-05-31",
+      "verified_on": "2026-11-19",
+      "quote": "Queen Elizabeth 2010 2,070",
+      "other_values_seen": [],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "Fetched the Carnival Corporation 'Ships in our Fleet, As of May 31, 2026' PDF and confirmed the row matches the user-supplied value. The PDF column is headed 'Passenger Capacity' without defining it; Carnival Corporation's 10-K defines passenger capacity as lower berths. IMO confirmed on VesselFinder (name, MMSI, build year match). This is the 2010 Cunard MS Queen Elizabeth, not the 1940 RMS or QE2.",
+      "review": []
+    },
+    {
+      "vessel_id": "name-regent-mariner",
+      "imo": null,
+      "imo_source_url": null,
+      "canonical_name": "Regent Mariner",
+      "aliases": [],
+      "operator": "Regent Seven Seas Cruises",
+      "passenger_capacity": null,
+      "capacity_type": null,
+      "capacity_definition": null,
+      "capacity_source_url": null,
+      "capacity_source_title": null,
+      "capacity_source_kind": null,
+      "source_date": "2026-03-25",
+      "verified_on": "2026-11-19",
+      "quote": null,
+      "other_values_seen": [
+        {
+          "value": 720,
+          "type": "unspecified",
+          "url": "https://cruiseindustrynews.com/cruise-news/2026/10/seven-seas-mariner-celebrating-25-years-with-regent/"
+        },
+        {
+          "value": 708,
+          "type": "unspecified",
+          "url": "https://www.cruisemapper.com/ships/Seven-Seas-Mariner-605"
+        },
+        {
+          "value": 700,
+          "type": "double_occupancy",
+          "url": "https://www.cruisemapper.com/ships/Seven-Seas-Mariner-605"
+        },
+        {
+          "value": 700,
+          "type": "unspecified",
+          "url": "https://en.wikipedia.org/wiki/Seven_Seas_Mariner"
+        }
+      ],
+      "status": "UNRESOLVED",
+      "notes": "IDENTITY NOT CONFIRMED. 'Regent Mariner' is not an official or former ship name. Research suggests Seven Seas Mariner (IMO 9210139, Regent Seven Seas; 700 guests, definition not stated, NCLH press release 2026-03-25) with medium-high confidence, but the match rests on a similar name only. Confirm with the Dock Report's IMO or call sign before linking.",
+      "review": [
+        {
+          "set": {
+            "canonical_name": "Regent Mariner",
+            "aliases": [],
+            "imo": null,
+            "imo_source_url": null,
+            "passenger_capacity": null,
+            "capacity_type": null,
+            "capacity_source_url": null,
+            "capacity_source_title": null,
+            "capacity_source_kind": null,
+            "quote": null,
+            "status": "UNRESOLVED",
+            "notes": "IDENTITY NOT CONFIRMED. 'Regent Mariner' is not an official or former ship name. Research suggests Seven Seas Mariner (IMO 9210139, Regent Seven Seas; 700 guests, definition not stated, NCLH press release 2026-03-25) with medium-high confidence, but the match rests on a similar name only. Confirm with the Dock Report's IMO or call sign before linking."
+          },
+          "reason": "Matching a Dock Report name to a ship only because the names are similar is not allowed. Kept as an unresolved record with the candidate in the notes until the identity is confirmed.",
+          "decided_on": "2026-11-19"
+        }
+      ]
+    },
+    {
+      "vessel_id": "imo-9805348",
+      "imo": "9805348",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9805348",
+      "canonical_name": "Resilient Lady",
+      "aliases": [],
+      "operator": "Virgin Voyages",
+      "passenger_capacity": 2770,
+      "capacity_type": "unspecified",
+      "capacity_definition": "The source does not state which definition its figure uses.",
+      "capacity_source_url": "https://www.virginvoyages.com/dam/jcr%3A059a20a4-67b6-49e4-9c3b-7198d4f76b1d/Virgin%2520Voyages%2520Full%2520Fact%2520Sheet.pdf",
+      "capacity_source_title": "Virgin Voyages - Media Fact Sheet",
+      "capacity_source_kind": "official_fact_sheet",
+      "source_date": null,
+      "verified_on": "2026-11-19",
+      "quote": "Our ships can host 2,770 Sailors and 1,160 amazing Crew from around the world.",
+      "other_values_seen": [],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "Checked by reading the fact sheet PDF directly. 'Sailors' is not defined as double occupancy or maximum; the sentence says only 'can host', so the type is recorded as unspecified. The figure is fleet-wide. The fact sheet gives 1,330 cabins + 78 RockStar Quarters for Valiant, Resilient and Brilliant Lady. 2 x 1,408 = 2,816, which does not equal 2,770, so the figure's basis cannot be worked out from the cabin count. The fact sheet has no date (circa 2025). VesselFinder gives build year 2022 and GT 108,232.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9804801",
+      "imo": "9804801",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9804801",
+      "canonical_name": "Scarlet Lady",
+      "aliases": [],
+      "operator": "Virgin Voyages",
+      "passenger_capacity": 2770,
+      "capacity_type": "unspecified",
+      "capacity_definition": "The source does not state which definition its figure uses.",
+      "capacity_source_url": "https://www.virginvoyages.com/dam/jcr%3A059a20a4-67b6-49e4-9c3b-7198d4f76b1d/Virgin%2520Voyages%2520Full%2520Fact%2520Sheet.pdf",
+      "capacity_source_title": "Virgin Voyages - Media Fact Sheet",
+      "capacity_source_kind": "official_fact_sheet",
+      "source_date": null,
+      "verified_on": "2026-11-19",
+      "quote": "Our ships can host 2,770 Sailors and 1,160 amazing Crew from around the world.",
+      "other_values_seen": [],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "The fact sheet gives one fleet-wide figure ('Our ships'), not a figure per ship, and does not say whether it is double occupancy or maximum. The fact sheet has no date (its content refers to Brilliant Lady's Sept 2025 debut and to summer/fall 2025 deployments). The same fact sheet says that after her refit Scarlet Lady has 1,290 cabins plus 102 RockStar Quarters (1,392 in total), against 1,330 + 78 (1,408) on her sisters, so her real capacity may differ slightly from the fleet-wide 2,770. Do not confuse this ship with the bulk carrier SCARLET LADY, IMO 9225043.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9764958",
+      "imo": "9764958",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9764958",
+      "canonical_name": "Seabourn Ovation",
+      "aliases": [],
+      "operator": "Seabourn",
+      "passenger_capacity": 600,
+      "capacity_type": "lower_berth",
+      "capacity_definition": "Lower berths: two per cabin, excluding upper berths — the same basis as double occupancy.",
+      "capacity_source_url": "https://www.carnivalcorp.com/wp-content/uploads/2026/06/Ships-in-our-Fleet-as-of-May-31-2026.pdf",
+      "capacity_source_title": "Carnival Corporation fleet report, 2026-05-31",
+      "capacity_source_kind": "investor_report",
+      "source_date": "2026-05-31",
+      "verified_on": "2026-11-19",
+      "quote": "Seabourn Ovation 2018 600",
+      "other_values_seen": [],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "Fetched the Carnival Corporation 'Ships in our Fleet, As of May 31, 2026' PDF and confirmed the row matches the user-supplied value. The PDF column is headed 'Passenger Capacity' without defining it; Carnival Corporation's 10-K defines passenger capacity as lower berths. IMO confirmed on VesselFinder (name, MMSI, build year match).",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9483126",
+      "imo": "9483126",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9483126",
+      "canonical_name": "Seabourn Quest",
+      "aliases": [],
+      "operator": "Seabourn",
+      "passenger_capacity": 460,
+      "capacity_type": "lower_berth",
+      "capacity_definition": "Lower berths: two per cabin, excluding upper berths — the same basis as double occupancy.",
+      "capacity_source_url": "https://www.carnivalcorp.com/wp-content/uploads/2026/06/Ships-in-our-Fleet-as-of-May-31-2026.pdf",
+      "capacity_source_title": "Carnival Corporation fleet report, 2026-05-31",
+      "capacity_source_kind": "investor_report",
+      "source_date": "2026-05-31",
+      "verified_on": "2026-11-19",
+      "quote": "Seabourn Quest 2011 460",
+      "other_values_seen": [],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "Fetched the Carnival Corporation 'Ships in our Fleet, As of May 31, 2026' PDF and confirmed the row matches the user-supplied value. The PDF column is headed 'Passenger Capacity' without defining it; Carnival Corporation's 10-K defines passenger capacity as lower berths. IMO confirmed on VesselFinder (name, MMSI, build year match).",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9877444",
+      "imo": "9877444",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9877444",
+      "canonical_name": "Seven Seas Grandeur",
+      "aliases": [],
+      "operator": "Regent Seven Seas Cruises",
+      "passenger_capacity": 746,
+      "capacity_type": "unspecified",
+      "capacity_definition": "The source does not state which definition its figure uses.",
+      "capacity_source_url": "https://www.nclhltd.com/news-media/press-releases/detail/576/regent-takes-delivery-of-the-highly-anticipated-seven-seas",
+      "capacity_source_title": "Regent Takes Delivery of the Highly Anticipated Seven Seas Grandeur - A Heritage of Perfection",
+      "capacity_source_kind": "official_fact_sheet",
+      "source_date": "2023-11-14",
+      "verified_on": "2026-11-19",
+      "quote": "With gross tonnage of 55,500, staff of 548, and holding only 746 guests",
+      "other_values_seen": [],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "rssc.com ship pages returned HTTP 403 to the fetcher. A pre-delivery figure of 750 guests appeared in search snippets (Cruise Industry News naming article), but that page was not fetched and the figure is superseded by the delivery release. VesselFinder: IMO 9877444, MMSI 538010706, built 2023, Marshall Islands flag. One cruiseshiptracking.com page reportedly shows IMO 9811286, which looks like an error (not fetched).",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9807085",
+      "imo": "9807085",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9807085",
+      "canonical_name": "Seven Seas Splendor",
+      "aliases": [],
+      "operator": "Regent Seven Seas Cruises",
+      "passenger_capacity": 746,
+      "capacity_type": "unspecified",
+      "capacity_definition": "The source does not state which definition its figure uses.",
+      "capacity_source_url": "https://www.nclhltd.com/news-media/press-releases/detail/710/regent-seven-seas-cruises-unveils-133-night-2028-world",
+      "capacity_source_title": "Regent Seven Seas Cruises Unveils 133-Night 2028 World Cruise (NCLH press release)",
+      "capacity_source_kind": "official_fact_sheet",
+      "source_date": "2025-04-23",
+      "verified_on": "2026-11-19",
+      "quote": "one of Regent's Explorer-Class ships holding no more than 746 guests",
+      "other_values_seen": [
+        {
+          "value": 750,
+          "type": "unspecified",
+          "url": "https://www.nclhltd.com/news-media/press-releases/detail/354"
+        }
+      ],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "Two official figures from different dates. The delivery release (2020-01-31) says 'caring for 750 guests in 375 beautifully appointed suites'. The later 2025 release says 'no more than 746 guests', so the more recent official 746 is used. The 'no more than' wording reads like a ceiling, but no basis is defined, so the type is left unspecified. The release title is paraphrased from its URL slug. rssc.com returned 403. VesselFinder: IMO 9807085, MMSI 538007673, built 2020.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9192167",
+      "imo": "9192167",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9192167",
+      "canonical_name": "Silver Shadow",
+      "aliases": [],
+      "operator": "Silversea Cruises",
+      "passenger_capacity": 392,
+      "capacity_type": "unspecified",
+      "capacity_definition": "The source does not state which definition its figure uses.",
+      "capacity_source_url": "https://www.silversea.com/ships/silver-shadow.html",
+      "capacity_source_title": "Silver Shadow - Silversea ship page",
+      "capacity_source_kind": "official_fleet_page",
+      "source_date": null,
+      "verified_on": "2026-11-19",
+      "quote": "Guests capacity: 392",
+      "other_values_seen": [],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "Official page also states 'Built: 2000', 'Last refurbishment: 2019', 'Crew capacity: 302' (crew not used). Search snippets from secondary sites (CruiseMapper, adventure-life 'Max Passengers: 388') show 388, likely the pre-2019-refit figure; not fetched, so not listed in other_values_seen. IMO: VesselFinder shows SILVER SHADOW, IMO 9192167, MMSI 308628000, built 2000; one secondary site (luxurycruiseconnections) lists 9176692, which conflicts and was not used.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9876957",
+      "imo": "9876957",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9876957",
+      "canonical_name": "Vista",
+      "aliases": [
+        "Oceania Vista"
+      ],
+      "operator": "Oceania Cruises",
+      "passenger_capacity": 1200,
+      "capacity_type": "unspecified",
+      "capacity_definition": "The source does not state which definition its figure uses.",
+      "capacity_source_url": "https://www.nclhltd.com/news-media/press-releases/detail/544",
+      "capacity_source_title": "Oceania Cruises Takes Delivery of and Announces Leadership Team for Newest Ship Vista",
+      "capacity_source_kind": "official_fact_sheet",
+      "source_date": "2023-05-01",
+      "verified_on": "2026-11-19",
+      "quote": "The 1,200-guest Vista boasts the most spacious standard staterooms at sea",
+      "other_values_seen": [],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "Official NCLH (parent) press release; it does not define the basis. oceaniacruises.com ship pages returned HTTP 403 to the fetcher and could not be checked. A search snippet attributed '1,200 guests at double occupancy' to Baird Maritime, but that page was not fetched, so the type is left unspecified. VesselFinder: name 'VISTA', IMO 9876957, MMSI 538009952, built 2023, Marshall Islands flag. The NCLH FY2025 10-K lists 'Oceania Vista' built 2023 but gives no per-ship berths. Press releases are classed as official_fact_sheet because the schema has no press-release kind.",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9838345",
+      "imo": "9838345",
+      "imo_source_url": "https://en.wikipedia.org/wiki/Wonder_of_the_Seas",
+      "canonical_name": "Wonder of the Seas",
+      "aliases": [],
+      "operator": "Royal Caribbean International",
+      "passenger_capacity": 5734,
+      "capacity_type": "double_occupancy",
+      "capacity_definition": "Guests at double occupancy (two per cabin) — the same basis as lower berths.",
+      "capacity_source_url": "https://www.royalcaribbeanpresscenter.com/fact_sheets/1765910837_WONDER-Fact-Sheet.pdf",
+      "capacity_source_title": "Wonder of the Seas Fast Facts (Royal Caribbean Press Center fact sheet)",
+      "capacity_source_kind": "official_fact_sheet",
+      "source_date": "2025-12-16",
+      "verified_on": "2026-11-19",
+      "quote": "5,734 GUESTS (DOUBLE OCCUPANCY) ... Updated 12.16.25",
+      "other_values_seen": [
+        {
+          "value": 5734,
+          "type": "double_occupancy",
+          "url": "https://www.royalcaribbean.com/guides/ships-by-age"
+        },
+        {
+          "value": 5734,
+          "type": "double_occupancy",
+          "url": "https://www.royalcaribbean.com/guides/how-big-is-wonder-of-the-seas"
+        },
+        {
+          "value": 5734,
+          "type": "unspecified",
+          "url": "https://www.rclinvestor.com/financial-info/key-statistics"
+        },
+        {
+          "value": 7084,
+          "type": "maximum",
+          "url": "https://en.wikipedia.org/wiki/Wonder_of_the_Seas"
+        }
+      ],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "Press-center PDF fetched via Wayback snapshot 20260208043854 (live press center returns an SPA shell). Also confirmed on royalcaribbean.com guides: 'Approximate Passenger Capacity (double occupancy): 5,734' (ships-by-age, published 2025-11-04) and 'allows a maximum of 5,734 guests at double occupancy' (how-big-is-wonder, published 2025-09-11). Not confused with Celebrity Beyond (IMO 9838395).",
+      "review": []
+    },
+    {
+      "vessel_id": "imo-9221279",
+      "imo": "9221279",
+      "imo_source_url": "https://www.vesselfinder.com/vessels/details/9221279",
+      "canonical_name": "Zuiderdam",
+      "aliases": [],
+      "operator": "Holland America Line",
+      "passenger_capacity": 1990,
+      "capacity_type": "lower_berth",
+      "capacity_definition": "Lower berths: two per cabin, excluding upper berths — the same basis as double occupancy.",
+      "capacity_source_url": "https://www.carnivalcorp.com/wp-content/uploads/2026/06/Ships-in-our-Fleet-as-of-May-31-2026.pdf",
+      "capacity_source_title": "Carnival Corporation fleet report, 2026-05-31",
+      "capacity_source_kind": "investor_report",
+      "source_date": "2026-05-31",
+      "verified_on": "2026-11-19",
+      "quote": "Zuiderdam 2002 1,990",
+      "other_values_seen": [],
+      "status": "VERIFIED_OFFICIAL",
+      "notes": "Fetched the Carnival Corporation 'Ships in our Fleet, As of May 31, 2026' PDF and confirmed the row matches the user-supplied value. The PDF column is headed 'Passenger Capacity' without defining it; Carnival Corporation's 10-K defines passenger capacity as lower berths. IMO confirmed on VesselFinder (name, MMSI, build year match).",
+      "review": []
+    }
+  ]
+}

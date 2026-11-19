@@ -28,10 +28,12 @@ import { useAskTwin } from './hooks/useAskTwin.js';
 import { ACTION } from './ask/actions.js';
 import { WorkspaceSidebar } from './components/WorkspaceSidebar.jsx';
 import { ScenarioPlanner } from './components/ScenarioPlanner.jsx';
+import CruiseWorkspace from './components/CruiseWorkspace.jsx';
 import { DesignAlternatives } from './components/DesignAlternatives.jsx';
 import { useDesignAlternatives } from './hooks/useDesignAlternatives.js';
 import { useRoadWidening } from './hooks/useRoadWidening.js';
 import { useScenarioPlanner } from './hooks/useScenarioPlanner.js';
+import { useCruiseDemand } from './hooks/useCruiseDemand.js';
 import { LiveEventDetailsPanel } from './components/LiveEventDetailsPanel.jsx';
 import { CameraDetailsPanel } from './components/CameraDetailsPanel.jsx';
 import { MessageSignDetailsPanel } from './components/MessageSignDetailsPanel.jsx';
@@ -113,6 +115,7 @@ export function App() {
   const containerRef = useRef(null);
   // Holds the live map-click handler; the shared picker is built once and reads through it.
   const selectFromMapRef = useRef(() => {});
+  const cruiseRef = useRef(null);   // the cruise hook is declared later; the picker reads it through this
   const { status, notice, viewerRef, resetView, zoom, nudge, northUp } = usePortTwin(containerRef);
   /** Open state lives here, because the map-control column has to know to step aside. */
   const [plannerOpen, setPlannerOpen] = useState(false);
@@ -228,6 +231,11 @@ export function App() {
   // While "Link building" is armed, a map click on a footprint links it to the selected asset
   // instead of selecting it. Held in a ref so the one shared picker never has to be rebuilt.
   selectFromMapRef.current = hit => {
+    // A garage clicked in the Cruise Parking Simulation selects it there and nowhere else.
+    if (hit?.kind === 'cruise-garage') {
+      cruiseRef.current?.setSelectedGarageId(hit.id);
+      return;
+    }
     // While the planner is picking footprints, a building click goes into its selection set
     // instead of selecting the building — the same interception the Explorer's link mode uses.
     if (planner.geometryMode === 'SELECT' && hit?.kind === 'building') {
@@ -359,6 +367,12 @@ export function App() {
    * `active` gates both the layer and the overlay, so leaving the workspace takes the proposals
    * off the map without unmounting anything or disturbing the planner's saved state.
    */
+  /** Cruise-driven demand for the planner: the November vessel calls against the same scenarios. */
+  const cruise = useCruiseDemand({
+    viewerRef, pickerRef, infra, buildingsById, planner, active: workspace === WORKSPACE.PLANNER,
+  });
+  cruiseRef.current = cruise;
+
   const designs = useDesignAlternatives({
     viewerRef, roadsById, buildingsById, active: workspace === WORKSPACE.DESIGNS,
   });
@@ -648,9 +662,18 @@ export function App() {
             onOpenAssistant={() => ask.setOpen(true)}
             onLinkFootprint={linkFootprintFor}
             open={plannerOpen}
-            onOpenChange={setPlannerOpen}
+            onOpenChange={value => {
+              // Opening the planner closes the minimised Cruise Parking Simulation bar ("View on
+              // map"): the planner takes over the map, and Cruise demand reopens the simulation.
+              if (value && cruise.mapMode) cruise.setWorkspaceOpen(false);
+              setPlannerOpen(value);
+            }}
             cameraHandlers={cameraHandlers}
+            cruise={cruise}
           />
+        )}
+        {workspace === WORKSPACE.PLANNER && cruise.enabled && (
+          <CruiseWorkspace cruise={cruise} mapRef={containerRef} cameraHandlers={cameraHandlers} onLocateAsset={flyToAssetById} />
         )}
 
         {status === TWIN_STATUS.INITIALISING && <LoadingOverlay />}
