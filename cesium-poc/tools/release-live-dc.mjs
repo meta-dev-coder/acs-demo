@@ -4,7 +4,7 @@
  * "latest" pointer, then prints (never runs) the `aws s3 cp` upload commands. Secret-looking files
  * (.env*, token files, .dc-*, keys) are left out, and a secret-looking value anywhere refuses the release.
  *
- *   node tools/release-live-dc.mjs [--skip-build] [--no-env-files]
+ *   node tools/release-live-dc.mjs [--skip-build] [--no-env-files] [--skip-portmiami]
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -43,10 +43,10 @@ function walk(dir, base = dir, out = []) {
 const stamp = ms => new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
 
 export async function releaseLiveDc({
-  distDir = DEFAULT_OUT_DIR, outDir = DEFAULT_RELEASE_DIR, build = true, envFiles = true, now = Date.now, logger = console,
+  distDir = DEFAULT_OUT_DIR, outDir = DEFAULT_RELEASE_DIR, build = true, envFiles = true, portmiami = true, now = Date.now, logger = console,
   bucket = RELEASE_BUCKET, prefix = RELEASE_PREFIX,
 } = {}) {
-  if (build) await buildLiveDcBundle({ outDir: distDir, envFiles, logger });
+  if (build) await buildLiveDcBundle({ outDir: distDir, envFiles, portmiami, logger });
   for (const entry of REQUIRED_ENTRIES) {
     if (!existsSync(join(distDir, entry))) throw new Error(`${join(distDir, entry)} is missing: build first (npm run live-dc:bundle)`);
   }
@@ -99,7 +99,7 @@ export async function releaseLiveDc({
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const argv = process.argv.slice(2);
-  releaseLiveDc({ build: !argv.includes('--skip-build'), envFiles: !argv.includes('--no-env-files') }).catch(error => {
+  releaseLiveDc({ build: !argv.includes('--skip-build'), envFiles: !argv.includes('--no-env-files'), portmiami: !argv.includes('--skip-portmiami') }).catch(error => {
     console.error(`release-live-dc: ${error.message}`);
     process.exitCode = 1;
   });

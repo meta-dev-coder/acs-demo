@@ -18,6 +18,10 @@ One Node process (`live-dc-sync.mjs`, systemd unit `live-dc`) on an EC2 instance
 - the live sync loop (FL511 -> DataConnect Live classes) every `LIVE_DC_INTERVAL_SECONDS` (300),
 - the built I-595 frontend (`web/`) on `http://<host>:8095/?demo=i595`, using same-origin API paths with live
   DataConnect on,
+- the PortMiami Digital Twin (`../portmiami-digital-twin`, a separate project) on `http://<host>:8095/portmiami/`,
+  built into `web/portmiami/` with its API (`/api/portmiami/...`) mounted in the same process from `portmiami/`
+  (`server/liveDc/portMiami.mjs`). Same password, same port. Read-only: its design and geometry stores are
+  seeded once into `/var/lib/live-dc/portmiami/` and never overwritten by an update,
 - the read-only APIs (`/api/live-dc`, `/api/i595/live-events[?source=dataconnect]`, `/api/dataconnect`, camera
   snapshots, message signs). No write routes, and the DataConnect interactive sign-in is not exposed,
 - a password gate: `/login` and `POST /api/login` set an HttpOnly, SameSite=Strict session cookie (8 h,
@@ -44,10 +48,15 @@ From `cesium-poc/`:
    ```
    VITE_I595_MODEL_BASE_URL=https://d3syo4sqvwi009.cloudfront.net/data/models npm run live-dc:release
    ```
-   Check that the output says `public keys passed: VITE_GOOGLE_MAPS_API_KEY, VITE_I595_MODEL_BASE_URL`.
+   Check that the output says `public keys passed: VITE_GOOGLE_MAPS_API_KEY, VITE_I595_MODEL_BASE_URL`, and for
+   PortMiami `portmiami web: … public keys passed: VITE_GOOGLE_MAPS_API_KEY` (from `portmiami-digital-twin/.env.local`;
+   that key's referrer restriction must allow the same two `:8095/*` URLs). Run `npm ci` in
+   `portmiami-digital-twin/` once first. Add `--skip-portmiami` (`node tools/release-live-dc.mjs --skip-portmiami`)
+   to release I-595 alone.
 3. Run the three `aws s3 cp` commands it prints, as `arpana_thakur`. Upload `latest` last.
 4. On the instance: `sudo /opt/live-dc/livedc.sh update latest`, then `sudo /opt/live-dc/livedc.sh status`.
-5. Open `http://34.237.187.140:8095/?demo=i595`. Security group `dev-access-us` only allows listed IPs on 8095.
+5. Open `http://34.237.187.140:8095/?demo=i595` (I-595) and `http://34.237.187.140:8095/portmiami/` (PortMiami).
+   Security group `dev-access-us` only allows listed IPs on 8095. `livedc.sh logs` shows `live-dc portmiami: on at /portmiami/`.
 
 ## 1. Build and release (locally)
 

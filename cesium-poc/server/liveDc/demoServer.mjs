@@ -21,6 +21,7 @@ import { createAskTools } from './askTools.mjs';
 import { dictionarySummary, loadDataDictionary } from './dataDictionary.mjs';
 import { enrichmentDataPath } from './eventEnrichment.mjs';
 import { fetchEventWeather } from './eventWeather.mjs';
+import { loadPortMiami } from './portMiami.mjs';
 
 /** The committed snapshot, for runs outside the bundle (the bundle ships it under data/dataconnect-data). */
 const DEFAULT_SNAPSHOT_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'public', 'dataconnect-data');
@@ -135,7 +136,13 @@ export async function startDemoHttp({ env = process.env, httpConfig, service, ne
   logger.log?.(`live-dc ask-the-twin: ${ask ? (ask.target ? `on, forwarded to ${ask.target}` : `on (${String(env.ASK_TWIN_ANTHROPIC_SECRET_NAME).trim()})`) : 'off (ASK_TWIN_ANTHROPIC_SECRET_NAME and ASK_TWIN_SERVICE_URL unset)'}`);
   const edgeGate = createEdgeGate({ keys: edgeKeysFromEnv(env) });
   if (edgeGate.enabled) logger.log?.('live-dc ask-the-twin: CloudFront edge path on (x-ask-edge-key, per-IP and global limits)');
-  const { server } = createDemoHost({ passwordHash: httpConfig.passwordHash, webDir: httpConfig.webDir, apiHandlers: handlers, ask, status, logger, edgeGate });
+  // The PortMiami Digital Twin, when the release carries it. A failure to load it never stops the I-595 host.
+  const portMiami = await loadPortMiami({ env, logger }).catch(error => {
+    logger.error?.(`live-dc portmiami: not loaded: ${error?.message ?? error}`);
+    return null;
+  });
+  if (!portMiami) logger.log?.('live-dc portmiami: off (no portmiami/ bundle in this release)');
+  const { server } = createDemoHost({ passwordHash: httpConfig.passwordHash, webDir: httpConfig.webDir, apiHandlers: handlers, ask, status, logger, edgeGate, portMiami });
   await new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(httpConfig.port, httpConfig.host, () => { server.off('error', reject); resolve(); });
@@ -148,6 +155,7 @@ export async function startDemoHttp({ env = process.env, httpConfig, service, ne
       server.closeAllConnections?.();
       await new Promise(resolve => server.close(() => resolve()));
       await stop();
+      await portMiami?.stop();
     },
   };
 }

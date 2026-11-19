@@ -434,7 +434,7 @@ function RecommendationSection({ cruise, onMap, onEdit }) {
       )}
       <div className="cd-reco-actions">
         {target && onEdit && <button type="button" className="cw-btn is-primary" onClick={() => onEdit(target.id)}>Edit {target.name.split('.')[0]} capacity</button>}
-        <button type="button" className="cw-btn" onClick={() => { if (target) cruise.setViewId(target.id); onMap(); }}>View on map</button>
+        <button type="button" className="cw-btn" onClick={() => onMap(target?.id)}>View {target ? `${target.name.split('.')[0]} ` : ''}on map</button>
       </div>
     </section>
   );
@@ -485,7 +485,7 @@ function TimeTab({ cruise, onDetails, onCompare, setSlot, details, setDetails })
       <div className="cx-actions">
         <button type="button" className="cw-btn is-primary" onClick={onCompare}>Compare solutions →</button>
         <button type="button" className="cw-btn" onClick={() => onDetails('CALC')}>How was this calculated?</button>
-        <button type="button" className="cw-btn" onClick={cruise.viewOnMap}>View on map</button>
+        <button type="button" className="cw-btn" onClick={() => cruise.viewOnMap()}>View on map</button>
         <button type="button" className="cw-btn" aria-expanded={details} onClick={() => setDetails(!details)}>{details ? 'Hide garage details' : 'Garage details'}</button>
       </div>
       {details && (
@@ -695,7 +695,9 @@ function CompareTab({ cruise, onMap, onEdit }) {
                 <div><dt>Maximum unmet demand</dt><dd className={c.maxShortage ? 'cw-bad' : 'cw-ok'}>{fmt(c.maxShortage)}</dd></div>
               </dl>
               <div className="cx-card-actions">
-                <button type="button" className="cw-btn is-small" aria-pressed={cruise.viewId === c.id} onClick={() => cruise.setViewId(c.id)}>{cruise.viewId === c.id ? 'Shown in chart' : 'Show in chart'}</button>
+                {/* The chart is in Time Simulation: show this design there. */}
+                <button type="button" className="cw-btn is-small" onClick={() => { cruise.setViewId(c.id); cruise.setStep(WORKSPACE_STEP.TIME); }}>Show in chart</button>
+                <button type="button" className="cw-btn is-small" onClick={() => onMap(c.id)}>View on map</button>
                 {c.id !== 'baseline' && <button type="button" className="cw-btn is-small" onClick={() => onEdit(c.id)}>Edit capacity</button>}
               </div>
             </article>
@@ -742,7 +744,7 @@ function EditPanel({ cruise, id, onClose }) {
       <div className="cd-drawer-body">
         <p className="cw-note">This is the Parking Scenario Planner's {alt.key ?? alt.name}: saved changes appear there, with the same facility and 3D geometry. Every number in the simulation follows the edit as you type; nothing is saved until you choose Save design.</p>
         <DesignEditor cruise={cruise} id={id} />
-        <div className="de-actions"><button type="button" className="cw-btn" onClick={() => { cruise.setViewId(id); cruise.viewOnMap(); }}>View on map</button></div>
+        <div className="de-actions"><button type="button" className="cw-btn" onClick={() => cruise.viewOnMap(id)}>View on map</button></div>
       </div>
     </aside>
   );
@@ -991,7 +993,7 @@ export default function CruiseWorkspace({ cruise, mapRef, cameraHandlers = {}, o
               {step === WORKSPACE_STEP.ACTIVITY && <ActivityTab cruise={c} />}
               {step === WORKSPACE_STEP.TURNOVER && <TurnoverTab cruise={c} />}
               {step === WORKSPACE_STEP.TIME && <TimeTab cruise={c} onDetails={setDrawer} setSlot={setSlot} details={garageDetails} setDetails={setGarageDetails} onCompare={() => cruise.setStep(WORKSPACE_STEP.COMPARE)} />}
-              {step === WORKSPACE_STEP.COMPARE && <CompareTab cruise={c} onMap={cruise.viewOnMap} onEdit={id => { setEditing(id); cruise.setViewId(id); }} />}
+              {step === WORKSPACE_STEP.COMPARE && <CompareTab cruise={c} onMap={id => cruise.viewOnMap(id)} onEdit={id => { setEditing(id); cruise.setViewId(id); }} />}
               {step === WORKSPACE_STEP.COMPARE && editing && <EditPanel cruise={c} id={editing} onClose={() => setEditing(null)} />}
             </>
           )}

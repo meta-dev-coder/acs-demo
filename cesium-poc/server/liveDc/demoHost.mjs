@@ -3,12 +3,17 @@
  * the read-only API handlers and /healthz. Everything except /login, /api/login, /api/logout and
  * /healthz needs a session. Only GET/HEAD reach the API handlers, plus POST on the two curated-data
  * read routes; the DataConnect interactive sign-in routes are not exposed.
+ *
+ * The PortMiami Digital Twin, when the release carries it (portMiami.mjs), is the second app on the same
+ * host: its frontend under /portmiami/ (part of webDir) and its /api/portmiami/... routes, behind the same
+ * session, read-only except the POST that interprets a question.
  */
 import { createServer } from 'node:http';
 import { createReadStream, existsSync, realpathSync, statSync } from 'node:fs';
 import { extname, join, resolve, sep } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { createLoginLimiter, createSessionSigner, parseCookies, verifyPassword } from './demoAuth.mjs';
+import { PORTMIAMI_API_PREFIX, PORTMIAMI_ASK, PORTMIAMI_PATH } from './portMiami.mjs';
 
 export const SESSION_COOKIE = 'live_dc_session';
 const MAX_LOGIN_BODY = 4096;
@@ -34,13 +39,13 @@ const BASE_HEADERS = {
 
 function loginPage(nonce) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>I-595 live demo</title><style nonce="${nonce}">
+<title>Digital Twin live demo</title><style nonce="${nonce}">
 body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0f1720;color:#e6edf3;font:15px system-ui,sans-serif}
 form{background:#18222d;padding:28px;border-radius:10px;width:min(320px,90vw);box-shadow:0 8px 30px #0006}
 h1{font-size:18px;margin:0 0 16px}input,button{width:100%;box-sizing:border-box;padding:10px;border-radius:6px;font:inherit}
 input{border:1px solid #334;background:#0f1720;color:inherit;margin-bottom:12px}button{border:0;background:#2f81f7;color:#fff;cursor:pointer}
 p{min-height:1.2em;color:#ff8a8a;margin:10px 0 0;font-size:13px}</style></head><body>
-<form id="f"><h1>I-595 live demo</h1><input id="pw" type="password" autocomplete="current-password" placeholder="Password" required autofocus>
+<form id="f"><h1>Digital Twin live demo</h1><input id="pw" type="password" autocomplete="current-password" placeholder="Password" required autofocus>
 <button type="submit">Sign in</button><p id="m" role="alert"></p></form>
 <script nonce="${nonce}">
 document.getElementById('f').addEventListener('submit', async e => {
@@ -74,7 +79,7 @@ function readBody(req, limit) {
 }
 
 export function createDemoHost({
-  passwordHash, webDir, apiHandlers = [], ask = null, status = {}, logger = console, now = Date.now, sessionKey, edgeGate = null,
+  passwordHash, webDir, apiHandlers = [], ask = null, status = {}, logger = console, now = Date.now, sessionKey, edgeGate = null, portMiami = null,
   sessionTtlMs = 8 * 3600_000, maxFailures = 5, lockoutMs = 15 * 60_000, home = '/?demo=i595',
 }) {
   if (!passwordHash) throw new Error('LIVE_DEMO_PASSWORD_HASH is required for the HTTP host');
@@ -133,7 +138,7 @@ export function createDemoHost({
       const { size } = statSync(real);
       res.writeHead(200, {
         ...BASE_HEADERS, 'content-type': TYPES[extname(real).toLowerCase()] ?? 'application/octet-stream', 'content-length': size,
-        'cache-control': decoded.startsWith('/assets/') ? 'private, max-age=31536000, immutable' : 'no-cache',
+        'cache-control': decoded.startsWith('/assets/') || decoded.startsWith(`${PORTMIAMI_PATH}/assets/`) ? 'private, max-age=31536000, immutable' : 'no-cache',
       });
       if (req.method === 'HEAD') return res.end();
       createReadStream(real).on('error', () => res.destroy()).pipe(res);
@@ -184,6 +189,15 @@ export function createDemoHost({
         return send(req, res, 302, { error: 'Sign in first.' }, { location: `/login?next=${encodeURIComponent(pathname + url.search)}` });
       }
       return send(req, res, 401, { error: 'Sign in first.' });
+    }
+
+    // PortMiami: /portmiami needs its trailing slash, because its data URLs are relative to the page.
+    if (pathname === PORTMIAMI_PATH && read) return send(req, res, 301, { error: 'Moved.' }, { location: `${PORTMIAMI_PATH}/${url.search}` });
+    if (pathname.startsWith(PORTMIAMI_API_PREFIX)) {
+      if (!portMiami) return send(req, res, 404, { error: 'Not found.' });
+      if (!read && !(method === 'POST' && pathname === PORTMIAMI_ASK)) return send(req, res, 405, { error: 'This deployment is read-only.' });
+      if (await portMiami.handle(req, res)) return;
+      return send(req, res, 404, { error: 'Not found.' });
     }
 
     if (pathname.startsWith('/api/')) {

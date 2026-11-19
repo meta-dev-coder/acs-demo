@@ -30,6 +30,7 @@ import { cruiseGarageImpact, dayCruises, dayEvents, explainInterval, inspectInte
 import { FOCUS, compareDesigns, demandVsCapacity, explainDemandAt } from '../cruise/demandCapacity.js';
 import { SEARCH_STATUS, findMinimumExpansion } from '../cruise/designSearch.js';
 import { installCruiseParkingLayer, utilisationColour } from '../cesium/cruiseParkingLayer.js';
+import { PLACEABLE_TYPES } from './useScenarioPlanner.js';
 import { getGeometry } from '../infrastructure/assetGeometryService.js';
 import { GEOMETRY_TIER, resolveAssetGeometry } from '../infrastructure/geometryResolver.js';
 
@@ -703,8 +704,17 @@ export function useCruiseDemand({ viewerRef, pickerRef = null, infra, buildingsB
   // closes or returns from the map, so its blue proposed layers (expansion floors, new garage,
   // surface lot) come back as the user left them.
   const plannerSelectionRef = useRef(null);
-  const viewOnMap = useCallback(() => {
-    const scenario = planner.scenarios.find(x => (selectedId === 'baseline' ? x.type === 'BASELINE' : x.id === selectedId));
+  const plannerRef = useRef(planner);
+  plannerRef.current = planner;
+  /**
+   * `designId` names the design to show (a card's or the recommendation's own); without it, the
+   * design already shown. Passing it, rather than setting it first and reading it back, is what makes
+   * the map show the design that was clicked and not the one shown before.
+   */
+  const viewOnMap = useCallback(designId => {
+    const id = typeof designId === 'string' ? designId : selectedId;
+    if (typeof designId === 'string') setViewId(designId);
+    const scenario = planner.scenarios.find(x => (id === 'baseline' ? x.type === 'BASELINE' : x.id === id));
     if (scenario && scenario.id !== planner.selected?.id) {
       if (plannerSelectionRef.current === null) plannerSelectionRef.current = planner.selected?.id ?? null;
       planner.select(scenario.id);
@@ -713,6 +723,16 @@ export function useCruiseDemand({ viewerRef, pickerRef = null, infra, buildingsB
     setSelectedGarageId(garageId);
     setMapMode(true);
     setTimeout(() => { if (garageId && !layerRef.current?.focusFacility(garageId)) layerRef.current?.focusTerminal(dvc?.terminals[0]); }, 80);
+    // Then the design's own site, once the planner has drawn it in blue: A — the expanded garage with
+    // its added floors; B and C — the placed new garage or surface lots. With nothing placed, the
+    // camera stays on the garage in view.
+    if (scenario && scenario.type !== 'BASELINE') {
+      setTimeout(() => {
+        const p = plannerRef.current;
+        if (PLACEABLE_TYPES.has(scenario.type)) p.placement?.frame?.();
+        else p.flyToScenario?.();
+      }, 900);
+    }
   }, [planner, selectedId, focus, dvc]);
   useEffect(() => { if (!workspaceOpen) setMapMode(false); }, [workspaceOpen]);
   useEffect(() => {

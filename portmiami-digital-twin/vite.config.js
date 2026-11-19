@@ -30,6 +30,10 @@ export default defineConfig({
     cesium({ cesiumBuildRootPath, cesiumBuildPath: join(cesiumBuildRootPath, 'Cesium') }),
     liveTrafficPlugin,
   ],
+  // Served from the site root by default. The ACS EC2 release builds it under /portmiami/ beside the
+  // I-595 app (cesium-poc/tools/build-live-dc-bundle.mjs); the app's data URLs are relative, and its
+  // /api/portmiami routes are answered by the same host.
+  base: process.env.PORTMIAMI_BASE || '/',
   build: { target: 'esnext' },
   // 5200, because the ACS dev server owns 5188 and the repository root owns 5180. strictPort so a
   // clash fails loudly instead of silently moving the app to another port mid-demo.
