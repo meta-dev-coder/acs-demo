@@ -13,6 +13,7 @@ import { buildSnapshot } from '../server/ifcSpatial/reports/snapshot.mjs';
 import { renderReportPdf } from '../server/ifcSpatial/reports/pdfReport.mjs';
 import { renderRegisterXlsx, safeCell } from '../server/ifcSpatial/reports/xlsxRegister.mjs';
 import { draftEmail, toEml } from '../server/ifcSpatial/reports/emailDraft.mjs';
+import { validateReportBody } from '../server/ifcSpatial/reports/service.mjs';
 import { ApsError } from '../server/aps/oauth.mjs';
 import { inspectionReport, specSheet } from './pdfFixtures.mjs';
 
@@ -88,13 +89,13 @@ test('eligibility: degraded is a review candidate, never an inspection requireme
   assert.equal(degradedNoRecords.classification, 'REVIEW_RECOMMENDED');
 });
 
-async function sampleSnapshot(extra = {}) {
+async function sampleSnapshot(extra = {}, more = {}) {
   const results = new Map([['TX-A', { analysis: await analysis('TX-A', LATEST_ACTION) }], ['TX-C', { analysis: await analysis('TX-C', { i: inspectionReport({ assetId: 'TX-C', date: '2025-06-01', number: 'C1', condition: 'GOOD (4/5)', findings: [['Bushings', 'OK', 'Clean.']] }) }) }],
     ['TX-D', { analysis: analyzeAssetDocuments({ asset: TX('TX-D'), docs: [] }) }], ['TX-E', { error: 'Your ACC account cannot read this document.' }]]);
   return buildSnapshot({ reportId: 'RPT-20261126-abcdefgh', request: { question: 'Prepare a report of all transformers requiring inspection and draft an email to the electrical maintenance team.', kind: 'INSPECTION', types: ['TRANSFORMER'],
     typeLabels: [{ singular: 'transformer', plural: 'transformers' }], outputs: { pdf: true, xlsx: true, email: true }, recipientGroup: 'Electrical Maintenance Team', filters: {}, options: {}, ...extra },
   assets: ['TX-A', 'TX-C', 'TX-D', 'TX-E'].map(id => input(id)), results, project: { id: 'b.p', name: 'Seagirt Electrical Digital Twin POC' }, model: { fileName: 'net.ifc', versionNumber: 3 }, now: NOW,
-  context: [{ id: 'X', lon: -76.541, lat: 39.256 }] });
+  context: [{ id: 'X', lon: -76.541, lat: 39.256 }], ...more });
 }
 
 test('snapshot: one consistent result for every deliverable; coverage and limitations said', async () => {
@@ -433,4 +434,111 @@ test('gmail with the real report store: addresses saved in the draft, real files
   assert.deepEqual([again.emailDraft.sendState, again.emailDraft.sent, again.emailDraft.to], ['DRAFT', null, []]);
   assert.deepEqual(again.artifacts.map(a => a.artifactId), r.artifacts.map(a => a.artifactId), 'the files are not regenerated');
   assert.equal(again.emailSent.length, 2, 'both sent drafts stay in the report');
+});
+
+test('a report about a selected area: kept as a snapshot, named, drawn on the PDF plot, in the register and the email', async () => {
+  const area = { selectionId: 'area-1a2b3c4d', label: 'Berth Zone W', zone: 'Berth Zone W', versionNumber: 3, areaM2: 41250, placementMode: 'USER_CALIBRATED', resolvedAt: '2026-11-26T08:59:00.000Z',
+    geometry: { type: 'Polygon', coordinates: [[[-76.542, 39.255], [-76.540, 39.255], [-76.540, 39.257], [-76.542, 39.257], [-76.542, 39.255]]] }, listed: 9, kept: 4, dropped: ['TX-Z'],
+    counts: { within: 12, intersects: 2, crosses: 3, unknown: 1 } };
+  const v = validateReportBody({ request: { types: ['TRANSFORMER'], outputs: {} }, assets: [], area });
+  assert.equal(v.area.label, 'Berth Zone W');
+  assert.equal(v.area.geometry.coordinates[0].length, 5);
+  assert.equal(validateReportBody({ request: { types: ['TRANSFORMER'] }, assets: [], area: { geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 1]]] } } }).area, null, 'a broken ring is no area');
+  const s = await sampleSnapshot({}, { area: v.area });
+  assert.equal(s.area.selectionId, 'area-1a2b3c4d');
+  assert.equal(s.names.reportTitle, 'Selected Area Transformer Inspection Report');
+  assert.equal(s.names.pdfFile, 'Selected_Area_Transformer_Inspection_Report_2026-11-26.pdf');
+  assert.equal(s.names.xlsxFile, 'Selected_Area_Transformer_Inspection_Register_2026-11-26.xlsx');
+  assert.ok(s.limitations.some(l => /selected on the map/.test(l) && /bounding-box footprints/.test(l)));
+  assert.ok(s.limitations.some(l => /1 modelled asset has no position/.test(l)));
+  const text = (await extractPdfText(await renderReportPdf(s, { now: NOW }))).pages.flatMap(p => p.lines.map(l => l.cells.map(c => c.text).join(' '))).join('\n');
+  assert.ok(text.includes('Selected Area Transformer Inspection Report'));
+  assert.match(text, /Scope: selected area/);
+  assert.match(text, /Selected area/);
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(await renderRegisterXlsx(s));
+  const rows = [];
+  wb.getWorksheet('Sources and Criteria').eachRow(r => rows.push(r.values.slice(1)));
+  assert.ok(rows.some(r => r[0] === 'Scope' && /Berth Zone W/.test(r[1])));
+  assert.ok(rows.some(r => r[0] === 'Area boundary (WGS84 lon, lat)' && /-76\.542000 39\.255000/.test(r[1])));
+  const d = draftEmail(s, { attachments: [{ filename: s.names.pdfFile }, { filename: s.names.xlsxFile }] });
+  assert.match(d.body, /in the selected area of Seagirt \(Berth Zone W, IFC V3\)/);
+  // The snapshot is a copy: changing the selection afterwards does not change it.
+  v.area.label = 'Somewhere else';
+  assert.equal(s.area.label, 'Berth Zone W');
+});
+
+test('endpoint: an area report covers only the assets the server places in the area, whatever the page lists', async () => {
+  const { modelToLonLatFor } = await import('../src/ifcSpatial/placement.js');
+  const h = harness({ 'TX-M1_Transformer_Inspection-2026-001_2026-10-28.pdf': inspectionReport({ assetId: 'TX-M1', date: '2026-10-28', number: 'M1-26', condition: 'POOR (2/5)', findings: [['Radiators and cooling fans', 'Defect', 'Leaking.']],
+    actions: [['Thermographic inspection of LV connections', 'High', '2026-12-15']] }), 'TX-M2_Transformer.pdf': specSheet({ assetId: 'TX-M2', fields: [['Rating', '12 MVA']] }) });
+  const prepared = (await h.call('POST', '/api/ifc-spatial/prepare?file=net.ifc')).json;
+  const elements = (await h.call('GET', prepared.elementsUrl)).json.elements;
+  const placement = { mode: 'USER_CALIBRATED', lon: -76.54, lat: 39.25, heightOffset: 0, headingDeg: 0, scale: 1 };
+  const toLL = modelToLonLatFor(placement, null, 0);
+  const box = elements.find(e => e.networkId === 'TX-M1').bbox;
+  const c = toLL((box.min[0] + box.max[0]) / 2, (box.min[1] + box.max[1]) / 2, 0);
+  const m2 = elements.find(e => e.networkId === 'TX-M2').bbox;
+  const d = 0.00005; // about 5 m around TX-M1's centre
+  const geometry = { type: 'Polygon', coordinates: [[[c.lon - d, c.lat - d], [c.lon + d, c.lat - d], [c.lon + d, c.lat + d], [c.lon - d, c.lat + d], [c.lon - d, c.lat - d]]] };
+  const tm2 = toLL((m2.min[0] + m2.max[0]) / 2, (m2.min[1] + m2.max[1]) / 2, 0);
+  assert.ok(Math.hypot(tm2.lon - c.lon, tm2.lat - c.lat) > 2 * d, 'TX-M2 is outside the test area');
+  const body = { request: { question: 'Prepare an inspection report for transformers in this area', kind: 'INSPECTION', types: ['TRANSFORMER'], typeLabels: [{ singular: 'transformer', plural: 'transformers' }],
+    outputs: { pdf: true, xlsx: false, email: true } }, assets: ['TX-M1', 'TX-M2'].map(id => input(id)), context: [],
+    area: { key: prepared.key, geometry, placement, label: 'Custom selected area', selectionId: 'whatever-the-page-says' } };
+  const created = await h.call('POST', '/api/ifc-spatial/reports?file=net.ifc', body);
+  assert.equal(created.status, 202, JSON.stringify(created.json));
+  const r = await until(h, created.json.reportId);
+  assert.equal(r.status, 'COMPLETED', JSON.stringify(r.error ?? r.steps));
+  assert.equal(r.coverage.evaluated, 1, 'TX-M2 was listed by the page but is outside the area');
+  assert.match(r.steps[0].detail, /in the selected area \(Custom selected area\)/);
+  assert.equal(r.artifacts[0].filename, 'Selected_Area_Transformer_Inspection_Report_2026-11-26.pdf');
+  const snap = (await h.call('GET', `/api/ifc-spatial/reports/${r.reportId}/snapshot?file=net.ifc`)).json;
+  assert.match(snap.area.selectionId, /^area-[0-9a-f]{8}$/, 'the server’s own selection id, not the page’s');
+  assert.deepEqual(snap.area.dropped, ['TX-M2']);
+  assert.match(r.emailDraft.body, /in the selected area of Seagirt \(Custom selected area, IFC V2\)/);
+  // A bad area is refused, not silently widened to the terminal.
+  const bad = await h.call('POST', '/api/ifc-spatial/reports?file=net.ifc', { ...body, area: { ...body.area, geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 1], [1, 0], [0, 1]]] } } });
+  assert.equal(bad.status, 400);
+  assert.equal(bad.json.error.code, 'INVALID_AREA');
+});
+
+test('endpoint: a maintenance report from an investigation: the same assessment, a maintenance PDF, a corrective action register and a draft', async () => {
+  const h = harness({
+    'TX-M1_Transformer_Inspection-2025-001_2025-04-10.pdf': inspectionReport({ assetId: 'TX-M1', date: '2025-04-10', number: 'M1-25', condition: 'FAIR (3/5)', findings: [['Radiators and cooling fans', 'Attention', 'Weep.']], actions: [['Re-sample oil for DGA', 'Medium', '2025-10-10']] }),
+    'TX-M1_Transformer_Inspection-2026-001_2026-10-28.pdf': inspectionReport({ assetId: 'TX-M1', date: '2026-10-28', number: 'M1-26', condition: 'POOR (2/5)', findings: [['Radiators and cooling fans', 'Defect', 'Oil leaking at radiator 3.'], ['Cooling fans', 'Defect', 'Fan 4 failed.']],
+      actions: [['Repair radiator 3 isolation valve', 'High', '2026-12-15']] }),
+  });
+  await h.call('POST', '/api/ifc-spatial/prepare?file=net.ifc');
+  const status = { code: 'DEGRADED', label: 'Degraded', source: 'REPORTED', asOf: '2026-11-24' };
+  const body = { request: { question: 'Prepare a report of these issues and draft an email to the maintenance team', kind: 'MAINTENANCE', types: ['TRANSFORMER'], typeLabels: [{ singular: 'transformer', plural: 'transformers' }],
+    outputs: { pdf: true, xlsx: true, email: true }, recipientGroup: 'Maintenance Team', investigation: { question: 'For degraded assets, what needs to be fixed?', primaryIntent: 'CORRECTIVE_ACTIONS', statusFilters: ['DEGRADED'], scopeLabel: 'Entire terminal' } },
+  assets: [input('TX-M1', { status }), input('TX-M2', { status })], context: [] };
+  const created = await h.call('POST', '/api/ifc-spatial/reports?file=net.ifc', body);
+  assert.equal(created.status, 202, JSON.stringify(created.json));
+  const r = await until(h, created.json.reportId);
+  assert.equal(r.status, 'COMPLETED', JSON.stringify(r.error ?? r.steps));
+  assert.match(r.steps.find(x => x.id === 'evaluate').detail, /^1 with documented findings, 2 actions without verified closure$/);
+  assert.deepEqual(r.artifacts.map(a => a.filename), ['Transformer_Maintenance_Report_2026-11-26.pdf', 'Corrective_Action_Register_2026-11-26.xlsx']);
+  assert.deepEqual(r.assets.map(a => [a.id, a.classification]), [['TX-M1', 'AVAILABLE'], ['TX-M2', 'NO_DOCUMENTS']]);
+  const text = (await extractPdfText((await h.call('GET', r.artifacts[0].url)).buf)).pages.flatMap(p => p.lines.map(l => l.cells.map(c => c.text).join(' '))).join('\n');
+  for (const needle of ['Transformer Maintenance Report', 'Executive summary', 'Matching assets', 'Documented defects and findings', 'Fan 4 failed.', 'Documented corrective actions and closure', 'Repair radiator 3 isolation valve', 'No closure evidence', 'Data completeness', 'Source references', 'Limitations'])
+    assert.ok(text.includes(needle), needle);
+  assert.match(text, /No ACC documents are linked to this asset/);
+  const wb = new ExcelJS.Workbook(); await wb.xlsx.load((await h.call('GET', r.artifacts[1].url)).buf);
+  assert.deepEqual(wb.worksheets.map(w => w.name), ['Corrective Action Register', 'Asset Summary', 'Restrictions and Closure', 'Sources and Criteria']);
+  const reg = wb.getWorksheet('Corrective Action Register');
+  const rows = []; reg.eachRow((row, i) => { if (i > 1) rows.push(row.values.slice(1)); });
+  assert.ok(rows.some(x => x[0] === 'TX-M1' && x[7] === 'Cooling fans' && x[9] === 'Defect' && x[17] === 1), 'a finding with its severity and page');
+  assert.ok(rows.some(x => x[0] === 'TX-M1' && x[13] === 'Repair radiator 3 isolation valve' && x[15] === 'No closure evidence'));
+  assert.ok(rows.some(x => x[0] === 'TX-M2' && x[18] === 'No documents linked' && /Establish the cause/.test(x[14])), 'an asset without evidence: a row saying so, no findings invented');
+  assert.equal(new Set(rows.filter(x => x[7]).map(x => `${x[0]}|${x[7]}`)).size, rows.filter(x => x[7]).length, 'no duplicate finding rows');
+  assert.match(r.emailDraft.subject, /^Seagirt — Maintenance findings$/);
+  assert.match(r.emailDraft.body, /Documented inspection findings: TX-M1 \(radiators and cooling fans, cooling fans\)/);
+  assert.match(r.emailDraft.body, /2 documented corrective actions have no verified closure/);
+  assert.match(r.emailDraft.body, /TX-M2 has no documented findings; the cause of the reported status is not established/);
+  assert.equal(r.emailDraft.sendState, 'DRAFT', 'never sent automatically');
+  const snap = (await h.call('GET', `/api/ifc-spatial/reports/${r.reportId}/snapshot?file=net.ifc`)).json;
+  assert.equal(snap.request.investigation.question, 'For degraded assets, what needs to be fixed?');
+  assert.equal(snap.kind, 'MAINTENANCE');
 });

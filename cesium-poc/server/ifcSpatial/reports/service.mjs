@@ -16,6 +16,7 @@ import { join } from 'node:path';
 import { ApsError } from '../../aps/oauth.mjs';
 import { NO_POLICY } from './eligibility.mjs';
 import { buildSnapshot, REPORT_KIND } from './snapshot.mjs';
+import { buildMaintenanceSnapshot } from './maintenanceSnapshot.mjs';
 import { renderReportPdf } from './pdfReport.mjs';
 import { renderRegisterXlsx } from './xlsxRegister.mjs';
 import { draftEmail, toEml } from './emailDraft.mjs';
@@ -37,7 +38,10 @@ export function validateReportBody(body) {
   if (!Array.isArray(body.assets)) throw new ApsError('INVALID_REPORT', 400, 'List the assets the request covers (assets).');
   if (body.assets.length > 2000) throw new ApsError('INVALID_REPORT', 400, 'Too many assets for one report.');
   const request = {
-    question: str(r.question, 600) ?? '', kind: r.kind === REPORT_KIND.ASSET_LIST ? REPORT_KIND.ASSET_LIST : REPORT_KIND.INSPECTION,
+    question: str(r.question, 600) ?? '', kind: [REPORT_KIND.ASSET_LIST, REPORT_KIND.MAINTENANCE].includes(r.kind) ? r.kind : REPORT_KIND.INSPECTION,
+    // A maintenance report: the investigation it comes from (its question, objective, filters and scope label).
+    investigation: r.kind === REPORT_KIND.MAINTENANCE && r.investigation ? { question: str(r.investigation.question, 600), primaryIntent: str(r.investigation.primaryIntent, 40),
+      statusFilters: (Array.isArray(r.investigation.statusFilters) ? r.investigation.statusFilters : []).filter(x => STATUS_CODES.has(x)).slice(0, 5), scopeLabel: str(r.investigation.scopeLabel, 120) } : null,
     types: r.types, typeLabels: (r.typeLabels ?? []).slice(0, 10).map(l => ({ singular: str(l?.singular, 60) ?? '', plural: str(l?.plural, 60) ?? '' })),
     outputs: { pdf: Boolean(r.outputs?.pdf), xlsx: Boolean(r.outputs?.xlsx), email: Boolean(r.outputs?.email) },
     recipientGroup: str(r.recipientGroup, 120),
@@ -52,7 +56,23 @@ export function validateReportBody(body) {
     status: a?.status ? { code: STATUS_CODES.has(a.status.code) ? a.status.code : 'UNKNOWN', label: str(a.status.label, 40), source: str(a.status.source, 40), asOf: str(a.status.asOf, 30), evaluatedAt: str(a.status.evaluatedAt, 30) } : null,
   })).filter(a => a.id);
   const context = (Array.isArray(body.context) ? body.context : []).slice(0, 2000).map(c => ({ id: str(c?.id, 80), lon: num(c?.lon), lat: num(c?.lat) })).filter(c => c.lon !== null && c.lat !== null);
-  return { request, assets: [...new Map(assets.map(a => [a.id, a])).values()], context, revisionOf: REPORT_ID.test(body.revisionOf ?? '') ? body.revisionOf : null, regenerate: Boolean(body.regenerate) };
+  return { request, assets: [...new Map(assets.map(a => [a.id, a])).values()], context, revisionOf: REPORT_ID.test(body.revisionOf ?? '') ? body.revisionOf : null, regenerate: Boolean(body.regenerate),
+    area: areaOf(body.area) };
+}
+
+/**
+ * A report's selected area, as the server resolved it (api.mjs scopes the request before it gets here): kept
+ * in the snapshot, so later changes to the selection never change a generated report.
+ */
+function areaOf(a) {
+  if (!a || typeof a !== 'object') return null;
+  const ring = a.geometry?.type === 'Polygon' && Array.isArray(a.geometry.coordinates?.[0]) ? a.geometry.coordinates[0].filter(p => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1])).slice(0, 202).map(p => [Number(p[0]), Number(p[1])]) : [];
+  if (ring.length < 4) return null;
+  const n = v => (Number.isFinite(Number(v)) ? Number(v) : null);
+  return { selectionId: str(a.selectionId, 40), label: str(a.label, 80) ?? 'Custom selected area', zone: str(a.zone, 80), versionNumber: n(a.versionNumber), areaM2: n(a.areaM2),
+    placementMode: str(a.placementMode, 40), resolvedAt: str(a.resolvedAt, 40), geometry: { type: 'Polygon', coordinates: [ring] }, coordinateSystem: 'EPSG:4326',
+    listed: n(a.listed), kept: n(a.kept), dropped: Array.isArray(a.dropped) ? a.dropped.slice(0, 200).map(x => str(x, 80)).filter(Boolean) : [],
+    counts: { within: n(a.counts?.within) ?? 0, intersects: n(a.counts?.intersects) ?? 0, crosses: n(a.counts?.crosses) ?? 0, unknown: n(a.counts?.unknown) ?? 0 } };
 }
 
 /**
@@ -122,7 +142,7 @@ export function createReportService({ dir, aps, analyzeAsset, listing, now = () 
     const known = new Set(index.assets.map(a => a.assetId));
     const assets = input.assets.filter(a => known.has(a.id));
     const unknown = input.assets.filter(a => !known.has(a.id)).map(a => a.id);
-    const key = createHash('sha256').update(JSON.stringify([owner, files.project.id, fileName, index.model?.versionNumber, index.lastSyncedAt, input.request, assets.map(a => [a.id, a.status?.code, a.status?.asOf]), policy()])).digest('hex');
+    const key = createHash('sha256').update(JSON.stringify([owner, files.project.id, fileName, index.model?.versionNumber, index.lastSyncedAt, input.request, assets.map(a => [a.id, a.status?.code, a.status?.asOf]), policy(), input.area?.selectionId ?? null])).digest('hex');
     purge();
     if (!input.regenerate) {
       const same = [...jobs.values()].find(j => j.key === key && j.owner === owner && ![JOB.FAILED, JOB.CANCELLED].includes(j.status));
@@ -144,11 +164,11 @@ export function createReportService({ dir, aps, analyzeAsset, listing, now = () 
     const job = {
       reportId, key, owner, projectId: files.project.id, projectName: files.project.name, fileName, model: { fileName, versionNumber: index.model?.versionNumber ?? null },
       revision: prev && prev.owner === owner ? prev.revision + 1 : 1, revisionOf: prev && prev.owner === owner ? prev.reportId : null,
-      createdAt: new Date(now()).toISOString(), updatedAt: new Date(now()).toISOString(), status: JOB.PENDING, request: input.request, unknown,
+      createdAt: new Date(now()).toISOString(), updatedAt: new Date(now()).toISOString(), status: JOB.PENDING, request: input.request, unknown, area: input.area,
       steps: [
-        { id: 'select', label: 'Identifying matching assets', state: 'done', detail: `${assets.length} ${input.request.typeLabels.map(l => l.plural).join(', ') || 'assets'} in the model` },
+        { id: 'select', label: 'Identifying matching assets', state: 'done', detail: `${assets.length} ${input.request.typeLabels.map(l => l.plural).join(', ') || 'assets'} ${input.area ? `in the selected area (${input.area.label})` : 'in the model'}` },
         { id: 'documents', label: 'Reviewing ACC documents', state: 'pending', done: 0, total: assets.length },
-        { id: 'evaluate', label: input.request.kind === REPORT_KIND.INSPECTION ? 'Evaluating inspection requirements' : 'Building the asset summary', state: 'pending' },
+        { id: 'evaluate', label: input.request.kind === REPORT_KIND.INSPECTION ? 'Evaluating inspection requirements' : input.request.kind === REPORT_KIND.MAINTENANCE ? 'Building the maintenance assessment' : 'Building the asset summary', state: 'pending' },
         ...(outputs.pdf ? [{ id: 'pdf', label: 'Generating PDF report', state: 'pending' }] : []),
         ...(outputs.xlsx ? [{ id: 'xlsx', label: 'Generating Excel register', state: 'pending' }] : []),
         ...(outputs.email ? [{ id: 'email', label: 'Preparing email draft', state: 'pending' }] : []),
@@ -186,10 +206,12 @@ export function createReportService({ dir, aps, analyzeAsset, listing, now = () 
     step(job, 'evaluate', { state: 'running' });
     const pol = policy();
     if (job.request.options.dueWithinDays) Object.assign(pol, { dueWithinDays: job.request.options.dueWithinDays });
-    job.snapshot = buildSnapshot({ reportId: job.reportId, revision: job.revision, revisionOf: job.revisionOf, request: job.request, assets, results, project, model: job.model,
-      documentsIndex: index, now: now(), policy: pol, context });
+    const build = job.request.kind === REPORT_KIND.MAINTENANCE ? buildMaintenanceSnapshot : buildSnapshot;
+    job.snapshot = build({ reportId: job.reportId, revision: job.revision, revisionOf: job.revisionOf, request: job.request, assets, results, project, model: job.model,
+      documentsIndex: index, now: now(), policy: pol, context, area: job.area ?? null });
     if (job.unknown.length) job.snapshot.limitations.unshift(`${job.unknown.length} requested asset id${job.unknown.length === 1 ? ' is' : 's are'} not in the model's asset registry and ${job.unknown.length === 1 ? 'was' : 'were'} left out: ${job.unknown.join(', ')}.`);
-    step(job, 'evaluate', { state: 'done', detail: job.request.kind === REPORT_KIND.INSPECTION ? `${job.snapshot.summary.inspectionRequired} require inspection, ${job.snapshot.summary.reviewRecommended} for review` : `${job.snapshot.summary.included} included` });
+    step(job, 'evaluate', { state: 'done', detail: job.request.kind === REPORT_KIND.INSPECTION ? `${job.snapshot.summary.inspectionRequired} require inspection, ${job.snapshot.summary.reviewRecommended} for review`
+      : job.request.kind === REPORT_KIND.MAINTENANCE ? `${job.snapshot.summary.withFindings} with documented findings, ${job.snapshot.summary.openActions} actions without verified closure` : `${job.snapshot.summary.included} included` });
     job.status = JOB.GENERATING;
     persist(job);
     const want = job.request.outputs;
@@ -239,10 +261,13 @@ export function createReportService({ dir, aps, analyzeAsset, listing, now = () 
       request: job.request, model: job.model, illustrative: s?.illustrative ?? null,
       summary: s?.summary ?? null, coverage: s?.inventoryCoverage ?? null, criteria: s?.appliedCriteria ?? null, limitations: s?.limitations ?? null, names: s?.names ?? null,
       selectedIds: s?.selectedIds ?? [], reviewIds: s?.reviewIds ?? [],
-      assets: (s?.assets ?? []).map(a => ({ id: a.id, typeLabel: a.typeLabel, classification: a.inspection.classification, label: a.inspection.label, priority: a.inspection.priority.level,
+      assets: (s?.assets ?? []).map(a => (s.kind === REPORT_KIND.MAINTENANCE ? { id: a.id, typeLabel: a.typeLabel, classification: a.evidenceAvailability, label: a.row.text, priority: null, reason: a.row.evidence,
+        latestInspection: a.latestInspection?.date ?? null, condition: a.latestInspection?.condition?.label ?? null, status: a.statusLabel, nextDue: null, followUp: a.documentedCorrectiveActions[0]?.text ?? null } : {
+        id: a.id, typeLabel: a.typeLabel, classification: a.inspection.classification, label: a.inspection.label, priority: a.inspection.priority.level,
         reason: a.inspection.reasons.find(r => r.classification === a.inspection.classification)?.text ?? null, latestInspection: a.latestInspection?.date ?? null,
         condition: a.condition ? `${a.condition.label ?? ''}${Number.isFinite(a.condition.score) ? ` ${a.condition.score}/${a.condition.scale}` : ''}`.trim() : null,
         status: a.operationalStatus?.label ?? null, nextDue: a.inspection.nextInspection.date, followUp: a.inspection.followUps[0]?.text ?? null })),
+      maintenance: s?.maintenance ?? null,
       evaluated: s?.evaluated ?? [], sources: s ? s.sources.length : 0, documentsRead: s ? s.documentVersions.filter(d => ['SUCCESS', 'PARTIAL'].includes(d.status)).length : 0,
       artifacts: job.artifacts.map(a => ({ artifactId: a.artifactId, type: a.type, title: a.title ?? null, filename: a.filename, size: a.size, status: a.status, error: a.error, createdAt: a.createdAt ?? null,
         url: a.status === 'COMPLETED' ? `/api/ifc-spatial/reports/${job.reportId}/artifacts/${a.artifactId}?file=${encodeURIComponent(job.fileName)}` : null })),

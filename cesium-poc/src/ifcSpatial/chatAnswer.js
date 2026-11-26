@@ -112,14 +112,15 @@ export function renderChatAnswer(v, { describe = () => null } = {}) {
   if (status === 'loading') {
     return `<div class="tw-msg"><span class="tw-avatar">${sparkleSvg(20)}</span><div class="tw-msg-b"><p class="tw-say is-loading" aria-busy="true"><span class="tw-dots" aria-hidden="true"><i></i><i></i><i></i></span>${esc(v.title ?? 'Working…')}</p></div></div>`;
   }
-  const meta = [v.kind, status === 'limited' ? 'partial' : status === 'unsupported' ? 'not answerable from the data' : status === 'error' ? 'error' : null].filter(Boolean).join(' · ');
+  // With a scope chip the kind is left out (one label per answer); a partial or failed answer still says so.
+  const meta = [v.scope ? null : v.kind, status === 'limited' ? 'partial' : status === 'unsupported' ? 'not answerable from the data' : status === 'error' ? 'error' : null].filter(Boolean).join(' · ');
   const lead = v.lead && v.lead.trim() !== say.trim() ? `<div class="tw-lead">${md(v.lead)}</div>` : '';
   const sub = v.title && v.say && v.title !== v.say && !v.asset ? `<p class="tw-sub">${esc(v.title)}</p>` : '';
   const metrics = v.metrics?.length ? `<div class="tw-metrics">${v.metrics.map(m => `<div class="tw-metric is-${tone(m.tone)}"><b>${esc(m.value)}</b><span>${esc(m.label)}</span></div>`).join('')}</div>` : '';
   const groups = (v.groups ?? []).filter(g => g.items?.length).map(g => groupHtml(g, describe)).join('');
   const bullets = v.bullets?.length ? `<ul class="tw-list">${v.bullets.slice(0, 5).map(b => `<li>${md(b).replace(/^<p>|<\/p>$/g, '')}</li>`).join('')}</ul>${v.bullets.length > 5 ? `<details class="tw-more"><summary>${v.bullets.length - 5} more</summary><ul class="tw-list">${v.bullets.slice(5).map(b => `<li>${md(b).replace(/^<p>|<\/p>$/g, '')}</li>`).join('')}</ul></details>` : ''}` : '';
   const actions = (v.actions ?? []).map(a => `<button type="button" class="tw-btn${a.primary ? ' is-primary' : ''}"${attrs(a.attrs)}>${esc(a.label)}</button>`).join('');
-  const suggestions = (v.followUps ?? []).slice(0, 3);
+  const suggestions = (v.followUps ?? []).slice(0, v.suggestLimit ?? 3);
   const details = (v.details ?? []).filter(d => d.items?.length || d.markdown || d.html);
   const sources = v.sources ?? [];
   const sourcesHtml = details.length || sources.length ? `<details class="tw-sources"><summary>${ASK_ICONS.info}<span>Sources &amp; assumptions</span></summary>
@@ -127,7 +128,7 @@ export function renderChatAnswer(v, { describe = () => null } = {}) {
       ${details.map(d => `<div class="tw-src-sec"><h5>${esc(d.title)}</h5>${d.html ?? (d.markdown ? md(d.markdown) : `<ul class="tw-list">${d.items.map(x => `<li>${md(x).replace(/^<p>|<\/p>$/g, '')}</li>`).join('')}</ul>`)}</div>`).join('')}</details>` : '';
   // A plain answer (the document workspace) is its own header: a sentence only when it answers directly.
   const bubble = v.plain && !say ? '' : `<div class="tw-msg is-${esc(status)}"><span class="tw-avatar">${sparkleSvg(20)}</span><div class="tw-msg-b">
-      <p class="tw-say">${esc(say)}</p>${v.say2 ? `<p class="tw-say2">${esc(v.say2)}</p>` : ''}${sub}${lead}${meta && !v.plain ? `<span class="tw-meta">${esc(meta)}</span>` : ''}</div></div>`;
+      ${v.scope ? `<span class="tw-scope${/^Selected area/.test(v.scope) ? ' is-area' : ''}">${ASK_ICONS.scan}<span>${esc(v.scope)}</span></span>` : ''}<p class="tw-say">${esc(say)}</p>${v.say2 ? `<p class="tw-say2">${esc(v.say2)}</p>` : ''}${sub}${lead}${meta && !v.plain ? `<span class="tw-meta">${esc(meta)}</span>` : ''}</div></div>`;
   return `${bubble}
     ${v.asset ? assetCardHtml(v.asset) : ''}${v.relation ? relationHtml(v.relation) : ''}${v.collection ? collectionHtml(v.collection) : ''}${metrics}${groups}${v.html ? `<div class="tw-card tw-legacy">${v.html}</div>` : ''}${bullets}${v.extraHtml ? `<div class="tw-extra">${v.extraHtml}</div>` : ''}
     ${actions ? `<div class="tw-btns">${actions}</div>` : ''}

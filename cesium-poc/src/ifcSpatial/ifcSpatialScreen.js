@@ -294,6 +294,13 @@ export function mountIfcSpatial({ host = document.body, syncIntervalMs = 60_000,
     net = createNetworkTwin({ viewer, ...netIndex, modelToLonLat, panel: netPanel, left: $('.isp-net'), askHost: $('.isp-ask'), header: $('.isp-scenario-pill'),
       assetsHost: $('.isp-assets'), chainHost: $('.isp-chain'), sourceLabel: `${st.fileName ?? ''}${st.manifest?.versionNumber ? ` v${st.manifest.versionNumber}` : ''}`,
       onWorkspace: ws => setWorkspace(ws), opsHost: $('.isp-ops'), powerHost: $('.isp-power'), onDocument: (id, opts) => docs.openPreview(id, opts), compareTools,
+      // Select Area: membership is resolved by the server from its own elements, through the placement the area was drawn on.
+      areaTools: {
+        version: () => ({ key: st.manifest?.key ?? null, versionNumber: st.manifest?.versionNumber ?? null, fileName: st.fileName }),
+        resolve: (geometry, { nearM = null, zones = [] } = {}) => request(`/area?file=${encodeURIComponent(st.fileName)}`, { method: 'POST',
+          body: { key: st.manifest?.key, geometry, placement: st.placement, nearM, zones } }),
+        placement: () => st.placement,
+      },
       docTools: {
         analyze: (assetId, type) => request(`/documents/analysis?file=${encodeURIComponent(st.fileName)}&asset=${encodeURIComponent(assetId)}&type=${encodeURIComponent(type)}${st.manifest?.versionNumber ? `&version=${st.manifest.versionNumber}` : ''}`),
         fleet: () => request(`/documents/analysis/fleet?file=${encodeURIComponent(st.fileName)}`),
@@ -972,6 +979,8 @@ export function mountIfcSpatial({ host = document.body, syncIntervalMs = 60_000,
   }
 
   function pickAt(position) {
+    // Drawing an area: its clicks are corners, never a selection.
+    if (net?.areaDrawing?.()) return null;
     const picked = pickThrough(position);
     if (net?.pick(picked)) { right.hidden = true; return { globalId: net.state().selectedId }; }
     if (picked && picked.primitive === model && typeof picked.getProperty === 'function') {
@@ -1136,6 +1145,9 @@ export function mountIfcSpatial({ host = document.body, syncIntervalMs = 60_000,
     focus: Object.freeze({ asset: id => net?.focus(id) ?? false, state: () => net?.focusState() ?? null }),
     supply: id => net?.supply(id) ?? null, topologyReport: () => net?.topologyReport() ?? null,
     cameraInfo: () => (viewer && !viewer.isDestroyed() ? { headingDeg: Math.round(CMath.toDegrees(viewer.camera.heading)), pitchDeg: Math.round(CMath.toDegrees(viewer.camera.pitch)),
-      heightM: Math.round(viewer.camera.positionCartographic.height) } : null), compare: Object.freeze({ ...compare }), routeInfo: id => net?.routeInfo(id) ?? null });
+      heightM: Math.round(viewer.camera.positionCartographic.height) } : null), compare: Object.freeze({ ...compare }), routeInfo: id => net?.routeInfo(id) ?? null,
+    // Select Area: select a ring of [lon, lat] as if drawn; screen points of a ring; an asset's position; clear.
+    area: Object.freeze({ select: (ring, mode) => net?.selectArea(ring, mode) ?? false, screen: ring => net?.areaScreen(ring) ?? [], clear: () => net?.clearArea(),
+      lonLat: id => net?.assetLonLat(id) ?? null, drawing: () => net?.areaDrawing() ?? false }) });
   return api;
 }

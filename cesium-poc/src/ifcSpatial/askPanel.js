@@ -27,6 +27,10 @@ export const ASK_ICONS = Object.freeze({
   chevron: svg('<path d="m9.5 6 6 6-6 6"/>', { size: 18 }),
   collapse: svg('<path d="m12.5 7-5 5 5 5"/><path d="m18 7-5 5 5 5"/>', { size: 20 }),
   // Panel width: Maximize 2 / Minimize 2 (the Lucide shapes, drawn like the other icons here).
+  // Select Area: a dashed selection frame with corner handles.
+  scan: svg('<path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><path d="M10.5 4h3M10.5 20h3M4 10.5v3M20 10.5v3" stroke-dasharray="1.5 1.5"/>', { size: 18 }),
+  rect: svg('<rect x="4" y="6" width="16" height="12" rx="1.2" stroke-dasharray="2.4 1.8"/>'),
+  polygon: svg('<path d="m5 8 6-4 8 5-2 10H7z" stroke-dasharray="2.4 1.8"/><circle cx="5" cy="8" r="1.3"/><circle cx="11" cy="4" r="1.3"/><circle cx="19" cy="9" r="1.3"/><circle cx="17" cy="19" r="1.3"/><circle cx="7" cy="19" r="1.3"/>'),
   maximize: svg('<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/>', { size: 18 }),
   minimize: svg('<path d="M4 14h6v6"/><path d="M20 10h-6V4"/><path d="m14 10 7-7"/><path d="m3 21 7-7"/>', { size: 18 }),
   chat: svg('<path d="M5.5 5h13A2.5 2.5 0 0 1 21 7.5v7a2.5 2.5 0 0 1-2.5 2.5H10l-4.6 3.4V17h0A2.5 2.5 0 0 1 3 14.5v-7A2.5 2.5 0 0 1 5.5 5Z"/><path d="M8.5 11h.01M12 11h.01M15.5 11h.01" stroke-width="2.4"/>', { size: 22 }),
@@ -112,8 +116,14 @@ export function askPanelHtml({ bankHtml = '' } = {}) {
       <span class="isp-askp-card-ic">${ASK_ICONS[s.icon]}</span><span class="isp-askp-card-l">${esc(s.label)}</span><span class="isp-askp-card-ch">${ASK_ICONS.chevron}</span></button>`;
   return `<div class="isp-askp" id="isp-askp" role="complementary" aria-label="Ask the Twin">
     <div class="isp-askp-head">${sparkleSvg()}<h2>Ask the Twin <span class="isp-askp-ai">AI</span></h2>
+      <span class="isp-askp-areawrap"><button type="button" class="isp-askp-areabtn" data-act="areaMenu" aria-haspopup="menu" aria-expanded="false" aria-pressed="false" aria-label="Select an area on the map" title="Select an area on the map">${ASK_ICONS.scan}</button>
+        <span class="isp-askp-areamenu" role="menu" aria-label="Select an area" hidden>
+          <button type="button" role="menuitem" data-act="areaDraw" data-mode="RECTANGLE">${ASK_ICONS.rect}<span>Draw rectangle</span></button>
+          <button type="button" role="menuitem" data-act="areaDraw" data-mode="POLYGON">${ASK_ICONS.polygon}<span>Draw polygon</span></button>
+          <button type="button" role="menuitem" data-act="areaMenuClose">${ASK_ICONS.clear ?? ''}<span>Cancel</span></button></span></span>
       <button type="button" class="isp-askp-width" data-act="askWidth" aria-pressed="false" aria-controls="isp-askp" aria-label="Expand panel width" title="Expand panel width">${ASK_ICONS.maximize}</button>
       <button type="button" class="isp-askp-collapse" data-act="askCollapse" aria-label="Collapse Ask the Twin" aria-controls="isp-askp" aria-expanded="true" title="Collapse">${ASK_ICONS.collapse}</button></div>
+    <section class="isp-askp-area" aria-label="Selected area" hidden></section>
     <div class="isp-askp-body">
       <div class="isp-askp-welcome">
         <div class="isp-askp-art">${illustrationSvg()}</div>

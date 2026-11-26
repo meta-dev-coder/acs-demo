@@ -24,7 +24,7 @@ test.beforeAll(async () => {
 async function mockSpatial(page: Page, { prepareError = null as null | { status: number; code: string; message: string }, signedIn = true, status = {} as Record<string, Record<string, string>> } = {}) {
   const saved: Record<string, any> = {};
   // `version` is the tip version in ACC; a test raises it to publish a new version.
-  const calls = { prepare: [] as string[], put: [] as any[], del: 0, viewerSdk: 0, version: 1, refreshes: 0 };
+  const calls = { prepare: [] as string[], put: [] as any[], del: 0, viewerSdk: 0, version: 1, refreshes: 0, area: [] as any[] };
   await page.route("https://developer.api.autodesk.com/**", route => { calls.viewerSdk += 1; return route.abort(); });
   // No Google requests from tests: the Google 3D base map is refused, so the screen falls back to the simple map.
   await page.route(/googleapis\.com/, route => route.abort());
@@ -54,6 +54,16 @@ async function mockSpatial(page: Page, { prepareError = null as null | { status:
         // The network's own geometry is not in this GLB, so its elements carry no feature ids here.
         // `status`: SuperDNA_AssetStatus for chosen network ids (a test's own reported states).
         : json(200, { elements: [...converted.elements, ...NETWORK.elements.map((e: any) => ({ ...e, featureId: null, ...(status[e.networkId] ? { properties: { ...e.properties, SuperDNA_AssetStatus: status[e.networkId] } } : {}) }))], connections: [...(converted.connections ?? []), ...networkConnections(calls.version)] });
+    }
+    // Select Area: the server's own resolution (server/ifcSpatial/area.mjs) over the served elements.
+    if (path === "/area") {
+      const { resolveAreaFor } = await import("../server/ifcSpatial/area.mjs");
+      const body = route.request().postDataJSON();
+      calls.area.push(body);
+      const file = FILES.find(f => f.key === body.key) ?? FILES[0];
+      try {
+        return json(200, resolveAreaFor({ elements: [...converted.elements, ...NETWORK.elements], georef: converted.diagnostics.placement, placement: body.placement, body, key: body.key, fileName: file.fileName, versionNumber: calls.version }));
+      } catch (error: any) { return json(400, { error: { code: error.code ?? "INVALID_AREA", message: error.message } }); }
     }
     if (path === "/placement") {
       const key = url.searchParams.get("key")!;
@@ -619,7 +629,8 @@ test.describe("IFC Spatial Twin", () => {
     await page.route(/googleapis\.com/, route => route.abort());
     await page.route("**/api/ifc-spatial/**", async route => {
       const u = new URL(route.request().url());
-      const req: any = Readable.from([]);
+      const post = route.request().postDataBuffer();
+      const req: any = Readable.from(post ? [post] : []);
       Object.assign(req, { method: route.request().method(), url: u.pathname + u.search, headers: {} });
       let status = 200, headers: any = {}; const parts: Buffer[] = [];
       await api.handle(req, { writeHead(s: number, h: any) { status = s; headers = h; }, write(c: any) { parts.push(Buffer.from(c)); }, end(b: any) { if (b) parts.push(Buffer.from(b)); } } as any);
@@ -728,6 +739,24 @@ test.describe("IFC Spatial Twin", () => {
     await expect(page.locator(".isp-ask")).toBeHidden();
     await page.click('[data-cmp="exit"]');
     await expect(page.locator(".isp-askp")).toBeVisible();
+
+    // Select Area: the same comparison inside an area (each version placed at its own positions).
+    const all = await page.evaluate(() => { const s = (window as any).__ifcSpatial; return ["TX-M1", "TX-M2", "STS-01", "STS-12", "HM-1", "QSS-W", "QSS-E"].map(id => s.area.lonLat(id)).filter(Boolean); });
+    const lo = all.map((p: any) => p.lon), la = all.map((p: any) => p.lat), m = 0.004;
+    await page.evaluate(r => (window as any).__ifcSpatial.area.select(r, "POLYGON"), [[Math.min(...lo) - m, Math.min(...la) - m], [Math.max(...lo) + m, Math.min(...la) - m], [Math.max(...lo) + m, Math.max(...la) + m], [Math.min(...lo) - m, Math.max(...la) + m]]);
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().network.area);
+    await askQ("What changed in this area between V3 and V4?");
+    await page.waitForFunction(() => { const a = (window as any).__ifcSpatial.state().network.answer; return a?.kind === "Area version changes" && a.status !== "loading"; }, null, { timeout: 300_000 });
+    await expect(page.locator(`${ANSWER} .tw-scope`)).toContainText("Selected area");
+    await expect(page.locator(`${ANSWER} .tw-say`)).toContainText(/Between V3 and V4, .* in the selected area\./);
+    expect((await page.evaluate(() => (window as any).__ifcSpatial.compare.state())).active).toBe(false);
+    // An area away from the terminal: no changes in it.
+    await page.evaluate(() => (window as any).__ifcSpatial.area.select([[-76.60, 39.20], [-76.599, 39.20], [-76.599, 39.201], [-76.60, 39.201]], "POLYGON"));
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().network.area?.inside.length === 0);
+    await askQ("Were any transformers added in this area?");
+    await page.waitForFunction(() => { const a = (window as any).__ifcSpatial.state().network.answer; return a?.kind === "Area version changes" && a.status !== "loading"; }, null, { timeout: 300_000 });
+    await expect(page.locator(`${ANSWER} .tw-say`)).toContainText(/^No added transformers in the selected area/);
+    await page.evaluate(() => (window as any).__ifcSpatial.area.clear());
   });
 
   test("12 Ask the Twin results on the map: highlighted, selected without losing the set, back, clustered, cleared", async ({ page }) => {
@@ -1409,7 +1438,7 @@ test.describe("IFC Spatial Twin", () => {
     await expect(btn).toHaveAttribute("aria-pressed", "false");
     await expect(btn).toHaveAttribute("aria-label", "Expand panel width");
     await expect(btn).toHaveAttribute("title", "Expand panel width");
-    expect(await page.locator(".isp-askp-head button").evaluateAll(b => b.map(x => x.className))).toEqual(["isp-askp-width", "isp-askp-collapse"]);
+    expect(await page.locator(".isp-askp-head > button, .isp-askp-head .isp-askp-areabtn").evaluateAll(b => b.map(x => x.className))).toEqual(["isp-askp-areabtn", "isp-askp-width", "isp-askp-collapse"]);
     // A conversation with results on the map.
     await page.fill(".isp-askbar input", "Show me all transformers installed across Seagirt.");
     await page.press(".isp-askbar input", "Enter");
@@ -1593,5 +1622,414 @@ test.describe("IFC Spatial Twin", () => {
     // Reset ends the simulation and closes its panel.
     await page.locator(".isp-sim .isp-sim-reset").click();
     await expect(page.locator(".isp-sim")).toHaveCount(0);
+  });
+
+  test("19 Select Area: draw a rectangle and a polygon, area-scoped answers, supply beyond the area, outage by area, change and clear", async ({ page }) => {
+    test.setTimeout(480_000);
+    const SHOTS = process.env.AREA_SHOTS ?? null;
+    const shot = async (name: string, locator?: any) => { if (SHOTS) await (locator ?? page).screenshot({ path: `${SHOTS}/${name}.png` }); };
+    const calls = await mockSpatial(page);
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await openTwin(page, "&screen=ifc-spatial");
+    await ready(page);
+    await openAsk(page);
+    const area = () => page.evaluate(() => (window as any).__ifcSpatial.state().network.area);
+    const answer = () => page.evaluate(() => (window as any).__ifcSpatial.state().network.answer);
+    const askQ = async (q: string) => { await page.fill(".isp-askbar input", q); await page.press(".isp-askbar input", "Enter"); };
+    const waitKind = (kind: string) => page.waitForFunction(k => { const a = (window as any).__ifcSpatial.state().network.answer; return a?.kind === k && a.status !== "loading"; }, kind, { timeout: 60_000 });
+    const screenOf = (ids: string[]) => page.evaluate(list => list.map(id => (window as any).__ifcSpatial.assetScreenPosition(id)), ids);
+    const scope = page.locator(`${ANSWER} .tw-scope`);
+
+    // ---- the button and its menu ----
+    const btn = page.locator(".isp-askp-areabtn");
+    await expect(btn).toHaveAttribute("aria-label", "Select an area on the map");
+    await expect(btn).toHaveAttribute("aria-pressed", "false");
+    await btn.click();
+    const menu = page.locator(".isp-askp-areamenu");
+    await expect(menu.getByRole("menuitem")).toHaveText(["Draw rectangle", "Draw polygon", "Cancel"]);
+    await shot("01-select-area-button", page.locator(".isp-askp"));
+    // Cancel from the menu: nothing is drawn.
+    await menu.getByRole("menuitem", { name: "Cancel" }).click();
+    await expect(menu).toBeHidden();
+    expect(await area()).toBeNull();
+
+    // ---- a rectangle around the western cranes: press, drag, release ----
+    await btn.click();
+    await menu.getByRole("menuitem", { name: "Draw rectangle" }).click();
+    await expect(page.locator(".isp-area-hint")).toContainText("drag on the map");
+    expect(await page.evaluate(() => (window as any).__ifcSpatial.area.drawing())).toBe(true);
+    const cranes = await screenOf(["STS-04", "STS-05", "STS-06"]);
+    const xs = cranes.map((p: any) => p.x), ys = cranes.map((p: any) => p.y);
+    const r0 = { x: Math.min(...xs) - 28, y: Math.min(...ys) - 28 }, r1 = { x: Math.max(...xs) + 28, y: Math.max(...ys) + 28 };
+    expect(r0.x).toBeGreaterThan((await page.locator(".isp-askp").boundingBox())!.x + 430);
+    // A click on a map asset while drawing is a corner, never a selection.
+    await page.mouse.move(r0.x, r0.y);
+    await page.mouse.down();
+    await page.mouse.move((r0.x + r1.x) / 2, (r0.y + r1.y) / 2, { steps: 4 });
+    await page.mouse.move(r1.x, r1.y, { steps: 4 });
+    await shot("02-rectangle-drawing");
+    await page.mouse.up();
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().network.area, null, { timeout: 30_000 });
+    const a1 = await area();
+    expect(a1.selectionType).toBe("RECTANGLE");
+    for (const id of ["STS-04", "STS-05", "STS-06"]) expect(a1.inside).toContain(id);
+    expect(a1.inside).not.toContain("TX-M1");
+    expect(calls.area.length).toBe(1);
+    expect(calls.area[0].geometry.type).toBe("Polygon");
+    expect((await page.evaluate(() => (window as any).__ifcSpatial.state().network.selectedId))).toBeNull();
+    expect(await page.evaluate(() => (window as any).__ifcSpatial.area.drawing())).toBe(false);
+    await expect(btn).toHaveClass(/is-active/);
+
+    // ---- the compact card and at most four suggestions ----
+    const card = page.locator(".isp-askp-area .isp-area-card");
+    await expect(card).toContainText("Selected area");
+    await expect(card).toContainText(`${a1.inside.length} assets`);
+    await expect(card).toContainText(a1.zone ?? "Custom selected area");
+    const chips = page.locator(`${ANSWER} .tw-chip`);
+    expect(await chips.count()).toBeGreaterThan(0);
+    expect(await chips.count()).toBeLessThanOrEqual(4);
+    await shot("04-area-summary", page.locator(".isp-askp"));
+
+    // ---- inventory, scoped to the area ----
+    await askQ("How many electrical assets are in this area?");
+    await waitKind("Area inventory");
+    await expect(scope).toContainText("Selected area");
+    expect((await answer()).status).toBe("answered");
+    const askIds = await page.evaluate(() => (window as any).__ifcSpatial.state().network.askIds);
+    expect(askIds.every((id: string) => a1.inside.includes(id))).toBe(true);
+    await shot("05-area-inventory", page.locator(".isp-askp"));
+    await askQ("Show all cranes in this area");
+    await waitKind("Area inventory");
+    await expect(page.locator(`${ANSWER} .tw-say`)).toContainText(/\d+ cranes? in the selected area/);
+
+    // ---- status: only the area's assets ----
+    await askQ("Which assets are degraded or without power?");
+    await waitKind("Area power status");
+    await expect(scope).toContainText("Selected area");
+
+    // ---- supply: traced through the whole network, equipment outside the area marked ----
+    await askQ("Which transformers supply this area?");
+    await waitKind("Area supply");
+    const dep = page.locator(`${ANSWER} .tw-dep`);
+    await expect(dep).toBeVisible();
+    const outside = await dep.locator(".tw-dep-where.is-out").count();
+    expect(outside).toBeGreaterThan(0);
+    await expect(page.locator(`${ANSWER} .tw-dep-legend`)).toContainText("Outside the area");
+    await shot("06-supply-dependencies", page);
+    await askQ("Are any of these transformers located outside the selected area?");
+    await waitKind("Area supply");
+    await expect(page.locator(`${ANSWER} .tw-say`)).toContainText(/^Yes/);
+    const outTx = await page.evaluate(() => (window as any).__ifcSpatial.state().network.askIds[0]);
+    expect(a1.inside).not.toContain(outTx);
+
+    // ---- outage: the whole network simulated, consumers split by the area ----
+    await askQ(`What happens if ${outTx} shuts down?`);
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().network.answer?.kind === "Outage simulation", null, { timeout: 60_000 });
+    const out = page.locator(`${ANSWER} .tw-out`);
+    await expect(out).toContainText("Inside the selected area");
+    await expect(out).toContainText("Outside the area");
+    await shot("07-outage-by-area", page.locator(".isp-askp"));
+    await page.locator(`${ANSWER} [data-act="simPanel"]`).click();
+    await expect(page.locator(".isp-sim")).toBeVisible();
+    await page.locator(".isp-sim .isp-sim-reset").click();
+    await expect(page.locator(".isp-sim")).toHaveCount(0);
+
+    // ---- a result row focuses its asset; the area stays ----
+    await askQ("Show the cranes in this area");
+    await waitKind("Area inventory");
+    await page.locator(`${ANSWER} .tw-crow`).first().click();
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().network.selectedId);
+    expect((await area()).selectionId).toBe(a1.selectionId);
+
+    // ---- the whole terminal on request, without clearing the area ----
+    await askQ("Show all degraded assets across Seagirt");
+    await page.waitForFunction(() => { const a = (window as any).__ifcSpatial.state().network.answer; return a && a.kind === "Power status"; }, null, { timeout: 60_000 });
+    await expect(scope).toContainText("Entire terminal");
+    expect((await area()).selectionId).toBe(a1.selectionId);
+
+    // ---- Escape cancels a drawing; the area is unchanged ----
+    await btn.click();
+    await menu.getByRole("menuitem", { name: "Draw polygon" }).click();
+    await expect(page.locator(".isp-area-hint")).toContainText("Click to add corners");
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".isp-area-hint")).toBeHidden();
+    expect(await page.evaluate(() => (window as any).__ifcSpatial.area.drawing())).toBe(false);
+    expect((await area()).selectionId).toBe(a1.selectionId);
+
+    // ---- a polygon around the main substation: click the corners, Finish ----
+    // Back to the opening view (the crane clicked above is zoomed in); the area is kept by Reset view.
+    await page.click('[data-cam="home"]');
+    await page.waitForFunction(() => { const s = (window as any).__ifcSpatial.assetScreenPosition("TX-M1"); return s && s.x > 560 && s.x < 1500 && s.y > 120 && s.y < 800; }, null, { timeout: 30_000 });
+    await page.waitForTimeout(1500);
+    expect((await area()).selectionId).toBe(a1.selectionId);
+    await btn.click();
+    await menu.getByRole("menuitem", { name: "Draw polygon" }).click();
+    const [m1, m2] = await screenOf(["TX-M1", "TX-M2"]);
+    const cx = (m1.x + m2.x) / 2, cy = (m1.y + m2.y) / 2, rr = 46;
+    for (const [dx, dy] of [[-rr, -rr], [rr, -rr * 0.8], [rr * 1.1, rr], [-rr * 0.9, rr * 1.1]]) { await page.mouse.click(cx + dx, cy + dy); await page.waitForTimeout(400); }
+    await expect(page.locator(".isp-area-hint")).toContainText("(4)");
+    await shot("03-polygon-drawing");
+    await page.locator('.isp-area-hint [data-area-hint="finish"]').click();
+    await page.waitForFunction(id => { const a = (window as any).__ifcSpatial.state().network.area; return a && a.selectionId !== id; }, a1.selectionId, { timeout: 30_000 });
+    const a2 = await area();
+    expect(a2.selectionType).toBe("POLYGON");
+    expect(a2.inside).toEqual(expect.arrayContaining(["TX-M1", "TX-M2"]));
+    expect(a2.inside).not.toContain("STS-05");
+    // The new area, not the previous one, answers.
+    await askQ("How many assets are in this area?");
+    await waitKind("Area inventory");
+    const ids2 = await page.evaluate(() => (window as any).__ifcSpatial.state().network.askIds);
+    expect(ids2.some((id: string) => a1.inside.includes(id) && !a2.inside.includes(id))).toBe(false);
+
+    // ---- both widths keep the area and the conversation ----
+    await page.locator(".isp-askp-width").click();
+    await expect.poll(async () => (await page.locator(".isp-ask").boundingBox())!.width, { timeout: 20_000 }).toBeGreaterThan(500);
+    await expect(card).toBeVisible();
+    await shot("11-expanded-width", page);
+    await page.locator(".isp-askp-width").click();
+    await expect.poll(async () => (await page.locator(".isp-ask").boundingBox())!.width, { timeout: 20_000 }).toBeLessThan(450);
+    await expect(card).toBeVisible();
+    await shot("10-default-width", page);
+
+    // ---- clear: full-terminal answers again, the conversation stays ----
+    const turns = await page.locator(".isp-turn").count();
+    await page.locator('.isp-area-card [data-act="areaClear"]').click();
+    await expect(page.locator(".isp-askp-area")).toBeHidden();
+    expect(await area()).toBeNull();
+    await expect(btn).not.toHaveClass(/is-active/);
+    expect(await page.locator(".isp-turn").count()).toBe(turns);
+    await askQ("Which assets are degraded?");
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().network.answer?.kind === "Power status", null, { timeout: 60_000 });
+    await expect(scope).toHaveCount(0);
+    await shot("12-cleared", page);
+    // An area question with none selected says so.
+    await askQ("Which transformers supply this area?");
+    await waitKind("Select Area");
+    await expect(page.locator(`${ANSWER} .tw-say`)).toHaveText("No area is selected.");
+  });
+
+  test("20 maintenance investigation: 'what needs to be fixed' for degraded assets reads their ACC inspections (not a status summary), follow-ups resolve the asset", async ({ page }) => {
+    test.setTimeout(420_000);
+    const SHOTS = process.env.AREA_SHOTS ?? null;
+    const shot = async (name: string, locator?: any) => { if (SHOTS) await (locator ?? page).screenshot({ path: `${SHOTS}/${name}.png` }); };
+    const { createIfcSpatialApi } = await import("../server/ifcSpatial/api.mjs");
+    const { specSheet, inspectionReport } = await import("../tests/pdfFixtures.mjs");
+    const { mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { Readable } = await import("node:stream");
+    // TX-M2 is degraded in the model (StatusFlag POOR CONDITION); its ACC records: three dated inspections.
+    const pdfs: Record<string, Uint8Array> = {
+      "TX-M2_Transformer.pdf": specSheet({ assetId: "TX-M2", fields: [["Rating", "34.5/13.8 kV, 12 MVA"]] }),
+      "TX-M2_Transformer_Inspection-2024-001_2024-03-12.pdf": inspectionReport({ assetId: "TX-M2", date: "2024-03-12", number: "M2-24", condition: "GOOD (4/5)", findings: [["Bushings (HV and LV)", "OK", "Clean."]] }),
+      "TX-M2_Transformer_Inspection-2025-001_2025-04-10.pdf": inspectionReport({ assetId: "TX-M2", date: "2025-04-10", number: "M2-25", condition: "FAIR (3/5)", findings: [["Radiators and cooling fans", "Attention", "Weep at radiator 3 valve."]], actions: [["Re-sample oil for DGA", "Medium", "2025-10-10"]] }),
+      "TX-M2_Transformer_Inspection-2026-001_2026-10-28.pdf": inspectionReport({ assetId: "TX-M2", date: "2026-10-28", number: "M2-26", condition: "POOR (2/5)", findings: [["Radiators and cooling fans", "Defect", "Oil leaking at radiator 3 isolation valve."], ["Cooling fans", "Defect", "Fan 4 failed."], ["Bushings (HV and LV)", "Attention", "Discolouration on LV X2 connector."]], actions: [["Repair radiator 3 isolation valve", "High", "2026-12-15"]] }),
+    };
+    const tree: Record<string, { folders: { id: string; name: string }[]; files: string[] }> = {
+      top: { folders: [{ id: "docs", name: "Asset Documentation" }], files: [] }, docs: { folders: [{ id: "f2", name: "02_Transformers" }], files: [] }, f2: { folders: [], files: Object.keys(pdfs) } };
+    const client = {
+      async getAll(path: string) {
+        const id = decodeURIComponent(/folders\/([^/]+)\/contents/.exec(path)![1]);
+        const node = tree[id] ?? { folders: [], files: [] };
+        return { data: [...node.folders.map(f => ({ type: "folders", id: f.id, attributes: { displayName: f.name } })),
+          ...node.files.map(f => ({ type: "items", id: `urn:item:${f}`, attributes: { displayName: f }, relationships: { tip: { data: { id: `urn:v:${f}?version=1` } } }, links: { webView: { href: `https://acc.autodesk.com/docs/files/projects/p?entityId=${f}` } } }))],
+          included: node.files.map(f => ({ type: "versions", id: `urn:v:${f}?version=1`, attributes: { name: f, versionNumber: 1, fileType: "pdf", storageSize: pdfs[f].length, lastModifiedTime: "2026-11-25T08:00:00Z" } })) };
+      },
+      async get() { return { data: {} }; },
+    };
+    const model = readFileSync(new URL("../tests/fixtures/ifc/seagirt-compare-v2.ifc", import.meta.url));
+    const v = "urn:model?version=3";
+    const files = { hub: { id: "h" }, project: { id: "b.p", name: "Seagirt Electrical Digital Twin POC" }, topFolders: [{ id: "top", name: "Project Files" }],
+      files: [{ fileName: "seagirt_power_network.ifc", itemId: "urn:i", tipVersionId: v, versions: [{ id: v, versionNumber: 3 }] }] };
+    const analysed: string[] = [];
+    const api = createIfcSpatialApi({ aps: { dataClient: () => client, projectFiles: async () => files, sessionId: () => "browser-session" }, cacheDir: mkdtempSync(join(tmpdir(), "ifc-maint-e2e-")),
+      logger: { info() {}, warn() {}, error() {} }, download: async () => ({ bytes: model }), now: () => Date.parse("2026-11-26T09:00:00Z"),
+      openStream: async (_c: unknown, _p: unknown, versionId: string) => {
+        const name = versionId.replace(/^urn:v:/, "").replace(/\?.*$/, "");
+        return { body: Readable.from([Buffer.from(pdfs[name])]), contentLength: pdfs[name].length, fileName: name };
+      } });
+    await page.route(/googleapis\.com/, route => route.abort());
+    await page.route("**/api/ifc-spatial/**", async route => {
+      const u = new URL(route.request().url());
+      if (u.pathname.endsWith("/documents/analysis")) analysed.push(u.searchParams.get("asset")!);
+      const body = route.request().postDataBuffer();
+      const req: any = Readable.from(body ? [body] : []);
+      Object.assign(req, { method: route.request().method(), url: u.pathname + u.search, headers: {} });
+      let status = 200, headers: any = {}; const parts: Buffer[] = [];
+      await api.handle(req, { writeHead(s: number, h: any) { status = s; headers = h; }, write(c: any) { parts.push(Buffer.from(c)); }, end(b: any) { if (b) parts.push(Buffer.from(b)); } } as any);
+      await route.fulfill({ status, headers, body: Buffer.concat(parts) });
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openTwin(page, "&screen=ifc-spatial");
+    await page.waitForFunction(() => (window as any).__ifcSpatial?.state().phase === "ready", null, { timeout: 180_000 });
+    await page.waitForFunction(() => (window as any).__ifcSpatial.documents.state().summary, null, { timeout: 60_000 });
+    await openAsk(page);
+    const askQ = async (q: string) => { await page.fill(".isp-askbar input", q); await page.press(".isp-askbar input", "Enter"); };
+    const answer = () => page.evaluate(() => (window as any).__ifcSpatial.state().network.answer);
+    const waitKind = (kind: string) => page.waitForFunction(k => { const a = (window as any).__ifcSpatial.state().network.answer; return a?.kind === k && a.status !== "loading"; }, kind, { timeout: 120_000 });
+
+    // A selected area around TX-M2: "For degraded asset, what needs to be fixed?" is a maintenance investigation.
+    const m2 = await page.evaluate(() => (window as any).__ifcSpatial.area.lonLat("TX-M2"));
+    const d = 0.0008;
+    await page.evaluate(r => (window as any).__ifcSpatial.area.select(r, "RECTANGLE"), [[m2.lon - d, m2.lat - d], [m2.lon + d, m2.lat - d], [m2.lon + d, m2.lat + d], [m2.lon - d, m2.lat + d]]);
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().network.area?.inside.includes("TX-M2"));
+    await askQ("Which assets are degraded in this area?");
+    await waitKind("Area power status");
+    await expect(page.locator(`${ANSWER} .tw-say`)).toContainText("degraded");
+    await askQ("For degraded asset, what needs to be fixed?");
+    await waitKind("Maintenance assessment");
+    expect(analysed).toContain("TX-M2");
+    const card = page.locator(`${ANSWER} .tw-maint`);
+    await expect(page.locator(`${ANSWER} .tw-say`)).toContainText("I found one degraded transformer, TX-M2, in the selected area. Its latest inspection (2026-10-28) documents 3 issues");
+    await expect(card.locator(".tw-mh").first()).toHaveText("What needs to be fixed or investigated");
+    await expect(card.locator(".tw-mfind")).toHaveCount(4);
+    await expect(card).toContainText("Fan 4 failed.");
+    await expect(card).toContainText("Repair radiator 3 isolation valve");
+    await expect(card.locator(".tw-mtrend circle")).toHaveCount(3);
+    await expect(card.locator(".tw-mtrend")).toContainText("Mar 2024");
+    await expect(page.locator(`${ANSWER} .tw-scope`)).toContainText("Selected area");
+    await expect(page.locator(`${ANSWER} .tw-maint-list`)).toHaveCount(0, { timeout: 1000 });
+    await shot("m1-single-asset", page);
+    // The asset is focused on the map; the area stays.
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().network.selectedId === "TX-M2");
+    expect((await page.evaluate(() => (window as any).__ifcSpatial.state().network.area))).not.toBeNull();
+    // A source opens the existing document preview at its page.
+    await card.locator(".tw-msrc .tw-mcite").click();
+    await page.waitForFunction(() => (window as any).__ifcSpatial.documents.state().previewing, null, { timeout: 30_000 });
+    await page.waitForTimeout(1500);
+    await shot("m7-source-preview", page);
+    await page.evaluate(() => (window as any).__ifcSpatial.documents.closePreview());
+
+    // Follow-ups resolve TX-M2 from the conversation.
+    await askQ("What needs to be fixed?");
+    await waitKind("Maintenance assessment");
+    await expect(page.locator(`${ANSWER} .tw-mid`)).toHaveText("TX-M2");
+    // Phase 2: each follow-up answered for what it asks, from the same (cached) records.
+    const before = analysed.length;
+    const say = () => page.locator(`${ANSWER} .tw-say`);
+    const follow = async (q: string, re: RegExp) => { await askQ(q); await waitKind("Maintenance assessment"); await expect(say()).toContainText(re); };
+    await follow("Has this issue occurred before?", /^Yes: \d of TX-M2's latest findings (was|were) also reported in earlier inspections/);
+    await expect(page.locator(`${ANSWER} .tw-maint`)).toContainText("Recurrence across inspections");
+    await follow("Is its condition getting worse?", /Yes: TX-M2's documented condition has worsened, from Good 4\/5 \(Mar 2024\) to Poor 2\/5 \(Oct 2026\)/);
+    await follow("Since when has this asset been degraded?", /do not establish when the degraded status began/);
+    await follow("Which repairs are still outstanding?", /documented actions? (has|have) no verified closure for TX-M2/);
+    await expect(page.locator(`${ANSWER} .tw-maint .tw-mtag`).first()).toContainText("Closure not verified");
+    await follow("Can we continue operating this asset?", /operating restriction/);
+    await expect(page.locator(`${ANSWER} .tw-say2`)).toContainText("needs engineering approval");
+    await follow("Why is this asset degraded?", /The records do not establish why TX-M2 is degraded/);
+    // Evidence opens on request.
+    if (await page.locator(`${ANSWER} .tw-mfold > summary`).count()) await page.locator(`${ANSWER} .tw-mfold > summary`).click();
+    await page.locator(`${ANSWER} .tw-mev > summary`).first().click();
+    await expect(page.locator(`${ANSWER} .tw-mev blockquote`).first()).toBeVisible();
+    expect(analysed.length).toBe(before);
+
+    // ---- Phase 4: the investigation's report and email; network follow-ups on its asset ----
+    await expect(page.locator(`${ANSWER} [data-maint-report]`)).toBeVisible();
+    await askQ("Prepare a report of these issues.");
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().network.report?.status === "COMPLETED", null, { timeout: 120_000 });
+    await expect(page.locator(`${ANSWER} .tw-say`)).toContainText("The maintenance report covers 1 asset: 1 with documented findings");
+    // Asked with the area selected: the report keeps the area (named so) and its snapshot.
+    await expect(page.locator(ANSWER)).toContainText("Selected Area Transformer Maintenance Report");
+    await expect(page.locator(ANSWER)).toContainText("Selected Area Corrective Action Register");
+    await expect(page.locator(ANSWER)).toContainText("PDF · Findings, corrective actions, closure and locations");
+    await shot("m5-maintenance-report", page.locator(".isp-askp"));
+    await askQ("Inform the maintenance team.");
+    await page.waitForFunction(() => /maintenance findings/i.test(document.querySelector(".isp-askp-chat .isp-turn:last-child .isp-msg-ans")?.textContent ?? "") || /TX-M2/.test((document.querySelector(".isp-askp-chat .isp-turn:last-child .isp-msg-ans [contenteditable]") as HTMLElement)?.innerText ?? ""), null, { timeout: 60_000 });
+    await expect(page.locator(`${ANSWER} [contenteditable]`).first()).toContainText("TX-M2");
+    await expect(page.locator(`${ANSWER} [contenteditable]`).first()).toContainText("no verified closure");
+    await expect(page.locator(`${ANSWER} .tw-say`).first()).toHaveText(/^I've drafted an email to the Maintenance Team with the report and the register attached\./);
+    await shot("m6-email", page.locator(".isp-askp"));
+    // The draft survives a width change (one implementation, both widths).
+    const draftText = await page.locator(`${ANSWER} [contenteditable]`).first().innerText();
+    await page.locator(".isp-askp-width").click();
+    await expect.poll(async () => (await page.locator(".isp-ask").boundingBox())!.width, { timeout: 20_000 }).toBeGreaterThan(500);
+    await shot("m8-email-expanded", page);
+    expect(await page.locator(`${ANSWER} [contenteditable]`).first().innerText()).toBe(draftText);
+    await page.locator(".isp-askp-width").click();
+    await expect.poll(async () => (await page.locator(".isp-ask").boundingBox())!.width, { timeout: 20_000 }).toBeLessThan(450);
+    await askQ("Is there an alternate supply?");
+    await page.waitForFunction(() => { const a = (window as any).__ifcSpatial.state().network.answer; return a && a.status !== "loading" && a.kind !== "Maintenance assessment"; }, null, { timeout: 60_000 });
+    await expect(page.locator(`${ANSWER}`)).toContainText("TX-M2");
+    await expect(page.locator(".isp-turn:last-child .isp-msg-user p")).toHaveText("Is there an alternate supply?");
+    // Replacement: only when asked, from the existing replacement review of the resolved asset.
+    await askQ("What needs to be done before replacement?");
+    await page.waitForFunction(() => { const a = (window as any).__ifcSpatial.state().network.answer; return a && a.status !== "loading" && a.kind !== "Maintenance assessment" && a.kind !== "Alternate supply"; }, null, { timeout: 90_000 });
+    await expect(page.locator(ANSWER)).toContainText("TX-M2");
+    await expect(page.locator(".isp-turn:last-child .isp-msg-user p")).toHaveText("What needs to be done before replacement?");
+    // The asset again (the email turn is no longer the context), then the outage.
+    await askQ("What needs to be fixed on TX-M2?");
+    await waitKind("Maintenance assessment");
+    await askQ("What happens if we shut it down?");
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().network.answer?.kind === "Outage simulation", null, { timeout: 60_000 });
+    await expect(page.locator(".isp-turn:last-child .isp-msg-user p")).toHaveText("What happens if we shut it down?");
+    await expect(page.locator(`${ANSWER} .tw-say`)).toContainText("TX-M2");
+    await page.locator(`${ANSWER} [data-act="simReset"]`).click();
+
+    // The whole terminal: the same investigation, the area kept.
+    await askQ("Show what needs to be fixed for all degraded assets across Seagirt.");
+    await waitKind("Maintenance assessment");
+    await expect(page.locator(`${ANSWER} .tw-scope`)).toContainText("Entire terminal");
+    expect((await page.evaluate(() => (window as any).__ifcSpatial.state().network.area))).not.toBeNull();
+    // ---- Phase 3: several assets: a compact collection, drill-down, Back to results, all on the map, both widths ----
+    await askQ("For all degraded and unpowered assets across Seagirt, what needs to be fixed?");
+    await waitKind("Maintenance assessment");
+    const list = page.locator(`${ANSWER} .tw-maint-list`);
+    await expect(list).toBeVisible();
+    const rows = list.locator(".tw-mrow");
+    const n = await rows.count();
+    expect(n).toBeGreaterThan(1);
+    await expect(say()).toContainText(new RegExp(`^I found ${n} assets that are degraded or without power across the terminal\\. Inspection evidence is available for 1 of them\\.`));
+    await expect(rows.first()).toHaveAttribute("data-maint-open", "TX-M2");
+    await expect(list.locator(".tw-mrow:not([data-maint-open='TX-M2']) .tw-mrow-t").first()).toHaveText(/Cause of (power loss|degradation) not documented/);
+    const metrics = await list.locator(".tw-mmetrics b").allTextContents();
+    expect(metrics.map(Number)).toEqual([n, 1, n - 1]);
+    await expect(list.locator('.tw-mrow[data-maint-open="TX-M2"] .tw-mrow-t')).toContainText("Radiators and cooling fans");
+    await expect(list.locator(".tw-mrow:not([data-maint-open='TX-M2']) .tw-mrow-t").first()).toHaveText(/not documented|No linked documents/);
+    // Only TX-M2 has linked documents: only its records are read (cached from before).
+    expect(analysed.filter(x => x !== "TX-M2").length).toBe(0);
+    const ids = await rows.evaluateAll(r => r.map(x => (x as HTMLElement).dataset.maintOpen));
+    await shot("m2-multi-default", page.locator(".isp-askp"));
+    // Show all on map: every row highlighted, nothing focused.
+    await list.locator("[data-maint-all]").click();
+    await page.waitForFunction(list => { const s = (window as any).__ifcSpatial.state().network; return list.every((id: string) => s.askIds.includes(id)); }, ids);
+    // A row: that asset's assessment, focused on the map, with Back to results; the area stays.
+    await list.locator('.tw-mrow[data-maint-open="TX-M2"]').click();
+    await expect(page.locator(`${ANSWER} .tw-maint .tw-mid`)).toHaveText("TX-M2");
+    await expect(page.locator(`${ANSWER} .tw-mback`)).toContainText(`Back to results (${n})`);
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().network.selectedId === "TX-M2");
+    expect((await page.evaluate(() => (window as any).__ifcSpatial.state().network.area))).not.toBeNull();
+    await shot("m4-drilldown", page);
+    // Expanded and restored: the opened asset and the conversation stay.
+    await page.locator(".isp-askp-width").click();
+    await expect.poll(async () => (await page.locator(".isp-ask").boundingBox())!.width, { timeout: 20_000 }).toBeGreaterThan(500);
+    await expect(page.locator(`${ANSWER} .tw-maint .tw-mid`)).toHaveText("TX-M2");
+    await page.locator(`${ANSWER} .tw-mback`).click();
+    await expect(page.locator(`${ANSWER} .tw-maint-list`)).toBeVisible();
+    await page.waitForFunction(list => { const s = (window as any).__ifcSpatial.state().network; return list.every((id: string) => s.askIds.includes(id)); }, ids);
+    expect((await page.evaluate(() => (window as any).__ifcSpatial.state().network.selectedId))).toBeNull();
+    await shot("m3-multi-expanded", page);
+    await page.locator(".isp-askp-width").click();
+    await expect.poll(async () => (await page.locator(".isp-ask").boundingBox())!.width, { timeout: 20_000 }).toBeLessThan(450);
+    await expect(page.locator(`${ANSWER} .tw-maint-list`)).toBeVisible();
+    // A newer question while one runs: the earlier answer never lands on the newer turn.
+    await askQ("For all degraded and unpowered assets across Seagirt, which repairs are still outstanding?");
+    await askQ("Which assets are degraded?");
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().network.answer?.kind === "Area power status" || (window as any).__ifcSpatial.state().network.answer?.kind === "Power status", null, { timeout: 60_000 });
+    await page.waitForTimeout(1500);
+    expect((await page.evaluate(() => (window as any).__ifcSpatial.state().network.answer)).kind).not.toBe("Maintenance assessment");
+
+    // An asset without linked documents: nothing invented.
+    await page.evaluate(() => (window as any).__ifcSpatial.area.clear());
+    await askQ("What needs to be fixed on TX-M1?");
+    await waitKind("Maintenance assessment");
+    await expect(page.locator(`${ANSWER} .tw-maint`)).toHaveClass(/is-empty/);
+    await expect(page.locator(`${ANSWER} .tw-mfind`)).toHaveCount(0);
+    await shot("m9-missing-evidence", page.locator(".isp-askp"));
+    // Scenario D: with the area cleared, the same question is terminal-wide and says no area.
+    await askQ("For degraded assets, what needs to be fixed?");
+    await waitKind("Maintenance assessment");
+    await expect(page.locator(`${ANSWER} .tw-scope`)).toHaveCount(0);
+    await expect(page.locator(`${ANSWER} .tw-say`)).toContainText(/^I found one degraded transformer, TX-M2\. /);
+    void answer;
   });
 });

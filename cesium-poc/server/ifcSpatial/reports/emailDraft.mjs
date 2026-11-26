@@ -27,23 +27,35 @@ export function draftEmail(snap, { recipientGroup = snap.request.recipientGroup,
   const site = snap.project.name ? snap.project.name.replace(/\s+(Electrical )?Digital Twin.*$/i, '').trim() : null;
   const project = site ? `${site} — ` : '';
   const inspection = snap.kind === 'INSPECTION';
-  const subject = inspection ? `${project}${cap(snap.request.phrase)} requiring inspection` : `${project}${snap.names.reportTitle}`;
+  const maintenance = snap.kind === 'MAINTENANCE';
+  const subject = maintenance ? `${project}Maintenance findings${snap.area ? ` — selected area (${snap.area.label})` : ''}` : inspection ? `${project}${cap(snap.request.phrase)} requiring inspection` : `${project}${snap.names.reportTitle}`;
   const ids = list => (list.length > 8 ? `${list.slice(0, 8).join(', ')} and ${list.length - 8} more` : list.join(', '));
   const kinds = [...new Set(attachments.map(a => (/\.pdf$/i.test(a.filename) ? 'report' : /\.xlsx$/i.test(a.filename) ? 'register' : 'file')))];
   const what = kinds.length ? `the attached ${kinds.join(' and ')}` : 'the report in the Seagirt twin';
   const title = snap.names.reportTitle.replace(/ (Report|Register)$/, '').toLowerCase();
-  const where = site ? ` across ${site}` : '';
+  const where = snap.area ? ` in the selected area of ${site ?? 'the terminal'} (${snap.area.label}${snap.model?.versionNumber ? `, IFC V${snap.model.versionNumber}` : ''})` : site ? ` across ${site}` : '';
   // Short and actionable (about 100–150 words): what was found, what is missing, what to do. The report has the rest.
   const lines = [greeting(recipientGroup), ''];
-  if (inspection) {
+  if (maintenance) {
+    // Scope, the assets with findings (their main ones), what has no evidence, the request; the report has the rest.
+    const withF = snap.assets.filter(a => a.evidenceAvailability === 'AVAILABLE');
+    const without = snap.assets.filter(a => a.evidenceAvailability !== 'AVAILABLE');
+    lines.push(`Please find ${kinds.length ? 'attached ' : ''}the maintenance findings for ${plural(snap.assets.length, 'asset', 'assets')}${where}.`);
+    // Lower-case only the first letter of a plain word ("Cooling fans" → "cooling fans"; "HV", "LV X2" kept).
+    const lc = t => (/^[A-Z][a-z]/.test(t) ? `${t[0].toLowerCase()}${t.slice(1)}` : t);
+    if (withF.length) lines.push('', `Documented inspection findings: ${withF.slice(0, 4).map(a => `${a.id} (${a.findings.slice(0, 3).map(f => lc(f.title)).join(', ') || 'open actions'})`).join('; ')}${withF.length > 4 ? ` and ${withF.length - 4} more` : ''}.`);
+    if (snap.summary.openActions) lines.push('', `${plural(snap.summary.openActions, 'documented corrective action has', 'documented corrective actions have')} no verified closure.`);
+    if (without.length) lines.push('', `${ids(without.map(a => a.id))} ${without.length === 1 ? 'has' : 'have'} no documented findings; the cause of the reported status is not established.`);
+    if (style !== 'short') lines.push('', `Please review ${what} and confirm the corrective actions. Engineering review is needed before any repair, isolation or change in operation.`);
+  } else if (inspection) {
     lines.push(s.inspectionRequired
       ? `Based on the available asset records and ACC inspection documents, ${typed(snap, s.inspectionRequired)} ${s.inspectionRequired === 1 ? 'requires' : 'require'} inspection${where}: ${ids(snap.selectedIds)}.`
       : `Based on the available asset records and ACC inspection documents, no ${snap.request.phrase}${where} meet the inspection-required criteria.`);
     if (s.reviewRecommended) lines.push('', `${cap(typed(snap, s.reviewRecommended))} ${s.reviewRecommended === 1 ? 'is' : 'are'} recommended for engineering review: ${ids(snap.reviewIds)}.`);
   } else lines.push(`Please find ${kinds.length ? 'attached ' : ''}the ${title} ${kinds.length === 2 ? 'report and register' : kinds[0] === 'register' ? 'register' : 'report'} covering ${typed(snap, s.included)}${where}.`);
   const missing = snap.inventoryCoverage.insufficientEvidence;
-  if (missing) lines.push('', `Inspection history could not be established for ${plural(missing, 'asset', 'assets')} from the available records${inspection ? '; this does not by itself mean they require inspection' : ''}.`);
-  if (style !== 'short') {
+  if (missing && !maintenance) lines.push('', `Inspection history could not be established for ${plural(missing, 'asset', 'assets')} from the available records${inspection ? '; this does not by itself mean they require inspection' : ''}.`);
+  if (style !== 'short' && !maintenance) {
     lines.push('', `Please review ${what} and coordinate the necessary follow-up${inspection && s.inspectionRequired ? ', including the proposed inspection schedule' : ''}${missing ? `${inspection && s.inspectionRequired ? ' and' : ', including'} verification of the missing inspection records` : ''}.`);
   }
   if (snap.illustrative) lines.push('', 'Note: this report is based on illustrative demonstration data and does not represent actual inspection records.');

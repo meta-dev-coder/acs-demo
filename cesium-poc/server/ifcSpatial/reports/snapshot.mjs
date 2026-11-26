@@ -9,7 +9,7 @@
  */
 import { CLASSIFICATION, CLASSIFICATION_LABEL, evaluateInspection, NO_POLICY, RULES } from './eligibility.mjs';
 
-export const REPORT_KIND = Object.freeze({ INSPECTION: 'INSPECTION', ASSET_LIST: 'ASSET_LIST' });
+export const REPORT_KIND = Object.freeze({ INSPECTION: 'INSPECTION', ASSET_LIST: 'ASSET_LIST', MAINTENANCE: 'MAINTENANCE' });
 const ILLUSTRATIVE = /illustrative|demo|mock|not as-built|not a real|fictional/i;
 
 const titleCase = s => String(s ?? '').replace(/\b[a-z]/g, c => c.toUpperCase());
@@ -25,7 +25,7 @@ export function typePhrase(request) {
  * email subject agree: "Transformer Inspection Report", "Degraded Electrical Assets Report", "Lighting Circuit
  * Register", "Electrical Asset Inventory Report". One noun per title (never "Asset Asset").
  */
-export function reportNames(request, generatedAt) {
+export function reportNames(request, generatedAt, { area = null } = {}) {
   const labels = request.typeLabels ?? [];
   const one = labels.length === 1;
   const noun = one ? titleCase(labels[0].singular) : 'Electrical Asset';
@@ -34,12 +34,15 @@ export function reportNames(request, generatedAt) {
   const f = request.filters ?? {};
   let report, register;
   if (request.kind === REPORT_KIND.INSPECTION) { report = `${noun} Inspection Report`; register = `${noun} Inspection Register`; }
+  else if (request.kind === REPORT_KIND.MAINTENANCE) { report = one ? `${noun} Maintenance Report` : 'Maintenance Report'; register = 'Corrective Action Register'; }
   else if (f.status === 'DEGRADED') { report = `Degraded ${nouns} Report`; register = `Degraded ${nouns} Register`; }
   else if (f.status === 'NO_POWER') { report = `${nouns} Without Power Report`; register = `${nouns} Without Power Register`; }
   else if (f.status === 'OFFLINE') { report = `Offline ${nouns} Report`; register = `Offline ${nouns} Register`; }
   else if (f.recurring) { report = `${noun} Recurring Findings Report`; register = `${noun} Recurring Findings Register`; }
   else if (request.options?.includeSpecs) { report = `${noun} Specification Report`; register = `${noun} Specification Register`; }
   else { report = `${noun} Inventory Report`; register = `${noun} Register`; }
+  // A selected area: said in the title ("Selected Area Transformer Inspection Report") and the file names.
+  if (area) { report = `Selected Area ${report}`; register = `Selected Area ${register}`; }
   const stem = s => s.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '');
   return { reportTitle: report, registerTitle: register, pdfFile: `${stem(report)}_${day}.pdf`, xlsxFile: `${stem(register)}_${day}.xlsx`, emlFile: `${stem(report)}_Email_Draft_${day}.eml` };
 }
@@ -127,7 +130,7 @@ function sourceRegistry(assets) {
  * @param {object[]} o.assets the population the request covers (the twin's inventory for those types)
  * @param {Map<string, {analysis?: object, error?: string}>} o.results each asset's document analysis
  */
-export function buildSnapshot({ reportId, revision = 1, revisionOf = null, request, assets, results, project, model, documentsIndex = null, now, policy = NO_POLICY, context = [] }) {
+export function buildSnapshot({ reportId, revision = 1, revisionOf = null, request, assets, results, project, model, documentsIndex = null, now, policy = NO_POLICY, context = [], area = null }) {
   const records = assets.map(x => assetRecord(x, results.get(x.id), { request, now, policy }));
   const { pool, selected, review } = select(records, request);
   const included = [...selected, ...review];
@@ -153,7 +156,7 @@ export function buildSnapshot({ reportId, revision = 1, revisionOf = null, reque
         && (rule !== 'POOR_CONDITION_POLICY' || policy.conditionRequiresInspection) && (rule !== 'POOR_CONDITION_REVIEW' || !policy.conditionRequiresInspection))
       .map(([rule, d]) => ({ rule, source: d.source, text: d.text, assets: triggered.get(rule) ?? 0,
         effect: rule === 'NO_INSPECTION_RECORDS' ? CLASSIFICATION.INSUFFICIENT_EVIDENCE : ['POOR_CONDITION_REVIEW', 'WORSENING_OR_RECURRING', 'ACTION_CLOSURE_NOT_VERIFIED', 'DEGRADED_STATUS'].includes(rule) ? CLASSIFICATION.REVIEW_RECOMMENDED : CLASSIFICATION.INSPECTION_REQUIRED }))
-    : [{ rule: 'SELECTION', source: 'USER_REQUEST', text: describeFilters(request), assets: pool.length, effect: 'INCLUDED' }];
+    : [{ rule: 'SELECTION', source: 'USER_REQUEST', text: describeFilters(request, area), assets: pool.length, effect: 'INCLUDED' }];
   const limitations = [];
   if (illustrativeRecords) limitations.push('The linked ACC documents describe themselves as illustrative demonstration records: the findings are not actual inspection results, and this report is illustrative.');
   if (illustrativePositions) limitations.push('Asset positions are illustrative model positions, not surveyed locations.');
@@ -163,6 +166,10 @@ export function buildSnapshot({ reportId, revision = 1, revisionOf = null, reque
   const failed = records.filter(r => r.analysisError);
   if (failed.length) limitations.push(`${failed.length} asset${failed.length === 1 ? '' : 's'} could not be assessed because the documents could not be read: ${failed.map(r => `${r.id} (${r.analysisError})`).join('; ')}.`);
   if (included.some(r => r.actions.some(x => x.closure === 'NOT_VERIFIED'))) limitations.push('Closure of corrective actions is taken only from later inspection reports; no maintenance records are linked, so "no record of completion" does not mean the work was not done.');
+  if (area) {
+    limitations.push(`Scope: the ${area.label === 'Custom selected area' ? 'custom area' : `area "${area.label}"`} selected on the map (${Math.round(area.areaM2 ?? 0).toLocaleString('en-US')} m², WGS84). The server placed the assets in it from the IFC model (cable routes, equipment bounding-box footprints), not from surveyed positions; assets partly inside or crossing the boundary are included.`);
+    if (area.counts?.unknown) limitations.push(`${area.counts.unknown} modelled asset${area.counts.unknown === 1 ? ' has' : 's have'} no position in the model and could not be placed inside or outside the area.`);
+  }
   limitations.push(`Operational status is the IFC model's reported status as evaluated by the twin when the report was requested${assets[0]?.status?.evaluatedAt ? ` (${assets[0].status.evaluatedAt})` : ''}, not live telemetry.`);
   limitations.push('This report summarises records for review. It is not an authorized engineering inspection or a maintenance instruction.');
 
@@ -172,7 +179,8 @@ export function buildSnapshot({ reportId, revision = 1, revisionOf = null, reque
     documentsIndex: documentsIndex ? { lastSyncedAt: documentsIndex.lastSyncedAt ?? null } : null,
     request: { question: request.question, kind: request.kind, types: request.types, typeLabels: request.typeLabels, phrase: typePhrase(request), filters: request.filters ?? {}, options: request.options ?? {},
       outputs: request.outputs, recipientGroup: request.recipientGroup ?? null },
-    names: reportNames(request, new Date(now).toISOString()),
+    names: reportNames(request, new Date(now).toISOString(), { area }),
+    area: area ? structuredClone(area) : null,
     policy: { name: policy.name, dueWithinDays: policy.dueWithinDays ?? null, conditionRequiresInspection: Boolean(policy.conditionRequiresInspection), intervalsByType: policy.intervalsByType ?? {} },
     appliedCriteria,
     inventoryCoverage: {
@@ -198,9 +206,9 @@ export function buildSnapshot({ reportId, revision = 1, revisionOf = null, reque
   };
 }
 
-function describeFilters(request) {
+function describeFilters(request, area = null) {
   const f = request.filters ?? {};
-  const bits = [`All ${typePhrase(request)} in the IFC model`];
+  const bits = [`All ${typePhrase(request)} ${area ? `in the selected area (${area.label}) of the IFC model` : 'in the IFC model'}`];
   if (f.status === 'DEGRADED') bits.push('with a degraded operational status');
   if (f.status === 'NO_POWER') bits.push('with no power');
   if (f.recurring) bits.push('with a finding recorded in more than one inspection report');

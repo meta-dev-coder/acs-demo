@@ -13,7 +13,9 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const size = b => (!Number.isFinite(b) ? '' : b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`);
 const RUNNING = new Set(['PENDING', 'ANALYZING', 'GENERATING']);
 const SOURCE = { DOCUMENTED: 'Documented', POLICY: 'Policy', USER_ASSUMPTION: 'Your assumption', DERIVED: 'Derived review criterion', OPERATIONAL: 'Operational status', USER_REQUEST: 'Request' };
-const TONE = { INSPECTION_REQUIRED: 'bad', REVIEW_RECOMMENDED: 'warn', INSUFFICIENT_EVIDENCE: 'neutral', NO_REQUIREMENT_IDENTIFIED: 'ok' };
+const TONE = { INSPECTION_REQUIRED: 'bad', REVIEW_RECOMMENDED: 'warn', INSUFFICIENT_EVIDENCE: 'neutral', NO_REQUIREMENT_IDENTIFIED: 'ok',
+  // Maintenance reports: the asset's evidence (maintenance.js).
+  AVAILABLE: 'warn', NO_RELEVANT_FINDINGS: 'ok', NO_INSPECTION_RECORDS: 'neutral', NO_DOCUMENTS: 'neutral', RETRIEVAL_FAILED: 'bad', UNREADABLE: 'bad', NOT_CHECKED: 'neutral' };
 const icon = (name, svg) => `<span class="tw-art-ic is-${name}" aria-hidden="true">${svg}</span>`;
 const PDF_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4M9 13h6M9 17h4"/></svg>';
 const XLSX_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M4 10h16M4 15h16M10 4v16"/></svg>';
@@ -26,16 +28,18 @@ export function reportSay(r) {
   const phrase = req.typeLabels.map(l => l.plural).join(' and ') || 'assets';
   const one = req.typeLabels.length === 1 ? req.typeLabels[0].singular : 'asset';
   const s = r.summary;
-  if (RUNNING.has(r.status)) return { say: req.outputs.pdf || req.outputs.xlsx || req.outputs.email ? `Preparing the ${req.kind === 'INSPECTION' ? 'inspection ' : ''}report for ${phrase}…` : `Evaluating ${phrase}…`, say2: null };
+  if (RUNNING.has(r.status)) return { say: req.outputs.pdf || req.outputs.xlsx || req.outputs.email ? `Preparing the ${req.kind === 'INSPECTION' ? 'inspection ' : req.kind === 'MAINTENANCE' ? 'maintenance ' : ''}report for ${phrase}…` : `Evaluating ${phrase}…`, say2: null };
   if (r.status === 'FAILED' && !s) return { say: 'The report could not be generated.', say2: r.error ?? null };
   if (r.status === 'CANCELLED') return { say: 'Report generation was cancelled.', say2: null };
   let say;
-  if (req.kind === 'INSPECTION') {
+  if (req.kind === 'MAINTENANCE') {
+    say = `The maintenance report covers ${plural(s.included, 'asset', 'assets')}: ${s.withFindings} with documented findings${s.openActions ? `, ${plural(s.openActions, 'action', 'actions')} without verified closure` : ''}.`;
+  } else if (req.kind === 'INSPECTION') {
     say = s.inspectionRequired ? `I found ${plural(s.inspectionRequired, one, phrase.split(' and ')[0])} requiring inspection.`
       : `No ${phrase} meet the available inspection-required criteria.`;
   } else say = s.included ? `I found ${plural(s.included, one, phrase)}${req.filters.status === 'DEGRADED' ? ' with a degraded status' : req.filters.status === 'NO_POWER' ? ' with no power' : req.filters.recurring ? ' with recurring inspection findings' : ''}.` : `No ${phrase} match.`;
   const done = r.artifacts.filter(a => a.status === 'COMPLETED');
-  const made = [done.some(a => a.type === 'PDF') && (req.kind === 'INSPECTION' ? 'an inspection report' : 'a report'), done.some(a => a.type === 'XLSX') && 'an Excel register', r.emailDraft && 'a draft email'].filter(Boolean);
+  const made = [done.some(a => a.type === 'PDF') && (req.kind === 'INSPECTION' ? 'an inspection report' : req.kind === 'MAINTENANCE' ? 'a maintenance report' : 'a report'), done.some(a => a.type === 'XLSX') && (req.kind === 'MAINTENANCE' ? 'a corrective action register' : 'an Excel register'), r.emailDraft && 'a draft email'].filter(Boolean);
   const failed = r.artifacts.filter(a => a.status === 'FAILED').map(a => (a.type === 'PDF' ? 'the PDF report' : 'the Excel register'));
   const say2 = [made.length ? `I've prepared ${made.length > 1 ? `${made.slice(0, -1).join(', ')} and ${made.at(-1)}` : made[0]} for your review.` : null,
     failed.length ? `${failed.join(' and ')} could not be generated; you can retry it.` : null,
@@ -68,7 +72,8 @@ function matchingHtml(r, u) {
 
 function artifactHtml(r, a) {
   const pdf = a.type === 'PDF';
-  const desc = pdf ? `PDF · ${r.request.kind === 'INSPECTION' ? 'Asset details, location plot and inspection history' : 'Asset details and location plot'}` : `XLSX · ${plural(r.summary.included, 'asset', 'assets')} and recommended follow-ups`;
+  const desc = r.request.kind === 'MAINTENANCE' ? (pdf ? 'PDF · Findings, corrective actions, closure and locations' : `XLSX · Findings and corrective actions for ${plural(r.summary.included, 'asset', 'assets')}`)
+    : pdf ? `PDF · ${r.request.kind === 'INSPECTION' ? 'Asset details, location plot and inspection history' : 'Asset details and location plot'}` : `XLSX · ${plural(r.summary.included, 'asset', 'assets')} and recommended follow-ups`;
   if (a.status === 'FAILED') {
     return `<div class="tw-card tw-art is-failed">${icon(pdf ? 'pdf' : 'xlsx', pdf ? PDF_ICON : XLSX_ICON)}<div class="tw-art-m"><b>${pdf ? 'PDF report' : 'Excel register'}</b><small class="tw-rwarn">Generation failed: ${esc(a.error)}</small></div>
       <div class="tw-art-acts"><button type="button" class="tw-rlink" data-report-act="retry" data-report-type="${esc(a.type)}" data-report-id="${esc(r.reportId)}">Retry</button></div></div>`;

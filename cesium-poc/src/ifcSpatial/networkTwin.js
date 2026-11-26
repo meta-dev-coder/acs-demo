@@ -27,16 +27,23 @@ import { checkSupplyRelationship, EVIDENCE, RELATIONSHIP, resolveSupplyPath, ROL
 import { classifyDocumentQuestion, DOC_INTENT } from './docQuestions.js';
 import { docAnalysisHtml, docCompareAssetsHtml, docSay, fleetHtml, primaryCitation } from './docAnswer.js';
 import { citePopoverHtml, switchReviewTab } from './docReview.js';
-import { parseReportFollowUp, parseReportRequest, typeLabels } from './reportRequest.js';
+import { parseReportFollowUp, parseReportRequest, recipientOf, typeLabels } from './reportRequest.js';
 import { chipsHtml, registerPreviewHtml, reportHtml, reportSay, sendReadiness, splitAddresses } from './reportAnswer.js';
 import { classifyQuestion } from './intentRouter.js';
-import { approxMetres, bufferOutline, buildSpatialIndex, parseSpatialQuestion, querySpatial } from './spatialIndex.js';
+import { approxMetres, bufferOutline, buildSpatialIndex, categoriesIn, parseSpatialQuestion, querySpatial } from './spatialIndex.js';
 import { answerFacilityQuestion, buildFacilities } from './facilities.js';
 import { ASK_ICONS, askPanelHtml } from './askPanel.js';
 import { renderChatAnswer } from './chatAnswer.js';
 import { createFocusEffects, createLocatorSound } from './focusEffects.js';
 import { activeAlerts, assetStatuses, investigateOutage, STATUS, STATUS_LABEL, statusSummary } from './operations.js';
 import { IFC_QUESTION_BANK } from './ifcQuestionBank.js';
+import { AREA_MODE, createAreaDraw } from './areaDraw.js';
+import { INTENT, isMaintenancePlan, planQuestion } from './askIntent.js';
+import { resolveTargets, runInvestigation } from './askOrchestrator.js';
+import { buildMaintenanceAssessment } from './maintenance.js';
+import { maintenanceHtml, maintenanceSayFor, maintenanceSuggestions } from './maintenanceAnswer.js';
+import { areaIntentOf, areaScopeOf, distanceIn, isInArea, mentionsArea, polygonOf, validateAreaGeometry } from './areaQuery.js';
+import { alternateCoverage, changesInArea, constructionScreen, dependentsOutside, inventoryOf, outageByArea, statusOfArea, supplyOfArea } from './areaIntel.js';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
 const typeLabel = type => (TYPE_LABEL[type]?.[0] ?? String(type ?? '').toLowerCase().replaceAll('_', ' '));
@@ -205,10 +212,10 @@ export function restoreOptions(network, scenario) {
 }
 
 // What the user opened stays open when a new model version rebuilds the twin; the first load starts collapsed.
-const remembered = { opsCollapsed: true, askOpen: false };
+const remembered = { opsCollapsed: true, askOpen: false, area: null };
 
 export function createNetworkTwin({ viewer, elements, connections, modelToLonLat, panel, left, askHost, header, alertHost = null, assetsHost, chainHost, sourceLabel = '',
-  opsHost = null, powerHost = null, onDocument = () => {}, onArtifact = () => false, compareTools = null, docTools = null, heading = 0, baseHeight = 0, onSelectElement = () => {}, onFocusElement = () => {}, onWorkspace = () => {} }) {
+  opsHost = null, powerHost = null, onDocument = () => {}, onArtifact = () => false, compareTools = null, docTools = null, areaTools = null, heading = 0, baseHeight = 0, onSelectElement = () => {}, onFocusElement = () => {}, onWorkspace = () => {} }) {
   const scadaRoutes = elements.filter(e => /scada|fibre/i.test(e.networkRole ?? '') && e.route?.length >= 2)
     .map(e => ({ id: e.networkId ?? e.globalId, points: e.route.map(p => modelToLonLat(...p)) }));
   const built = buildIfcNetwork({ elements, connections, toLonLat: modelToLonLat });
@@ -348,7 +355,7 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
       dimAlpha: ui.ask || ui.focus || ui.sim ? 0.12 : undefined,
       emphasise: Boolean(ui.result?.paths?.length) || ui.workspace === 'assets', stateLabels: st.active,
       // Cables in an Ask the Twin result glow in its colour (equipment keeps its status tile; its halo is the highlight).
-      highlight: ui.ask ? new Map(ui.ask.ids.filter(id => network.assets.get(id)?.route?.length >= 2 && view.nodeState.get(id) !== 'dead').map(id => [id, ASK_COLOR])) : null,
+      highlight: ui.ask ? new Map(ui.ask.ids.filter(id => network.assets.get(id)?.route?.length >= 2 && view.nodeState.get(id) !== 'dead').map(id => [id, ui.ask.colors?.get(id) ?? ASK_COLOR])) : null,
       // Outside a simulation, what the model leaves without power is flagged and pulses on the map.
       alert: st.active ? null : ui.opsCollapsed ? unpowered : new Set([...unpowered, ...alertTone.keys()]),
       alertNames: st.active || ui.opsCollapsed ? null : alertTone,
@@ -1329,6 +1336,8 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
   /** A version question: resolved against ACC's versions, answered from the server's comparison. */
   async function askVersions(question, parsed) {
     const mine = ++askToken;
+    // Asked about the selected area: kept as it was when asked (a later area never changes this answer).
+    const area = ui.area && /^Selected area/.test(ui.turns[ui.turn]?.scope ?? '') ? ui.area : null;
     const fileName = compareTools.fileName();
     ui.result = null; ui.question = question;
     ui.view = { question, status: 'loading', title: 'Reading the versions of the model in ACC and comparing…' };
@@ -1342,6 +1351,7 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
       render();
       const result = await compareTools.compare(v.base, v.target);
       if (mine !== askToken) return;
+      if (area) { areaVersionsAnswer(question, area, result, v); return; }
       const sameCmp = ui.cmp && ui.cmp.base === v.base && ui.cmp.target === v.target;
       const { view, ids } = compareAnswer(parsed, result, { question, fileName, base: v.base, target: v.target, how: v.how, lastIds: sameCmp ? ui.cmp.lastIds : null });
       ui.cmp = { base: v.base, target: v.target, lastIds: ids?.length ? ids : sameCmp ? ui.cmp.lastIds : null, changeIds: new Set((result.changes ?? []).map(c => c.networkId).filter(Boolean)) };
@@ -1358,6 +1368,39 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
         lead: error.code === 'VERSIONS' ? '' : `${error.message}${error.code ? ` (${error.code})` : ''}`, actions: [{ label: 'Retry', primary: true, attrs: { 'data-ask': question } }] };
       render();
     }
+  }
+
+  /** What changed between two versions inside the selected area (each version placed by its own positions). */
+  function areaVersionsAnswer(question, a, result, v) {
+    const cats = categoriesIn(question, spatial());
+    const words = Array.isArray(cats) ? cats.map(c => c.toLowerCase()) : null;
+    const matches = c => !words || words.some(w => `${c.kind ?? ''} ${c.ifcClass ?? ''} ${categoryOfId(c.networkId ?? '') ?? ''} ${c.name ?? ''}`.toLowerCase().includes(w.replace(/s$/, '')));
+    const r = changesInArea(result.changes ?? [], { ring: a.ring, toLonLat: modelToLonLat, matches });
+    const idOf = c => c.networkId ?? c.name ?? c.globalId;
+    const what = words?.length === 1 ? pluralOf(cats[0]) : 'assets';
+    const onlyAdded = /\badded\b/i.test(question) && !/\b(removed|moved|changed|modified)\b/i.test(question);
+    const onlyRemoved = /\b(removed|deleted)\b/i.test(question) && !/\b(added|moved|changed|modified)\b/i.test(question);
+    const onlyMoved = /\bmoved\b/i.test(question) && !/\b(added|removed|changed|modified)\b/i.test(question);
+    const onlyConn = /\bconnection|connectivity\b/i.test(question);
+    const counts = [['Added', r.added, 'ok'], ['Removed', r.removed, 'bad'], ['Moved into the area', r.movedIn, 'info'], ['Moved out of the area', r.movedOut, 'warn'], ['Moved within', r.movedWithin, 'neutral'], ['Modified', r.modified, 'neutral']];
+    const shown = onlyAdded ? counts.slice(0, 1) : onlyRemoved ? counts.slice(1, 2) : onlyMoved ? counts.slice(2, 5) : onlyConn ? [['Connections changed', r.connectivity, 'info']] : counts;
+    const n = new Set(shown.flatMap(([, list]) => list.map(c => c.globalId))).size;
+    const say = n ? `Between V${v.base} and V${v.target}, ${shown.filter(([, l]) => l.length).map(([label, l]) => `${l.length} ${label.toLowerCase()}`).join(', ')} in the selected area${words ? ` (${what})` : ''}.`
+      : `No ${onlyAdded ? 'added ' : onlyRemoved ? 'removed ' : onlyMoved ? 'moved ' : onlyConn ? 'connection ' : ''}${what === 'assets' ? 'changes' : what} in the selected area between V${v.base} and V${v.target}.`;
+    const inModel = list => list.map(c => c.networkId ?? built.assetByGlobalId.get(c.globalId)?.id).filter(id => id && network.assets.has(id));
+    const changed = shown.flatMap(([, list]) => list);
+    const item = c => ({ id: idOf(c), label: idOf(c), attrs: network.assets.has(c.networkId ?? '') ? { 'data-asset': c.networkId } : null });
+    areaView(question, a, { kind: 'Area version changes', say,
+      say2: [r.unplaced.length ? `${r.unplaced.length} changed ${r.unplaced.length === 1 ? 'element has' : 'elements have'} no position in either version and could not be placed.` : '',
+        result.frame?.frame === 'INCOMPATIBLE' ? 'The two versions use different coordinate frames: positions may not be comparable.' : '',
+        'Each version is tested against the same boundary at its own positions; a removed asset is found where it was in the older version.'].filter(Boolean).join(' '),
+      metrics: shown.map(([label, list, tone]) => ({ label, value: list.length, tone })),
+      groups: shown.filter(([, l]) => l.length).map(([label, list, tone]) => ({ label, tone, noun: 'assets', items: list.map(item) })),
+      sources: [...areaSources(a), `IFC comparison V${v.base} → V${v.target} (${compareTools.fileName()}); positions: a cable’s route midpoint, else the placement origin, else the box centre`],
+      actions: [...(inModel(changed).length ? [{ label: 'View changed assets', primary: true, attrs: { 'data-cmp-show': inModel(changed).join(',') } }] : []),
+        ...(changed.length ? [{ label: 'Open version comparison', attrs: { 'data-cmp-open': `${v.base}:${v.target}`, 'data-cmp-ids': changed.map(c => c.globalId).join(',') } }] : [])] });
+    ui.cmp = { base: v.base, target: v.target, lastIds: changed.map(c => c.globalId), changeIds: new Set((result.changes ?? []).map(c => c.networkId).filter(Boolean)) };
+    if (inModel(changed).length) areaHighlight(inModel(changed), question, 'assets');
   }
 
   // ---- answers from the asset's documents (server/ifcSpatial/docIntel.mjs) ----
@@ -1456,6 +1499,7 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
       if (!cached) for (const x of analyses) docCache.set(x.asset.id, { analysis: x, at: Date.now() });
       const a = analyses[0];
       ui.lastDoc = { assetId: a.asset.id, intent: q.intent, analyses };
+      ui.lastInvestigation = null;
       if (ids.length > 1) {
         ui.view = { question, kind: 'Documents', status: 'answered', say: `${ids.join(' and ')} side by side, from their linked ACC documents.`, extraHtml: docCompareAssetsHtml(analyses, { aspect: q.aspect }),
           suggestions: ids.map(id => `Summarize ${id}'s inspection history`).slice(0, 2) };
@@ -1553,23 +1597,26 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
     const ids = rec.data.assets.map(a => a.id).filter(x => network.assets.has(x));
     if (rec.turn === ui.turn && ids.length) { setAskResults(ids, rec.question, { noun: 'assets' }); render(); frame(ids, { pitch: -55, minRange: 350 }); }
   }
-  async function startReport(question, request, { revisionOf = null, regenerate = false } = {}) {
+  async function startReport(question, request, { revisionOf = null, regenerate = false, area = null, ids = null, investigationAt = null } = {}) {
     const mine = ++askToken;
-    const population = reportPopulation(request.types);
+    // A report about the selected area: its assets only (the server checks the area again and keeps a snapshot of it).
+    // A maintenance report: the investigation's assets.
+    const population = reportPopulation(request.types).filter(x => (!area || area.inside.has(x.id)) && (!ids || ids.includes(x.id)));
     const phrase = request.typeLabels.map(l => l.plural).join(' and ');
     if (!population.length) {
-      ui.view = { question, kind: 'Report', status: 'limited', say: `The model has no ${phrase || 'assets of that type'}, so there is nothing to report.` };
+      ui.view = { question, kind: 'Report', status: 'limited', say: `${area ? 'The selected area holds' : 'The model has'} no ${phrase || 'assets of that type'}, so there is nothing to report.`, ...(area ? { scope: areaScopeLabel(area) } : {}) };
       render();
       return;
     }
-    ui.view = { question, kind: 'Report', status: 'answered', say: `Identifying matching assets: ${population.length} ${phrase} in the model…`, extraHtml: '' };
+    ui.view = { question, kind: 'Report', status: 'answered', say: `Identifying matching assets: ${population.length} ${phrase} ${area ? 'in the selected area' : 'in the model'}…`, extraHtml: '', ...(area ? { scope: areaScopeLabel(area) } : {}) };
     render();
     const turn = ui.turn;
     try {
-      const data = await docTools.report.create({ request: { question, ...request }, assets: population, context: reportContext(), revisionOf, regenerate });
+      const data = await docTools.report.create({ request: { question, ...request }, assets: population, context: reportContext(), revisionOf, regenerate,
+        ...(area ? { area: { key: area.versionKey, geometry: area.geometry, placement: areaTools.placement(), label: areaLabel(area), selectionId: area.selectionId, zones: areaZones() } } : {}) });
       // Stopped while the job was being created: it is cancelled on the server too.
       if (mine !== askToken) { if (REPORT_RUNNING.has(data.status) && !data.reused) docTools.report.cancel(data.reportId).catch(() => {}); return; }
-      const rec = { data, question, turn, ui: { assetsOpen: !(request.outputs.pdf || request.outputs.xlsx || request.outputs.email) } };
+      const rec = { data, question, turn, investigationAt, ui: { assetsOpen: !(request.outputs.pdf || request.outputs.xlsx || request.outputs.email) } };
       ui.reports.set(data.reportId, rec);
       ui.lastReport = data.reportId;
       if (working?.token === mine) working.cancel = () => stopReport(data.reportId);
@@ -1592,7 +1639,7 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
     renderReport(id);
     return true;
   }
-  function askReport(question, req) {
+  function askReport(question, req, { area = null } = {}) {
     ui.result = null; ui.question = question;
     if (req.unsupported) {
       ui.view = { question, kind: 'Report', status: 'unsupported', say: 'I cannot generate that kind of report yet.',
@@ -1601,7 +1648,7 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
       return;
     }
     if (req.needsTypes) { ui.view = { question, kind: 'Report', status: 'answered', say: 'Which assets?', lead: 'Name an asset type, for example transformers, circuit breakers, cranes or lighting.' }; render(); return; }
-    tracked(startReport(question, { kind: req.kind, types: req.types, typeLabels: req.typeLabels, outputs: req.outputs, recipientGroup: req.recipientGroup, filters: req.filters, options: req.options }));
+    tracked(startReport(question, { kind: req.kind, types: req.types, typeLabels: req.typeLabels, outputs: req.outputs, recipientGroup: req.recipientGroup, filters: req.filters, options: req.options }, { area }));
   }
   /** A follow-up on the last report: the draft edited, the assets shown again, or a new revision. */
   async function askReportFollowUp(question, f) {
@@ -1629,8 +1676,13 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
       try {
         const data = await docTools.report.email(r.reportId, body);
         if (mine !== askToken) return;
-        const what = f.email.style === 'short' ? 'I\'ve shortened the email draft.' : f.email.recipientGroup ? `The draft is now addressed to ${f.email.recipientGroup}.` : f.email.removeType ? `The ${f.email.removeType === 'PDF' ? 'PDF report' : 'Excel register'} is no longer attached.` : 'I\'ve rewritten the email draft.';
-        const next = { data, question, turn, ui: { emailOpen: true }, say: what, say2: `The report and register were not regenerated (report ${data.reportId}${data.revision > 1 ? ` rev ${data.revision}` : ''}).` };
+        // The first draft for this report is said as such (with its attachments); later ones as changes to it.
+        const first = !r.emailDraft;
+        const files = data.artifacts.filter(a => a.status === 'COMPLETED').map(a => (a.type === 'PDF' ? 'the report' : 'the register'));
+        const what = first ? `I've drafted an email${f.email.recipientGroup ? ` to the ${f.email.recipientGroup}` : ''}${files.length ? ` with ${files.join(' and ')} attached` : ''}.`
+          : f.email.style === 'short' ? 'I\'ve shortened the email draft.' : f.email.recipientGroup ? `The draft is now addressed to ${f.email.recipientGroup}.` : f.email.removeType ? `The ${f.email.removeType === 'PDF' ? 'PDF report' : 'Excel register'} is no longer attached.` : 'I\'ve rewritten the email draft.';
+        const next = { data, question, turn, investigationAt: rec.investigationAt ?? null, ui: { emailOpen: true }, say: what,
+          say2: first ? 'Review it and add the recipients; nothing is sent until you confirm.' : `The report and register were not regenerated (report ${data.reportId}${data.revision > 1 ? ` rev ${data.revision}` : ''}).` };
         ui.reports.set(r.reportId, next);
         renderReport(r.reportId);
       } catch (error) { if (turn === ui.turn) { ui.view = { question, kind: 'Report', status: 'error', title: 'The draft could not be updated', lead: error?.message ?? String(error) }; render(); } }
@@ -1900,7 +1952,9 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
   function render() {
     if (ui.sim && !session.state().active) ui.sim = null;   // the scenario was reset elsewhere
     // The current answer is shown in its conversation turn in the Ask the Twin panel, never in the card.
-    const view = ui.view ?? (ui.result ? resultView(ui.result) : null);
+    const base = ui.view ?? (ui.result ? resultView(ui.result) : null);
+    // Every answer while an area exists says which scope it used (kept with its turn: a later area never relabels it).
+    const view = base && !base.scope && ui.turns[ui.turn]?.scope ? { ...base, scope: ui.turns[ui.turn].scope } : base;
     const answer = view ? renderChatAnswer(view, { describe: describeRow }) : null;
     if (answer) renderTurn(answer);
     renderAskBusy();
@@ -2067,11 +2121,34 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
     // version comparison and the document list, which would take them as "which files" (docQuestions.js).
     // Reports and registers ("prepare a report of … and draft an email"): before the document questions,
     // which would take "report" for an inspection report. A follow-up on the last report edits it.
+    // Select Area: the scope of this question (the area by default; "across Seagirt" for the whole terminal).
+    const areaScope = ui.area ? areaScopeOf(question) : null;
+    ui.turns[ui.turn].scope = ui.area ? (areaScope.scope === 'TERMINAL' ? 'Entire terminal' : areaScope.scope === 'OUTSIDE' ? `Outside the selected area` : areaScope.scope === 'NEAR' ? 'Near the selected area' : areaScopeLabel(ui.area)) : null;
+    // The question's objective, target, scope and time (askIntent.js): read before any keyword handler, so a
+    // status word, a category or the selected area never decides what is asked.
+    const plan = planFor(question);
+    ui.lastPlan = plan;
+    if (plan.clarify) { askWhichAsset(question, plan); return; }
+    if (docTools && isMaintenancePlan(plan) && !existingDocAnswer(question, plan)) { tracked(askMaintenance(question, plan)); return; }
+    // A follow-up that refers to an asset ("What happens if we shut it down?"): the asset from the conversation,
+    // asked of the engine that answers it.
+    // A report or an email from the maintenance investigation in progress (§20–§21), not a generic inventory.
+    if (docTools?.report && [INTENT.REPORT_GENERATION, INTENT.EMAIL_DRAFT].includes(plan.primaryIntent) && askInvestigationReport(question, plan)) return;
+    const followUp = resolvedFollowUp(question, plan);
+    if (followUp) { askQuestionAs(followUp, question); return; }
     if (docTools?.report) {
       const follow = ui.lastReport ? parseReportFollowUp(question, ui.reports.get(ui.lastReport)?.data, { knownTypes: reportTypes() }) : null;
       if (follow) { tracked(askReportFollowUp(question, follow)); return; }
       const rq = parseReportRequest(question, { knownTypes: reportTypes() });
-      if (rq) { askReport(question, rq); return; }
+      if (rq) { askReport(question, rq, { area: areaScope?.scope === 'AREA' ? ui.area : null }); return; }
+    }
+    if (ui.area && areaScope.scope !== 'TERMINAL' && askArea(question, areaScope)) return;
+    if (!ui.area && mentionsArea(question) && !/\b(zone|yard|berth|substation)\s+\w/i.test(question)) {
+      ui.result = null; ui.question = question;
+      ui.view = { question, kind: 'Select Area', status: 'answered', say: 'No area is selected.', say2: 'Select an area on the map first (the Select Area button in this panel’s header), then ask again. Or ask about the whole terminal.',
+        actions: [{ label: 'Select an area', primary: true, attrs: { 'data-act': 'areaMenu' } }] };
+      render();
+      return;
     }
     if (docTools) {
       const docIds = new Set([...network.assets.keys(), ...(ui.docs?.documents ?? []).map(d => d.mapping?.assetId).filter(Boolean)]);
@@ -2079,7 +2156,11 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
       if (docQ) { tracked(askDocIntel(question, docQ)); return; }
     }
     const knownIds = new Set([...network.assets.keys(), ...(ui.cmp?.changeIds ?? [])]);
-    const parsed = compareTools ? parseCompareQuestion(question, { cmp: ui.cmp, knownIds, selectedId: ui.selectedId }) : null;
+    // "Were any transformers added in this area?": the area is the turn's scope; the comparison reads the rest.
+    const cmpText = (ui.area ? question.replace(/\s*\b(?:in|within|inside|for|across)\s+(?:the\s+)?(?:this|that|selected|the selected|my)\s+(?:area|zone|selection|boundary)\b/gi, '') : question)
+      // "Were any transformers added?" read as "Which transformers were added?".
+      .replace(/^\s*(?:were|was|have|has)\s+any\s+(.+?)\s+(?:been\s+)?(added|removed|deleted|moved|changed|modified)\b/i, 'Which $1 were $2');
+    const parsed = compareTools ? parseCompareQuestion(cmpText, { cmp: ui.cmp, knownIds, selectedId: ui.selectedId }) : null;
     if (parsed) { tracked(askVersions(question, parsed)); return; }
     if (/\b(document(ation)?s?|datasheets?|data sheets?|asset sheets?|pdfs?|manuals?)\b/i.test(question)) { askDocuments(question); return; }
     // Spatial questions (near, within, nearest, inside, between): before anything takes a named asset as "locate it".
@@ -2260,7 +2341,23 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
         ...(sim.potential.length ? [{ label: `Potentially affected (if the fault is in ${sim.throughTerminals.join(', ')}’s terminals)`, noun: 'assets', tone: 'warn', items: sim.potential.map(item) }] : []),
         ...(sim.equipment.length ? [{ label: 'De-energized equipment', noun: 'assets', tone: 'neutral', items: sim.equipment.map(item) }] : []),
       ],
-      actions: [{ label: 'Reset simulation', primary: true, attrs: { 'data-act': 'simReset' } }] };
+      actions: [{ label: 'Reset simulation', primary: true, attrs: { 'data-act': 'simReset' } }], ...areaOutage(sim) };
+  }
+  /**
+   * With an area selected, a simulated outage (run on the whole network) is split by where its affected
+   * consumers are: inside the area, outside it, or with no position. The panel opens from here.
+   */
+  function areaOutage(sim) {
+    const a = ui.area;
+    if (!a) return {};
+    const p = outageByArea(sim.consumers, a.m.relations);
+    const fail = sim.failed.map(id => `${id} (${relationText[a.m.relations[id]?.relation ?? 'UNKNOWN_LOCATION']} the area)`).join(', ');
+    const list = (label, ids, tone) => `<div class="tw-out-col is-${tone}"><b>${ids.length}</b><span>${esc(label)}</span>${ids.length ? `<div class="tw-out-ids">${ids.slice(0, 12).map(id => `<button type="button" data-asset="${esc(id)}">${esc(id)}</button>`).join('')}${ids.length > 12 ? `<small>+${ids.length - 12}</small>` : ''}</div>` : ''}</div>`;
+    return { scope: areaScopeLabel(a),
+      extraHtml: `<section class="tw-card tw-out" aria-label="Impact by area"><header class="tw-card-h"><h4>Affected consumers by area</h4><span class="tw-count">${p.total}</span></header>
+        <div class="tw-out-cols">${list('Inside the selected area', p.inside, 'in')}${list('Outside the area', p.outside, 'out')}${p.unknown.length ? list('No position in the model', p.unknown, 'unk') : ''}</div>
+        <p class="tw-note">${ASK_ICONS.info}Simulated on the whole network (failed: ${esc(fail)}). Modelled alternate routes are not an approved switching plan; the reported status is unchanged.</p></section>`,
+      actions: [{ label: 'Open outage simulation', primary: true, attrs: { 'data-act': 'simPanel' } }, { label: 'Reset simulation', attrs: { 'data-act': 'simReset' } }] };
   }
   function endSimulation() {
     const id = ui.sim?.id ?? null;
@@ -2556,6 +2653,648 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
     askQuestion(q);
   });
 
+
+  // ---- context-aware investigations (askIntent.js → askOrchestrator.js → maintenance.js) ----
+
+  ui.lastInvestigation = null;
+  /** The structured conversation context a question is read against (§9). */
+  function conversationContext() {
+    return { selectedAssetId: ui.inspector ?? ui.focus?.id ?? null,
+      collection: ui.lastCollection?.ids?.length ? { ids: ui.lastCollection.ids } : ui.lastAssets?.length ? { ids: ui.lastAssets } : null,
+      investigation: ui.lastInvestigation ? { ids: ui.lastInvestigation.ids } : null };
+  }
+  function planFor(question) {
+    const known = new Set(network.assets.keys());
+    return planQuestion(question, { knownIds: known, namedIds: q => namedIds(q, known), categoriesIn: q => categoriesIn(q, spatial()), conversation: conversationContext(),
+      area: ui.area ? { selectionId: ui.area.selectionId, versionKey: ui.area.versionKey } : null });
+  }
+  /**
+   * One named asset's inspection history or condition trend: the existing document review answers it (its tabs,
+   * citations and preview); the orchestrator takes every other maintenance question.
+   */
+  function existingDocAnswer(question, plan) {
+    if (!plan.target.ids || plan.target.ids.length !== 1) return false;
+    const id = plan.target.ids[0];
+    const docIds = new Set([...network.assets.keys(), ...(ui.docs?.documents ?? []).map(d => d.mapping?.assetId).filter(Boolean)]);
+    const understood = () => Boolean(classifyDocumentQuestion(question, { assetIds: docIds, contextAssetId: id, lastAnalysis: ui.lastDoc?.assetId === id ? ui.lastDoc.analyses?.[0] ?? null : null }));
+    // A follow-up inside that asset's open document review stays in the review (its tabs and citations).
+    if (ui.lastDoc?.assetId === id && !ui.lastInvestigation && understood()) return true;
+    if (plan.target.kind !== 'NAMED') return false;
+    if (![INTENT.INSPECTION_HISTORY, INTENT.CONDITION_TREND, INTENT.RECURRING_DEFECTS].includes(plan.primaryIntent)) return false;
+    return understood();
+  }
+  /** "Which one?" when one asset is needed and the conversation offers several (never chosen arbitrarily). */
+  function askWhichAsset(question, plan) {
+    ui.result = null; ui.question = question;
+    const verb = { OUTAGE_IMPACT: 'What happens if {id} goes offline?', REPLACEMENT_ASSESSMENT: 'What needs to be done before replacing {id}?' }[plan.primaryIntent] ?? `${question} ({id})`;
+    ui.view = { question, kind: 'Clarification', status: 'answered', say: `Which asset do you mean? The last answer had ${plan.clarify.options.length}.`,
+      followUps: plan.clarify.options.slice(0, 4).map(id => ({ label: id, question: verb.replace('{id}', id), icon: ICON_OF[network.assets.get(id)?.assetType] ?? 'bolt' })), suggestLimit: 4 };
+    render();
+  }
+  /** A follow-up on one asset from the conversation, rewritten for the engine that answers it (its target is validated). */
+  function resolvedFollowUp(question, plan) {
+    if (!['PREVIOUS', 'SELECTED'].includes(plan.target.kind) || plan.target.ids.length !== 1) return null;
+    const id = plan.target.ids[0];
+    // Questions the document review already answers in context ("What specifications are missing?") keep their own wording.
+    if (docTools && existingDocAnswer(question, plan)) return null;
+    const map = { [INTENT.OUTAGE_IMPACT]: `What happens if ${id} goes offline?`, [INTENT.ALTERNATE_SUPPLY]: `Is there an alternate supply if ${id} fails?`,
+      [INTENT.REPLACEMENT_ASSESSMENT]: `What should we verify before replacing ${id}?`, [INTENT.SUPPLY_DEPENDENCY]: `What supplies ${id}?`, [INTENT.DOWNSTREAM_IMPACT]: `What does ${id} supply?`,
+      [INTENT.TECHNICAL_SPECIFICATIONS]: `What are ${id}'s technical specifications?`, [INTENT.ASSET_LOCATION]: `Show me ${id}` };
+    return map[plan.primaryIntent] ?? null;
+  }
+  /** Ask a rewritten question in the current turn (the turn keeps what the user typed). */
+  function askQuestionAs(rewritten, typed) {
+    const turn = ui.turns[ui.turn];
+    ui.turns.pop(); ui.turn = ui.turns.length - 1;
+    chat.querySelector('.isp-turn:last-child')?.remove();
+    askQuestion(rewritten);
+    const el = chat.querySelector('.isp-turn:last-child .isp-msg-user p');
+    if (el) el.textContent = typed;
+    if (ui.turns[ui.turn]) ui.turns[ui.turn].question = typed;
+    void turn;
+  }
+
+  /** A maintenance investigation: the plan run by the orchestrator over the twin's services, then the assessment. */
+  async function askMaintenance(question, plan) {
+    const mine = ++askToken;
+    // The scope as it is now: a later area, or a cleared one, never changes this answer.
+    const area = plan.scope.type === 'SELECTED_AREA' ? ui.area : null;
+    const scopeLabel = area ? areaScopeLabel(area) : plan.scope.explicit && ui.area ? 'Entire terminal' : null;
+    ui.result = null; ui.question = question;
+    clearFocus(); ui.inspector = null;
+    if (plan.target.kind === 'SCOPE' && !area) {
+      ui.view = { question, kind: 'Maintenance assessment', status: 'answered', say: 'Which assets should I investigate?', say2: 'Name an asset, a status or a type, or select an area on the map.',
+        followUps: [{ label: 'Degraded assets', question: `For degraded assets, ${question.replace(/^\s*(for [^,]+,\s*)?/i, '').replace(/^./, c => c.toLowerCase())}`, icon: 'bolt' }, { label: 'Assets without power', question: `For assets without power, ${question.replace(/^./, c => c.toLowerCase())}`, icon: 'bolt' }] };
+      render();
+      return;
+    }
+    const progress = p => {
+      if (mine !== askToken) return;
+      ui.view = { question, kind: 'Maintenance assessment', status: 'loading', title: p.total ? `${p.label} (${p.done ?? 0} of ${p.total})…` : `${p.label}…`, ...(scopeLabel ? { scope: scopeLabel } : {}) };
+      render();
+    };
+    const tools = {
+      scopeAssets: scope => (scope.type === 'SELECTED_AREA' && area ? [...area.inside] : [...network.assets.keys()]),
+      statusOf: id => statuses.get(id) ?? null,
+      categoryOf: id => categoryOfId(id),
+      isAsset: id => network.assets.has(id),
+      documentsOf: id => (ui.docs ? documentsForAsset(ui.docs, id) : null),
+      analyze: async id => {
+        const hit = docCache.get(id);
+        if (hit && Date.now() - hit.at < DOC_CACHE_MS) return hit.analysis;
+        const a = await docTools.analyze(id, 'MAINTENANCE_HISTORY');
+        docCache.set(id, { analysis: a, at: Date.now() });
+        return a;
+      },
+    };
+    let inv;
+    try { inv = await runInvestigation(plan, tools, { isCurrent: () => mine === askToken, onProgress: progress }); }
+    catch (error) {
+      if (mine !== askToken) return;
+      ui.view = { question, kind: 'Maintenance assessment', status: 'error', say: 'The investigation could not be completed.', say2: `${error?.message ?? error}`, actions: [{ label: 'Retry', primary: true, attrs: { 'data-ask': question } }] };
+      render();
+      return;
+    }
+    if (inv.cancelled || mine !== askToken) return;
+    const m = buildMaintenanceAssessment(inv, { scopeLabel, describe: id => { const x = network.assets.get(id); return x ? { type: typeName(x), name: String(x.name ?? '').replace(new RegExp(`\\s*\\b${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`), '') || null } : {}; } });
+    ui.lastInvestigation = { ids: m.assets.map(a => a.assetId), assessment: m, question, at: Date.now() };
+    ui.lastDoc = null;
+    ui.maint = { assessment: m, open: m.assets.length === 1 ? m.assets[0].assetId : null };
+    renderMaintenance(question);
+    const ids = m.assets.map(a => a.assetId).filter(id => network.assets.has(id));
+    if (ids.length === 1) { setAskResults(ids, question, { keep: ids[0], noun: 'assets' }); ui.selectedId = ids[0]; focusAsset(ids[0], { sound: false }); }
+    else if (ids.length) { setAskResults(ids, question, { noun: 'assets' }); render(); frame(ids, { pitch: -58, minRange: 300 }); }
+  }
+  /**
+   * "Prepare a report of these issues", "Generate a maintenance report", "Inform the maintenance team": the
+   * maintenance report (PDF, corrective action register, draft) from the current investigation. Returns false
+   * when the question is a report of another kind (an inspection report, a register by type or status).
+   */
+  /** The recipient group named in a request ("to the electrical maintenance team", "inform the maintenance team"). */
+  const groupOf = q => recipientOf(q) ?? (/\b(?:inform|notify|tell|update|e-?mail|alert)\s+(?:the\s+)?((?:[\w&-]+\s+){0,3}team)\b/i.exec(q)?.[1] ?? null)?.replace(/\b[a-z]/g, c => c.toUpperCase()) ?? null;
+  function askInvestigationReport(question, plan) {
+    const inv = ui.lastInvestigation;
+    const rec = ui.lastReport ? ui.reports.get(ui.lastReport) : null;
+    // A report already made from this investigation: the email follows it.
+    if (plan.primaryIntent === INTENT.EMAIL_DRAFT && inv && rec?.investigationAt === inv.at) {
+      tracked(askReportFollowUp(question, { email: { regenerate: true, recipientGroup: groupOf(question) ?? undefined } }));
+      return true;
+    }
+    if (/\brequiring inspection\b|\binspection (report|register)\b/i.test(question)) return false;
+    const aboutInvestigation = /\b(these|those|this|them|it|investigation)\b/i.test(question) || /\b(maintenance|corrective|defects?|findings?|issues?|repairs?)\b/i.test(question);
+    let ids = null, from = null;
+    if (inv && (aboutInvestigation || plan.primaryIntent === INTENT.EMAIL_DRAFT)) { ids = inv.ids; from = inv; }
+    else if (/\b(maintenance report|corrective action register|maintenance register)\b/i.test(question)) {
+      // No investigation yet: its assets from the question (a status, a type, the area), as the investigation would find them.
+      const p = planFor(question.replace(/\b(prepare|generate|create|make|produce)\b[^,]*?\b(report|register)\b( (of|for|on))?/i, 'what needs to be fixed for'));
+      const tgt = resolveTargets(p, { scopeAssets: scope => (scope.type === 'SELECTED_AREA' && ui.area ? [...ui.area.inside] : [...network.assets.keys()]), statusOf: id => statuses.get(id) ?? null,
+        categoryOf: id => categoryOfId(id), isAsset: id => network.assets.has(id) });
+      if (!tgt.ids.length || p.target.kind === 'SCOPE') { ui.result = null; ui.question = question; ui.view = { question, kind: 'Report', status: 'answered', say: 'Which assets should the maintenance report cover?', say2: 'Ask what needs to be fixed first (for example for degraded assets), or name the assets.' }; render(); return true; }
+      ids = tgt.ids; from = { question, assessment: { primaryIntent: INTENT.CORRECTIVE_ACTIONS, filters: p.assetFilters, scope: { label: p.scope.type === 'SELECTED_AREA' && ui.area ? areaScopeLabel(ui.area) : null } }, at: null };
+    } else return false;
+    const wantsEmail = plan.primaryIntent === INTENT.EMAIL_DRAFT || plan.supportingIntents.includes(INTENT.EMAIL_DRAFT) || /\b(e-?mail|inform|notify)\b/i.test(question);
+    const onlyXlsx = /\b(excel|xlsx|spreadsheet|register)\b/i.test(question) && !/\b(pdf|report)\b/i.test(question);
+    const onlyPdf = /\bpdf\b/i.test(question) && !/\b(excel|xlsx|spreadsheet|register)\b/i.test(question);
+    const types = [...new Set(ids.map(id => network.assets.get(id)?.assetType).filter(Boolean))];
+    const a = from.assessment;
+    const areaOf = a?.scope?.type === 'SELECTED_AREA' && ui.area && a.scope.selectionId === ui.area.selectionId ? ui.area : null;
+    ui.result = null; ui.question = question;
+    tracked(startReport(question, { kind: 'MAINTENANCE', types, typeLabels: typeLabels(types), outputs: { pdf: !onlyXlsx, xlsx: !onlyPdf, email: wantsEmail },
+      recipientGroup: groupOf(question) ?? null, filters: { condition: null, excludeNoRecords: false, recurring: false, status: null }, options: { historyDepth: null, includeSpecs: false, dueWithinDays: null },
+      investigation: { question: from.question, primaryIntent: a?.primaryIntent ?? INTENT.CORRECTIVE_ACTIONS, statusFilters: a?.filters?.operationalStatus ?? [], scopeLabel: a?.scope?.label ?? null } },
+    { ids, area: areaOf, investigationAt: from.at }));
+    return true;
+  }
+  /** The assessment into its turn: one asset in detail, or the collection (and one opened from it). */
+  function renderMaintenance(question = ui.question) {
+    const m = ui.maint?.assessment;
+    if (!m) return;
+    const one = m.assets.length === 1;
+    const say = maintenanceSayFor(m, ui.maint.open);
+    ui.view = { question, kind: 'Maintenance assessment', status: 'answered', plain: false, say: say.say, say2: say.say2,
+      ...(m.scope.label ? { scope: m.scope.label } : {}),
+      extraHtml: maintenanceHtml(m, { open: ui.maint.open, statusPill: id => reportedPill(id), illustrative: m.illustrative, reports: Boolean(docTools?.report) }),
+      followUps: maintenanceSuggestions(m, { open: ui.maint.open, reports: Boolean(docTools?.report) }), suggestLimit: 3 };
+    void one;
+    render();
+  }
+
+  // ---- Select Area: spatial electrical intelligence over a drawn area ----
+  // The area (areaDraw.js) is drawn on the map; the server resolves which elements it holds (areaQuery.js,
+  // POST /area); the answers use the twin's own engines (supply paths, statuses, the simulation, documents,
+  // reports) over the whole network, with the area only saying where each asset is (areaIntel.js).
+
+  const OUTSIDE_COLOR = '#b48cff'; // supply equipment and paths outside the area (not a status colour)
+  const UNCOUNTABLE = /(switchgear|equipment|\(scada\))$/i;
+  const pluralOf = (c, keepCase = false) => { const l = keepCase ? String(c) : String(c).toLowerCase(); return UNCOUNTABLE.test(l) || /s$/.test(l) ? l : /(ch|sh|x)$/.test(l) ? `${l}es` : /[^aeiou]y$/.test(l) ? `${l.slice(0, -1)}ies` : `${l}s`; };
+  const approxDistance = m => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`);
+  ui.area = null; // the active area: {selectionId, selectionType, geometry, ring, label, zone, versionKey, versionNumber, createdAt, m (membership), inside: Set}
+  ui.areaState = null; // {kind: 'drawing' | 'resolving' | 'error', mode, points, message}
+  let areaToken = 0;
+  const areaHint = document.createElement('div');
+  areaHint.className = 'isp-area-hint';
+  areaHint.hidden = true;
+  areaHint.setAttribute('role', 'status');
+  askHost.parentElement?.append(areaHint);
+  const areaDraw = areaTools && viewer ? createAreaDraw(viewer, {
+    onComplete: (ring, mode) => { void commitArea(ring, mode); },
+    onCancel: reason => {
+      ui.areaState = reason === 'too-few-points' ? { kind: 'error', message: 'A polygon needs at least three corners. The selection was not changed.' }
+        : reason === 'no-ground' ? { kind: 'error', message: 'Part of that area is off the ground (sky or horizon), so it could not be placed. The selection was not changed.' } : null;
+      renderArea();
+    },
+    onProgress: p => { ui.areaState = { kind: 'drawing', mode: p.mode, points: p.points }; renderArea(); },
+  }) : null;
+  const areaZones = () => zonePoints.map(z => ({ name: titleCase(z.text), lon: z.at.lon, lat: z.at.lat }));
+  const areaLabel = a => a?.zone ?? 'Custom selected area';
+  const areaScopeLabel = a => `Selected area · ${areaLabel(a)}`;
+
+  /** A drawn ring: validated here (the server validates again), resolved by the server, then shown. */
+  async function commitArea(ring, mode, { quiet = false } = {}) {
+    const v = validateAreaGeometry(polygonOf(ring));
+    if (!v.ok) { ui.areaState = { kind: 'error', message: `${v.message} The selection was not changed.` }; renderArea(); return false; }
+    const mine = ++areaToken;
+    ui.areaState = { kind: 'resolving' };
+    renderArea();
+    let m;
+    try {
+      m = await areaTools.resolve(polygonOf(v.ring), { zones: areaZones() });
+    } catch (error) {
+      if (mine !== areaToken) return false;
+      ui.areaState = { kind: 'error', message: `The area could not be resolved: ${error?.message ?? error}. The selection was not changed.` };
+      areaDraw?.show(ui.area?.ring ?? null);
+      renderArea();
+      return false;
+    }
+    // A newer selection (or a cleared one) wins over this late result.
+    if (mine !== areaToken) return false;
+    const inside = new Set([...m.within, ...m.intersects, ...m.crosses]);
+    ui.area = { selectionId: m.selectionId, selectionType: mode, geometry: m.geometry, coordinateSystem: m.coordinateSystem, ring: v.ring, zone: m.zone ?? null,
+      versionKey: m.key, versionNumber: m.versionNumber, projectFile: m.fileName, createdAt: m.resolvedAt, m, inside, areaM2: m.areaM2 };
+    remembered.area = { ring: v.ring, mode };
+    ui.areaState = null;
+    areaDraw?.show(v.ring);
+    renderArea();
+    if (!quiet) areaSelectedTurn();
+    return true;
+  }
+  function clearArea() {
+    areaToken += 1;
+    ui.area = null; ui.areaState = null; remembered.area = null;
+    areaDraw?.cancel();
+    areaDraw?.show(null);
+    renderArea();
+  }
+  /** The area's assets that are network assets (electrical equipment and cables). */
+  const areaAssets = (a = ui.area) => [...(a?.inside ?? [])].filter(id => network.assets.has(id));
+  const isCable = id => { const x = network.assets.get(id); return x?.assetType === 'FEEDER' || x?.electricalRole === ROLE.CONDUCTOR || x?.route?.length >= 2; };
+  const consumersIn = ids => ids.filter(id => { const x = network.assets.get(id); return x && (x.electricalRole === ROLE.LOAD || CONSUMER_TYPES.has(x.assetType)); });
+  const categoryOfId = id => spatial().byId.get(id)?.category ?? spatial().facilities.find(f => f.id === id)?.category ?? (network.assets.has(id) ? cap(TYPE_NAME[network.assets.get(id).assetType] ?? typeLabel(network.assets.get(id).assetType)) : 'Other');
+  const statusOfId = id => statuses.get(id) ?? null;
+
+  /** The compact context card under the header, the Select Area button, and the drawing hint on the map. */
+  function renderArea() {
+    const btn = askHost.querySelector('.isp-askp-areabtn');
+    const card = askHost.querySelector('.isp-askp-area');
+    const a = ui.area;
+    btn?.classList.toggle('is-active', Boolean(a));
+    btn?.setAttribute('aria-pressed', String(Boolean(a)));
+    if (card) {
+      card.hidden = !a && ui.areaState?.kind !== 'resolving';
+      if (!a && ui.areaState?.kind === 'resolving') card.innerHTML = '<div class="isp-area-card is-busy"><span class="tw-spin" aria-hidden="true"></span><span>Resolving the selected area…</span></div>';
+      else if (a) {
+        const s = statusOfArea(areaAssets(a), statusOfId);
+        const total = a.inside.size;
+        const unknown = a.m.unknown.length;
+        card.innerHTML = `<div class="isp-area-card">
+          <div class="isp-area-h"><span class="isp-area-ic" aria-hidden="true">${ASK_ICONS.scan}</span>
+            <div class="isp-area-t"><b>Selected area</b><small>${esc(a.versionNumber ? `IFC V${a.versionNumber}` : versionTag())} · ${esc(areaLabel(a))}</small></div>
+            <button type="button" class="isp-area-icbtn" data-act="areaShow" aria-label="Show the selected area on the map" title="Show the selected area on the map">${ASK_ICONS.target}</button></div>
+          <div class="isp-area-m"><span><b>${total}</b> ${total === 1 ? 'asset' : 'assets'}</span>${s.counts.NO_POWER ? `<span class="is-bad"><i></i><b>${s.counts.NO_POWER}</b> no power</span>` : ''}${s.counts.DEGRADED ? `<span class="is-warn"><i></i><b>${s.counts.DEGRADED}</b> degraded</span>` : ''}${!s.counts.NO_POWER && !s.counts.DEGRADED && s.monitored ? '<span class="is-ok"><i></i>no alerts</span>' : ''}${unknown ? `<span class="is-muted" title="Assets with no position in the model: not placed inside or outside">${unknown} unplaced</span>` : ''}</div>
+          <div class="isp-area-acts"><button type="button" data-act="areaAssets">View assets</button><button type="button" data-act="areaMenu" data-change="1">Change area</button><button type="button" data-act="areaClear">Clear area</button></div></div>`;
+      }
+    }
+    // The hint on the map while drawing, resolving, or when a drawing could not be used.
+    const st = ui.areaState;
+    if (!st || (st.kind === 'resolving' && !areaDraw)) { areaHint.hidden = true; return; }
+    areaHint.hidden = false;
+    areaHint.classList.toggle('is-error', st.kind === 'error');
+    if (st.kind === 'drawing') {
+      const poly = st.mode === AREA_MODE.POLYGON;
+      areaHint.innerHTML = `<span class="isp-area-hint-ic" aria-hidden="true">${poly ? ASK_ICONS.polygon : ASK_ICONS.rect}</span>
+        <span>${poly ? `Click to add corners${st.points ? ` (${st.points})` : ''}. Double-click or Finish to close the area.` : 'Press and drag on the map to draw a rectangle.'} <kbd>Esc</kbd> cancels.</span>
+        ${poly ? `<button type="button" class="isp-area-hint-btn is-primary" data-area-hint="finish"${st.points >= 3 ? '' : ' disabled'}>Finish</button>` : ''}
+        <button type="button" class="isp-area-hint-btn" data-area-hint="cancel">Cancel</button>`;
+    } else if (st.kind === 'resolving') {
+      areaHint.innerHTML = '<span class="tw-spin" aria-hidden="true"></span><span>Finding the assets in the area…</span>';
+    } else {
+      areaHint.innerHTML = `<span class="isp-area-hint-ic" aria-hidden="true">${ASK_ICONS.info}</span><span>${esc(st.message)}</span>
+        <button type="button" class="isp-area-hint-btn" data-area-hint="retry">Try again</button><button type="button" class="isp-area-hint-btn" data-area-hint="dismiss">Dismiss</button>`;
+    }
+  }
+  areaHint.addEventListener('click', e => {
+    const b = e.target.closest('[data-area-hint]');
+    if (!b) return;
+    const act = b.dataset.areaHint;
+    if (act === 'finish') areaDraw?.finish();
+    else if (act === 'cancel') areaDraw?.cancel();
+    else if (act === 'retry') { ui.areaState = null; openAreaMenu(true); }
+    else { ui.areaState = null; renderArea(); }
+  });
+  function openAreaMenu(open = null) {
+    const menu = askHost.querySelector('.isp-askp-areamenu');
+    const btn = askHost.querySelector('.isp-askp-areabtn');
+    if (!menu || !btn) return;
+    const next = open ?? menu.hidden;
+    menu.hidden = !next;
+    btn.setAttribute('aria-expanded', String(next));
+    if (next) menu.querySelector('button')?.focus();
+  }
+  document.addEventListener('pointerdown', e => { if (!e.target.closest?.('.isp-askp-areawrap')) { const menu = askHost.querySelector('.isp-askp-areamenu'); if (menu && !menu.hidden) openAreaMenu(false); } }, true);
+  function startAreaDraw(mode) {
+    openAreaMenu(false);
+    if (!areaDraw) return;
+    clearFocus();
+    areaDraw.start(mode);
+  }
+  /** Fly to the selected area (the area stays as it is). */
+  function showArea() {
+    const ring = ui.area?.ring;
+    if (!ring) return;
+    const sphere = BoundingSphere.fromPoints(ring.map(([lon, lat]) => Cartesian3.fromDegrees(lon, lat, baseHeight)));
+    viewer.camera.flyToBoundingSphere(sphere, { duration: 1.2, offset: new HeadingPitchRange(CMath.toRadians(heading), CMath.toRadians(-62), Math.max(sphere.radius * 2.6, 220)) });
+  }
+
+  /** The suggestions after an area is selected: at most four, from what the area holds. */
+  function areaSuggestions(a = ui.area) {
+    const ids = areaAssets(a);
+    if (!a.inside.size) return [{ label: 'Show assets within 50 m of this area', question: 'Show assets within 50 metres of this area', icon: 'target' }];
+    const types = new Set(ids.map(id => network.assets.get(id)?.assetType));
+    const s = statusOfArea(ids, statusOfId);
+    const consumers = consumersIn(ids);
+    const out = [{ label: 'Show electrical assets in this area', question: 'Show electrical assets in this area', icon: 'layers' }];
+    if (s.attention.length) out.push({ label: 'Which assets require attention?', question: 'Which assets in this area require attention?', icon: 'bolt' });
+    if (types.has('TRANSFORMER')) out.push({ label: 'Which transformers supply this area?', question: 'Which transformers supply this area?', icon: 'network' });
+    else if (consumers.length) out.push({ label: 'Where does this area get its power from?', question: 'Where does this area get its power from?', icon: 'network' });
+    if (docTools?.report) out.push(types.has('TRANSFORMER')
+      ? { label: 'Prepare a transformer inspection report', question: 'Prepare an inspection report for transformers in this area', icon: 'doc' }
+      : { label: 'Prepare an area inspection report', question: `Prepare an inspection report for ${[...new Set(ids.map(id => typeLabels([network.assets.get(id)?.assetType])[0]?.plural).filter(Boolean))].slice(0, 2).join(' and ') || 'assets'} in this area`, icon: 'doc' });
+    return out.slice(0, 4);
+  }
+  function areaSelectedTurn() {
+    const a = ui.area;
+    beginTurn(null, { fromMap: true });
+    ui.result = null; ui.question = null;
+    const n = a.inside.size;
+    ui.view = { kind: 'Selected area', status: 'answered', scope: areaScopeLabel(a),
+      say: n ? 'Area selected. Ask about the assets in it, their power, supply, inspections or a report.' : 'Area selected. No modelled assets are inside it.',
+      say2: a.m.unknown.length ? `${a.m.unknown.length} ${a.m.unknown.length === 1 ? 'asset has' : 'assets have'} no position in the model, so ${a.m.unknown.length === 1 ? 'it is' : 'they are'} neither inside nor outside.` : '',
+      followUps: areaSuggestions(a), suggestLimit: 4 };
+    render();
+  }
+
+  // ---- area answers ----
+
+  const relationText = { WITHIN: 'inside', INTERSECTS: 'partly inside', CROSSES: 'crosses the boundary', OUTSIDE: 'outside', UNKNOWN_LOCATION: 'no position' };
+  /** The area answers' common frame: scope, version, membership basis. */
+  const areaSources = a => [`Area: ${areaLabel(a)} (${Math.round(a.areaM2).toLocaleString('en-US')} m², EPSG:4326), resolved on the server against ${a.versionNumber ? `IFC V${a.versionNumber}` : 'the loaded model'} through the map placement`,
+    'Membership: cables by their modelled route, other equipment by its bounding-box footprint, substations by their equipment outline (positions in this IFC are illustrative, not surveyed)'];
+  function areaView(question, a, view) {
+    ui.result = null; ui.question = question;
+    clearFocus(); ui.inspector = null;
+    ui.view = { question, status: 'answered', scope: areaScopeLabel(a), sources: areaSources(a), ...view };
+    render();
+  }
+  /** Highlight ids on the map (the area stays) and frame them. */
+  function areaHighlight(ids, question, noun = 'results', colors = null) {
+    setAskResults(ids, question, { noun });
+    if (ui.ask && colors) ui.ask.colors = colors;
+    render();
+    if (ui.ask) frame(ui.ask.ids, { pitch: -58, minRange: 300 });
+  }
+  const statusRows = ids => ids.map(id => ({ id, name: network.assets.get(id)?.name, icon: ICON_OF[network.assets.get(id)?.assetType] ?? 'bolt', status: reportedPill(id) }));
+
+  /** "How many assets are in this area?", "Show all transformers in this area", "… outside this area". */
+  function askAreaInventory(question, a, { scope = 'AREA', ids: given = null, nearM = null } = {}) {
+    const cats = categoriesIn(question, spatial());
+    const filter = Array.isArray(cats) ? cats : null;
+    const pool = given ?? (scope === 'OUTSIDE' ? Object.entries(a.m.relations).filter(([, r]) => r.relation === 'OUTSIDE').map(([id]) => id) : [...a.inside]);
+    const inv = inventoryOf(pool, categoryOfId, { filter });
+    const ids = inv.categories.flatMap(c => c.ids);
+    const where = scope === 'OUTSIDE' ? 'outside the selected area' : scope === 'NEAR' ? `within ${approxDistance(nearM)} of the selected area (outside it)` : 'in the selected area';
+    const noun = filter?.length === 1 ? (ids.length === 1 ? filter[0].toLowerCase() : pluralOf(filter[0])) : ids.length === 1 ? 'asset' : 'assets';
+    if (!ids.length) {
+      return areaView(question, a, { kind: 'Area inventory', say: `No ${filter ? pluralOf(filter[0]) : 'assets'} ${where}.`,
+        say2: a.m.unknown.length ? `${a.m.unknown.length} assets have no position in the model and could not be placed.` : '',
+        followUps: scope === 'AREA' ? [{ label: 'Within 50 m of this area', question: `Show ${filter ? pluralOf(filter[0]) : 'assets'} within 50 metres of this area`, icon: 'target' }] : [] });
+    }
+    const partial = ids.filter(id => a.m.relations[id]?.relation === 'INTERSECTS').length;
+    const crossing = ids.filter(id => a.m.relations[id]?.relation === 'CROSSES').length;
+    const breakdown = inv.categories.length > 1 ? `<div class="tw-abreak" aria-label="By category">${inv.categories.map(c => `<button type="button" class="tw-abreak-r" data-ask="${esc(`Show ${pluralOf(c.category)} ${scope === 'OUTSIDE' ? 'outside this area' : 'in this area'}`)}"><span>${esc(pluralOf(c.category, true))}</span><b>${c.ids.length}</b></button>`).join('')}</div>` : '';
+    const c = { ...collectionOf(ids, { noun: 'assets', nounOne: 'asset' }), rows: statusRows(ids) };
+    areaView(question, a, { kind: 'Area inventory',
+      say: `${ids.length} ${noun} ${where}.`,
+      say2: [partial ? `${partial} partly inside the boundary` : '', crossing ? `${crossing} ${crossing === 1 ? 'cable crosses' : 'cables cross'} it` : '', scope === 'AREA' && a.m.unknown.length ? `${a.m.unknown.length} with no position not counted` : ''].filter(Boolean).join(' · '),
+      extraHtml: breakdown, collection: c,
+      actions: [{ label: 'Show on map', primary: true, attrs: { 'data-area-show': ids.join(',') } }],
+      followUps: [{ label: 'Which require attention?', question: 'Which assets in this area require attention?', icon: 'bolt' }, { label: 'Where does the power come from?', question: 'Where does this area get its power from?', icon: 'network' }] });
+    areaHighlight(ids, question, filter?.length === 1 ? pluralOf(filter[0]) : 'assets');
+  }
+
+  /** "Which assets are degraded?", "Which have no power?", "Are all cranes operational in this area?". */
+  function askAreaStatus(question, a) {
+    const cats = categoriesIn(question, spatial());
+    const filter = Array.isArray(cats) ? cats : null;
+    const ids = areaAssets(a).filter(id => !filter || filter.includes(categoryOfId(id)));
+    const s = statusOfArea(ids, statusOfId);
+    const wantsDeg = /\bdegraded\b/i.test(question), wantsNo = /\b(no power|without power|unpowered|de-?energi[sz]ed)\b/i.test(question), wantsOff = /\boffline\b/i.test(question);
+    const pick = wantsDeg || wantsNo || wantsOff ? [...(wantsNo ? s.lists.NO_POWER : []), ...(wantsDeg ? s.lists.DEGRADED : []), ...(wantsOff ? s.lists.OFFLINE : [])] : s.attention;
+    const operational = /\b(operational|working|available|running)\b/i.test(question);
+    const what = filter?.length === 1 ? pluralOf(filter[0]) : 'monitored assets';
+    const say = !s.monitored ? `No ${filter ? pluralOf(filter[0]) : 'monitored assets'} in the selected area have a power status.`
+      : operational && !s.attention.length ? `All ${s.monitored} ${what} in the selected area have power.`
+        : pick.length ? `In the selected area, ${[s.counts.NO_POWER && (!wantsDeg || wantsNo) ? `${s.counts.NO_POWER} ${s.counts.NO_POWER === 1 ? 'asset has' : 'assets have'} no power` : '', s.counts.DEGRADED && (!wantsNo || wantsDeg) ? `${s.counts.DEGRADED} ${s.counts.DEGRADED === 1 ? 'is' : 'are'} degraded` : '', s.counts.OFFLINE && (!wantsDeg && !wantsNo || wantsOff) ? `${s.counts.OFFLINE} offline` : ''].filter(Boolean).join(', ')}.`
+          : `None of the ${s.monitored} ${what} in the selected area ${wantsDeg && !wantsNo ? 'is degraded' : wantsNo && !wantsDeg ? 'is without power' : 'has an alert'}.`;
+    const notes = [s.unmonitored ? `${s.unmonitored} ${s.unmonitored === 1 ? 'asset (a cable or structure) has' : 'assets (cables, structures) have'} no status of its own and ${s.unmonitored === 1 ? 'is' : 'are'} not counted.` : '',
+      operational ? 'Power status is electrical only: an energized asset is not shown to be mechanically available.' : '',
+      session.state().active ? 'These are reported statuses, not the running simulation.' : ''].filter(Boolean);
+    const c = pick.length ? { ...collectionOf(pick, { noun: 'assets', nounOne: 'asset' }), rows: statusRows(pick) } : null;
+    areaView(question, a, { kind: 'Area power status', say, say2: notes.join(' '),
+      metrics: s.monitored ? [{ label: 'No power', value: s.counts.NO_POWER, tone: 'bad' }, { label: 'Degraded', value: s.counts.DEGRADED, tone: 'warn' }, { label: 'Powered', value: s.counts.POWERED, tone: 'ok' }, ...(s.counts.OFFLINE ? [{ label: 'Offline', value: s.counts.OFFLINE, tone: 'neutral' }] : []), ...(s.counts.UNKNOWN ? [{ label: 'Unknown', value: s.counts.UNKNOWN, tone: 'neutral' }] : [])] : [],
+      collection: c,
+      actions: s.lists.NO_POWER[0] ? [{ label: `Investigate ${s.lists.NO_POWER[0]}`, primary: true, attrs: { 'data-ops-investigate': s.lists.NO_POWER[0] } }] : [],
+      followUps: [{ label: 'Where does the power come from?', question: 'Where does this area get its power from?', icon: 'network' }, { label: 'Which require inspection?', question: 'Which assets in this area require inspection?', icon: 'doc' }] });
+    if (pick.length) areaHighlight(pick, question, 'assets'); else { clearAsk(); render(); }
+  }
+
+  /** "Where does this area get its power from?", "Which transformers supply this area?", "… supplied by TX-M1?". */
+  function askAreaSupply(question, a) {
+    const ids = areaAssets(a);
+    const named = namedIds(question, new Set(network.assets.keys()));
+    let consumers = consumersIn(ids);
+    if (!consumers.length) consumers = ids.filter(id => network.assets.get(id)?.electricalRole !== ROLE.SOURCE && !isCable(id));
+    const cats = categoriesIn(question, spatial());
+    // A category filter only for consumers named in the question ("the cranes in this area"), never for the
+    // equipment asked about upstream ("which transformers supply …") or a word like "supply".
+    const filterCats = Array.isArray(cats) ? cats.filter(c => consumers.some(id => categoryOfId(id) === c)) : [];
+    if (filterCats.length) consumers = consumers.filter(id => filterCats.includes(categoryOfId(id)));
+    if (!consumers.length) return areaView(question, a, { kind: 'Area supply', say: 'The selected area holds no consumers or equipment with a supply path to trace.' });
+    const roles = /\btransformers?\b/i.test(question) ? [ROLE.TRANSFORMER] : /\b(substations?|switchgear|switchboards?|rmus?)\b/i.test(question) ? [ROLE.DISTRIBUTION] : [ROLE.SOURCE, ROLE.TRANSFORMER, ROLE.DISTRIBUTION];
+    const roleOfId = id => network.assets.get(id)?.electricalRole ?? ROLE.UNKNOWN;
+    const sup = supplyOfArea({ consumers, supplyOf, roleOf: roleOfId, relations: a.m.relations, roles });
+    // "Are any assets in this area supplied by TX-M1?"
+    const by = named.find(id => network.assets.has(id) && /\b(supplied|fed|powered)\s+(by|from)\b/i.test(question));
+    if (by) {
+      const fed = consumers.filter(c => (supplyOf(c).primary?.path ?? []).includes(by));
+      const c = fed.length ? { ...collectionOf(fed, { noun: 'assets', nounOne: 'asset' }), rows: statusRows(fed) } : null;
+      areaView(question, a, { kind: 'Area supply', say: fed.length ? `Yes: ${fed.length} of the area’s ${consumers.length} ${consumers.length === 1 ? 'consumer is' : 'consumers are'} supplied through ${by} on ${fed.length === 1 ? 'its' : 'their'} normal supply path.` : `No: none of the area’s ${consumers.length} consumers has ${by} on its normal supply path in the model.`,
+        say2: `${by} is ${relationText[a.m.relations[by]?.relation ?? 'UNKNOWN_LOCATION']} the area.`, collection: c });
+      if (fed.length) areaHighlight([by, ...fed], question, 'assets');
+      return;
+    }
+    ui.lastAreaSupply = { selectionId: a.selectionId, roles, upstream: sup.upstream.map(u => ({ id: u.id, inside: u.inside })) };
+    const noun = roles.length === 1 && roles[0] === ROLE.TRANSFORMER ? 'transformer' : roles.length === 1 ? 'substation or switchboard' : 'supply equipment';
+    const nouns = noun === 'transformer' ? 'transformers' : noun === 'substation or switchboard' ? 'substations and switchboards' : 'pieces of supply equipment';
+    const n = sup.upstream.length;
+    const say = !n ? `No modelled ${nouns} supply the area’s consumers.` : roles.length === 1
+      ? `The selected area receives power through ${n} modelled ${n === 1 ? noun : nouns}${sup.inside.length && sup.outside.length ? `: ${sup.inside.length} inside the area and ${sup.outside.length} outside it` : sup.outside.length ? `, all outside the area` : ', all inside the area'}.`
+      : `The selected area is supplied from ${sup.upstream.filter(u => u.role === ROLE.SOURCE).map(u => u.id).join(', ') || 'no modelled source'}, through ${sup.upstream.filter(u => u.role === ROLE.TRANSFORMER).length} transformers and ${sup.upstream.filter(u => u.role === ROLE.DISTRIBUTION).length} switchboards (${sup.outside.length} of them outside the area).`;
+    const pill = u => { const p = reportedPill(u.id); return `<span class="tw-status is-${esc(p?.tone ?? 'neutral')}">${esc(p?.label ?? 'Unknown')}</span>`; };
+    const rowsHtml = sup.upstream.map(u => `<div class="tw-dep-r"><button type="button" class="tw-dep-id" data-asset="${esc(u.id)}">${esc(u.id)}</button>
+        <span class="tw-dep-where is-${u.inside ? 'in' : 'out'}">${u.inside ? 'Inside area' : 'Outside area'}</span>
+        <span class="tw-dep-n">${u.consumers.length} of ${consumers.length} consumers</span>${pill(u)}
+        <button type="button" class="tw-dep-path" data-area-path="${esc(u.id)}">View supply path</button></div>`).join('');
+    const card = n ? `<section class="tw-card tw-dep" aria-label="Supplying equipment"><header class="tw-card-h"><h4>Supplying ${esc(nouns)}</h4><span class="tw-count">${n}</span></header>
+        <div class="tw-dep-rows">${rowsHtml}</div>
+        <p class="tw-dep-legend"><span><i class="is-in"></i>In or across the area</span><span><i class="is-out"></i>Outside the area</span><span><i class="is-area"></i>Selected area</span></p></section>` : '';
+    areaView(question, a, { kind: 'Area supply', say,
+      say2: [sup.unsupplied.length ? `${sup.unsupplied.length} ${sup.unsupplied.length === 1 ? 'consumer has' : 'consumers have'} no supply path in the model (${sup.unsupplied.slice(0, 4).join(', ')}${sup.unsupplied.length > 4 ? ', …' : ''}).` : '',
+        sup.unverified.length ? `${sup.unverified.length} of the paths include connections with no direction in the IFC (taken from the source side).` : '',
+        'Traced on the model’s supply paths through the whole network, not by distance.'].filter(Boolean).join(' '),
+      extraHtml: card,
+      actions: n ? [{ label: 'Highlight supply network', primary: true, attrs: { 'data-area-supplyhl': '1' } }, { label: 'View external dependencies', attrs: { 'data-ask': 'Which assets outside this area depend on equipment inside it?' } }] : [],
+      followUps: [{ label: 'Alternate supply?', question: 'Do the consumers in this area have an alternate power supply?', icon: 'network' }] });
+    ui.areaSupplyPaths = { consumers, pathIds: sup.pathIds, upstream: sup.upstream };
+    highlightAreaSupply();
+  }
+  /** The area's supply paths on the map: inside the area in the answer colour, outside it in violet. */
+  function highlightAreaSupply(onlyFrom = null) {
+    const p = ui.areaSupplyPaths;
+    const a = ui.area;
+    if (!p || !a) return;
+    let ids = p.pathIds;
+    if (onlyFrom) {
+      const set = new Set([onlyFrom]);
+      for (const c of p.upstream.find(u => u.id === onlyFrom)?.consumers ?? []) { const path = supplyOf(c).primary?.path ?? []; const i = path.indexOf(onlyFrom); if (i >= 0) path.slice(i).forEach(x => set.add(x)); }
+      ids = [...set];
+    }
+    const colors = new Map(ids.filter(id => !isInArea(a.m.relations[id]?.relation)).map(id => [id, OUTSIDE_COLOR]));
+    areaHighlight(ids, ui.question, 'assets', colors);
+  }
+  /** "Are any of these transformers located outside the selected area?" — on the last supply answer. */
+  function askAreaSupplyFollow(question, a) {
+    const last = ui.lastAreaSupply;
+    const outside = last.upstream.filter(u => !u.inside).map(u => u.id), inside = last.upstream.filter(u => u.inside).map(u => u.id);
+    areaView(question, a, { kind: 'Area supply',
+      say: outside.length ? `Yes: ${outside.length} of the ${last.upstream.length} ${outside.length === 1 ? 'is' : 'are'} outside the selected area: ${outside.join(', ')}.` : `No: all ${last.upstream.length} are inside the selected area.`,
+      say2: inside.length ? `Inside the area: ${inside.join(', ')}.` : '', collection: outside.length ? { ...collectionOf(outside, { noun: 'assets', nounOne: 'asset' }), rows: statusRows(outside) } : null,
+      followUps: outside[0] ? [{ label: `If ${outside[0]} shuts down`, question: `What happens if ${outside[0]} shuts down?`, icon: 'bolt' }] : [] });
+    if (outside.length) areaHighlight(outside, question, 'assets', new Map(outside.map(id => [id, OUTSIDE_COLOR])));
+  }
+
+  /** "Which assets outside this area depend on equipment inside it?" */
+  function askAreaDownstream(question, a) {
+    const all = [...network.assets.keys()].filter(id => { const x = network.assets.get(id); return x.electricalRole === ROLE.LOAD || CONSUMER_TYPES.has(x.assetType); });
+    const deps = dependentsOutside({ consumers: all, supplyOf, relations: a.m.relations });
+    const via = [...new Set(deps.flatMap(d => d.via))];
+    const ids = deps.map(d => d.id);
+    areaView(question, a, { kind: 'Downstream impact',
+      say: deps.length ? `${deps.length} ${deps.length === 1 ? 'consumer outside the area depends' : 'consumers outside the area depend'} on equipment inside it, through ${via.length} ${via.length === 1 ? 'asset' : 'assets'} in the area (${via.slice(0, 4).join(', ')}${via.length > 4 ? ', …' : ''}).` : 'No consumer outside the area has equipment inside it on its normal supply path.',
+      say2: 'From the normal supply paths in the model (normally-open devices open).',
+      collection: ids.length ? { ...collectionOf(ids, { noun: 'assets', nounOne: 'asset' }), rows: statusRows(ids) } : null,
+      followUps: via[0] ? [{ label: `If ${via[0]} shuts down`, question: `What happens if ${via[0]} shuts down?`, icon: 'bolt' }] : [] });
+    if (ids.length) areaHighlight([...via, ...ids], question, 'assets', new Map(ids.map(id => [id, OUTSIDE_COLOR])));
+  }
+
+  /** "Do the cranes in this area have an alternate power supply?" — coverage per consumer. */
+  function askAreaAlternate(question, a) {
+    const cats = categoriesIn(question, spatial());
+    const filter = Array.isArray(cats) ? cats : null;
+    const consumers = consumersIn(areaAssets(a)).filter(id => !filter || filter.includes(categoryOfId(id)));
+    const what = filter?.length === 1 ? pluralOf(filter[0]) : 'consumers';
+    if (!consumers.length) return areaView(question, a, { kind: 'Alternate supply', say: `No ${what} in the selected area.` });
+    const cov = alternateCoverage(consumers, supplyOf);
+    const closing = [...new Set(cov.covered.flatMap(c => c.needsClosing))];
+    areaView(question, a, { kind: 'Alternate supply',
+      say: cov.all ? `Yes: all ${cov.total} ${what} in the area have a modelled alternate route.` : cov.none ? `No: none of the ${cov.total} ${what} in the area has a modelled alternate route.` : `Partly: ${cov.covered.length} of the ${cov.total} ${what} in the area have a modelled alternate route; ${cov.without.length} ${cov.without.length === 1 ? 'has' : 'have'} none${cov.unknown.length ? ` and ${cov.unknown.length} ${cov.unknown.length === 1 ? 'has' : 'have'} no supply path in the model` : ''}.`,
+      say2: [closing.length ? `The alternate routes need ${closing.join(', ')} closed.` : '', 'A modelled route is not an approved switching plan: capacity, protection coordination and site procedures still need engineering verification.'].filter(Boolean).join(' '),
+      groups: [{ label: 'With an alternate route', tone: 'ok', noun: 'assets', items: cov.covered.map(c => ({ id: c.id, label: c.id, attrs: { 'data-asset': c.id } })) },
+        { label: 'No alternate route', tone: 'warn', noun: 'assets', items: cov.without.map(id => ({ id, label: id, attrs: { 'data-asset': id } })) }] });
+    areaHighlight(consumers, question, what);
+  }
+
+  /** "We are planning construction in this area…", "Which cables cross this area?" */
+  async function askAreaConstruction(question, a) {
+    const nearM = distanceIn(question);
+    let m = a.m;
+    const mine = ++askToken;
+    if (nearM) {
+      ui.view = { question, kind: 'Construction screening', status: 'loading', title: `Screening the area and a ${approxDistance(nearM)} buffer…`, scope: areaScopeLabel(a) };
+      render();
+      try { m = await areaTools.resolve(a.geometry, { nearM, zones: areaZones() }); } catch (error) { if (mine === askToken) areaView(question, a, { kind: 'Construction screening', status: 'error', say: `The buffer could not be computed: ${error?.message ?? error}` }); return; }
+      if (mine !== askToken) return;
+    }
+    const scr = constructionScreen({ membership: m, kindOf: id => (isCable(id) ? 'CABLE' : 'EQUIPMENT'), nearM });
+    const onlyCables = /\bcables?\b/i.test(question) && !/\bconstruction|excavat|dig|works?\b/i.test(question);
+    const all = [...new Set([...scr.within, ...scr.intersects, ...scr.cables])].filter(id => network.assets.has(id) || spatial().byId.has(id));
+    const consumersAll = [...network.assets.keys()].filter(id => { const x = network.assets.get(id); return x.electricalRole === ROLE.LOAD || CONSUMER_TYPES.has(x.assetType); });
+    const deps = dependentsOutside({ consumers: consumersAll, supplyOf, relations: m.relations });
+    const g = (label, list, tone) => ({ label, tone, noun: 'assets', items: list.map(id => ({ id, label: id, attrs: network.assets.has(id) ? { 'data-asset': id } : null })) });
+    areaView(question, a, { kind: 'Construction screening',
+      say: onlyCables ? (scr.cables.length ? `${scr.cablesCrossing.length} modelled ${scr.cablesCrossing.length === 1 ? 'cable crosses' : 'cables cross'} the area${scr.cablesWithin.length ? ` and ${scr.cablesWithin.length} ${scr.cablesWithin.length === 1 ? 'runs' : 'run'} entirely inside it` : ''}.` : 'No modelled cable route enters the area.')
+        : `Preliminary screening: ${all.length} modelled ${all.length === 1 ? 'asset is' : 'assets are'} in or across the boundary (${scr.cables.length} ${scr.cables.length === 1 ? 'cable' : 'cables'}, ${scr.within.length} inside, ${scr.intersects.length} partly inside)${nearM ? `, and ${scr.near.length} more within ${approxDistance(nearM)}` : ''}.${deps.length ? ` ${deps.length} ${deps.length === 1 ? 'consumer elsewhere depends' : 'consumers elsewhere depend'} on equipment inside it.` : ''}`,
+      say2: ['A screening of the IFC model only, not a construction clearance or permit: cable depths and surveyed positions are not in the model, positions are illustrative, and the absence of a modelled cable does not mean none is there.',
+        nearM ? '' : 'No buffer was applied: name a distance (for example “within 10 m of this area”) to include nearby assets.'].filter(Boolean).join(' '),
+      groups: [g('Cables crossing the boundary', scr.cablesCrossing, 'bad'), g('Cables inside the area', scr.cablesWithin, 'warn'), ...(onlyCables ? [] : [g('Equipment inside', scr.within, 'info'), g('Partly inside the boundary', scr.intersects, 'warn')]),
+        ...(nearM ? [{ label: `Within ${approxDistance(nearM)} (proximity, not an intersection)`, tone: 'neutral', noun: 'assets', items: scr.near.map(n => ({ id: n.id, label: n.id, status: { label: approxMetres(n.distanceM), tone: 'neutral' }, attrs: network.assets.has(n.id) ? { 'data-asset': n.id } : null })) }] : [])],
+      actions: deps.length ? [{ label: 'View external dependencies', attrs: { 'data-ask': 'Which assets outside this area depend on equipment inside it?' } }] : [] });
+    areaHighlight(onlyCables ? scr.cables : [...all, ...scr.near.map(n => n.id)], question, 'assets');
+  }
+
+  /** "Within 50 m of this area": resolved again on the server with that buffer. */
+  async function askAreaNear(question, a, distanceM) {
+    const mine = ++askToken;
+    ui.view = { question, kind: 'Area inventory', status: 'loading', title: `Finding assets within ${approxDistance(distanceM)} of the area…`, scope: areaScopeLabel(a) };
+    render();
+    let m;
+    try { m = await areaTools.resolve(a.geometry, { nearM: distanceM, zones: areaZones() }); } catch (error) { if (mine === askToken) areaView(question, a, { kind: 'Area inventory', status: 'error', say: `The buffer could not be computed: ${error?.message ?? error}` }); return; }
+    if (mine !== askToken) return;
+    askAreaInventory(question, a, { scope: 'NEAR', ids: m.near.map(n => n.id), nearM: distanceM });
+  }
+
+  /** "Which assets in this area require inspection?", "… no linked inspection documents?", "… recurring defects?" */
+  async function askAreaInspection(question, a) {
+    const ids = areaAssets(a);
+    const mine = ++askToken;
+    // Report-style eligibility (inspection required) runs through the report pipeline, which reads every document.
+    if (/\b(require|requiring|need|needs|due|overdue)\b[^?]*\binspect/i.test(question) && docTools?.report) {
+      const types = [...new Set(ids.map(id => network.assets.get(id)?.assetType).filter(t => t && !['FEEDER'].includes(t)))];
+      if (!types.length) return areaView(question, a, { kind: 'Inspection', say: 'The selected area holds no equipment to assess for inspection.' });
+      tracked(startReport(question, { kind: 'INSPECTION', types, typeLabels: typeLabels(types), outputs: { pdf: false, xlsx: false, email: false }, recipientGroup: null,
+        filters: { condition: null, excludeNoRecords: false, recurring: false, status: null }, options: { historyDepth: null, includeSpecs: false, dueWithinDays: null } }, { area: a }));
+      return;
+    }
+    ui.view = { question, kind: 'Inspection', status: 'loading', title: 'Reading the asset documentation index…', scope: areaScopeLabel(a) };
+    render();
+    const docsOf = id => (ui.docs ? documentsForAsset(ui.docs, id) : []);
+    const equipment = ids.filter(id => !isCable(id));
+    if (!ui.docs) return areaView(question, a, { kind: 'Inspection', status: 'limited', say: 'The asset documentation index has not been read from ACC yet, so documents could not be checked.', say2: 'Open Asset documentation (or sign in to Autodesk), then ask again.' });
+    const withDocs = equipment.filter(id => docsOf(id).length), without = equipment.filter(id => !docsOf(id).length);
+    const docText = d => `${d.docType ?? ''} ${d.title ?? ''} ${d.fileName ?? d.name ?? ''}`;
+    const isInspection = d => /inspect/i.test(docText(d));
+    const isSpec = d => /spec|datasheet|data sheet/i.test(docText(d));
+    if (/\b(no|without|missing|lack\w*)\b/i.test(question)) {
+      const spec = /\bspec/i.test(question);
+      const missing = equipment.filter(id => !docsOf(id).some(spec ? isSpec : isInspection));
+      return areaView(question, a, { kind: 'Documents', say: `${missing.length} of the ${equipment.length} ${equipment.length === 1 ? 'asset' : 'assets'} in the area ${missing.length === 1 ? 'has' : 'have'} no linked ${spec ? 'technical specification' : 'inspection document'} in ACC.`,
+        say2: 'Missing documents are a data gap, not evidence that an asset needs inspection.',
+        collection: missing.length ? { ...collectionOf(missing, { noun: 'assets', nounOne: 'asset' }), rows: statusRows(missing) } : null });
+    }
+    // Recurring, worsening or open findings: the fleet analysis (documents read once and cached on the server).
+    ui.view = { question, kind: 'Inspection', status: 'loading', title: `Reading inspection documents for ${withDocs.length} ${withDocs.length === 1 ? 'asset' : 'assets'} in the area…`, scope: areaScopeLabel(a) };
+    render();
+    let fleet = null;
+    try { fleet = docTools?.fleet ? await docTools.fleet() : null; } catch (error) { if (mine === askToken) areaView(question, a, { kind: 'Inspection', status: 'error', say: `The inspection documents could not be read: ${error?.message ?? error}` }); return; }
+    if (mine !== askToken) return;
+    const inArea = new Set(ids);
+    const rows = (fleet?.assets ?? []).filter(x => inArea.has(x.assetId));
+    const flagged = rows.filter(x => x.recurring?.length || x.worsening);
+    areaView(question, a, { kind: 'Inspection',
+      say: `${withDocs.length} of the ${equipment.length} assets in the area have linked documents in ACC; ${flagged.length ? `${flagged.length} ${flagged.length === 1 ? 'has' : 'have'} recurring or worsening inspection findings` : 'none has a recurring or worsening finding in its inspection reports'}.`,
+      say2: [without.length ? `${without.length} have no linked documents (no findings are assumed for them).` : '', fleet?.failures?.length ? `${fleet.failures.length} documents could not be read.` : ''].filter(Boolean).join(' '),
+      extraHtml: fleet && rows.length ? fleetHtml({ ...fleet, assets: rows, withInspections: rows.length, checkedAssets: equipment.filter(id => docsOf(id).length >= 2).length }) : '',
+      followUps: [{ label: 'Which require inspection?', question: 'Which assets in this area require inspection?', icon: 'doc' }, { label: 'Missing inspection documents', question: 'Which assets in this area have no linked inspection documents?', icon: 'doc' }] });
+    if (flagged.length) areaHighlight(flagged.map(x => x.assetId), question, 'assets');
+  }
+
+  /**
+   * Route a question while an area is selected. Returns true when it was answered here. Questions about one
+   * named asset, versions and reports go their usual way (reports and the simulation take the area along).
+   */
+  function askArea(question, scopeInfo) {
+    const a = ui.area;
+    if (!a) return false;
+    const intent = areaIntentOf(question);
+    const named = namedIds(question, new Set(network.assets.keys()));
+    if (intent === 'OUTAGE' || intent === 'VERSIONS') return false;
+    if (scopeInfo.scope === 'NEAR') {
+      if (!scopeInfo.distanceM) {
+        areaView(question, a, { kind: 'Area inventory', say: 'Within what distance of the area?', say2: 'No default distance is configured; name one.',
+          followUps: [10, 50, 100].map(d => ({ label: `Within ${d} m`, question: `${question.replace(/\?$/, '')} within ${d} metres of this area`, icon: 'target' })) });
+        return true;
+      }
+      tracked(askAreaNear(question, a, scopeInfo.distanceM));
+      return true;
+    }
+    if (named.length && !scopeInfo.explicit && !(intent === 'SUPPLY' && /\b(supplied|fed|powered)\s+(by|from)\b/i.test(question))) return false;
+    if (/\b(these|those|them|they)\b/i.test(question) && /\b(outside|inside|located)\b/i.test(question) && ui.lastAreaSupply?.selectionId === a.selectionId) { askAreaSupplyFollow(question, a); return true; }
+    switch (intent) {
+      case 'SUPPLY': askAreaSupply(question, a); return true;
+      case 'DOWNSTREAM': askAreaDownstream(question, a); return true;
+      case 'ALTERNATE': askAreaAlternate(question, a); return true;
+      case 'CONSTRUCTION': tracked(askAreaConstruction(question, a)); return true;
+      case 'INSPECTION': tracked(askAreaInspection(question, a)); return true;
+      case 'STATUS': askAreaStatus(question, a); return true;
+      default:
+        // Inventory only for questions about assets (a category, "assets", "equipment", "how many").
+        if (!categoriesIn(question, spatial()) && !/\b(how many|count|list|show|which|what|any)\b/i.test(question)) return false;
+        askAreaInventory(question, a, { scope: scopeInfo.scope });
+        return true;
+    }
+  }
+  // Re-resolve a remembered area on this model version (a new version or placement rebuilt the twin).
+  if (remembered.area && areaTools) void commitArea(remembered.area.ring, remembered.area.mode, { quiet: true });
+
   // Esc in Ask the Twin stops the answer in progress (outside the email editor, where it is just a key).
   askHost.addEventListener('keydown', event => {
     if (event.key !== 'Escape' || event.target.closest?.('.tw-mail.is-edit')) return;
@@ -2616,6 +3355,15 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
       compareTools.open(base, target, { focus: t.dataset.cmpFocus ?? null, ids: t.dataset.cmpIds ? t.dataset.cmpIds.split(',') : null, status: t.dataset.cmpStatus ?? null });
       return true;
     }
+    // The maintenance assessment: open one asset from the collection, back to it, focus, all on the map.
+    if (t.dataset.maintOpen && ui.maint) { ui.maint.open = t.dataset.maintOpen; renderMaintenance(); if (network.assets.has(ui.maint.open)) { ui.selectedId = ui.maint.open; focusAsset(ui.maint.open, { sound: false }); } return true; }
+    if (t.dataset.maintBack && ui.maint) { ui.maint.open = null; clearFocus(); ui.inspector = null; ui.selectedId = null; renderMaintenance(); const ids = ui.maint.assessment.assets.map(a => a.assetId).filter(id => network.assets.has(id)); if (ids.length) { setAskResults(ids, ui.question, { noun: 'assets' }); render(); frame(ids, { pitch: -58, minRange: 300 }); } return true; }
+    if (t.dataset.maintFocus) { if (network.assets.has(t.dataset.maintFocus)) { ui.selectedId = t.dataset.maintFocus; focusAsset(t.dataset.maintFocus, { recenter: true }); } return true; }
+    if (t.dataset.maintReport && ui.maint) { askQuestion('Generate a maintenance report of these findings'); return true; }
+    if (t.dataset.maintAll && ui.maint) { const ids = ui.maint.assessment.assets.map(a => a.assetId).filter(id => network.assets.has(id)); clearFocus(); setAskResults(ids, ui.question, { noun: 'assets' }); render(); frame(ids, { pitch: -58, minRange: 300 }); return true; }
+    if (t.dataset.areaShow !== undefined) { const ids = t.dataset.areaShow.split(',').filter(Boolean); if (ids.length) areaHighlight(ids, ui.question, 'assets'); return true; }
+    if (t.dataset.areaPath) { highlightAreaSupply(t.dataset.areaPath); return true; }
+    if (t.dataset.areaSupplyhl) { highlightAreaSupply(); return true; }
     if (t.dataset.assetTab) { ui.assetTab = t.dataset.assetTab; render(); return true; }
     if (t.dataset.docPreview) { onDocument(t.dataset.docPreview); return true; }
     if (t.dataset.asset) { selectAsset(t.dataset.asset, { zoom: true }); return true; }
@@ -2638,6 +3386,12 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
       case 'askCollapse': expandAsk(false); askHost.querySelector('.isp-askp-launcher').focus(); return true;
       case 'askExpand': expandAsk(true); form.q.focus(); return true;
       case 'askWidth': setAskWidth(!askWide); return true;
+      case 'areaMenu': openAreaMenu(); return true;
+      case 'areaMenuClose': openAreaMenu(false); areaDraw?.cancel(); return true;
+      case 'areaDraw': startAreaDraw(t.dataset.mode); return true;
+      case 'areaClear': clearArea(); return true;
+      case 'areaShow': showArea(); return true;
+      case 'areaAssets': askQuestion('Show the assets in this area'); return true;
       case 'netClear': ui.result = null; ui.view = null; ui.selectedId = null; ui.question = null; ui.inspector = null; render(); return true;
       case 'focusRecenter': if (ui.focus) focusAsset(ui.focus.id, { recenter: true, sound: false }); else if (ui.sim) frameSimulation(); return true;
       case 'focusRetry': if (t.dataset.assetId) focusAsset(t.dataset.assetId); return true;
@@ -2678,6 +3432,7 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
       }
       case 'netReset': endSimulation(); return true;
       case 'simReset': endSimulation(); return true;
+      case 'simPanel': if (ui.sim && session.state().active) { ui.sim.inChat = false; render(); frameSimulation(); } return true;
       case 'simOpen': if (ui.sim) { ui.inspector = null; render(); frameSimulation(); } return true;
       case 'simAll': ui.sim.all = !ui.sim.all; render(); return true;
       case 'simView': ui.sim.view = ui.sim.view === 'after' ? 'before' : 'after'; render(); return true;
@@ -2761,9 +3516,20 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
     focusState: () => ({ id: ui.focus?.id ?? null, state: ui.focus?.state ?? null, inspector: ui.inspector, effects: focusFx.state(), sound: soundOn, bar: !focusBar.hidden }),
     state: () => ({ answer: ui.view && { kind: ui.view.kind, status: ui.view.status, title: ui.view.title },
       sim: ui.sim && session.state().active ? { id: ui.sim.id, tab: ui.sim.tab, view: ui.sim.view, consumers: simulationOf()?.consumers ?? [] } : null, cmp: ui.cmp && { base: ui.cmp.base, target: ui.cmp.target, lastIds: ui.cmp.lastIds?.length ?? 0 }, workspace: ui.workspace, selectedId: ui.selectedId, result: ui.result && { intent: ui.result.intent, title: ui.result.answer.title, status: ui.result.status, targets: ui.result.targetAssetIds },
+      area: ui.area ? { selectionId: ui.area.selectionId, selectionType: ui.area.selectionType, zone: ui.area.zone, versionNumber: ui.area.versionNumber, inside: [...ui.area.inside], unknown: ui.area.m.unknown, ring: ui.area.ring } : null,
+      areaState: ui.areaState?.kind ?? null, areaDrawing: Boolean(areaDraw?.drawing()),
+      plan: ui.lastPlan ? { primaryIntent: ui.lastPlan.primaryIntent, supportingIntents: ui.lastPlan.supportingIntents, target: ui.lastPlan.target, scope: ui.lastPlan.scope.type } : null,
+      investigation: ui.lastInvestigation ? { ids: ui.lastInvestigation.ids } : null,
       alertNames: ui.opsCollapsed || session.state().active ? [] : [...alertTone.keys()], askIds: ui.ask?.ids ?? [], askWidth: askWide ? 'expanded' : 'default', report: ui.lastReport ? { id: ui.lastReport, status: ui.reports.get(ui.lastReport)?.data.status ?? null } : null,
       scenario: session.state().active ? session.state().label : null, preset: ui.preset, counts: overlay.counts(), unpowered: [...unpowered],
       nodeStates: Object.fromEntries(networkState(network, session.state().active ? session.state().scenario : null).nodeState) }),
-    destroy() { window.removeEventListener('message', onGmailMessage); window.removeEventListener('resize', onOpsResize); overlay.destroy(); markers.destroy(); askHl.destroy(); focusFx.destroy(); locator.stop(); focusBar.remove(); },
+    /** Select Area: drawing in progress (the screen's map clicks are corners, not a selection). */
+    areaDrawing: () => Boolean(areaDraw?.drawing()),
+    /** Tests / diagnostics: select an area from a ring of [lon, lat] (as if drawn), and screen points of a ring. */
+    selectArea: (ring, mode = 'POLYGON') => commitArea(ring, mode),
+    areaScreen: ring => ring.map(p => areaDraw?.toScreen(p) ?? null),
+    assetLonLat: id => { const x = network.assets.get(id); return Number.isFinite(x?.location?.longitude) ? { lon: x.location.longitude, lat: x.location.latitude } : null; },
+    clearArea,
+    destroy() { areaDraw?.destroy(); areaHint.remove(); window.removeEventListener('message', onGmailMessage); window.removeEventListener('resize', onOpsResize); overlay.destroy(); markers.destroy(); askHl.destroy(); focusFx.destroy(); locator.stop(); focusBar.remove(); },
   };
 }

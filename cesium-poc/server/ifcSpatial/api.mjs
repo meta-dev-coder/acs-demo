@@ -24,6 +24,9 @@
  *   PUT    /api/ifc-spatial/reports/ID/email       edit or regenerate the draft (the files are not regenerated)
  *   GET    /api/ifc-spatial/reports/ID/artifacts/AID[?download=1]   a generated file   ·   GET .../email.eml   the draft with its attachments
  *   GET    /api/ifc-spatial/reports/ID/snapshot    the structured snapshot the files were generated from
+ *   POST   /api/ifc-spatial/area?file=NAME          Select Area: {key, geometry (GeoJSON Polygon, EPSG:4326), placement[, nearM, zones]}
+ *          → which of that version's elements lie within, intersect, cross or are outside the area (areaQuery.js),
+ *          resolved here from the cached elements through the placement the area was drawn on (never from ids sent by the page)
  *   GET    /api/ifc-spatial/placement?key=KEY      the file's georeferenced placement and any saved calibration
  *   PUT    /api/ifc-spatial/placement?key=KEY      save a calibration for this model version
  *   DELETE /api/ifc-spatial/placement?key=KEY      forget it (back to the file's own georeferencing)
@@ -47,6 +50,7 @@ import { ANALYSIS, ANALYSIS_PIPELINE, analyzeAssetDocuments, normalizeDocument, 
 import { COMPARE_VERSION, compareVersions, DEFAULT_OPTIONS } from './compare.mjs';
 import { modelToGeographic } from './georef.mjs';
 import { createReportService } from './reports/service.mjs';
+import { AreaError, resolveAreaFor } from './area.mjs';
 
 export const IFC_SPATIAL_BASE = '/api/ifc-spatial';
 const KEY = /^[a-f0-9]{24}$/;
@@ -501,6 +505,43 @@ export function createIfcSpatialApi({ aps, cacheDir = fileURLToPath(new URL('../
     req.on('error', reject);
   });
 
+  // ---- Select Area: membership resolved from this server's elements (areaQuery.js) ----
+
+  const areaCache = new Map(); // selectionId|placement|nearM → result (membership only: no status, which changes)
+  function resolveArea(fileName, body) {
+    const key = String(body?.key ?? '');
+    if (!KEY.test(key)) throw new ApsError('INVALID_AREA', 400, 'Name the model version (key).');
+    const meta = cached(key);
+    if (!meta) throw new ApsError('NOT_CONVERTED', 404, 'This model version has not been converted.');
+    if (meta.fileName !== fileName) throw new ApsError('INVALID_AREA', 400, 'That model version belongs to another file.');
+    const placement = validatePlacement(body.placement);
+    const cacheKey = JSON.stringify([key, body.geometry, placement, body.nearM ?? null, body.zones ?? null]);
+    if (areaCache.has(cacheKey)) return { ...areaCache.get(cacheKey), cached: true };
+    let result;
+    try {
+      result = resolveAreaFor({ elements: readJson(join(dirOf(key), 'elements.json'))?.elements ?? [], georef: readJson(join(dirOf(key), 'diagnostics.json'))?.placement ?? null,
+        placement, body, key, fileName, versionNumber: meta.versionNumber ?? null });
+    } catch (error) {
+      if (error instanceof AreaError) throw new ApsError(error.code, 400, error.message);
+      throw error;
+    }
+    if (areaCache.size > 200) areaCache.delete(areaCache.keys().next().value);
+    areaCache.set(cacheKey, result);
+    return result;
+  }
+  /** A report's area: resolved again here; the report covers only the listed assets the server places in it. */
+  function scopeReportToArea(fileName, body) {
+    const r = resolveArea(fileName, body.area);
+    const inside = new Set([...r.within, ...r.intersects, ...r.crosses]);
+    const listed = Array.isArray(body.assets) ? body.assets : [];
+    body.assets = listed.filter(a => inside.has(a?.id));
+    const label = String(body.area.label ?? '').slice(0, 80) || (r.zone ? r.zone : 'Custom selected area');
+    return { selectionId: r.selectionId, label, zone: r.zone, versionNumber: r.versionNumber, key: r.key, geometry: r.geometry, areaM2: r.areaM2,
+      placementMode: r.placementMode, resolvedAt: r.resolvedAt, listed: listed.length, kept: body.assets.length,
+      dropped: listed.filter(a => !inside.has(a?.id)).map(a => String(a?.id ?? '')).slice(0, 200),
+      counts: { within: r.within.length, intersects: r.intersects.length, crosses: r.crosses.length, unknown: r.unknown.length } };
+  }
+
   async function handle(req, res) {
     const url = new URL(req.url, 'http://localhost');
     if (url.pathname !== IFC_SPATIAL_BASE && !url.pathname.startsWith(`${IFC_SPATIAL_BASE}/`)) return false;
@@ -554,7 +595,13 @@ export function createIfcSpatialApi({ aps, cacheDir = fileURLToPath(new URL('../
         const body = readFileSync(join(dirOf(asset[1]), asset[2]));
         return send(res, 200, body, asset[2].endsWith('.glb') ? 'model/gltf-binary' : 'application/json; charset=utf-8'), true;
       }
-      if (path === '/reports' && method === 'POST') return send(res, 202, await reports.create(req, needFile(), await readBody(req, 1_000_000))), true;
+      if (path === '/area' && method === 'POST') return send(res, 200, resolveArea(needFile(), await readBody(req, 200_000))), true;
+      if (path === '/reports' && method === 'POST') {
+        const body = await readBody(req, 1_000_000);
+        // A report about a selected area: its assets are the ones the server places in the area, not the page's list.
+        if (body?.area) body.area = scopeReportToArea(needFile(), body);
+        return send(res, 202, await reports.create(req, needFile(), body)), true;
+      }
       const rep = /^\/reports\/([^/]+)(?:\/(cancel|retry|email|email\.eml|snapshot|artifacts\/([^/]+)))?$/.exec(path);
       if (rep) {
         const [, id, action, artifactId] = rep;

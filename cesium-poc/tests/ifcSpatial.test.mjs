@@ -329,3 +329,28 @@ test('the version check: /models?refresh=1 re-reads ACC, and a new tip version i
   assert.equal(json.models[0].versionNumber, 2);
   assert.equal(json.models[0].status, 'not_converted');
 });
+
+test('api: Select Area resolves membership on the server from the cached elements and the placement, and refuses bad areas', async () => {
+  const h = harness();
+  const prepared = (await h.call('POST', '/api/ifc-spatial/prepare?file=network.ifc')).json;
+  const elements = (await h.call('GET', prepared.elementsUrl)).json.elements;
+  const placement = { mode: 'USER_CALIBRATED', lon: -76.54, lat: 39.25, heightOffset: 0, headingDeg: 0, scale: 1 };
+  const d = 0.05; // a box of roughly 8 × 11 km around the placement origin
+  const geometry = { type: 'Polygon', coordinates: [[[-76.54 - d, 39.25 - d], [-76.54 + d, 39.25 - d], [-76.54 + d, 39.25 + d], [-76.54 - d, 39.25 + d], [-76.54 - d, 39.25 - d]]] };
+  const ok = await h.call('POST', '/api/ifc-spatial/area?file=network.ifc', { key: prepared.key, geometry, placement });
+  assert.equal(ok.status, 200);
+  const ids = new Set(elements.filter(e => !['IfcDistributionPort', 'IfcSite', 'IfcElementAssembly'].includes(e.ifcClass)).map(e => e.networkId ?? e.tag).filter(Boolean));
+  assert.equal(Object.keys(ok.json.relations).length, ids.size);
+  assert.equal(ok.json.outside, 0);
+  assert.equal(ok.json.coordinateSystem, 'EPSG:4326');
+  assert.match(ok.json.selectionId, /^area-[0-9a-f]{8}$/);
+  const far = await h.call('POST', '/api/ifc-spatial/area?file=network.ifc', { key: prepared.key, placement,
+    geometry: { type: 'Polygon', coordinates: [[[-70, 30], [-69.99, 30], [-69.99, 30.01], [-70, 30.01]]] } });
+  assert.equal(far.json.within.length + far.json.intersects.length + far.json.crosses.length, 0, 'an area elsewhere holds nothing');
+  const crossing = await h.call('POST', '/api/ifc-spatial/area?file=network.ifc', { key: prepared.key, placement,
+    geometry: { type: 'Polygon', coordinates: [[[-76.6, 39.2], [-76.5, 39.3], [-76.5, 39.2], [-76.6, 39.3]]] } });
+  assert.equal(crossing.status, 400);
+  assert.equal(crossing.json.error.code, 'INVALID_AREA');
+  assert.equal((await h.call('POST', '/api/ifc-spatial/area?file=network.ifc', { key: 'nope', geometry, placement })).status, 400);
+  assert.equal((await h.call('POST', '/api/ifc-spatial/area?file=network.ifc', { key: prepared.key, geometry, placement: { mode: 'X' } })).json.error.code, 'INVALID_PLACEMENT');
+});

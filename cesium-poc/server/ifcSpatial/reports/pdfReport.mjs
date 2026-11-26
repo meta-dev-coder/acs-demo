@@ -60,7 +60,10 @@ function draw(doc, snap) {
     doc.y += 8;
   }
   para(`Request: "${snap.request.question}"`, { size: 8.5, color: MUTED });
+  if (snap.area) para(`Scope: selected area — ${snap.area.label} (${Math.round(snap.area.areaM2 ?? 0).toLocaleString('en-US')} m², WGS84), resolved ${String(snap.area.resolvedAt ?? '').replace('T', ' ').slice(0, 16)} UTC on IFC ${snap.model.versionNumber ? `v${snap.model.versionNumber}` : 'model'}. The boundary is drawn on the asset location plot.`, { size: 8.5, color: MUTED });
 
+  if (snap.kind === 'MAINTENANCE') drawMaintenance(doc, snap, { W, t, heading, para, bullet, ensure });
+  else {
   // ---- executive summary ----
   heading('Executive summary');
   const s = snap.summary, cov = snap.inventoryCoverage;
@@ -152,6 +155,8 @@ function draw(doc, snap) {
       others.map(e => [e.id, e.label, e.latestInspection ?? 'None', e.analysisError ? `Documents could not be read: ${e.analysisError}` : !e.documents?.linked ? 'No ACC documents linked' : e.classification === 'INSUFFICIENT_EVIDENCE' ? 'No readable inspection report among the linked documents' : 'Inspection records reviewed; no rule applies']), { W, size: 7.5 });
   }
 
+  }
+
   // ---- sources ----
   heading('Source references');
   if (!snap.sources.length) para('No ACC documents were cited.', { color: MUTED });
@@ -219,7 +224,9 @@ function table(doc, cols, rows, { W, size = 8, color = () => null, links = () =>
 /** The included assets at their model coordinates, with the rest of the inventory faint for context. */
 function locationPlot(doc, snap, W) {
   const included = snap.assets.filter(a => Number.isFinite(a.location.lon));
-  if (!included.length) {
+  // A selected area: its boundary is drawn too, and the plot fits it with the assets.
+  const ring = snap.area?.geometry?.coordinates?.[0] ?? [];
+  if (!included.length && !ring.length) {
     doc.font('Helvetica').fontSize(8.5).fillColor(MUTED).text(pdfText(snap.assets.length ? 'None of the included assets has a position in the model: no location plot is drawn.' : 'No assets to plot.'), M, doc.y, { width: W });
     doc.moveDown(0.5);
     return;
@@ -227,9 +234,10 @@ function locationPlot(doc, snap, W) {
   const H = 250;
   if (doc.y + H + 40 > doc.page.height - doc.page.margins.bottom) doc.addPage();
   const top = doc.y;
-  const lat0 = included.reduce((s, a) => s + a.location.lat, 0) / included.length;
+  const pts = [...included.map(a => [a.location.lon, a.location.lat]), ...ring];
+  const lat0 = pts.reduce((s, p) => s + p[1], 0) / pts.length;
   const kx = Math.cos(lat0 * Math.PI / 180) * 111_320, ky = 110_574;
-  const xs = included.map(a => a.location.lon * kx), ys = included.map(a => a.location.lat * ky);
+  const xs = pts.map(p => p[0] * kx), ys = pts.map(p => p[1] * ky);
   const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
   // Fit the included assets with a margin (at least 60 m across, so one asset is not drawn at a huge scale).
   const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
@@ -243,6 +251,10 @@ function locationPlot(doc, snap, W) {
     const x = px(c.lon * kx), y = py(c.lat * ky);
     if (x < M || x > M + W || y < top || y > top + H) continue;
     doc.circle(x, y, 1.6).fill('#c3ccd8');
+  }
+  if (ring.length >= 4) {
+    doc.polygon(...ring.map(p => [px(p[0] * kx), py(p[1] * ky)])).lineWidth(1.4).fillOpacity(0.08).fillAndStroke('#0e9fc4', '#0e9fc4');
+    doc.fillOpacity(1);
   }
   const required = new Set(snap.selectedIds);
   for (const a of included) {
@@ -259,6 +271,7 @@ function locationPlot(doc, snap, W) {
   let lx = M + 110;
   if (snap.kind === 'INSPECTION' && snap.reviewIds.length) { doc.circle(lx, ly, 4).lineWidth(1.4).strokeColor('#b54708').stroke(); doc.fillColor(TEXT).text('Review recommended', lx + 8, ly - 4, { lineBreak: false }); lx += 105; }
   doc.circle(lx, ly, 1.8).fill('#c3ccd8'); doc.fillColor(TEXT).text('Other modelled assets', lx + 6, ly - 4, { lineBreak: false });
+  if (ring.length >= 4) { lx += 108; doc.rect(lx - 4, ly - 4, 10, 8).lineWidth(1.2).strokeColor('#0e9fc4').stroke(); doc.fillColor(TEXT).text('Selected area', lx + 10, ly - 4, { lineBreak: false }); }
   const nx = M + W - 20, ny = top + 14;
   doc.moveTo(nx, ny + 12).lineTo(nx, ny).lineWidth(1).strokeColor(TEXT).stroke();
   doc.polygon([nx - 3, ny + 4], [nx, ny - 1], [nx + 3, ny + 4]).fill(TEXT);
@@ -271,4 +284,65 @@ function locationPlot(doc, snap, W) {
   doc.x = M;
   doc.font('Helvetica').fontSize(7.5).fillColor(MUTED).text(pdfText(`Schematic plot of the assets' positions in the IFC model (WGS84), drawn without imagery.${snap.assets.some(a => /illustrative/i.test(a.location.basis)) ? ' Positions are illustrative model positions, not surveyed locations.' : ''}`), M, doc.y, { width: W });
   doc.moveDown(0.4);
+}
+
+/**
+ * The maintenance report's body (seagirt_implementation.md §20): summary, matching assets, locations, and per
+ * asset the documented condition and trend, defects, corrective actions and closure, further checks, operating
+ * restrictions — every line from the snapshot, cited by source number.
+ */
+function drawMaintenance(doc, snap, { W, t, heading, para, bullet, ensure }) {
+  const s = snap.summary;
+  const CLOSURE = { NOT_VERIFIED: 'No closure evidence', NOT_COMPLETED_WITH_EVIDENCE: 'Documented as not completed', COMPLETED_WITH_EVIDENCE: 'Documented as completed' };
+  const n = x => (x?.n ? ` [${x.n}]` : '');
+  heading('Executive summary');
+  const kpis = [[s.included, 'Assets investigated', NAVY], [s.withFindings, 'With documented findings', '#b54708'], [s.openActions, 'Actions without verified closure', '#b42318'], [s.withoutFindings, 'Without documented findings', '#475467']];
+  const kw = (W - 3 * 8) / 4, ky = doc.y;
+  kpis.forEach(([v, l, c], i) => {
+    const x = M + i * (kw + 8);
+    doc.rect(x, ky, kw, 46).fillAndStroke(SOFT, LINE);
+    doc.font('Helvetica-Bold').fontSize(18).fillColor(c).text(String(v), x + 9, ky + 7, { width: kw - 18 });
+    doc.font('Helvetica').fontSize(7.5).fillColor(MUTED).text(t(l), x + 9, ky + 30, { width: kw - 18 });
+  });
+  doc.y = ky + 56;
+  para(`${s.withFindings} of ${s.included} investigated assets ${s.withFindings === 1 ? 'has' : 'have'} documented inspection findings${s.openActions ? `, with ${s.openActions} documented action${s.openActions === 1 ? '' : 's'} without verified closure` : ''}${s.restrictions ? ` and ${s.restrictions} documented operating restriction${s.restrictions === 1 ? '' : 's'}` : ''}. ${s.unknownCause ? `The records do not establish the cause of the reported status for ${s.unknownCause} of them.` : ''}`);
+  if (snap.maintenance?.statusAsOf) para(`Operational status as recorded in the model up to ${snap.maintenance.statusAsOf}.`, { size: 8.5, color: MUTED });
+  heading('Matching assets');
+  table(doc, [{ h: 'Asset', w: 0.11 }, { h: 'Type', w: 0.13 }, { h: 'Status', w: 0.11 }, { h: 'Latest inspection', w: 0.14 }, { h: 'Condition', w: 0.11 }, { h: 'Main documented findings / evidence', w: 0.4 }],
+    snap.assets.map(a => [a.id, a.typeLabel ?? '—', a.statusLabel ?? '—', a.latestInspection?.date ?? 'None', a.latestInspection?.condition?.label ?? '—', truncate(a.row.text, 160)]),
+    { W, color: (row, i) => (i === 4 ? COND(row[4]) : null) });
+  if (snap.assets.some(a => Number.isFinite(a.location.lon)) && doc.y + 340 > doc.page.height - doc.page.margins.bottom) doc.addPage();
+  heading(snap.area ? 'Selected area and asset locations' : 'Asset locations');
+  locationPlot(doc, snap, W);
+  for (const a of snap.assets) {
+    heading(`${a.id}${a.description ? ` — ${a.description}` : ''}`, { size: 11.5 });
+    para([`Type: ${a.typeLabel}`, `Status: ${a.statusLabel}${a.statusAsOf ? ` (as of ${a.statusAsOf})` : ''}`, `Position: ${a.location.basis}`].join('   ·   '), { size: 8, color: MUTED });
+    if (a.evidenceAvailability !== 'AVAILABLE') {
+      para({ NO_DOCUMENTS: 'No ACC documents are linked to this asset: the records do not establish what needs to be fixed. A site inspection is needed to establish the cause of the reported status.',
+        NO_INSPECTION_RECORDS: 'The linked documents include no inspection report: no defects or corrective actions are documented.', NO_RELEVANT_FINDINGS: 'The inspection records contain no findings or actions requiring attention.',
+        RETRIEVAL_FAILED: 'The linked documents could not be retrieved: the assessment of this asset is incomplete.', UNREADABLE: 'The linked documents could not be read: the assessment of this asset is incomplete.' }[a.evidenceAvailability] ?? 'Documents not checked.', { size: 8.5 });
+      continue;
+    }
+    if (a.latestInspection) para(`Latest inspection: ${a.latestInspection.date}${a.latestInspection.condition?.label ? ` — ${a.latestInspection.condition.label}${Number.isFinite(a.latestInspection.condition.score) ? ` (${a.latestInspection.condition.score}/${a.latestInspection.condition.scale ?? 5})` : ''}` : ''}${a.conditionTrend.length > 1 ? `  ·  Documented condition trend: ${a.conditionTrend.map(p => `${p.date} ${p.score}/${p.scale}`).join(' -> ')}` : ''}`, { size: 8.5 });
+    if (a.findings.length) {
+      ensure(70); // the label stays with its table
+      para('Documented defects and findings:', { font: 'Helvetica-Bold', size: 8.5, gap: 0.1 });
+      table(doc, [{ h: 'Finding', w: 0.24 }, { h: 'Detail', w: 0.36 }, { h: 'Severity', w: 0.1 }, { h: 'First / latest reported', w: 0.2 }, { h: 'Src', w: 0.1 }],
+        a.findings.map(f => [f.title, f.text ?? '—', f.severity === 'DEFECT' ? 'Defect' : f.severity === 'ATTENTION' ? 'Attention' : '—', `${f.firstReported ?? f.latestReported ?? '—'}${f.recurring ? ' (recurring)' : f.trend === 'NEW_FINDING' ? ' (new)' : ''} / ${f.latestReported ?? '—'}`, f.n ? `[${f.n}]` : '—']), { W, size: 7.5 });
+    }
+    const actions = [...a.documentedCorrectiveActions, ...a.completedActions];
+    if (actions.length) {
+      ensure(60);
+      para('Documented corrective actions and closure:', { font: 'Helvetica-Bold', size: 8.5, gap: 0.1 });
+      table(doc, [{ h: 'Action', w: 0.4 }, { h: 'Raised', w: 0.13 }, { h: 'Due', w: 0.13 }, { h: 'Closure', w: 0.24 }, { h: 'Src', w: 0.1 }],
+        actions.map(x => [x.text, x.raisedOn ?? '—', x.due ?? '—', CLOSURE[x.closure] ?? x.closure, x.n ? `[${x.n}]` : '—']), { W, size: 7.5 });
+    }
+    if (a.additionalInvestigations.length) { para('Further checks suggested by the findings (derived, not documented instructions):', { font: 'Helvetica-Bold', size: 8.5, gap: 0.1 }); for (const x of a.additionalInvestigations) bullet(x.text, { size: 8.5 }); }
+    if (a.operatingRestrictions.length) { para('Documented operating restrictions:', { font: 'Helvetica-Bold', size: 8.5, gap: 0.1 }); for (const r of a.operatingRestrictions) bullet(`${r.text}${n(r)} — ${r.applicability}`, { size: 8.5 }); }
+    for (const l of a.limitations) para(`Limitation: ${l}`, { size: 8, color: MUTED });
+    ensure(10);
+  }
+  heading('Data completeness');
+  const cov = snap.inventoryCoverage;
+  para(`${cov.evaluated} assets investigated; ACC documents linked for ${cov.withDocuments}; documents read for ${cov.successfullyAnalyzed}; inspection records for ${cov.withInspectionRecords}${cov.failed.length ? `; ${cov.failed.length} could not be retrieved` : ''}.`, { size: 8.5 });
 }

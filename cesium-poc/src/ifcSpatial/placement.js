@@ -96,3 +96,22 @@ export function modelMatrixFor(placement, georef, terrainHeight = 0) {
 
 /** Apply a column-major 4×4 to a point. */
 export const transformPoint = (m, [x, y, z]) => [m[0] * x + m[4] * y + m[8] * z + m[12], m[1] * x + m[5] * y + m[9] * z + m[13], m[2] * x + m[6] * y + m[10] * z + m[14]];
+
+/** Earth-fixed metres → longitude / latitude / height (WGS84; iterative, sub-millimetre). */
+export function ecefToLonLat([x, y, z]) {
+  const lon = Math.atan2(y, x);
+  const p = Math.hypot(x, y);
+  let lat = Math.atan2(z, p * (1 - WGS84.e2)), height = 0;
+  for (let i = 0; i < 6; i++) {
+    const n = WGS84.a / Math.sqrt(1 - WGS84.e2 * Math.sin(lat) ** 2);
+    height = p / Math.cos(lat) - n;
+    lat = Math.atan2(z, p * (1 - WGS84.e2 * (n / (n + height))));
+  }
+  return { lon: lon / DEG, lat: lat / DEG, height };
+}
+
+/** IFC model metres → longitude / latitude / height for a placement (the map's transform, without Cesium). */
+export const modelToLonLatFor = (placement, georef, terrainHeight = 0) => {
+  const m = modelMatrixFor(placement, georef, terrainHeight);
+  return (x, y, z = 0) => ecefToLonLat(transformPoint(m, [x, y, z]));
+};
