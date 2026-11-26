@@ -1,0 +1,42 @@
+{
+  "provenance": "DERIVED",
+  "notice": "Candidate links between public GIS features and illustrative electrical assets. Not verified.",
+  "generatedBy": "tools/build-seagirt-data.mjs",
+  "associations": [
+    {
+      "electricalAssetId": "SS1",
+      "geographicFeatureId": "osm-substation",
+      "osmId": "way/336181714",
+      "geographicSource": "OpenStreetMap",
+      "associationStatus": "CANDIDATE",
+      "geometryConfidence": "PUBLIC_MAPPED",
+      "topologyConfidence": "ILLUSTRATIVE",
+      "verified": false,
+      "anchor": {
+        "longitude": -76.5481528,
+        "latitude": 39.2623915
+      },
+      "distanceM": 132,
+      "footprintM": {
+        "eastWest": 80,
+        "northSouth": 99
+      },
+      "osmTags": {
+        "barrier": "fence",
+        "power": "substation"
+      },
+      "evidence": [
+        "Tagged barrier=fence, power=substation in OpenStreetMap.",
+        "Lies inside the mapped Seagirt Marine Terminal outline.",
+        "The only power-tagged feature in the terminal extract.",
+        "Its centroid is 132 m from Substation SS1’s illustrative position."
+      ],
+      "missingEvidence": [
+        "No operator, voltage, name or ref recorded on the OpenStreetMap feature.",
+        "No drawing, single-line diagram or asset register links this footprint to SS1.",
+        "SS1 itself is an illustrative asset, not a record of real equipment."
+      ],
+      "note": "Candidate geographic match only. Using the footprint as SS1’s map anchor is a display choice; it does not change the asset registry or confirm connectivity."
+    }
+  ]
+}

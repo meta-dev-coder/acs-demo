@@ -42,3 +42,6 @@ __pycache__/
 # immutable version id, so they are build output, not source. A committed copy of one model lives
 # in tests/fixtures/speckle/ as a test fixture and IS tracked.
 .data/speckle/
+
+# Encrypted APS session store (server/aps/sessions.mjs), only written with APS_SESSION_ENCRYPTION_KEY set
+.aps/

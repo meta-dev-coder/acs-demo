@@ -886,9 +886,11 @@ export default function CruiseWorkspace({ cruise, mapRef, cameraHandlers = {}, o
   }, [docked, focusKey, focusMap, onLocateAsset]);
 
   const close = useCallback(() => cruise.setWorkspaceOpen(false), [cruise]);
+  // Focus the Close button once, when the workspace opens — not on every update, or each keystroke in
+  // an input (which updates the simulation) would move the cursor out of it.
+  useEffect(() => { if (open) closeRef.current?.focus(); }, [open]);
   useEffect(() => {
     if (!open) return undefined;
-    closeRef.current?.focus();
     const onKey = e => { if (e.key === 'Escape') (drawer ? setDrawer(null) : close()); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

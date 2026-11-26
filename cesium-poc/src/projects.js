@@ -49,6 +49,16 @@ export const PROJECTS = Object.freeze([
     synthetic: true,
     load: () => import('./construction/constructionDemo.js'),
   }),
+  Object.freeze({
+    id: 'seagirt',
+    label: 'Seagirt Marine Terminal',
+    description: 'Electrical digital twin: assets, connectivity, outage impact and Ask the Twin (illustrative electrical data).',
+    bootTitle: 'Loading Seagirt Marine Terminal',
+    bootNote: 'Preparing the electrical network…',
+    /** The electrical network is illustrative until the terminal's own inventory arrives. */
+    synthetic: true,
+    load: () => import('./seagirt/seagirtDemo.js'),
+  }),
 ]);
 
 /** The project a search string asks for, or null for the legacy page. */

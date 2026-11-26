@@ -1,0 +1,4009 @@
+{
+ "source": "Trimmed from the Model Derivative property database of seagirt_power_network.ifc (Autodesk Forma, version 1), converted to the Autodesk Viewer property shape. Values unchanged.",
+ "results": [
+  {
+   "dbId": 2,
+   "name": "IfcProject::Seagirt Marine Terminal power network (illustrative)",
+   "externalId": "MTcwSW5vMXNyQ1FmZVVLRmQ3M19xOQ==",
+   "properties": [
+    {
+     "displayCategory": "",
+     "displayName": "Name",
+     "displayValue": "IfcProject::Seagirt Marine Terminal power network (illustrative)",
+     "hidden": false
+    },
+    {
+     "displayCategory": "",
+     "displayName": "Component Name",
+     "displayValue": "Seagirt Marine Terminal power network (illustrative)",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "GlobalId",
+     "displayValue": "170Ino1srCQfeUKFd73_q9",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "Description",
+     "displayValue": "Illustrative mock electrical network for a what-if demonstration. Not as-built. Generated from the Seagirt Terminal Power What-If web mock.",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcClass",
+     "displayValue": "IfcProject",
+     "hidden": false
+    }
+   ]
+  },
+  {
+   "dbId": 16,
+   "name": "IfcElectricDistributionBoard::UTIL-A Utility intake A (34.5 kV metering switchgear)",
+   "externalId": "MDc5UW4kSmhQNFhnT3IybTNxaDlnVg==",
+   "properties": [
+    {
+     "displayCategory": "",
+     "displayName": "Name",
+     "displayValue": "IfcElectricDistributionBoard::UTIL-A Utility intake A (34.5 kV metering switchgear)",
+     "hidden": false
+    },
+    {
+     "displayCategory": "",
+     "displayName": "Component Name",
+     "displayValue": "UTIL-A Utility intake A (34.5 kV metering switchgear)",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "GlobalId",
+     "displayValue": "079Qn$JhP4XgOr2m3qh9gV",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "Tag",
+     "displayValue": "UTIL-A",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "PredefinedType",
+     "displayValue": "SWITCHBOARD",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcClass",
+     "displayValue": "IfcElectricDistributionBoard",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcPropertySetList",
+     "displayValue": "\"SuperDNA_PowerNetwork\"",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID",
+     "displayValue": "2gBJmimzDA9AQ3abSIiafu",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSpatialContainer GUID",
+     "displayValue": "1slDgCd1L1$uBj8Xmnq$k2",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSpatialContainer",
+     "displayValue": "Seagirt Marine Terminal",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSystem",
+     "displayValue": "34.5 kV utility supply",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "GlobalId",
+     "displayValue": "0dJ6NbMpzFTxqjdlwX8v5P",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkID",
+     "displayValue": "UTIL-A",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkRole",
+     "displayValue": "Source",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "VoltageLevel",
+     "displayValue": "34.5 kV",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "DataStatus",
+     "displayValue": "Illustrative mock, not as-built",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "SourceRef",
+     "displayValue": "Seagirt what-if mock v1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "079Qn$JhP4XgOr2m3qh9gV",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "UTIL-A Utility intake A (34.5 kV metering switchgear)",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "GlobalId",
+     "displayValue": "2gBJmimzDA9AQ3abSIiafu",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "03XS9NdUr70w67kKMpoK4B, 2gBJmimzDA9AQ3abSIiafu",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "2gBJmimzDA9AQ3abSIiafu, 03XS9NdUr70w67kKMpoK4B",
+     "hidden": false
+    }
+   ]
+  },
+  {
+   "dbId": 20,
+   "name": "IfcElectricDistributionBoard::QSS-W Quay switching station West",
+   "externalId": "MXZ1SlJuSVV2NGJ4XyQzOWd4V2ZUbQ==",
+   "properties": [
+    {
+     "displayCategory": "",
+     "displayName": "Name",
+     "displayValue": "IfcElectricDistributionBoard::QSS-W Quay switching station West",
+     "hidden": false
+    },
+    {
+     "displayCategory": "",
+     "displayName": "Component Name",
+     "displayValue": "QSS-W Quay switching station West",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "GlobalId",
+     "displayValue": "1vuJRnIUv4bx_$39gxWfTm",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "Tag",
+     "displayValue": "QSS-W",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "PredefinedType",
+     "displayValue": "SWITCHBOARD",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcClass",
+     "displayValue": "IfcElectricDistributionBoard",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcPropertySetList",
+     "displayValue": "\"SuperDNA_PowerNetwork\"",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID",
+     "displayValue": "3kSURuoJLE3Ahh0wrtPUpO",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID 2",
+     "displayValue": "2_4iqfgkn0L9Tpx3LDZd5$",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSpatialContainer GUID",
+     "displayValue": "1slDgCd1L1$uBj8Xmnq$k2",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSpatialContainer",
+     "displayValue": "Seagirt Marine Terminal",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSystem",
+     "displayValue": "13.8 kV quay feeders and apron",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "GlobalId",
+     "displayValue": "1Q$Tc4wrnAEhwbq1X26Cn2",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkID",
+     "displayValue": "QSS-W",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkRole",
+     "displayValue": "Quay switching station",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "VoltageLevel",
+     "displayValue": "13.8 kV",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "DataStatus",
+     "displayValue": "Illustrative mock, not as-built",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "SourceRef",
+     "displayValue": "Seagirt what-if mock v1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "1vuJRnIUv4bx_$39gxWfTm",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "QSS-W Quay switching station West",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "GlobalId",
+     "displayValue": "3kSURuoJLE3Ahh0wrtPUpO",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "FlowDirection",
+     "displayValue": "SINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "3jvb3HkGvDng$OkfBlba_W, 3kSURuoJLE3Ahh0wrtPUpO",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "3jvb3HkGvDng$OkfBlba_W, 3kSURuoJLE3Ahh0wrtPUpO",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "1vuJRnIUv4bx_$39gxWfTm",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "QSS-W Quay switching station West",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "GlobalId",
+     "displayValue": "2_4iqfgkn0L9Tpx3LDZd5$",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "0MKUH9O1P1$gKZUUreai25, 2_4iqfgkn0L9Tpx3LDZd5$",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "2_4iqfgkn0L9Tpx3LDZd5$, 0MKUH9O1P1$gKZUUreai25",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IfcRelFlowControlElements",
+     "displayName": "Related Id 1",
+     "displayValue": "2kH8TAfdLBU8a7TZL4aaOF",
+     "hidden": false
+    }
+   ]
+  },
+  {
+   "dbId": 54,
+   "name": "IfcCableSegment::FO-01 SCADA fibre, MSS to QSS-W",
+   "externalId": "MUokMXlOQTlqMks4NGxUVE8ycm9rUQ==",
+   "properties": [
+    {
+     "displayCategory": "",
+     "displayName": "Name",
+     "displayValue": "IfcCableSegment::FO-01 SCADA fibre, MSS to QSS-W",
+     "hidden": false
+    },
+    {
+     "displayCategory": "",
+     "displayName": "Component Name",
+     "displayValue": "FO-01 SCADA fibre, MSS to QSS-W",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "GlobalId",
+     "displayValue": "1J$1yNA9j2K84lTTO2rokQ",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "ObjectType",
+     "displayValue": "FIBRE_OPTIC_CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "Tag",
+     "displayValue": "FO-01",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "PredefinedType",
+     "displayValue": "USERDEFINED",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcClass",
+     "displayValue": "IfcCableSegment",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcPropertySetList",
+     "displayValue": "\"SuperDNA_PowerNetwork\"",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID",
+     "displayValue": "3dpnoF3RD1seYhkv9vNLVP",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID 2",
+     "displayValue": "3lI3hnZC97fh$LDGkItldw",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSpatialContainer GUID",
+     "displayValue": "1slDgCd1L1$uBj8Xmnq$k2",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSpatialContainer",
+     "displayValue": "Seagirt Marine Terminal",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSystem",
+     "displayValue": "SCADA control network",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "GlobalId",
+     "displayValue": "3F4oLCiC917frm10c6nP_Q",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkID",
+     "displayValue": "FO-01",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkRole",
+     "displayValue": "SCADA fibre",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "FromNetworkID",
+     "displayValue": "RTU-MSS",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "ToNetworkID",
+     "displayValue": "RTU-QSS-W",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "RouteLengthM",
+     "displayValue": "1249.700",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "Routing",
+     "displayValue": "Shares the MV duct bank",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "DataStatus",
+     "displayValue": "Illustrative mock, not as-built",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "SourceRef",
+     "displayValue": "Seagirt what-if mock v1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "1J$1yNA9j2K84lTTO2rokQ",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "FO-01 SCADA fibre, MSS to QSS-W",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "GlobalId",
+     "displayValue": "3dpnoF3RD1seYhkv9vNLVP",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "SystemType",
+     "displayValue": "CONTROL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "1E8xx6HL97ChGyVEOBkcND, 3dpnoF3RD1seYhkv9vNLVP",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "3dpnoF3RD1seYhkv9vNLVP, 1E8xx6HL97ChGyVEOBkcND",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "1J$1yNA9j2K84lTTO2rokQ",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "FO-01 SCADA fibre, MSS to QSS-W",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "GlobalId",
+     "displayValue": "3lI3hnZC97fh$LDGkItldw",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "SystemType",
+     "displayValue": "CONTROL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "0GdR8YHTbAbRN3_6qQwQUk, 3lI3hnZC97fh$LDGkItldw",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "3lI3hnZC97fh$LDGkItldw, 0GdR8YHTbAbRN3_6qQwQUk",
+     "hidden": false
+    }
+   ]
+  },
+  {
+   "dbId": 58,
+   "name": "IfcCableSegment::F1 Quay feeder F1, Bus A to QSS-W",
+   "externalId": "MVlhWFpvdU1INnc4cGpaeGtSX3lCag==",
+   "properties": [
+    {
+     "displayCategory": "",
+     "displayName": "Name",
+     "displayValue": "IfcCableSegment::F1 Quay feeder F1, Bus A to QSS-W",
+     "hidden": false
+    },
+    {
+     "displayCategory": "",
+     "displayName": "Component Name",
+     "displayValue": "F1 Quay feeder F1, Bus A to QSS-W",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "GlobalId",
+     "displayValue": "1YaXZouMH6w8pjZxkR_yBj",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "Tag",
+     "displayValue": "F1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLESEGMENT",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcClass",
+     "displayValue": "IfcCableSegment",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcPropertySetList",
+     "displayValue": "\"SuperDNA_PowerNetwork\"",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID",
+     "displayValue": "1xhjhcET9419NlWdU$ES1v",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID 2",
+     "displayValue": "3jvb3HkGvDng$OkfBlba_W",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSpatialContainer GUID",
+     "displayValue": "1slDgCd1L1$uBj8Xmnq$k2",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSpatialContainer",
+     "displayValue": "Seagirt Marine Terminal",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSystem",
+     "displayValue": "13.8 kV quay feeders and apron",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "GlobalId",
+     "displayValue": "0Zm4HP3VH9JgoTgikXnUVh",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkID",
+     "displayValue": "F1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkRole",
+     "displayValue": "Cable",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "VoltageLevel",
+     "displayValue": "13.8 kV",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "Circuit",
+     "displayValue": "F1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "FromNetworkID",
+     "displayValue": "BUS-A",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "ToNetworkID",
+     "displayValue": "QSS-W",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "OneWay",
+     "displayValue": "Yes",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "RouteLengthM",
+     "displayValue": "1250.000",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "InstallationDepthM",
+     "displayValue": "1.000",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "DataStatus",
+     "displayValue": "Illustrative mock, not as-built",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "SourceRef",
+     "displayValue": "Seagirt what-if mock v1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "1YaXZouMH6w8pjZxkR_yBj",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "F1 Quay feeder F1, Bus A to QSS-W",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "GlobalId",
+     "displayValue": "1xhjhcET9419NlWdU$ES1v",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "FlowDirection",
+     "displayValue": "SINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "3wrhpRA3f2lBv2eA3Igdek, 1xhjhcET9419NlWdU$ES1v",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "1xhjhcET9419NlWdU$ES1v, 3wrhpRA3f2lBv2eA3Igdek",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "1YaXZouMH6w8pjZxkR_yBj",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "F1 Quay feeder F1, Bus A to QSS-W",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "GlobalId",
+     "displayValue": "3jvb3HkGvDng$OkfBlba_W",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "3kSURuoJLE3Ahh0wrtPUpO, 3jvb3HkGvDng$OkfBlba_W",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "3jvb3HkGvDng$OkfBlba_W, 3kSURuoJLE3Ahh0wrtPUpO",
+     "hidden": false
+    }
+   ]
+  },
+  {
+   "dbId": 91,
+   "name": "IfcCableSegment::L1 480 V cable L1, TX-1 to R1",
+   "externalId": "M0QwJFU3NEVqOWp4ZkY3am5WVGx5Rg==",
+   "properties": [
+    {
+     "displayCategory": "",
+     "displayName": "Name",
+     "displayValue": "IfcCableSegment::L1 480 V cable L1, TX-1 to R1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "",
+     "displayName": "Component Name",
+     "displayValue": "L1 480 V cable L1, TX-1 to R1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "GlobalId",
+     "displayValue": "3D0$U74Ej9jxfF7jnVTlyF",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "Tag",
+     "displayValue": "L1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLESEGMENT",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcClass",
+     "displayValue": "IfcCableSegment",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcPropertySetList",
+     "displayValue": "\"SuperDNA_PowerNetwork\"",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID",
+     "displayValue": "3tP2lj995CRfjRUj_7cUsj",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID 2",
+     "displayValue": "3F$3H8xkTB1x3POHnZMAr3",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSpatialContainer GUID",
+     "displayValue": "1slDgCd1L1$uBj8Xmnq$k2",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSpatialContainer",
+     "displayValue": "Seagirt Marine Terminal",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSystem",
+     "displayValue": "480 V distribution",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "GlobalId",
+     "displayValue": "0olcSDkZj79A3xGigk4mDl",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkID",
+     "displayValue": "L1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkRole",
+     "displayValue": "Cable",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "VoltageLevel",
+     "displayValue": "480 V",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "Circuit",
+     "displayValue": "USS-1 LV",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "FromNetworkID",
+     "displayValue": "TX-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "ToNetworkID",
+     "displayValue": "R1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "OneWay",
+     "displayValue": "No",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "RouteLengthM",
+     "displayValue": "89.300",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "InstallationDepthM",
+     "displayValue": "1.000",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "DataStatus",
+     "displayValue": "Illustrative mock, not as-built",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "SourceRef",
+     "displayValue": "Seagirt what-if mock v1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "3D0$U74Ej9jxfF7jnVTlyF",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "L1 480 V cable L1, TX-1 to R1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "GlobalId",
+     "displayValue": "3tP2lj995CRfjRUj_7cUsj",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "0ZxCuVKXz9rfWEXpMvJFc8, 3tP2lj995CRfjRUj_7cUsj",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "0ZxCuVKXz9rfWEXpMvJFc8, 3tP2lj995CRfjRUj_7cUsj",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "3D0$U74Ej9jxfF7jnVTlyF",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "L1 480 V cable L1, TX-1 to R1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "GlobalId",
+     "displayValue": "3F$3H8xkTB1x3POHnZMAr3",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "1mJIsIym18gRufx1_$x5OM, 3F$3H8xkTB1x3POHnZMAr3",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "1mJIsIym18gRufx1_$x5OM, 3F$3H8xkTB1x3POHnZMAr3",
+     "hidden": false
+    }
+   ]
+  },
+  {
+   "dbId": 128,
+   "name": "IfcJunctionBox::V01 Crane power vault V01",
+   "externalId": "MW91SGR1OGsxQktCTnpOR3BiUjR5aA==",
+   "properties": [
+    {
+     "displayCategory": "",
+     "displayName": "Name",
+     "displayValue": "IfcJunctionBox::V01 Crane power vault V01",
+     "hidden": false
+    },
+    {
+     "displayCategory": "",
+     "displayName": "Component Name",
+     "displayValue": "V01 Crane power vault V01",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "GlobalId",
+     "displayValue": "1ouHdu8k1BKBNzNGpbR4yh",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "Tag",
+     "displayValue": "V01",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "PredefinedType",
+     "displayValue": "POWER",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcClass",
+     "displayValue": "IfcJunctionBox",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcPropertySetList",
+     "displayValue": "\"SuperDNA_PowerNetwork\"",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID",
+     "displayValue": "1akwP7CEP3QfeMhedu$65r",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID 2",
+     "displayValue": "24N5TSDsHBsOyAm_0VwAZx",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID 3",
+     "displayValue": "0tC9BUVtn2dPd9PnozgIPo",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSpatialContainer GUID",
+     "displayValue": "1slDgCd1L1$uBj8Xmnq$k2",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSpatialContainer",
+     "displayValue": "Seagirt Marine Terminal",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSystem",
+     "displayValue": "13.8 kV quay feeders and apron",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "GlobalId",
+     "displayValue": "3Q2RatwJHEYP4NAN2_njFm",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkID",
+     "displayValue": "V01",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkRole",
+     "displayValue": "Crane power vault",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "VoltageLevel",
+     "displayValue": "13.8 kV",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "DataStatus",
+     "displayValue": "Illustrative mock, not as-built",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "SourceRef",
+     "displayValue": "Seagirt what-if mock v1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "1ouHdu8k1BKBNzNGpbR4yh",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "V01 Crane power vault V01",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "GlobalId",
+     "displayValue": "1akwP7CEP3QfeMhedu$65r",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "0asqPntMjD28jVUMfFb7wM, 1akwP7CEP3QfeMhedu$65r",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "1akwP7CEP3QfeMhedu$65r, 0asqPntMjD28jVUMfFb7wM",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "1ouHdu8k1BKBNzNGpbR4yh",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "V01 Crane power vault V01",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "GlobalId",
+     "displayValue": "24N5TSDsHBsOyAm_0VwAZx",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "0tmqDvs5jE1gka$E9GbrMo, 24N5TSDsHBsOyAm_0VwAZx",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "0tmqDvs5jE1gka$E9GbrMo, 24N5TSDsHBsOyAm_0VwAZx",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 3",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "1ouHdu8k1BKBNzNGpbR4yh",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 3",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "V01 Crane power vault V01",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 3",
+     "displayName": "GlobalId",
+     "displayValue": "0tC9BUVtn2dPd9PnozgIPo",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 3",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 3",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 3",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 3",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 3",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 3",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "0q2kGcC$r8FveFbPcQIkmA, 0tC9BUVtn2dPd9PnozgIPo",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 3",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "0tC9BUVtn2dPd9PnozgIPo, 0q2kGcC$r8FveFbPcQIkmA",
+     "hidden": false
+    }
+   ]
+  },
+  {
+   "dbId": 150,
+   "name": "IfcSwitchingDevice::AT-1 Apron tie switch AT-1",
+   "externalId": "MTZPcU00Y2FuNTN2SkdEb2N3TU1uQQ==",
+   "properties": [
+    {
+     "displayCategory": "",
+     "displayName": "Name",
+     "displayValue": "IfcSwitchingDevice::AT-1 Apron tie switch AT-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "",
+     "displayName": "Component Name",
+     "displayValue": "AT-1 Apron tie switch AT-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "GlobalId",
+     "displayValue": "16OqM4can53vJGDocwMMnA",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "Tag",
+     "displayValue": "AT-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "PredefinedType",
+     "displayValue": "SWITCHDISCONNECTOR",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcClass",
+     "displayValue": "IfcSwitchingDevice",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcPropertySetList",
+     "displayValue": "\"SuperDNA_PowerNetwork\"",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID",
+     "displayValue": "1pUQsXLiL4sQmka0jq8URL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID 2",
+     "displayValue": "38VO_jErD2MPSuYR0oZdvM",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSpatialContainer GUID",
+     "displayValue": "1slDgCd1L1$uBj8Xmnq$k2",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSpatialContainer",
+     "displayValue": "Seagirt Marine Terminal",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSystem",
+     "displayValue": "13.8 kV quay feeders and apron",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "GlobalId",
+     "displayValue": "2pC2EgZIHC490XslXZzijv",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkID",
+     "displayValue": "AT-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkRole",
+     "displayValue": "Normally-open tie switch",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "VoltageLevel",
+     "displayValue": "13.8 kV",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "DataStatus",
+     "displayValue": "Illustrative mock, not as-built",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "SourceRef",
+     "displayValue": "Seagirt what-if mock v1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NormalState",
+     "displayValue": "OPEN",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "16OqM4can53vJGDocwMMnA",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "AT-1 Apron tie switch AT-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "GlobalId",
+     "displayValue": "1pUQsXLiL4sQmka0jq8URL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "1P2FnYn0r669RiX6SbYK6o, 1pUQsXLiL4sQmka0jq8URL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "1P2FnYn0r669RiX6SbYK6o, 1pUQsXLiL4sQmka0jq8URL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "16OqM4can53vJGDocwMMnA",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "AT-1 Apron tie switch AT-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "GlobalId",
+     "displayValue": "38VO_jErD2MPSuYR0oZdvM",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "1Q1XZurdv2iPOee6L3Di1f, 38VO_jErD2MPSuYR0oZdvM",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "38VO_jErD2MPSuYR0oZdvM, 1Q1XZurdv2iPOee6L3Di1f",
+     "hidden": false
+    }
+   ]
+  },
+  {
+   "dbId": 180,
+   "name": "IfcTransportElement::STS-01 Ship-to-shore container crane",
+   "externalId": "MnhrUnJRalc1RjJ2aEVNb3ZaWFRaYw==",
+   "properties": [
+    {
+     "displayCategory": "",
+     "displayName": "Name",
+     "displayValue": "IfcTransportElement::STS-01 Ship-to-shore container crane",
+     "hidden": false
+    },
+    {
+     "displayCategory": "",
+     "displayName": "Component Name",
+     "displayValue": "STS-01 Ship-to-shore container crane",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "GlobalId",
+     "displayValue": "2xkRrQjW5F2vhEMovZXTZc",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "Description",
+     "displayValue": "Simplified massing; position is a snapshot (cranes travel along the berth)",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "ObjectType",
+     "displayValue": "SHIP_TO_SHORE_CRANE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "Tag",
+     "displayValue": "STS-01",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "PredefinedType",
+     "displayValue": "USERDEFINED",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcClass",
+     "displayValue": "IfcTransportElement",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcPropertySetList",
+     "displayValue": "\"SuperDNA_PowerNetwork\"",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSpatialContainer GUID",
+     "displayValue": "1slDgCd1L1$uBj8Xmnq$k2",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSpatialContainer",
+     "displayValue": "Seagirt Marine Terminal",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "GlobalId",
+     "displayValue": "17p14iYhX8Gf_wuKFwk1Z4",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkID",
+     "displayValue": "STS-01-STRUCT",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkRole",
+     "displayValue": "Crane structure",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "DataStatus",
+     "displayValue": "Illustrative mock, not as-built",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "SourceRef",
+     "displayValue": "Seagirt what-if mock v1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "IntakeNetworkID",
+     "displayValue": "STS-01",
+     "hidden": false
+    }
+   ]
+  },
+  {
+   "dbId": 251,
+   "name": "IfcTransformer::TX-1 USS-1 transformer TX-1 (Reefer West)",
+   "externalId": "MUloWVFGNTF2QkRmV2E5RUFXQlJ0Qw==",
+   "properties": [
+    {
+     "displayCategory": "",
+     "displayName": "Name",
+     "displayValue": "IfcTransformer::TX-1 USS-1 transformer TX-1 (Reefer West)",
+     "hidden": false
+    },
+    {
+     "displayCategory": "",
+     "displayName": "Component Name",
+     "displayValue": "TX-1 USS-1 transformer TX-1 (Reefer West)",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "GlobalId",
+     "displayValue": "1IhYQF51vBDfWa9EAWBRtC",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "Tag",
+     "displayValue": "TX-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "PredefinedType",
+     "displayValue": "VOLTAGE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcClass",
+     "displayValue": "IfcTransformer",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcPropertySetList",
+     "displayValue": "\"SuperDNA_PowerNetwork\";\"Pset_TransformerTypeCommon\"",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID",
+     "displayValue": "0ZxCuVKXz9rfWEXpMvJFc8",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID 2",
+     "displayValue": "0d9eX0FJX4VxuljSSF_M2C",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcDecomposesGUID",
+     "displayValue": "0vt1c$TG5FhuR$EWS9j$d5",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcDecomposes",
+     "displayValue": "USS-1 Unit substation (Reefer West)",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSystem",
+     "displayValue": "480 V distribution",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "GlobalId",
+     "displayValue": "3iqJx9LoTFouThysK4R9oz",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkID",
+     "displayValue": "TX-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkRole",
+     "displayValue": "Unit transformer",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "VoltageLevel",
+     "displayValue": "480 V",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "DataStatus",
+     "displayValue": "Illustrative mock, not as-built",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "SourceRef",
+     "displayValue": "Seagirt what-if mock v1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "Rating",
+     "displayValue": "13.8 kV/480 V, 1500 kVA",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Pset_TransformerTypeCommon",
+     "displayName": "GlobalId",
+     "displayValue": "3_JuQMC_nCiPPtRQdbY1NY",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Pset_TransformerTypeCommon",
+     "displayName": "PrimaryVoltage",
+     "displayValue": "13800.000 V",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Pset_TransformerTypeCommon",
+     "displayName": "SecondaryVoltage",
+     "displayValue": "480.000 V",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Pset_TransformerTypeCommon",
+     "displayName": "MaximumApparentPower",
+     "displayValue": "1500000.000 W",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "1IhYQF51vBDfWa9EAWBRtC",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "TX-1 USS-1 transformer TX-1 (Reefer West)",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "GlobalId",
+     "displayValue": "0ZxCuVKXz9rfWEXpMvJFc8",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "3tP2lj995CRfjRUj_7cUsj, 0ZxCuVKXz9rfWEXpMvJFc8",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "0ZxCuVKXz9rfWEXpMvJFc8, 3tP2lj995CRfjRUj_7cUsj",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "1IhYQF51vBDfWa9EAWBRtC",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "TX-1 USS-1 transformer TX-1 (Reefer West)",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "GlobalId",
+     "displayValue": "0d9eX0FJX4VxuljSSF_M2C",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "0N3Two8FH8AuYCaltAMS5u, 0d9eX0FJX4VxuljSSF_M2C",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "0d9eX0FJX4VxuljSSF_M2C, 0N3Two8FH8AuYCaltAMS5u",
+     "hidden": false
+    }
+   ]
+  },
+  {
+   "dbId": 700,
+   "name": "IfcTransformer::TX-M1 Main transformer TX-M1",
+   "externalId": "MG5VajhjMTV2MHpodTNqWkJ0Mk9Jcg==",
+   "properties": [
+    {
+     "displayCategory": "",
+     "displayName": "Name",
+     "displayValue": "IfcTransformer::TX-M1 Main transformer TX-M1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "",
+     "displayName": "Component Name",
+     "displayValue": "TX-M1 Main transformer TX-M1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "GlobalId",
+     "displayValue": "0nUj8c15v0zhu3jZBt2OIr",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "Tag",
+     "displayValue": "TX-M1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "PredefinedType",
+     "displayValue": "VOLTAGE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcClass",
+     "displayValue": "IfcTransformer",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcPropertySetList",
+     "displayValue": "\"SuperDNA_PowerNetwork\";\"Pset_TransformerTypeCommon\"",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID",
+     "displayValue": "1cnNycQa59euPHI9cE$$78",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID 2",
+     "displayValue": "2FPYI3EPL1a8dbGYXm7oTm",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcDecomposesGUID",
+     "displayValue": "3Yd8KyBPL9pBcxAZImE5xj",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcDecomposes",
+     "displayValue": "MSS Main substation",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSystem",
+     "displayValue": "34.5 kV utility supply",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "GlobalId",
+     "displayValue": "2Qx72Oh_L8EAguX9nH3ONF",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkID",
+     "displayValue": "TX-M1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkRole",
+     "displayValue": "Main transformer",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "VoltageLevel",
+     "displayValue": "34.5 kV",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "DataStatus",
+     "displayValue": "Illustrative mock, not as-built",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "SourceRef",
+     "displayValue": "Seagirt what-if mock v1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "CapacitykW",
+     "displayValue": "11000.000",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "Rating",
+     "displayValue": "34.5/13.8 kV, 12 MVA",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Pset_TransformerTypeCommon",
+     "displayName": "GlobalId",
+     "displayValue": "3QNfhirdf8Ce3t2F2a9yOM",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Pset_TransformerTypeCommon",
+     "displayName": "PrimaryVoltage",
+     "displayValue": "34500.000 V",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Pset_TransformerTypeCommon",
+     "displayName": "SecondaryVoltage",
+     "displayValue": "13800.000 V",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Pset_TransformerTypeCommon",
+     "displayName": "MaximumApparentPower",
+     "displayValue": "12000000.000 W",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "0nUj8c15v0zhu3jZBt2OIr",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "TX-M1 Main transformer TX-M1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "GlobalId",
+     "displayValue": "1cnNycQa59euPHI9cE$$78",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "3gQvyMB5LBVfprXrREJ3$O, 1cnNycQa59euPHI9cE$$78",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "3gQvyMB5LBVfprXrREJ3$O, 1cnNycQa59euPHI9cE$$78",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "0nUj8c15v0zhu3jZBt2OIr",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "TX-M1 Main transformer TX-M1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "GlobalId",
+     "displayValue": "2FPYI3EPL1a8dbGYXm7oTm",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "FlowDirection",
+     "displayValue": "SINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "1JzU_gkknF3xTeFzGHml6e, 2FPYI3EPL1a8dbGYXm7oTm",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "1JzU_gkknF3xTeFzGHml6e, 2FPYI3EPL1a8dbGYXm7oTm",
+     "hidden": false
+    }
+   ]
+  },
+  {
+   "dbId": 701,
+   "name": "IfcProtectiveDevice::BT-1 Bus tie breaker BT-1",
+   "externalId": "MHNOdkZicnJMNk5mVmhaSHJ1Wl9XOQ==",
+   "properties": [
+    {
+     "displayCategory": "",
+     "displayName": "Name",
+     "displayValue": "IfcProtectiveDevice::BT-1 Bus tie breaker BT-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "",
+     "displayName": "Component Name",
+     "displayValue": "BT-1 Bus tie breaker BT-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "GlobalId",
+     "displayValue": "0sNvFbrrL6NfVhZHruZ_W9",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "Tag",
+     "displayValue": "BT-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "PredefinedType",
+     "displayValue": "CIRCUITBREAKER",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcClass",
+     "displayValue": "IfcProtectiveDevice",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcPropertySetList",
+     "displayValue": "\"SuperDNA_PowerNetwork\"",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID",
+     "displayValue": "2n2wRuGtv6bPvDHlO0r2Mf",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID 2",
+     "displayValue": "3JGGOWVY1BLOHP6zBlcELU",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcDecomposesGUID",
+     "displayValue": "3Yd8KyBPL9pBcxAZImE5xj",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcDecomposes",
+     "displayValue": "MSS Main substation",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSystem",
+     "displayValue": "13.8 kV yard ring",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "GlobalId",
+     "displayValue": "3ZqSF1tSTCIu1$P9QPiUSo",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkID",
+     "displayValue": "BT-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkRole",
+     "displayValue": "Bus tie breaker",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "VoltageLevel",
+     "displayValue": "13.8 kV",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "DataStatus",
+     "displayValue": "Illustrative mock, not as-built",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "SourceRef",
+     "displayValue": "Seagirt what-if mock v1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NormalState",
+     "displayValue": "OPEN",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "0sNvFbrrL6NfVhZHruZ_W9",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "BT-1 Bus tie breaker BT-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "GlobalId",
+     "displayValue": "2n2wRuGtv6bPvDHlO0r2Mf",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "1QqlQ$RC5CU988aQFIRrvd, 2n2wRuGtv6bPvDHlO0r2Mf",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "1QqlQ$RC5CU988aQFIRrvd, 2n2wRuGtv6bPvDHlO0r2Mf",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "0sNvFbrrL6NfVhZHruZ_W9",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "BT-1 Bus tie breaker BT-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "GlobalId",
+     "displayValue": "3JGGOWVY1BLOHP6zBlcELU",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "1G_NeSkJP1bPX4qdZAS07M, 3JGGOWVY1BLOHP6zBlcELU",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "3JGGOWVY1BLOHP6zBlcELU, 1G_NeSkJP1bPX4qdZAS07M",
+     "hidden": false
+    }
+   ]
+  },
+  {
+   "dbId": 702,
+   "name": "IfcController::RTU-MSS Main substation RTU",
+   "externalId": "MTZGaEhWOXBmNWZmbXZkakVKOFZ2cQ==",
+   "properties": [
+    {
+     "displayCategory": "",
+     "displayName": "Name",
+     "displayValue": "IfcController::RTU-MSS Main substation RTU",
+     "hidden": false
+    },
+    {
+     "displayCategory": "",
+     "displayName": "Component Name",
+     "displayValue": "RTU-MSS Main substation RTU",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "GlobalId",
+     "displayValue": "16FhHV9pf5ffmvdjEJ8Vvq",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "Description",
+     "displayValue": "Substation RTU on station battery (illustrative)",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "Tag",
+     "displayValue": "RTU-MSS",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "PredefinedType",
+     "displayValue": "PROGRAMMABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcClass",
+     "displayValue": "IfcController",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcPropertySetList",
+     "displayValue": "\"SuperDNA_PowerNetwork\"",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID",
+     "displayValue": "1E8xx6HL97ChGyVEOBkcND",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID 2",
+     "displayValue": "1SlAF2TNnEMPTxS45IFgCo",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID 3",
+     "displayValue": "2P5oXFRzH1FRDThw8KwCg$",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID 4",
+     "displayValue": "2PkVlXpVv4vhH4g836Vsh6",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID 5",
+     "displayValue": "0Gq9SzW5X2mhZErRjKzRt$",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID 6",
+     "displayValue": "1Fj3v8SIH8Dh4w2g$8BIvM",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcDecomposesGUID",
+     "displayValue": "3Yd8KyBPL9pBcxAZImE5xj",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcDecomposes",
+     "displayValue": "MSS Main substation",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSystem",
+     "displayValue": "SCADA control network",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "GlobalId",
+     "displayValue": "1CXumCN6r9jfYprg2fD5OB",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkID",
+     "displayValue": "RTU-MSS",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkRole",
+     "displayValue": "SCADA RTU",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "DataStatus",
+     "displayValue": "Illustrative mock, not as-built",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "SourceRef",
+     "displayValue": "Seagirt what-if mock v1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "",
+     "displayName": "Related Id",
+     "displayValue": "16FhHV9pf5ffmvdjEJ8Vvq",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "16FhHV9pf5ffmvdjEJ8Vvq",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "RTU-MSS Main substation RTU",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "GlobalId",
+     "displayValue": "1E8xx6HL97ChGyVEOBkcND",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "SystemType",
+     "displayValue": "CONTROL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "3dpnoF3RD1seYhkv9vNLVP, 1E8xx6HL97ChGyVEOBkcND",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "3dpnoF3RD1seYhkv9vNLVP, 1E8xx6HL97ChGyVEOBkcND",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "16FhHV9pf5ffmvdjEJ8Vvq",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "RTU-MSS Main substation RTU",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "GlobalId",
+     "displayValue": "1SlAF2TNnEMPTxS45IFgCo",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "SystemType",
+     "displayValue": "CONTROL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "1xu59$k4b8ow2ilnclS0qk, 1SlAF2TNnEMPTxS45IFgCo",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "1xu59$k4b8ow2ilnclS0qk, 1SlAF2TNnEMPTxS45IFgCo",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 3",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "16FhHV9pf5ffmvdjEJ8Vvq",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 3",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "RTU-MSS Main substation RTU",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 3",
+     "displayName": "GlobalId",
+     "displayValue": "2P5oXFRzH1FRDThw8KwCg$",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 3",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 3",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 3",
+     "displayName": "SystemType",
+     "displayValue": "CONTROL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 3",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 3",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 3",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "0ib697SyD4MfEN0MdFNXbZ, 2P5oXFRzH1FRDThw8KwCg$",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 3",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "0ib697SyD4MfEN0MdFNXbZ, 2P5oXFRzH1FRDThw8KwCg$",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 4",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "16FhHV9pf5ffmvdjEJ8Vvq",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 4",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "RTU-MSS Main substation RTU",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 4",
+     "displayName": "GlobalId",
+     "displayValue": "2PkVlXpVv4vhH4g836Vsh6",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 4",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 4",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 4",
+     "displayName": "SystemType",
+     "displayValue": "CONTROL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 4",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 4",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 4",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "3VEGfjDGL249wzJJyOBlbG, 2PkVlXpVv4vhH4g836Vsh6",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 4",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "3VEGfjDGL249wzJJyOBlbG, 2PkVlXpVv4vhH4g836Vsh6",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 5",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "16FhHV9pf5ffmvdjEJ8Vvq",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 5",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "RTU-MSS Main substation RTU",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 5",
+     "displayName": "GlobalId",
+     "displayValue": "0Gq9SzW5X2mhZErRjKzRt$",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 5",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 5",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 5",
+     "displayName": "SystemType",
+     "displayValue": "CONTROL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 5",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 5",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 5",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "2nNRPSVxL2VwQ67A$rIOOP, 0Gq9SzW5X2mhZErRjKzRt$",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 5",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "2nNRPSVxL2VwQ67A$rIOOP, 0Gq9SzW5X2mhZErRjKzRt$",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 6",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "16FhHV9pf5ffmvdjEJ8Vvq",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 6",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "RTU-MSS Main substation RTU",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 6",
+     "displayName": "GlobalId",
+     "displayValue": "1Fj3v8SIH8Dh4w2g$8BIvM",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 6",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 6",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 6",
+     "displayName": "SystemType",
+     "displayValue": "CONTROL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 6",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 6",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 6",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "1dK$QVCEn4Zueya4ELHflc, 1Fj3v8SIH8Dh4w2g$8BIvM",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 6",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "1dK$QVCEn4Zueya4ELHflc, 1Fj3v8SIH8Dh4w2g$8BIvM",
+     "hidden": false
+    }
+   ]
+  },
+  {
+   "dbId": 371,
+   "name": "IfcElectricGenerator::GEN-1 Standby diesel generator GEN-1",
+   "externalId": "MWllaUhHNFBqRER4X3NVVHl0dktraw==",
+   "properties": [
+    {
+     "displayCategory": "",
+     "displayName": "Name",
+     "displayValue": "IfcElectricGenerator::GEN-1 Standby diesel generator GEN-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "",
+     "displayName": "Component Name",
+     "displayValue": "GEN-1 Standby diesel generator GEN-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "GlobalId",
+     "displayValue": "1ieiHG4PjDDx_sUTytvKkk",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "Tag",
+     "displayValue": "GEN-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "PredefinedType",
+     "displayValue": "ENGINEGENERATOR",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcClass",
+     "displayValue": "IfcElectricGenerator",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcPropertySetList",
+     "displayValue": "\"SuperDNA_PowerNetwork\"",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID",
+     "displayValue": "0OA9a98Yj4LxWFyS8w_Vnf",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSpatialContainer GUID",
+     "displayValue": "1slDgCd1L1$uBj8Xmnq$k2",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSpatialContainer",
+     "displayValue": "Seagirt Marine Terminal",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSystem",
+     "displayValue": "Standby power",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "GlobalId",
+     "displayValue": "30hAXhjaz4J8YItGzZxhFb",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkID",
+     "displayValue": "GEN-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkRole",
+     "displayValue": "Standby source",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "VoltageLevel",
+     "displayValue": "480 V",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "DataStatus",
+     "displayValue": "Illustrative mock, not as-built",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "SourceRef",
+     "displayValue": "Seagirt what-if mock v1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "CapacitykW",
+     "displayValue": "400.000",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "Rating",
+     "displayValue": "400 kW",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "1ieiHG4PjDDx_sUTytvKkk",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "GEN-1 Standby diesel generator GEN-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "GlobalId",
+     "displayValue": "0OA9a98Yj4LxWFyS8w_Vnf",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "1wJwfXCqXDORuBkLNXbOVD, 0OA9a98Yj4LxWFyS8w_Vnf",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "0OA9a98Yj4LxWFyS8w_Vnf, 1wJwfXCqXDORuBkLNXbOVD",
+     "hidden": false
+    }
+   ]
+  },
+  {
+   "dbId": 444,
+   "name": "IfcLightFixture::HM-1 High-mast light HM-1",
+   "externalId": "M05jc2V5Z2tmRlZlJHJBM3V5OEdTMw==",
+   "properties": [
+    {
+     "displayCategory": "",
+     "displayName": "Name",
+     "displayValue": "IfcLightFixture::HM-1 High-mast light HM-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "",
+     "displayName": "Component Name",
+     "displayValue": "HM-1 High-mast light HM-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "GlobalId",
+     "displayValue": "3NcseygkfFVe$rA3uy8GS3",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "Tag",
+     "displayValue": "HM-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "PredefinedType",
+     "displayValue": "DIRECTIONSOURCE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcClass",
+     "displayValue": "IfcLightFixture",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcPropertySetList",
+     "displayValue": "\"SuperDNA_PowerNetwork\"",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID",
+     "displayValue": "1A8klcrVn3uwi$P7cGmJZS",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement HasPorts IfcGUID 2",
+     "displayValue": "03GC6eKSPBNgMXVX5FIduS",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSpatialContainer GUID",
+     "displayValue": "1slDgCd1L1$uBj8Xmnq$k2",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSpatialContainer",
+     "displayValue": "Seagirt Marine Terminal",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSystem",
+     "displayValue": "Yard and rail lighting",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "GlobalId",
+     "displayValue": "1uhBPwEPnFWPgy8BoK096x",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkID",
+     "displayValue": "HM-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "NetworkRole",
+     "displayValue": "Load",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "VoltageLevel",
+     "displayValue": "480 V",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "DataStatus",
+     "displayValue": "Illustrative mock, not as-built",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "SourceRef",
+     "displayValue": "Seagirt what-if mock v1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "SuperDNA_PowerNetwork",
+     "displayName": "DemandkW",
+     "displayValue": "12.000",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "3NcseygkfFVe$rA3uy8GS3",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "HM-1 High-mast light HM-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "GlobalId",
+     "displayValue": "1A8klcrVn3uwi$P7cGmJZS",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "1YjGp2OfP3DgNOWQN98_jt, 1A8klcrVn3uwi$P7cGmJZS",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "1YjGp2OfP3DgNOWQN98_jt, 1A8klcrVn3uwi$P7cGmJZS",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "3NcseygkfFVe$rA3uy8GS3",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "HM-1 High-mast light HM-1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "GlobalId",
+     "displayValue": "03GC6eKSPBNgMXVX5FIduS",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "Name",
+     "displayValue": "",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "2u2$ACbDb3FBOKTQ2Xz5zr, 03GC6eKSPBNgMXVX5FIduS",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Port 2",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "03GC6eKSPBNgMXVX5FIduS, 2u2$ACbDb3FBOKTQ2Xz5zr",
+     "hidden": false
+    }
+   ]
+  },
+  {
+   "dbId": 224,
+   "name": "IfcElementAssembly::USS-4 Unit substation (Yard lighting East)",
+   "externalId": "MGdwRmxHdlZYNTd1JHA4UU9vRHdXSQ==",
+   "properties": [
+    {
+     "displayCategory": "",
+     "displayName": "Name",
+     "displayValue": "IfcElementAssembly::USS-4 Unit substation (Yard lighting East)",
+     "hidden": false
+    },
+    {
+     "displayCategory": "",
+     "displayName": "Component Name",
+     "displayValue": "USS-4 Unit substation (Yard lighting East)",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "GlobalId",
+     "displayValue": "0gpFlGvVX57u$p8QOoDwWI",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "ObjectType",
+     "displayValue": "UNIT_SUBSTATION",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "Tag",
+     "displayValue": "USS-4",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "PredefinedType",
+     "displayValue": "USERDEFINED",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcClass",
+     "displayValue": "IfcElementAssembly",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSpatialContainer GUID",
+     "displayValue": "1slDgCd1L1$uBj8Xmnq$k2",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcSpatialContainer",
+     "displayValue": "Seagirt Marine Terminal",
+     "hidden": false
+    }
+   ]
+  },
+  {
+   "dbId": 425,
+   "name": "IfcBuildingElementProxy::R2 reefer rack row 1",
+   "externalId": "MTdtbVkwOEs5MklSVElzVnlNUFpGSQ==",
+   "properties": [
+    {
+     "displayCategory": "",
+     "displayName": "Name",
+     "displayValue": "IfcBuildingElementProxy::R2 reefer rack row 1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "",
+     "displayName": "Component Name",
+     "displayValue": "R2 reefer rack row 1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "",
+     "displayName": "Appearance",
+     "displayValue": "Reefer rack structure",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "GlobalId",
+     "displayValue": "17mmY08K92IRTIsVyMPZFI",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "Tag",
+     "displayValue": "R2-RACK1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "PredefinedType",
+     "displayValue": "ELEMENT",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcClass",
+     "displayValue": "IfcBuildingElementProxy",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcDecomposesGUID",
+     "displayValue": "210BgF2z16JOQzv9Sj0pci",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcDecomposes",
+     "displayValue": "Reefer racks East (240 plugs)",
+     "hidden": false
+    }
+   ]
+  },
+  {
+   "dbId": 25,
+   "name": "IfcDistributionPort",
+   "externalId": "MzNwbUxuekI5OHdBZjFvTE1CeThlVA==",
+   "properties": [
+    {
+     "displayCategory": "",
+     "displayName": "Name",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "GlobalId",
+     "displayValue": "33pmLnzB98wAf1oLMBy8eT",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "1uavg1xd903hyQM6blGfir, 33pmLnzB98wAf1oLMBy8eT",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "33pmLnzB98wAf1oLMBy8eT, 1uavg1xd903hyQM6blGfir",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement ContainedIn IfcGUID",
+     "displayValue": "0$gFrz3o5F8RiicmXPz1on",
+     "hidden": false
+    },
+    {
+     "displayCategory": "IFC Attributes",
+     "displayName": "IfcElement ContainedIn Name",
+     "displayValue": "GATE Truck gate complex LV panel",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Contained In",
+     "displayName": "IfcElement HasPorts IfcGUID",
+     "displayValue": "33pmLnzB98wAf1oLMBy8eT",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Contained In",
+     "displayName": "GlobalId",
+     "displayValue": "0$gFrz3o5F8RiicmXPz1on",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Contained In",
+     "displayName": "Tag",
+     "displayValue": "GATE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Contained In",
+     "displayName": "PredefinedType",
+     "displayValue": "DISTRIBUTIONBOARD",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Contained In",
+     "displayName": "IfcClass",
+     "displayValue": "IfcElectricDistributionBoard",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Contained In",
+     "displayName": "IfcPropertySetList",
+     "displayValue": "\"SuperDNA_PowerNetwork\"",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Contained In",
+     "displayName": "Name",
+     "displayValue": "GATE Truck gate complex LV panel",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Connencted To",
+     "displayName": "GlobalId",
+     "displayValue": "1uavg1xd903hyQM6blGfir, 33pmLnzB98wAf1oLMBy8eT",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Connencted To",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK, SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Connencted To",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE, CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Connencted To",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL, ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Connencted To",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort, IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Connencted To",
+     "displayName": "Name",
+     "displayValue": ", ",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Connencted To",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "33pmLnzB98wAf1oLMBy8eT, 1uavg1xd903hyQM6blGfir, 33pmLnzB98wAf1oLMBy8eT, 1uavg1xd903hyQM6blGfir",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Connencted To",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "33pmLnzB98wAf1oLMBy8eT, 1uavg1xd903hyQM6blGfir, 1uavg1xd903hyQM6blGfir, 33pmLnzB98wAf1oLMBy8eT",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Connencted From",
+     "displayName": "GlobalId",
+     "displayValue": "33pmLnzB98wAf1oLMBy8eT, 1uavg1xd903hyQM6blGfir",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Connencted From",
+     "displayName": "FlowDirection",
+     "displayValue": "SOURCEANDSINK, SOURCEANDSINK",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Connencted From",
+     "displayName": "PredefinedType",
+     "displayValue": "CABLE, CABLE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Connencted From",
+     "displayName": "SystemType",
+     "displayValue": "ELECTRICAL, ELECTRICAL",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Connencted From",
+     "displayName": "IfcClass",
+     "displayValue": "IfcDistributionPort, IfcDistributionPort",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Connencted From",
+     "displayName": "Name",
+     "displayValue": ", ",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Connencted From",
+     "displayName": "IfcPort ConnectedTo IfcGUID",
+     "displayValue": "1uavg1xd903hyQM6blGfir, 33pmLnzB98wAf1oLMBy8eT, 33pmLnzB98wAf1oLMBy8eT, 1uavg1xd903hyQM6blGfir",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Connencted From",
+     "displayName": "IfcPort ConnectedFrom IfcGUID",
+     "displayValue": "33pmLnzB98wAf1oLMBy8eT, 1uavg1xd903hyQM6blGfir, 33pmLnzB98wAf1oLMBy8eT, 1uavg1xd903hyQM6blGfir",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Contained In - SuperDNA_PowerNetwork",
+     "displayName": "GlobalId",
+     "displayValue": "1IgHcW$yvBF9lT1gq2S$x6",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Contained In - SuperDNA_PowerNetwork",
+     "displayName": "NetworkID",
+     "displayValue": "GATE",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Contained In - SuperDNA_PowerNetwork",
+     "displayName": "NetworkRole",
+     "displayValue": "Load",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Contained In - SuperDNA_PowerNetwork",
+     "displayName": "VoltageLevel",
+     "displayValue": "480 V",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Contained In - SuperDNA_PowerNetwork",
+     "displayName": "DataStatus",
+     "displayValue": "Illustrative mock, not as-built",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Contained In - SuperDNA_PowerNetwork",
+     "displayName": "SourceRef",
+     "displayValue": "Seagirt what-if mock v1",
+     "hidden": false
+    },
+    {
+     "displayCategory": "Contained In - SuperDNA_PowerNetwork",
+     "displayName": "DemandkW",
+     "displayValue": "220.000",
+     "hidden": false
+    }
+   ]
+  },
+  {
+   "dbId": 106,
+   "name": "IfcSweptDiskSolid::13.8 kV",
+   "externalId": "NjQwMDJCODBCNkE3Qzc2NzI4OTk3QjY5NTdGNTA2REIxQTlEM0RDNA==",
+   "properties": [
+    {
+     "displayCategory": "",
+     "displayName": "Name",
+     "displayValue": "IfcSweptDiskSolid::13.8 kV",
+     "hidden": false
+    },
+    {
+     "displayCategory": "",
+     "displayName": "Appearance",
+     "displayValue": "13.8 kV",
+     "hidden": false
+    }
+   ]
+  },
+  {
+   "dbId": 5,
+   "name": "IfcElectricDistributionBoard",
+   "externalId": "TUNSblJuSjZNMjgxUmpoU2FXbGpiVmhRZWpGdmJnPT1TV1pqUld4bFkzUnlhV05FYVhOMGNtbGlkWFJwYjI1Q2IyRnlaQT09",
+   "properties": [
+    {
+     "displayCategory": "",
+     "displayName": "Name",
+     "displayValue": "IfcElectricDistributionBoard",
+     "hidden": false
+    }
+   ]
+  }
+ ]
+}

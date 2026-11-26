@@ -3,6 +3,8 @@ import { createMessageSignsApi } from './server/messageSigns.mjs';
 import { createDataConnectApi } from './server/dataConnect.mjs';
 import { createLiveDcReadApi } from './server/liveDc/liveReadApi.mjs';
 import { createConstructionApi } from './server/construction/api.mjs';
+import { createApsApi } from './server/aps/api.mjs';
+import { createIfcSpatialApi } from './server/ifcSpatial/api.mjs';
 
 // Before any plugin reads process.env: Vite only exposes VITE_-prefixed variables, and the
 // server-side credentials are deliberately not prefixed, so nothing else would load them. The EC2 web
@@ -109,6 +111,21 @@ const constructionApi = () => {
   };
 };
 
+// Autodesk Platform Services sign-in (three-legged OAuth, PKCE) and the Forma project lookup,
+// same-origin under /api/aps/*. APS_CLIENT_ID / APS_CLIENT_SECRET / APS_CALLBACK_URL are not
+// VITE_-prefixed and the tokens live in this process, so neither ever reaches the browser bundle.
+// Unconfigured, every route answers with what is missing and the rest of the app is unaffected.
+// The IFC Spatial Twin's routes (/api/ifc-spatial/*) use the same APS instance, so the same session
+// downloads the IFC files; converted geometry is cached under .data/ifc-spatial/ (git-ignored).
+const apsApi = aps => {
+  const api = { middleware: (req, res, next) => aps.middleware(req, res, () => ifcSpatial.middleware(req, res, next)) };
+  const ifcSpatial = createIfcSpatialApi({ aps });
+  return { name: 'aps-oauth-api',
+    configureServer(server) { server.middlewares.use(api.middleware); },
+    configurePreviewServer(server) { server.middlewares.use(api.middleware); },
+  };
+};
+
 // CCTV snapshot proxy — pipes DIVAS JPEG bytes through same-origin to avoid CORS issues.
 const snapshotApi = () => {
   const api = createSnapshotApi();
@@ -140,7 +157,7 @@ export default defineConfig({
   // Upstream's wiring (liveEvents, askApi, historicalDc) plus this branch's constructionApi.
   // The incoming side still called liveEventsApi(liveDc) and dataConnectApi() with no argument,
   // which predates the shared clients created above; those signatures are the ones to keep.
-  plugins: [cesium({ cesiumBuildRootPath, cesiumBuildPath: join(cesiumBuildRootPath, "Cesium") }), liveEventsApi(liveEvents), askApi(liveEvents, liveDc, historicalDc), snapshotApi(), messageSignsApi(), dataConnectApi(historicalDc), liveDcReadApi(liveDc), constructionApi()],
+  plugins: [cesium({ cesiumBuildRootPath, cesiumBuildPath: join(cesiumBuildRootPath, "Cesium") }), liveEventsApi(liveEvents), askApi(liveEvents, liveDc, historicalDc), snapshotApi(), messageSignsApi(), dataConnectApi(historicalDc), liveDcReadApi(liveDc), constructionApi(), apsApi(createApsApi())],
   // Port 5188 (not the default 5180) keeps this NTTA worktree isolated from a sibling session's
   // dev server sharing localhost. Disable auto-open under headless e2e.
   server: { port: 5188, open: false, strictPort: true,

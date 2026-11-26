@@ -14,7 +14,10 @@
         'i595': ['Loading I-595 Digital Twin', 'Preparing the corridor map\u2026'],
         'construction-integration': ['Loading Construction Integration Demo', 'Preparing the integration workspace\u2026'],
       };
-      var booting = bootTitles[new URLSearchParams(location.search).get('demo')];
+      var bootParams = new URLSearchParams(location.search);
+      var booting = bootParams.get('demo') === 'seagirt' && bootParams.get('screen') === 'ifc-spatial'
+        ? ['Loading IFC Spatial Twin', 'Preparing the map and IFC model\u2026']
+        : bootTitles[bootParams.get('demo')];
       if (booting) {
         document.documentElement.classList.add('i595-booting');
         document.addEventListener('DOMContentLoaded', function () {

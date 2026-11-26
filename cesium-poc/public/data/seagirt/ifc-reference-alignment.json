@@ -1,0 +1,21 @@
+{
+  "name": "Seagirt IFC reference alignment",
+  "appliesTo": ["seagirt_power_network.ifc", "seagirt_power_network_display.ifc"],
+  "status": "USER_CALIBRATED",
+  "why": "The IFC's IfcMapConversion places the model as if the image it was drawn on were north-up, so the quay comes out east-west and offshore. That image is rotated about 38 degrees. This alignment replaces the file's georeferencing with a fit to the real terminal; it is a calibration, not authoritative georeferencing.",
+  "method": "Similarity transform (rotation, uniform scale, translation), computed in a local WGS84 east/north frame. IFC model metres map to pixels of the reference image the model was drawn from; two quay corners in that image are tied to their OpenStreetMap coordinates.",
+  "ifcFromReferenceImage": {
+    "relation": "x = (px - 974) * 5/3, y = -(py - 456) * 5/3 (metres; origin = main substation point)",
+    "evidence": "Fitted to 29 equipment positions in the image (the what-if artifact's node table): residuals 0.6 m in x and up to 4.4 m in y, except elements whose geometry is offset from their symbol (main transformers, crane structures)."
+  },
+  "referenceImage": "terminal.jpg (1417 x 876 px) from the 'Seagirt Terminal Power What-If' artifact: Cesium ion view, Google imagery",
+  "controlPoints": [
+    { "name": "West quay corner (angled west edge meets the berth face)", "imagePx": [433, 758], "lonLat": [-76.552731, 39.257649], "source": "OpenStreetMap way/87334858 (Seagirt Marine Terminal outline), vertex" },
+    { "name": "Southeast quay corner at Colgate Creek", "imagePx": [1258, 755], "lonLat": [-76.540514, 39.250385], "source": "OpenStreetMap way/87334858 (Seagirt Marine Terminal outline), vertex" }
+  ],
+  "check": "The whole OpenStreetMap terminal outline and road network, drawn onto the reference image through this transform, follow the quay, the Colgate Creek edge, the north boundary and the container-yard lanes.",
+  "result": { "metresPerImagePx": 1.609084, "rotationDeg": -37.61699 },
+  "placement": { "mode": "USER_CALIBRATED", "lon": -76.54130548, "lat": 39.2563301, "heightOffset": 0, "headingDeg": 37.61699, "scale": 0.96545 },
+  "accuracy": "About 5 to 10 m: OpenStreetMap outline accuracy and picking the corners to about 2 px. Scale 0.96545 because the model was built from the image's scale bar (60 px per 100 m); the terminal measures 62.1 px per 100 m in that image.",
+  "doesNotChange": "The electrical twin's assets, graph and positions; the IFC file; the converted geometry."
+}

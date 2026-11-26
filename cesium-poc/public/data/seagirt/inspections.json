@@ -1,0 +1,115 @@
+{
+  "provenance": "SYNTHETIC_DEMO",
+  "notice": "Illustrative demonstration data. Not Seagirt Marine Terminal equipment, connectivity or records.",
+  "generatedBy": "tools/build-seagirt-data.mjs",
+  "records": [
+    {
+      "assetId": "T1",
+      "date": "2026-03-18",
+      "type": "Annual transformer inspection",
+      "result": "SATISFACTORY_WITH_ACTIONS",
+      "notes": "Oil sample within limits; minor gasket weep noted for monitoring.",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "assetId": "T1",
+      "date": "2025-03-11",
+      "type": "Annual transformer inspection",
+      "result": "SATISFACTORY",
+      "notes": "No findings.",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "assetId": "T1",
+      "date": "2024-09-02",
+      "type": "Corrective maintenance",
+      "result": "COMPLETED",
+      "notes": "Cooling fan bearing replaced.",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "assetId": "T2",
+      "date": "2026-06-02",
+      "type": "Annual transformer inspection",
+      "result": "SATISFACTORY",
+      "notes": "No findings.",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "assetId": "T3",
+      "date": "2025-10-07",
+      "type": "Annual transformer inspection",
+      "result": "UNSATISFACTORY",
+      "notes": "Dissolved-gas analysis elevated (acetylene trace). Follow-up sampling recommended.",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "assetId": "T3",
+      "date": "2024-10-15",
+      "type": "Annual transformer inspection",
+      "result": "SATISFACTORY_WITH_ACTIONS",
+      "notes": "Bushing cleaning; tap changer counter checked.",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "assetId": "S1",
+      "date": "2026-04-21",
+      "type": "Switchgear thermography and maintenance",
+      "result": "SATISFACTORY_WITH_ACTIONS",
+      "notes": "Hot spot on CB2 line-side connection re-torqued; rescan clean.",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "assetId": "S1",
+      "date": "2025-04-17",
+      "type": "Switchgear thermography",
+      "result": "SATISFACTORY",
+      "notes": "No hot spots.",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "assetId": "S1",
+      "date": "2024-04-30",
+      "type": "Breaker trip testing (CB1–CB3)",
+      "result": "COMPLETED",
+      "notes": "All breakers tripped within tolerance.",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "assetId": "S2",
+      "date": "2026-07-09",
+      "type": "Switchgear thermography and maintenance",
+      "result": "SATISFACTORY",
+      "notes": "TB1 interlock verified (normally open).",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "assetId": "S3",
+      "date": "2026-02-14",
+      "type": "Switchgear thermography",
+      "result": "SATISFACTORY_WITH_ACTIONS",
+      "notes": "Enclosure heater fault logged; repair scheduled.",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "assetId": "SS1",
+      "date": "2026-05-12",
+      "type": "Substation annual inspection",
+      "result": "SATISFACTORY",
+      "notes": "No findings.",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    }
+  ]
+}

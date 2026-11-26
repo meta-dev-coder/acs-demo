@@ -87,6 +87,34 @@ export function cameraPivot(viewer) {
 }
 
 /**
+ * Turn the view around the point it is already looking at: borrow the pivot's reference frame,
+ * read the current bearing and tilt inside it, apply `next`, then hand the frame straight back.
+ * @param {(view: {headingDeg: number, pitchDeg: number}) => {headingDeg: number, pitchDeg: number}} next
+ */
+export function orbitAroundPivot(viewer, next) {
+  const camera = viewer.camera;
+  camera.cancelFlight();
+  const pivot = cameraPivot(viewer);
+  const range = Cartesian3.distance(camera.positionWC, pivot);
+  const transform = Transforms.eastNorthUpToFixedFrame(pivot);
+  try {
+    // Inside the frame, heading and pitch are read relative to the pivot rather than the globe.
+    camera.lookAtTransform(transform);
+    const view = next({ headingDeg: CMath.toDegrees(camera.heading), pitchDeg: CMath.toDegrees(camera.pitch) });
+    camera.lookAtTransform(transform, new HeadingPitchRange(
+      CMath.toRadians(normalizeHeadingDeg(view.headingDeg)), CMath.toRadians(clampPitchDeg(view.pitchDeg)), range));
+  } finally {
+    // Always hand the frame back: a camera left on a transform cannot be panned or orbited.
+    camera.lookAtTransform(Matrix4.IDENTITY);
+  }
+  viewer.scene.requestRender();
+}
+
+/** One orbit step around the point in view: a bearing change, a tilt change, or both. */
+export const orbitView = (viewer, headingDeltaDeg, pitchDeltaDeg) => orbitAroundPivot(viewer, ({ headingDeg, pitchDeg }) =>
+  ({ headingDeg: headingDeg + headingDeltaDeg, pitchDeg: pitchDeg + pitchDeltaDeg }));
+
+/**
  * @param {HTMLElement} container
  * @param {import('cesium').Viewer} viewer
  * @param {{zoom?: (factor: number) => void}} [hooks]  reuses the map's own proportional zoom
@@ -165,31 +193,7 @@ export function installMapNavigationControls(container, viewer, { zoom, onStreet
   unsubscribeTheme = themeMode?.subscribe?.(renderTheme) ?? null;
 
   const camera = viewer.camera;
-  /**
-   * Turn the view around the point it is already looking at: borrow the pivot's reference frame,
-   * read the current bearing and tilt inside it, apply `next`, then hand the frame straight back.
-   * @param {(view: {headingDeg: number, pitchDeg: number}) => {headingDeg: number, pitchDeg: number}} next
-   */
-  function orbitAroundPivot(next) {
-    camera.cancelFlight();
-    const pivot = cameraPivot(viewer);
-    const range = Cartesian3.distance(camera.positionWC, pivot);
-    const transform = Transforms.eastNorthUpToFixedFrame(pivot);
-    try {
-      // Inside the frame, heading and pitch are read relative to the pivot rather than the globe.
-      camera.lookAtTransform(transform);
-      const view = next({ headingDeg: CMath.toDegrees(camera.heading), pitchDeg: CMath.toDegrees(camera.pitch) });
-      camera.lookAtTransform(transform, new HeadingPitchRange(
-        CMath.toRadians(normalizeHeadingDeg(view.headingDeg)), CMath.toRadians(clampPitchDeg(view.pitchDeg)), range));
-    } finally {
-      // Always hand the frame back: a camera left on a transform cannot be panned or orbited.
-      camera.lookAtTransform(Matrix4.IDENTITY);
-    }
-    viewer.scene.requestRender();
-  }
-
-  const orbit = (headingDeltaDeg, pitchDeltaDeg) => orbitAroundPivot(({ headingDeg, pitchDeg }) =>
-    ({ headingDeg: headingDeg + headingDeltaDeg, pitchDeg: pitchDeg + pitchDeltaDeg }));
+  const orbit = (headingDeltaDeg, pitchDeltaDeg) => orbitView(viewer, headingDeltaDeg, pitchDeltaDeg);
 
   const actions = {
     'zoom-in': () => zoom?.(0.75),

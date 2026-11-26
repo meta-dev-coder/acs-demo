@@ -10,7 +10,7 @@
  *   B  the proposed new garage: capacity, floors, footprint size, and the terminals it may serve
  *   C  existing surface lots, the spaces added to each, and the terminals they may serve
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { PROPOSED_SCOPE } from '../cruise/cruiseAssumptions.js';
 import { CHANGE, CHANGE_LABEL, CHECK, beforeAfter, checkExpansion, checkNewGarage, checkSurfaceLot } from '../cruise/designCheck.js';
 import { capacityFeasibility } from '../scenarios/garagePlacement.js';
@@ -18,13 +18,22 @@ import { durationLabel } from '../cruise/demandCapacity.js';
 
 const fmt = v => (Number.isFinite(v) ? Math.round(v).toLocaleString('en-US') : '—');
 
-/** A whole-number input with − / + buttons. */
+/**
+ * A whole-number input with − / + buttons. While it has focus it keeps what is typed (it can be
+ * cleared and retyped); every complete number is applied as it is typed. Focusing it selects the
+ * number, so typing replaces it.
+ */
 function Stepper({ value, onChange, step = 50, min = 0, max = 20000, label }) {
-  const set = v => onChange(Math.max(min, Math.min(max, Math.round(Number(v) || 0))));
+  const [text, setText] = useState(null);   // null: not being typed in; show `value`
+  const clamp = v => Math.max(min, Math.min(max, Math.round(Number(v) || 0)));
+  const set = v => onChange(clamp(v));
   return (
     <span className="de-stepper">
       <button type="button" aria-label={`Decrease ${label}`} onClick={() => set(value - step)}>−</button>
-      <input type="number" value={value} min={min} max={max} aria-label={label} onChange={e => set(e.target.value)} />
+      <input type="number" value={text ?? value} min={min} max={max} aria-label={label}
+        onFocus={e => { setText(String(value)); e.target.select(); }}
+        onChange={e => { setText(e.target.value); if (e.target.value !== '') set(e.target.value); }}
+        onBlur={() => { if (text === '') set(0); setText(null); }} />
       <button type="button" aria-label={`Increase ${label}`} onClick={() => set(value + step)}>+</button>
     </span>
   );

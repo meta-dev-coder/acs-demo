@@ -11,6 +11,14 @@ import { loadConfig } from './config.mjs';
 import { API_BASE } from './api.mjs';
 import { createReadApiHandlers } from './readApiHandlers.mjs';
 import { createConstructionApi } from './construction/api.mjs';
+import { createApsApi } from './aps/api.mjs';
+import { createIfcSpatialApi } from './ifcSpatial/api.mjs';
+
+/** The Autodesk sign-in and the IFC Spatial Twin routes that use its session. */
+function apsHandlers({ env, logger }) {
+  const aps = createApsApi({ env, logger });
+  return [aps, createIfcSpatialApi({ aps, logger })];
+}
 
 export function createApiServer({ config = loadConfig(), env = process.env, logger = console,
   /**
@@ -20,10 +28,12 @@ export function createApiServer({ config = loadConfig(), env = process.env, logg
    * live-dc host's handler list, and this project has no place on that host — it would open a
    * SQLite file there and needs a newer Node than that host is documented to carry.
    */
-  construction = true } = {}) {
+  construction = true,
+  /** The Autodesk sign-in (/api/aps/*). Like construction, kept off the EC2 handler list. */
+  aps = true } = {}) {
   const { handlers: readHandlers, stop: stopRead } = createReadApiHandlers({ config, env, logger });
   const constructionApi = construction ? createConstructionApi({ logger }) : null;
-  const handlers = constructionApi ? [...readHandlers, constructionApi] : readHandlers;
+  const handlers = [...readHandlers, ...(constructionApi ? [constructionApi] : []), ...(aps ? apsHandlers({ env, logger }) : [])];
   /*
    * Phase 8B: the OpenProject background poller.
    *

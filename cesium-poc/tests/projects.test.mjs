@@ -12,7 +12,7 @@ import test from 'node:test';
 import { LEGACY_PAGE, PROJECTS, PROJECT_PARAM, projectFor, urlForProject } from '../src/projects.js';
 
 test('both projects are registered, with the ids the brief names', () => {
-  assert.deepEqual(PROJECTS.map(project => project.id), ['i595', 'construction-integration']);
+  assert.deepEqual(PROJECTS.map(project => project.id), ['i595', 'construction-integration', 'seagirt']);
   assert.equal(PROJECTS[1].label, 'Construction Integration Demo');
   assert.equal(PROJECTS[1].description,
     'SYNCHRO 4D integration with Primavera P6, ACC/Revit, and SAP.');

@@ -1,0 +1,1157 @@
+{
+  "provenance": "SYNTHETIC_DEMO",
+  "notice": "Illustrative demonstration data. Not Seagirt Marine Terminal equipment, connectivity or records.",
+  "generatedBy": "tools/build-seagirt-data.mjs",
+  "assets": [
+    {
+      "id": "MS1",
+      "name": "Main Supply MS1",
+      "assetType": "UTILITY_SUPPLY",
+      "projectId": "seagirt",
+      "parentAssetId": null,
+      "location": {
+        "longitude": -76.5498,
+        "latitude": 39.2635,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "positionNote": "Illustrative position for the demonstration — not a surveyed location of real equipment."
+      },
+      "rating": null,
+      "voltage": {
+        "primary": {
+          "value": 34.5,
+          "unit": "kV"
+        },
+        "secondary": null
+      },
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "MAJOR",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED",
+      "description": "Utility point of connection (illustrative)."
+    },
+    {
+      "id": "SS1",
+      "name": "Substation SS1",
+      "assetType": "SUBSTATION",
+      "projectId": "seagirt",
+      "parentAssetId": "MS1",
+      "location": {
+        "longitude": -76.549,
+        "latitude": 39.2614,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "positionNote": "Illustrative position for the demonstration — not a surveyed location of real equipment."
+      },
+      "rating": {
+        "value": 30,
+        "unit": "MVA"
+      },
+      "voltage": {
+        "primary": {
+          "value": 34.5,
+          "unit": "kV"
+        },
+        "secondary": {
+          "value": 13.8,
+          "unit": "kV"
+        }
+      },
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": "2026-05-12",
+      "nextInspectionDate": "2027-05-12",
+      "mapTier": "MAJOR",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "id": "T1",
+      "name": "Transformer T1",
+      "assetType": "TRANSFORMER",
+      "projectId": "seagirt",
+      "parentAssetId": "SS1",
+      "location": {
+        "longitude": -76.5475754,
+        "latitude": 39.2564204,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "positionNote": "Illustrative position for the demonstration — not a surveyed location of real equipment."
+      },
+      "rating": {
+        "value": 5,
+        "unit": "MVA"
+      },
+      "voltage": {
+        "primary": {
+          "value": 13.8,
+          "unit": "kV"
+        },
+        "secondary": {
+          "value": 4.16,
+          "unit": "kV"
+        }
+      },
+      "operationalStatus": "IN_SERVICE",
+      "condition": "FAIR",
+      "lastInspectionDate": "2026-03-18",
+      "nextInspectionDate": "2027-03-18",
+      "mapTier": "MAJOR",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "id": "T2",
+      "name": "Transformer T2",
+      "assetType": "TRANSFORMER",
+      "projectId": "seagirt",
+      "parentAssetId": "SS1",
+      "location": {
+        "longitude": -76.5456108,
+        "latitude": 39.255255,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "positionNote": "Illustrative position for the demonstration — not a surveyed location of real equipment."
+      },
+      "rating": {
+        "value": 5,
+        "unit": "MVA"
+      },
+      "voltage": {
+        "primary": {
+          "value": 13.8,
+          "unit": "kV"
+        },
+        "secondary": {
+          "value": 4.16,
+          "unit": "kV"
+        }
+      },
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": "2026-06-02",
+      "nextInspectionDate": "2027-06-02",
+      "mapTier": "MAJOR",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "id": "T3",
+      "name": "Transformer T3",
+      "assetType": "TRANSFORMER",
+      "projectId": "seagirt",
+      "parentAssetId": "SS1",
+      "location": {
+        "longitude": -76.5436462,
+        "latitude": 39.2540895,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "positionNote": "Illustrative position for the demonstration — not a surveyed location of real equipment."
+      },
+      "rating": {
+        "value": 3.75,
+        "unit": "MVA"
+      },
+      "voltage": {
+        "primary": {
+          "value": 13.8,
+          "unit": "kV"
+        },
+        "secondary": {
+          "value": 4.16,
+          "unit": "kV"
+        }
+      },
+      "operationalStatus": "IN_SERVICE",
+      "condition": "POOR",
+      "lastInspectionDate": "2025-10-07",
+      "nextInspectionDate": "2026-10-07",
+      "mapTier": "MAJOR",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED",
+      "conditionNote": "Synthetic: elevated dissolved-gas readings at last inspection; reinspection overdue."
+    },
+    {
+      "id": "S1",
+      "name": "Switchgear S1",
+      "assetType": "SWITCHGEAR",
+      "projectId": "seagirt",
+      "parentAssetId": "T1",
+      "location": {
+        "longitude": -76.5478226,
+        "latitude": 39.2561705,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "positionNote": "Illustrative position for the demonstration — not a surveyed location of real equipment."
+      },
+      "rating": null,
+      "voltage": {
+        "primary": {
+          "value": 4.16,
+          "unit": "kV"
+        },
+        "secondary": null
+      },
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": "2026-04-21",
+      "nextInspectionDate": "2027-04-21",
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "id": "S2",
+      "name": "Switchgear S2",
+      "assetType": "SWITCHGEAR",
+      "projectId": "seagirt",
+      "parentAssetId": "T2",
+      "location": {
+        "longitude": -76.545858,
+        "latitude": 39.2550051,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "positionNote": "Illustrative position for the demonstration — not a surveyed location of real equipment."
+      },
+      "rating": null,
+      "voltage": {
+        "primary": {
+          "value": 4.16,
+          "unit": "kV"
+        },
+        "secondary": null
+      },
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": "2026-07-09",
+      "nextInspectionDate": "2027-07-09",
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "id": "S3",
+      "name": "Switchgear S3",
+      "assetType": "SWITCHGEAR",
+      "projectId": "seagirt",
+      "parentAssetId": "T3",
+      "location": {
+        "longitude": -76.5438934,
+        "latitude": 39.2538397,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "positionNote": "Illustrative position for the demonstration — not a surveyed location of real equipment."
+      },
+      "rating": null,
+      "voltage": {
+        "primary": {
+          "value": 4.16,
+          "unit": "kV"
+        },
+        "secondary": null
+      },
+      "operationalStatus": "IN_SERVICE",
+      "condition": "FAIR",
+      "lastInspectionDate": "2026-02-14",
+      "nextInspectionDate": "2027-02-14",
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "id": "CB1",
+      "name": "Circuit Breaker CB1",
+      "assetType": "CIRCUIT_BREAKER",
+      "projectId": "seagirt",
+      "parentAssetId": "S1",
+      "location": {
+        "longitude": null,
+        "latitude": null,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": "S1-1",
+        "containerAssetId": "S1",
+        "cubicle": 1,
+        "positionNote": "Inside S1, cubicle 1 — no separate map position."
+      },
+      "rating": {
+        "value": 1200,
+        "unit": "A"
+      },
+      "voltage": null,
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED",
+      "normalState": "CLOSED"
+    },
+    {
+      "id": "CB2",
+      "name": "Circuit Breaker CB2",
+      "assetType": "CIRCUIT_BREAKER",
+      "projectId": "seagirt",
+      "parentAssetId": "S1",
+      "location": {
+        "longitude": null,
+        "latitude": null,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": "S1-2",
+        "containerAssetId": "S1",
+        "cubicle": 2,
+        "positionNote": "Inside S1, cubicle 2 — no separate map position."
+      },
+      "rating": {
+        "value": 1200,
+        "unit": "A"
+      },
+      "voltage": null,
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED",
+      "normalState": "CLOSED"
+    },
+    {
+      "id": "CB3",
+      "name": "Circuit Breaker CB3",
+      "assetType": "CIRCUIT_BREAKER",
+      "projectId": "seagirt",
+      "parentAssetId": "S1",
+      "location": {
+        "longitude": null,
+        "latitude": null,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": "S1-3",
+        "containerAssetId": "S1",
+        "cubicle": 3,
+        "positionNote": "Inside S1, cubicle 3 — no separate map position."
+      },
+      "rating": {
+        "value": 1200,
+        "unit": "A"
+      },
+      "voltage": null,
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED",
+      "normalState": "CLOSED"
+    },
+    {
+      "id": "CB4",
+      "name": "Circuit Breaker CB4",
+      "assetType": "CIRCUIT_BREAKER",
+      "projectId": "seagirt",
+      "parentAssetId": "S2",
+      "location": {
+        "longitude": null,
+        "latitude": null,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": "S2-1",
+        "containerAssetId": "S2",
+        "cubicle": 1,
+        "positionNote": "Inside S2, cubicle 1 — no separate map position."
+      },
+      "rating": {
+        "value": 1200,
+        "unit": "A"
+      },
+      "voltage": null,
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED",
+      "normalState": "CLOSED"
+    },
+    {
+      "id": "CB5",
+      "name": "Circuit Breaker CB5",
+      "assetType": "CIRCUIT_BREAKER",
+      "projectId": "seagirt",
+      "parentAssetId": "S2",
+      "location": {
+        "longitude": null,
+        "latitude": null,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": "S2-2",
+        "containerAssetId": "S2",
+        "cubicle": 2,
+        "positionNote": "Inside S2, cubicle 2 — no separate map position."
+      },
+      "rating": {
+        "value": 1200,
+        "unit": "A"
+      },
+      "voltage": null,
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED",
+      "normalState": "CLOSED"
+    },
+    {
+      "id": "CB6",
+      "name": "Circuit Breaker CB6",
+      "assetType": "CIRCUIT_BREAKER",
+      "projectId": "seagirt",
+      "parentAssetId": "S2",
+      "location": {
+        "longitude": null,
+        "latitude": null,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": "S2-3",
+        "containerAssetId": "S2",
+        "cubicle": 3,
+        "positionNote": "Inside S2, cubicle 3 — no separate map position."
+      },
+      "rating": {
+        "value": 1200,
+        "unit": "A"
+      },
+      "voltage": null,
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED",
+      "normalState": "CLOSED"
+    },
+    {
+      "id": "CB7",
+      "name": "Circuit Breaker CB7",
+      "assetType": "CIRCUIT_BREAKER",
+      "projectId": "seagirt",
+      "parentAssetId": "S3",
+      "location": {
+        "longitude": null,
+        "latitude": null,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": "S3-1",
+        "containerAssetId": "S3",
+        "cubicle": 1,
+        "positionNote": "Inside S3, cubicle 1 — no separate map position."
+      },
+      "rating": {
+        "value": 1200,
+        "unit": "A"
+      },
+      "voltage": null,
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED",
+      "normalState": "CLOSED"
+    },
+    {
+      "id": "CB8",
+      "name": "Circuit Breaker CB8",
+      "assetType": "CIRCUIT_BREAKER",
+      "projectId": "seagirt",
+      "parentAssetId": "S3",
+      "location": {
+        "longitude": null,
+        "latitude": null,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": "S3-2",
+        "containerAssetId": "S3",
+        "cubicle": 2,
+        "positionNote": "Inside S3, cubicle 2 — no separate map position."
+      },
+      "rating": {
+        "value": 1200,
+        "unit": "A"
+      },
+      "voltage": null,
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED",
+      "normalState": "CLOSED"
+    },
+    {
+      "id": "TB1",
+      "name": "Tie Breaker TB1",
+      "assetType": "CIRCUIT_BREAKER",
+      "projectId": "seagirt",
+      "parentAssetId": "S2",
+      "location": {
+        "longitude": null,
+        "latitude": null,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": "S2-4",
+        "containerAssetId": "S2",
+        "cubicle": 4,
+        "positionNote": "Inside S2, cubicle 4 — no separate map position."
+      },
+      "rating": {
+        "value": 1200,
+        "unit": "A"
+      },
+      "voltage": null,
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED",
+      "normalState": "OPEN",
+      "description": "Normally-open tie to Crane C2 (alternate supply from the T2 branch)."
+    },
+    {
+      "id": "F1",
+      "name": "Feeder F1",
+      "assetType": "FEEDER",
+      "projectId": "seagirt",
+      "parentAssetId": "CB1",
+      "location": {
+        "longitude": null,
+        "latitude": null,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "containerAssetId": null,
+        "cubicle": null,
+        "positionNote": null
+      },
+      "rating": null,
+      "voltage": {
+        "primary": {
+          "value": 4.16,
+          "unit": "kV"
+        },
+        "secondary": null
+      },
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED",
+      "from": "CB1",
+      "to": "L1",
+      "geometryNote": "No cable route is recorded; drawn schematically."
+    },
+    {
+      "id": "F2",
+      "name": "Feeder F2",
+      "assetType": "FEEDER",
+      "projectId": "seagirt",
+      "parentAssetId": "CB2",
+      "location": {
+        "longitude": null,
+        "latitude": null,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "containerAssetId": null,
+        "cubicle": null,
+        "positionNote": null
+      },
+      "rating": null,
+      "voltage": {
+        "primary": {
+          "value": 4.16,
+          "unit": "kV"
+        },
+        "secondary": null
+      },
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED",
+      "from": "CB2",
+      "to": "C2",
+      "geometryNote": "No cable route is recorded; drawn schematically."
+    },
+    {
+      "id": "F3",
+      "name": "Feeder F3",
+      "assetType": "FEEDER",
+      "projectId": "seagirt",
+      "parentAssetId": "CB3",
+      "location": {
+        "longitude": null,
+        "latitude": null,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "containerAssetId": null,
+        "cubicle": null,
+        "positionNote": null
+      },
+      "rating": null,
+      "voltage": {
+        "primary": {
+          "value": 4.16,
+          "unit": "kV"
+        },
+        "secondary": null
+      },
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED",
+      "from": "CB3",
+      "to": "C1",
+      "geometryNote": "No cable route is recorded; drawn schematically."
+    },
+    {
+      "id": "F4",
+      "name": "Feeder F4",
+      "assetType": "FEEDER",
+      "projectId": "seagirt",
+      "parentAssetId": "CB4",
+      "location": {
+        "longitude": null,
+        "latitude": null,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "containerAssetId": null,
+        "cubicle": null,
+        "positionNote": null
+      },
+      "rating": null,
+      "voltage": {
+        "primary": {
+          "value": 4.16,
+          "unit": "kV"
+        },
+        "secondary": null
+      },
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED",
+      "from": "CB4",
+      "to": "C3",
+      "geometryNote": "No cable route is recorded; drawn schematically."
+    },
+    {
+      "id": "F5",
+      "name": "Feeder F5",
+      "assetType": "FEEDER",
+      "projectId": "seagirt",
+      "parentAssetId": "CB5",
+      "location": {
+        "longitude": null,
+        "latitude": null,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "containerAssetId": null,
+        "cubicle": null,
+        "positionNote": null
+      },
+      "rating": null,
+      "voltage": {
+        "primary": {
+          "value": 4.16,
+          "unit": "kV"
+        },
+        "secondary": null
+      },
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED",
+      "from": "CB5",
+      "to": "C4",
+      "geometryNote": "No cable route is recorded; drawn schematically."
+    },
+    {
+      "id": "F6",
+      "name": "Feeder F6",
+      "assetType": "FEEDER",
+      "projectId": "seagirt",
+      "parentAssetId": "CB6",
+      "location": {
+        "longitude": null,
+        "latitude": null,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "containerAssetId": null,
+        "cubicle": null,
+        "positionNote": null
+      },
+      "rating": null,
+      "voltage": {
+        "primary": {
+          "value": 4.16,
+          "unit": "kV"
+        },
+        "secondary": null
+      },
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED",
+      "from": "CB6",
+      "to": "W1",
+      "geometryNote": "No cable route is recorded; drawn schematically."
+    },
+    {
+      "id": "F7",
+      "name": "Feeder F7",
+      "assetType": "FEEDER",
+      "projectId": "seagirt",
+      "parentAssetId": "CB7",
+      "location": {
+        "longitude": null,
+        "latitude": null,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "containerAssetId": null,
+        "cubicle": null,
+        "positionNote": null
+      },
+      "rating": null,
+      "voltage": {
+        "primary": {
+          "value": 4.16,
+          "unit": "kV"
+        },
+        "secondary": null
+      },
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED",
+      "from": "CB7",
+      "to": "C5",
+      "geometryNote": "No cable route is recorded; drawn schematically."
+    },
+    {
+      "id": "F8",
+      "name": "Feeder F8",
+      "assetType": "FEEDER",
+      "projectId": "seagirt",
+      "parentAssetId": "CB8",
+      "location": {
+        "longitude": null,
+        "latitude": null,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "containerAssetId": null,
+        "cubicle": null,
+        "positionNote": null
+      },
+      "rating": null,
+      "voltage": {
+        "primary": {
+          "value": 4.16,
+          "unit": "kV"
+        },
+        "secondary": null
+      },
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED",
+      "from": "CB8",
+      "to": "DP3",
+      "geometryNote": "No cable route is recorded; drawn schematically."
+    },
+    {
+      "id": "F2A",
+      "name": "Alternate Feeder F2A",
+      "assetType": "FEEDER",
+      "projectId": "seagirt",
+      "parentAssetId": "TB1",
+      "location": {
+        "longitude": null,
+        "latitude": null,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "containerAssetId": null,
+        "cubicle": null,
+        "positionNote": null
+      },
+      "rating": null,
+      "voltage": {
+        "primary": {
+          "value": 4.16,
+          "unit": "kV"
+        },
+        "secondary": null
+      },
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED",
+      "from": "TB1",
+      "to": "C2",
+      "geometryNote": "No cable route is recorded; drawn schematically."
+    },
+    {
+      "id": "C1",
+      "name": "Crane C1",
+      "assetType": "CRANE",
+      "projectId": "seagirt",
+      "parentAssetId": "F3",
+      "location": {
+        "longitude": -76.5488865,
+        "latitude": 39.2557254,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "positionNote": "Illustrative position for the demonstration — not a surveyed location of real equipment."
+      },
+      "rating": {
+        "value": 1.2,
+        "unit": "MW"
+      },
+      "voltage": null,
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": "2026-08-11",
+      "nextInspectionDate": "2027-02-11",
+      "mapTier": "MAJOR",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "id": "C2",
+      "name": "Crane C2",
+      "assetType": "CRANE",
+      "projectId": "seagirt",
+      "parentAssetId": "F2",
+      "location": {
+        "longitude": -76.5478762,
+        "latitude": 39.255126,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "positionNote": "Illustrative position for the demonstration — not a surveyed location of real equipment."
+      },
+      "rating": {
+        "value": 1.2,
+        "unit": "MW"
+      },
+      "voltage": null,
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": "2026-08-11",
+      "nextInspectionDate": "2027-02-11",
+      "mapTier": "MAJOR",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "id": "C3",
+      "name": "Crane C3",
+      "assetType": "CRANE",
+      "projectId": "seagirt",
+      "parentAssetId": "F4",
+      "location": {
+        "longitude": -76.5467535,
+        "latitude": 39.2544601,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "positionNote": "Illustrative position for the demonstration — not a surveyed location of real equipment."
+      },
+      "rating": {
+        "value": 1.2,
+        "unit": "MW"
+      },
+      "voltage": null,
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": "2026-07-28",
+      "nextInspectionDate": "2027-01-28",
+      "mapTier": "MAJOR",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "id": "C4",
+      "name": "Crane C4",
+      "assetType": "CRANE",
+      "projectId": "seagirt",
+      "parentAssetId": "F5",
+      "location": {
+        "longitude": -76.5457431,
+        "latitude": 39.2538607,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "positionNote": "Illustrative position for the demonstration — not a surveyed location of real equipment."
+      },
+      "rating": {
+        "value": 1.2,
+        "unit": "MW"
+      },
+      "voltage": null,
+      "operationalStatus": "IN_SERVICE",
+      "condition": "FAIR",
+      "lastInspectionDate": "2026-07-28",
+      "nextInspectionDate": "2027-01-28",
+      "mapTier": "MAJOR",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "id": "C5",
+      "name": "Crane C5",
+      "assetType": "CRANE",
+      "projectId": "seagirt",
+      "parentAssetId": "F7",
+      "location": {
+        "longitude": -76.5445082,
+        "latitude": 39.2531281,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "positionNote": "Illustrative position for the demonstration — not a surveyed location of real equipment."
+      },
+      "rating": {
+        "value": 1.2,
+        "unit": "MW"
+      },
+      "voltage": null,
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": "2026-09-03",
+      "nextInspectionDate": "2027-03-03",
+      "mapTier": "MAJOR",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "id": "L1",
+      "name": "Lighting Circuit L1",
+      "assetType": "LIGHTING_CIRCUIT",
+      "projectId": "seagirt",
+      "parentAssetId": "F1",
+      "location": {
+        "longitude": -76.5460941,
+        "latitude": 39.2574675,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "positionNote": "Illustrative position for the demonstration — not a surveyed location of real equipment."
+      },
+      "rating": {
+        "value": 0.25,
+        "unit": "MW"
+      },
+      "voltage": null,
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "id": "W1",
+      "name": "Warehouse W1",
+      "assetType": "WAREHOUSE",
+      "projectId": "seagirt",
+      "parentAssetId": "F6",
+      "location": {
+        "longitude": -76.5441294,
+        "latitude": 39.2563021,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "positionNote": "Illustrative position for the demonstration — not a surveyed location of real equipment."
+      },
+      "rating": {
+        "value": 0.6,
+        "unit": "MW"
+      },
+      "voltage": null,
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "id": "DP3",
+      "name": "Distribution Panel DP3",
+      "assetType": "DISTRIBUTION_PANEL",
+      "projectId": "seagirt",
+      "parentAssetId": "F8",
+      "location": {
+        "longitude": -76.5427715,
+        "latitude": 39.2547035,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "positionNote": "Illustrative position for the demonstration — not a surveyed location of real equipment."
+      },
+      "rating": null,
+      "voltage": {
+        "primary": {
+          "value": 0.48,
+          "unit": "kV"
+        },
+        "secondary": null
+      },
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "id": "W2",
+      "name": "Warehouse W2",
+      "assetType": "WAREHOUSE",
+      "projectId": "seagirt",
+      "parentAssetId": "DP3",
+      "location": {
+        "longitude": -76.5418135,
+        "latitude": 39.2550416,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "positionNote": "Illustrative position for the demonstration — not a surveyed location of real equipment."
+      },
+      "rating": {
+        "value": 0.45,
+        "unit": "MW"
+      },
+      "voltage": null,
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "id": "EV1",
+      "name": "Charging Station EV1",
+      "assetType": "EV_CHARGING",
+      "projectId": "seagirt",
+      "parentAssetId": "DP3",
+      "location": {
+        "longitude": -76.5513,
+        "latitude": 39.263,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "positionNote": "Illustrative position for the demonstration — not a surveyed location of real equipment."
+      },
+      "rating": {
+        "value": 0.35,
+        "unit": "MW"
+      },
+      "voltage": null,
+      "operationalStatus": "IN_SERVICE",
+      "condition": "GOOD",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED"
+    },
+    {
+      "id": "L1-MASTS",
+      "name": "Yard Lighting Masts (L1)",
+      "assetType": "LIGHTING_CIRCUIT",
+      "projectId": "seagirt",
+      "parentAssetId": "L1",
+      "location": {
+        "longitude": -76.5453972,
+        "latitude": 39.2578273,
+        "buildingId": null,
+        "roomId": null,
+        "cabinetId": null,
+        "positionNote": "Illustrative position for the demonstration — not a surveyed location of real equipment."
+      },
+      "rating": null,
+      "voltage": null,
+      "operationalStatus": "IN_SERVICE",
+      "condition": "UNKNOWN",
+      "lastInspectionDate": null,
+      "nextInspectionDate": null,
+      "mapTier": "DETAIL",
+      "dataProvenance": "SYNTHETIC_DEMO",
+      "verificationStatus": "UNVERIFIED",
+      "description": "Masts on circuit L1; their connection is undocumented in this synthetic inventory."
+    }
+  ]
+}

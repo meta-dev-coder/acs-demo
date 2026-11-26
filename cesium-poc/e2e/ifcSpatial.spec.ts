@@ -1,0 +1,1252 @@
+import { test, expect, type Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
+
+/**
+ * IFC Spatial Twin, in a real browser with real Cesium: the hand-written IFC fixture is converted by
+ * the real server converter (web-ifc) when the suite starts, and /api/ifc-spatial/* serves that
+ * output from route mocks, so no Autodesk credentials are needed. Under test: navigation and the
+ * electrical twin left as it was, the converted geometry loaded as a Cesium Model, picking by IFC
+ * GlobalId, model switching, placement, errors, and that no Autodesk Viewer is ever loaded.
+ */
+const IFC = readFileSync(new URL("../tests/fixtures/ifc/minimal-georef.ifc", import.meta.url));
+// The real IFC network (converted seagirt_power_network.ifc), served beside the small 3D fixture so the
+// overlay, the engine and Ask the Twin run on the actual network.
+const NETWORK = JSON.parse(readFileSync(new URL("../tests/fixtures/ifc-network.json", import.meta.url), "utf8"));
+let converted: { glb: Buffer; elements: any[]; diagnostics: any };
+const TX = "3Ax9Lk0t95uO2QkM8XbJ1a", BOARD = "2Wc3nV7mL0XhF8pR6tY4uZ";
+const FILES = [{ fileName: "seagirt_power_network.ifc", key: "a".repeat(24) }, { fileName: "seagirt_power_network_display.ifc", key: "b".repeat(24) }];
+
+test.beforeAll(async () => {
+  const { convertIfc } = await import("../server/ifcSpatial/convert.mjs");
+  converted = await convertIfc(IFC, { sourceFile: "minimal-georef.ifc", versionId: "v1", versionNumber: 1 });
+});
+
+async function mockSpatial(page: Page, { prepareError = null as null | { status: number; code: string; message: string }, signedIn = true } = {}) {
+  const saved: Record<string, any> = {};
+  // `version` is the tip version in ACC; a test raises it to publish a new version.
+  const calls = { prepare: [] as string[], put: [] as any[], del: 0, viewerSdk: 0, version: 1, refreshes: 0 };
+  await page.route("https://developer.api.autodesk.com/**", route => { calls.viewerSdk += 1; return route.abort(); });
+  // No Google requests from tests: the Google 3D base map is refused, so the screen falls back to the simple map.
+  await page.route(/googleapis\.com/, route => route.abort());
+  await page.route("**/api/ifc-spatial/**", async route => {
+    const url = new URL(route.request().url());
+    const json = (status: number, body: unknown) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+    if (!signedIn) return json(401, { error: { code: "NOT_AUTHENTICATED", message: "Not signed in to Autodesk.", hint: "Open /api/aps/login to sign in." } });
+    const path = url.pathname.replace("/api/ifc-spatial", "");
+    if (path === "/models") {
+      if (url.searchParams.get("refresh") === "1") calls.refreshes += 1;
+      return json(200, { project: { id: "b.p", name: "Seagirt Electrical Digital Twin POC" },
+        models: FILES.map(f => ({ fileName: f.fileName, versionId: `${f.fileName}?version=${calls.version}`, versionNumber: calls.version, key: f.key, status: "converted" })) });
+    }
+    if (path === "/prepare") {
+      const file = FILES.find(f => f.fileName === url.searchParams.get("file"))!;
+      calls.prepare.push(file.fileName);
+      if (prepareError) return json(prepareError.status, { error: { code: prepareError.code, message: prepareError.message } });
+      return json(200, { key: file.key, status: "ready", cached: true, fileName: file.fileName, versionId: `${file.fileName}?version=${calls.version}`, versionNumber: calls.version, convertedAt: "2026-11-23T10:00:00Z",
+        glbUrl: `/api/ifc-spatial/cache/${file.key}/model.glb?v=${calls.version}`, elementsUrl: `/api/ifc-spatial/cache/${file.key}/elements.json?v=${calls.version}`,
+        diagnostics: { schema: "IFC4", elements: converted.diagnostics.elements, withGeometry: converted.diagnostics.withGeometry, triangles: converted.diagnostics.triangles,
+          glbBytes: converted.glb.length, sourceBytes: IFC.length, library: "web-ifc 0.0.80", placementMode: "IFC_GEOREFERENCED", crs: "EPSG:26985", warnings: 0 },
+        placement: { georeferenced: converted.diagnostics.placement, saved: saved[file.key] ?? null } });
+    }
+    const asset = /^\/cache\/([ab]{24})\/(model\.glb|elements\.json)$/.exec(path);
+    if (asset) {
+      return asset[2] === "model.glb" ? route.fulfill({ status: 200, contentType: "model/gltf-binary", body: converted.glb })
+        // The network's own geometry is not in this GLB, so its elements carry no feature ids here.
+        : json(200, { elements: [...converted.elements, ...NETWORK.elements.map((e: any) => ({ ...e, featureId: null }))], connections: [...(converted.connections ?? []), ...networkConnections(calls.version)] });
+    }
+    if (path === "/placement") {
+      const key = url.searchParams.get("key")!;
+      if (route.request().method() === "PUT") { saved[key] = route.request().postDataJSON(); calls.put.push(saved[key]); return json(200, { key, saved: saved[key] }); }
+      if (route.request().method() === "DELETE") { delete saved[key]; calls.del += 1; return json(200, { key, saved: null }); }
+    }
+    return json(404, { error: { code: "NOT_FOUND", message: path } });
+  });
+  return calls;
+}
+
+// Version 2 of the network in ACC: cable AP-03 is no longer connected, so cranes STS-03 and STS-04 lose power.
+const AP03 = NETWORK.elements.find((e: any) => e.networkId === "AP-03").globalId;
+const networkConnections = (version: number) => version >= 2 ? NETWORK.connections.filter((c: any) => c.from !== AP03 && c.to !== AP03) : NETWORK.connections;
+
+// Ask the Twin answers: the newest turn of the conversation in the left panel.
+const ANSWER = ".isp-askp-chat .isp-turn:last-child .isp-msg-ans";
+/** Ask the Twin starts collapsed to its launcher: open it. */
+async function openAsk(page: Page) {
+  const launcher = page.locator('.isp-askp-launcher');
+  // The launcher appears once the network has loaded, after the screen reports ready.
+  await expect(page.locator(".isp-askp-launcher:visible, .isp-askbar input:visible").first()).toBeVisible({ timeout: 30_000 });
+  if (await launcher.isVisible()) await launcher.click({ force: true });
+  await expect(page.locator(".isp-askbar input")).toBeVisible();
+  // Wait out the slide-in (slow under SwiftShader), so clicks land on the panel, not where it was.
+  await page.waitForFunction(() => { const t = getComputedStyle(document.querySelector(".isp-askp")!).transform; return t === "none" || t === "matrix(1, 0, 0, 1, 0, 0)"; });
+}
+const spatial = (page: Page) => page.evaluate(() => (window as any).__ifcSpatial?.state() ?? null);
+const ready = (page: Page) => page.waitForFunction(() => ["ready", "error"].includes((window as any).__ifcSpatial?.state().phase), null, { timeout: 60_000 });
+
+async function openTwin(page: Page, query = "") {
+  await page.goto(`/?demo=seagirt${query}`);
+  await page.waitForFunction(() => (window as any).__seagirt, null, { timeout: 90_000 });
+}
+
+/** Click an IFC element where Cesium draws it, retrying while the first frames render. */
+async function clickElement(page: Page, globalId: string) {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const p = await page.evaluate(g => (window as any).__ifcSpatial.screenPositionOf(g), globalId);
+    await page.mouse.click(p.x, p.y);
+    await page.waitForTimeout(500);
+    if ((await spatial(page)).selected?.globalId === globalId) return;
+  }
+}
+
+test.describe("IFC Spatial Twin", () => {
+  test.setTimeout(150_000);
+
+  test("1 its own screen and Cesium viewer; the twin's outage survives; no Autodesk Viewer", async ({ page }) => {
+    const calls = await mockSpatial(page);
+    await openTwin(page);
+    await page.evaluate(() => (window as any).__seagirt.ask("What happens if Transformer T1 goes offline?"));
+    await page.waitForFunction(() => (window as any).__seagirt.state().scenario);
+    const before = await page.evaluate(() => (window as any).__seagirt.state());
+
+    await page.click('.sg-rail-item[data-tab="ifc-spatial"]');
+    await ready(page);
+    const s = await spatial(page);
+    expect(s.phase).toBe("ready");
+    expect(s.modelLoaded).toBe(true);
+    expect(s.primitives).toBe(1);
+    expect(page.url()).toContain("screen=ifc-spatial");
+    await expect(page.locator(".isp .cesium-widget")).toHaveCount(1);
+    await expect(page.locator("#cesiumContainer")).toBeHidden();
+    for (const chrome of [".sg-top", ".sg-panel", ".sg-ask"]) await expect(page.locator(chrome)).toBeHidden();
+    await expect(page.locator(".isp-conv")).toContainText("Geometry converted");
+    // Nothing saved for this version: it starts aligned to the terminal, not at the file's georeferencing.
+    await expect(page.locator(".isp-place")).toHaveText("User calibrated · aligned to terminal");
+    // Google 3D is the default base map; when it cannot load, the simple map stays and the switch says why.
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().base.note);
+    expect((await spatial(page)).base).toMatchObject({ map: "simple", google: false });
+    await expect(page.locator('[data-base="simple"]')).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator('[data-base="google"]')).toHaveAttribute("data-tip", /could not be loaded/);
+    expect(await page.locator(".adsk-viewing-viewer, .ifx").count()).toBe(0);
+    expect(calls.viewerSdk).toBe(0);
+
+    await page.click(`.sg-rail-item[data-tab="${before.tab}"]`);
+    await expect(page.locator(".isp")).toBeHidden();
+    await expect(page.locator("#cesiumContainer")).toBeVisible();
+    const after = await page.evaluate(() => (window as any).__seagirt.state());
+    expect(after.screen).toBe("twin");
+    expect(after.scenario).toEqual(before.scenario);
+    expect(after.investigation?.title).toBe(before.investigation?.title);
+    expect(after.markerStatus).toEqual(before.markerStatus);
+    expect((await spatial(page)).viewerAlive).toBe(false);
+    expect(await page.locator(".cesium-widget").count()).toBe(1);
+  });
+
+  test("2 3D geometry (a layer): picking identifies the IFC element by GlobalId; a network element opens its asset", async ({ page }) => {
+    await mockSpatial(page);
+    await openTwin(page, "&screen=ifc-spatial");
+    await ready(page);
+    // The IFC model from ACC is on by default, as a wireframe under the network overlay.
+    expect((await spatial(page)).layers.geometry).toBe(true);
+    expect((await spatial(page)).modelLoaded).toBe(true);
+    await expect(page.locator('[data-toggle="show"]')).toHaveAttribute("aria-pressed", "true");
+    // The network overlay is drawn over the geometry and would take these clicks: hide it for this test.
+    await page.click('[data-act="more"]');
+    await page.click(".isp-more-panel summary:has-text('More layers')");
+    await page.locator('[data-layer="network"]').uncheck({ force: true });
+    await page.click('[data-act="more"]');
+    // Picking hits drawn pixels: in wireframe a click inside an element's box falls between its edges.
+    await page.locator('[data-toggle="wireframe"]').dispatchEvent("click"); // hidden from the header, still wired
+    await expect(page.locator('[data-toggle="wireframe"]')).toHaveAttribute("aria-pressed", "false");
+    expect((await spatial(page)).selectable).toBe(2);
+    await page.evaluate(g => (window as any).__ifcSpatial.select(g), BOARD);
+    await page.waitForTimeout(1500);
+    await page.click('.isp-right:not(.isp-net-panel) [data-act="clear"]');
+    await clickElement(page, BOARD);
+    const s = await spatial(page);
+    expect(s.selected).toMatchObject({ globalId: BOARD, ifcClass: "IfcElectricDistributionBoard", name: "SW-T Test switchboard" });
+    await expect(page.locator(".isp-right:not(.isp-net-panel)")).toContainText(BOARD);
+    await page.click('.isp-right:not(.isp-net-panel) [data-act="isolate"]');
+    expect((await spatial(page)).isolated).toBe(true);
+    await page.click('.isp-right:not(.isp-net-panel) [data-act="clear"]');
+    await expect(page.locator(".isp-right:not(.isp-net-panel)")).toBeHidden();
+    // The transformer has a NetworkID: picking its geometry opens it as a network asset. Bring it into view first.
+    await page.evaluate(g => (window as any).__ifcSpatial.select(g), TX);
+    await page.waitForTimeout(1500);
+    await page.click('.isp-right:not(.isp-net-panel) [data-act="clear"]');
+    for (let attempt = 0; attempt < 8 && (await spatial(page)).network?.selectedId !== "TX-T"; attempt += 1) {
+      const p = await page.evaluate(g => (window as any).__ifcSpatial.screenPositionOf(g), TX);
+      await page.mouse.click(p.x, p.y);
+      await page.waitForTimeout(500);
+    }
+    expect((await spatial(page)).network.selectedId).toBe("TX-T");
+    await expect(page.locator(".isp-net-panel")).toContainText("TX-T");
+  });
+
+  test("3 switching models replaces the model, one at a time", async ({ page }) => {
+    const calls = await mockSpatial(page);
+    await openTwin(page, "&screen=ifc-spatial");
+    await ready(page);
+    await page.click('[data-act="more"]');
+    await page.selectOption(".isp-select", "seagirt_power_network_display.ifc");
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().manifest?.key === "b".repeat(24) && (window as any).__ifcSpatial.state().phase === "ready");
+    const s = await spatial(page);
+    expect(s.primitives).toBe(1);
+    expect(calls.prepare).toEqual(["seagirt_power_network.ifc", "seagirt_power_network_display.ifc"]);
+    expect(page.url()).toContain("model=seagirt_power_network_display.ifc");
+  });
+
+  test("4 placement: a new version starts aligned to the terminal; edits become user-calibrated, save per model version, reset to the file's georeferencing", async ({ page }) => {
+    const calls = await mockSpatial(page);
+    await openTwin(page, "&screen=ifc-spatial");
+    await ready(page);
+    const reference = JSON.parse(readFileSync(new URL("../public/data/seagirt/ifc-reference-alignment.json", import.meta.url), "utf8")).placement;
+    // Nothing saved: the documented terminal alignment, not saved until the user saves it.
+    expect((await spatial(page)).placement).toMatchObject({ mode: "USER_CALIBRATED", lon: reference.lon, lat: reference.lat, headingDeg: reference.headingDeg, scale: reference.scale });
+    expect(calls.put.length).toBe(0);
+    const before = (await spatial(page)).modelMatrix;
+    await page.click('[data-act="more"]');
+    await page.click('[data-act="placement"]');
+    await page.click('[data-act="more"]');
+    await page.fill('[data-p="headingDeg"]', "-35");
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().placement.headingDeg === -35);
+    expect((await spatial(page)).modelMatrix).not.toEqual(before);
+    await expect(page.locator(".isp-place")).toHaveText("User calibrated");
+    await page.click('[data-act="savePlacement"]');
+    await expect.poll(() => calls.put.length).toBe(1);
+    expect(calls.put[0]).toMatchObject({ mode: "USER_CALIBRATED", headingDeg: -35, scale: reference.scale });
+    // "Align to terminal" applies the committed reference calibration, still labelled user-calibrated.
+    await page.click('[data-act="alignReference"]');
+    await page.waitForFunction(h => Math.abs((window as any).__ifcSpatial.state().placement.headingDeg - h) < 1e-6, reference.headingDeg);
+    expect((await spatial(page)).placement).toMatchObject({ mode: "USER_CALIBRATED", lon: reference.lon, lat: reference.lat, scale: reference.scale });
+    await expect(page.locator(".isp-place")).toHaveText("User calibrated · aligned to terminal");
+    await expect(page.locator(".isp-ref")).toContainText("OpenStreetMap");
+    await page.click('[data-act="resetPlacement"]');
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().placement.mode === "IFC_GEOREFERENCED");
+    expect(calls.del).toBe(1);
+    expect((await spatial(page)).modelMatrix).not.toEqual(before);
+  });
+
+  test("5 errors are shown as errors, with no geometry put in their place", async ({ page }) => {
+    await mockSpatial(page, { prepareError: { status: 422, code: "INVALID_IFC", message: "The file is not an IFC STEP file (no ISO-10303-21 header)." } });
+    await openTwin(page, "&screen=ifc-spatial");
+    await ready(page);
+    await expect(page.locator(".isp-error h2")).toHaveText("Not a valid IFC file");
+    await expect(page.locator(".isp-error")).toContainText("INVALID_IFC");
+    expect((await spatial(page)).primitives).toBe(0);
+
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+    await mockSpatial(page, { signedIn: false });
+    await openTwin(page, "&screen=ifc-spatial");
+    await ready(page);
+    await expect(page.locator(".isp-error h2")).toHaveText("Sign in to Autodesk");
+    await expect(page.locator(".isp-error a")).toHaveAttribute("href", /\/api\/aps\/login\?returnTo=/);
+  });
+
+  test("6 the IFC network, drawn mock-style: status tiles, a what-if scenario, restore by switching", async ({ page }) => {
+    await mockSpatial(page);
+    await openTwin(page, "&screen=ifc-spatial");
+    await ready(page);
+    const counts = (await spatial(page)).network.counts;
+    expect(counts.routes).toBe(65);
+    expect(counts.symbols).toBeGreaterThan(50);
+    expect(counts.control).toBe(15);
+    await expect(page.locator(".isp-tiles")).toContainText("12/12");
+    await expect(page.locator(".isp-tiles")).toContainText("420/420");
+    await expect(page.locator(".isp-scenario-pill")).toBeHidden();
+    // Electrical Network is the default workspace, with no Assets panel.
+    await expect(page.locator('[data-ws="network"]')).toHaveAttribute("aria-current", "page");
+    await expect(page.locator(".isp-assets")).toBeHidden();
+    // The Assets workspace lists the network with live states; search narrows it; a row selects.
+    await page.click('[data-ws="assets"]');
+    expect((await spatial(page)).network.workspace).toBe("assets");
+    await expect(page.locator(".isp-arow")).toHaveCount(137, { timeout: 10000 }); // 136 from the IFC network + the 3D fixture's test transformer
+    await page.fill(".isp-asearch", "STS-05");
+    await expect(page.locator('.isp-arow[data-asset="STS-05"]')).toHaveCount(1);
+    await expect(page.locator(".isp-arow")).not.toHaveCount(137);
+    await page.click('.isp-arow[data-asset="STS-05"]');
+    expect((await spatial(page)).network.selectedId).toBe("STS-05");
+    await expect(page.locator(".isp-chain")).toContainText("TX-M1");
+    await expect(page.locator(".isp-chain")).toContainText("QSS-C");
+    await page.fill(".isp-asearch", "");
+    await page.click('[data-act="more"]');
+    const route = await page.evaluate(() => (window as any).__ifcSpatial.routeInfo("AP-03"));
+    expect(route.points).toBeGreaterThanOrEqual(2);
+    expect(Number.isFinite(route.first[0])).toBe(true);
+
+    await page.click('[data-scenario="txm2"]');
+    await page.click('[data-act="more"]');   // close the menu: the simulation panel is under it
+    await expect(page.locator(".isp-tiles")).toContainText("8/12");
+    // The Outage Simulation panel on the right: the failed asset, simulated vs reported, the consumers without
+    // power. Ask the Twin stays collapsed and no banner repeats it.
+    await expect(page.locator(".isp-sim-asset")).toContainText("TX-M2");
+    await expect(page.locator(".isp-sim-pill.is-sim")).toContainText("Simulated");
+    await expect(page.locator(".isp-sim-m.is-bad b")).toHaveText("15");
+    await expect(page.locator(".isp-sim-tabs .isp-tab")).toHaveText(["Overview", "Connections", "Properties", /^Documents/]);
+    await expect(page.locator(".isp-scenario-pill")).toBeHidden();
+    await expect(page.locator(".isp-ask")).toHaveClass(/is-collapsed/);
+    expect((await spatial(page)).network.nodeStates["STS-12"]).toBe("dead");
+    expect((await spatial(page)).network.nodeStates.OPS, "the ops building rides through on GEN-1").toBe("backup");
+    // The counts are clickable: each shows its own list.
+    await page.click('.isp-sim-m[data-sim-list="substations"]', { force: true });
+    await expect(page.locator(".isp-sim-card.is-list h3")).toContainText("Substations Affected");
+    await page.click('.isp-sim-m[data-sim-list="consumers"]', { force: true });
+    await page.click('.isp-sim [data-act="simAll"]', { force: true });
+    await expect(page.locator('.isp-sim-row[data-sim-asset="STS-12"]')).toHaveCount(1);
+    await expect(page.locator('.isp-sim-row[data-sim-asset="STS-01"]')).toHaveCount(0);
+    // The mock's restore options: BT-1 restores all but overloads TX-M1; AT-2 brings back the east cranes.
+    await expect(page.locator(".isp-restore")).toContainText("Close BT-1");
+    await expect(page.locator(".isp-opt", { hasText: "Close BT-1" })).toContainText("overloads TX-M1");
+    await page.click('[data-act="more"]');   // the restore options are in the menu
+    await page.click('[data-close="AT-2"]');
+    await page.click('[data-act="more"]');
+    await expect(page.locator(".isp-tiles")).toContainText("12/12");
+    expect((await spatial(page)).network.selectedId).toBe("AT-2");
+    await page.click(".isp-sim-reset", { force: true });
+    await expect(page.locator(".isp-sim")).toHaveCount(0);
+    expect((await spatial(page)).network.scenario).toBeNull();
+  });
+
+  test("7 Ask the Twin on the IFC network: typed, from the question bank, and from a symbol on the map", async ({ page }) => {
+    test.setTimeout(300_000);
+    await mockSpatial(page);
+    await openTwin(page, "&screen=ifc-spatial");
+    await ready(page);
+    await openAsk(page);
+    await page.fill(".isp-askbar input", "Which transformer supplies power to Crane STS-05?");
+    await page.press(".isp-askbar input", "Enter");
+    await expect(page.locator(`${ANSWER} .tw-say`)).toContainText("Main transformer TX-M1 supplies STS-05");
+    expect((await spatial(page)).network.result.intent).toBe("UPSTREAM_TYPE");
+
+    await page.click('.isp-askbar [data-act="bank"]');
+    await expect(page.locator(".isp-bankq")).toHaveCount(30);
+    // Forced: under load Cesium starves the frames Playwright's stability check waits for.
+    await page.click(".isp-bank summary:has-text('Power Outage')", { force: true });
+    await page.click(".isp-bankq:has-text('Which cranes will lose power if cable AP-03 fails?')", { force: true });
+    // Asked in the conversation: answered there (counts and every affected asset); no simulation panel opens.
+    await expect(page.locator(`${ANSWER} .tw-say`)).toContainText("2 consumers lose power");
+    await expect(page.locator(`${ANSWER} .tw-metric.is-bad b`)).toHaveText("2");
+    await expect(page.locator(`${ANSWER} .tw-crow`)).toHaveCount(2);
+    await expect(page.locator(`${ANSWER} .tw-crow`).first()).toContainText("No power (simulated)");
+    await expect(page.locator(".isp-sim")).toHaveCount(0);
+    expect((await page.evaluate(() => (window as any).__ifcSpatial.state().network.sim)).consumers.sort()).toEqual(["STS-03", "STS-04"]);
+    expect((await spatial(page)).network.nodeStates["AP-03"]).toBe("off");
+    await page.click(`${ANSWER} [data-act="simReset"]`, { force: true });
+    expect((await spatial(page)).network.scenario).toBeNull();
+
+    // A real click on a symbol on the map: first bring it into view (the status cards cover the right edge).
+    await page.evaluate(() => (window as any).__ifcSpatial.selectAsset("QSS-C"));
+    await page.waitForTimeout(1500);
+    await page.click('.isp-net-panel [data-act="netClear"]', { timeout: 10_000 }).catch(() => {});
+    for (let attempt = 0; attempt < 8 && (await spatial(page)).network.selectedId !== "QSS-C"; attempt += 1) {
+      const p = await page.evaluate(() => (window as any).__ifcSpatial.assetScreenPosition("QSS-C"));
+      await page.mouse.click(p.x, p.y);
+      await page.waitForTimeout(500);
+    }
+    expect((await spatial(page)).network.selectedId).toBe("QSS-C");
+    await expect(page.locator(".isp-chain")).toContainText("BUS-A");
+    await expect(page.locator(".isp-net-panel")).toContainText("Quay switching station Centre");
+    await page.click('.isp-net-panel [data-inv="DOWNSTREAM"]');
+    await expect(page.locator(ANSWER)).toContainText("Quay switching station Centre");
+    expect((await spatial(page)).network.result.intent).toBe("DOWNSTREAM");
+  });
+
+  test("8 ACC version check: a new version is loaded in place and what it leaves without power is highlighted", async ({ page }) => {
+    const calls = await mockSpatial(page);
+    await openTwin(page, "&screen=ifc-spatial");
+    await ready(page);
+    await expect(page.locator(".isp-sync")).toContainText("ACC v1");
+    // Version 1: the network is fully supplied; only the 3D fixture's test transformer, connected to nothing, has no power.
+    expect((await spatial(page)).network.unpowered).toEqual(["TX-T"]);
+    // Power Status starts collapsed in the header; open it.
+    await expect(page.locator(".isp-ops")).toBeHidden();
+    await page.click(".isp-power");
+    await expect(page.locator(".isp-ops-alerts h3")).toHaveText("Active Alerts (1)");
+
+    // Nothing new: the check re-reads ACC and keeps the model.
+    await page.evaluate(() => (window as any).__ifcSpatial.checkForUpdate());
+    expect(calls.refreshes).toBe(1);
+    expect(calls.prepare).toHaveLength(1);
+    await expect(page.locator(".isp-sync")).toContainText("checked");
+
+    // ACC now has version 2, with AP-03 disconnected.
+    calls.version = 2;
+    await page.evaluate(() => (window as any).__ifcSpatial.checkForUpdate());
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().sync.version === 2 && (window as any).__ifcSpatial.state().phase === "ready");
+    expect(calls.prepare).toHaveLength(2);
+    await expect(page.locator(".isp-sync")).toContainText("ACC v2 (was v1)");
+    const s = await spatial(page);
+    for (const id of ["AP-03", "STS-03", "STS-04"]) expect(s.network.unpowered).toContain(id);
+    expect(s.network.nodeStates["STS-03"]).toBe("dead");
+    expect(s.network.scenario, "the model's own state, not a simulation").toBeNull();
+    // Power Status and Active Alerts follow the new version; a card selects its asset.
+    await expect(page.locator('.isp-ops-row[data-ops-status="NO_POWER"] b')).toHaveText(String((await spatial(page)).ops.summary.counts.NO_POWER));
+    await expect(page.locator('[data-ops-alert="STS-03"]')).toBeVisible();
+    await page.click('[data-ops-alert="STS-03"]');
+    expect((await spatial(page)).network.selectedId).toBe("STS-03");
+    await expect(page.locator('[data-ops-alert="STS-03"]')).toHaveClass(/is-selected/);
+    // The header's Power Status chip hides the cards and stays in the header; a second click brings them back.
+    await expect(page.locator(".isp-power")).toContainText("Powered");
+    await page.click(".isp-power");
+    await expect(page.locator(".isp-ops")).toBeHidden();
+    await expect(page.locator(".isp-power")).toBeVisible();
+    await expect(page.locator(".isp-power")).toHaveAttribute("aria-expanded", "false");
+    await page.click(".isp-power");
+    await expect(page.locator(".isp-ops")).toBeVisible();
+  });
+
+  test("9 compare versions: the real V1 and V2, side by side, with the changes the server computed", async ({ page }) => {
+    test.setTimeout(400_000);
+    // The real server routes and converter, with the two real files standing in for ACC's versions.
+    const { createIfcSpatialApi } = await import("../server/ifcSpatial/api.mjs");
+    const { mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { Readable } = await import("node:stream");
+    const bytes = [readFileSync(new URL("../tests/fixtures/ifc/seagirt-compare-v1.ifc", import.meta.url)), readFileSync(new URL("../tests/fixtures/ifc/seagirt-compare-v2.ifc", import.meta.url))];
+    const ids = ["urn:v?version=1", "urn:v?version=2"];
+    const files = { hub: { id: "h" }, project: { id: "p", name: "Seagirt" }, files: [{ fileName: "seagirt_power_network.ifc", itemId: "urn:item", tipVersionId: ids[1],
+      versions: [{ id: ids[1], versionNumber: 2, createTime: "2026-11-24T06:11:00Z", createUserName: "Test User" }, { id: ids[0], versionNumber: 1, createTime: "2026-11-23T07:24:00Z", createUserName: "Test User" }] }] };
+    const api = createIfcSpatialApi({ aps: { dataClient: () => ({}), projectFiles: async () => files }, cacheDir: mkdtempSync(join(tmpdir(), "ifc-e2e-")), logger: { info() {}, warn() {}, error() {} },
+      download: async (_c: unknown, _p: unknown, versionId: string) => ({ bytes: bytes[ids.indexOf(versionId)] }) });
+    await page.route(/googleapis\.com/, route => route.abort());
+    await page.route("**/api/ifc-spatial/**", async route => {
+      const u = new URL(route.request().url());
+      const req: any = Readable.from([]);
+      Object.assign(req, { method: route.request().method(), url: u.pathname + u.search, headers: {} });
+      let status = 200, headers: any = {}, body: any = "";
+      await api.handle(req, { writeHead(s: number, h: any) { status = s; headers = h; }, end(b: any) { body = b ?? ""; } } as any);
+      await route.fulfill({ status, headers, body: Buffer.isBuffer(body) ? body : String(body) });
+    });
+    await openTwin(page, "&screen=ifc-spatial");
+    await page.waitForFunction(() => (window as any).__ifcSpatial?.state().phase === "ready", null, { timeout: 180_000 });
+    const cmp = () => page.evaluate(() => (window as any).__ifcSpatial.compare.state());
+
+    // The dialog: this file's versions from ACC, previous vs latest by default, two different ones required.
+    await page.click('[data-act="compare"]');
+    await expect(page.locator(".isp-cmp-dialog select[name=base] option")).toHaveCount(2);
+    await expect(page.locator(".isp-cmp-dialog select[name=base]")).toHaveValue("1");
+    await expect(page.locator(".isp-cmp-dialog select[name=target]")).toHaveValue("2");
+    await page.selectOption(".isp-cmp-dialog select[name=base]", "2");
+    await page.click(".isp-cmp-dialog button[type=submit]");
+    await expect(page.locator("[data-cmp-msg]")).toHaveText("Choose two different versions.");
+    await page.selectOption(".isp-cmp-dialog select[name=base]", "1");
+    await page.click(".isp-cmp-dialog button[type=submit]");
+    await page.waitForFunction(() => { const c = (window as any).__ifcSpatial.compare.state(); return c.summary && !c.busy && c.models.every(Boolean); }, null, { timeout: 300_000 });
+    let c = await cmp();
+    expect(c.summary).toMatchObject({ added: 4, moved: 1, modified: 2, removed: 0, total: 7 }); // TX-M2's status note is a status update, not a change
+    expect(c.changes.filter((x: any) => x.status === "ADDED" && x.kind === "light").map((x: any) => x.networkId)).toEqual(["HM-12", "HM-13"]);
+    await expect(page.locator(".isp-dc-total")).toHaveText("7 changes");
+    expect(c.mode, "opens in All Changes").toBe("all");
+    await expect(page.locator(".isp-dc-row")).toHaveCount(7);
+    await expect(page.locator(".isp-cmp-pane[data-side='0'] .isp-cmp-tag")).toContainText("Version 1");
+    await expect(page.locator(".isp-cmp-pane[data-side='1'] .isp-cmp-tag")).toContainText("Version 2");
+    await expect(page.locator(".isp")).toHaveClass(/is-comparing/);
+    expect(c.markers[1]).toBeGreaterThanOrEqual(6);
+
+    // Selecting the moved asset: Focus on Change, its old and new location and the distance.
+    const moved = c.changes.find((x: any) => x.status === "MOVED");
+    await page.click(`.isp-dc-row[data-cmp-select="${moved.globalId}"]`);
+    await expect(page.locator(".isp-dc-detail")).toContainText("Movement515 m");
+    await expect(page.locator(".isp-dc-detail")).toContainText("Previous location");
+    expect((await cmp()).selected).toBe(moved.globalId);
+    expect((await cmp()).mode).toBe("focus");
+    await page.click('[data-cmp="back"]');
+    expect((await cmp()).mode).toBe("all");
+    await page.click(`.isp-dc-row[data-cmp-select="${moved.globalId}"]`);
+    await page.waitForTimeout(1500);
+
+    // Camera sync, both ways; then unlocked.
+    const same = async () => { const [a, b] = await page.evaluate(() => [0, 1].map(i => (window as any).__ifcSpatial.compare.camera(i))); return a.position.every((v: number, i: number) => Math.abs(v - b.position[i]) < 0.01); };
+    await page.evaluate(() => (window as any).__ifcSpatial.compare.zoom(0, 80));
+    await expect.poll(same, { timeout: 30_000 }).toBe(true);
+    await page.evaluate(() => (window as any).__ifcSpatial.compare.zoom(1, -60));
+    await expect.poll(same, { timeout: 30_000 }).toBe(true);
+    await page.locator('[data-cmp-opt="sync"]').uncheck();
+    await page.evaluate(() => (window as any).__ifcSpatial.compare.zoom(0, 50));
+    await page.waitForTimeout(800);
+    expect(await same()).toBe(false);
+    await page.locator('[data-cmp-opt="sync"]').check();
+    await expect.poll(same, { timeout: 30_000 }).toBe(true);
+
+    // A click on a change marker in the updated view selects that change.
+    await page.click('[data-cmp="reset"]');
+    await page.waitForTimeout(2500);
+    // The change whose marker is furthest from the others, so the click cannot land on a neighbour
+    // (at the terminal alignment HM-12's marker sits on the end of the new cable L6e).
+    const onScreen = await page.evaluate(ids => ids.map((g: string) => ({ g, p: (window as any).__ifcSpatial.compare.screenPosition(g, 1) })).filter((x: any) => x.p),
+      c.changes.filter((x: any) => x.status !== "REMOVED").map((x: any) => x.globalId));
+    const gap = (x: any) => Math.min(...onScreen.filter((y: any) => y !== x).map((y: any) => Math.hypot(x.p.x - y.p.x, x.p.y - y.p.y)));
+    const target = onScreen.reduce((best: any, x: any) => (gap(x) > gap(best) ? x : best)).g;
+    for (let i = 0; i < 6 && (await cmp()).selected !== target; i += 1) {
+      const p = await page.evaluate(g => (window as any).__ifcSpatial.compare.screenPosition(g, 1), target);
+      if (p) await page.mouse.click(p.x, p.y);
+      await page.waitForTimeout(600);
+    }
+    expect((await cmp()).selected).toBe(target);
+
+    // Filters and modes.
+    await page.click('[data-cmp-mode="all"]');
+    await page.click('.isp-dc-chip[data-cmp-filter="ADDED"]');
+    await expect(page.locator(".isp-dc-row")).toHaveCount(4);
+    await page.click('[data-cmp-mode="full"]');
+    expect((await cmp()).mode).toBe("full");
+
+    // Switching versions: V2 against V1 reverses the change set.
+    await page.click('[data-cmp="dialog"]');
+    await page.selectOption(".isp-cmp-dialog select[name=base]", "2");
+    await page.selectOption(".isp-cmp-dialog select[name=target]", "1");
+    await page.click(".isp-cmp-dialog button[type=submit]");
+    await page.waitForFunction(() => { const s = (window as any).__ifcSpatial.compare.state(); return s.base === 2 && s.summary && !s.busy && s.models.every(Boolean); }, null, { timeout: 300_000 });
+    c = await cmp();
+    expect(c.summary).toMatchObject({ added: 0, removed: 4, moved: 1 });
+
+    // Exit: the screen as it was.
+    await page.click('[data-cmp="exit"]');
+    expect((await cmp()).active).toBe(false);
+    await expect(page.locator(".isp")).not.toHaveClass(/is-comparing/);
+    await expect(page.locator(".isp-cmp")).toBeHidden();
+    expect((await spatial(page)).phase).toBe("ready");
+    await openAsk(page);
+  });
+
+  test("10 asset documentation: ACC Docs PDFs linked to assets, the Documents tab, preview, download and manual linking", async ({ page }) => {
+    test.setTimeout(300_000);
+    const { createIfcSpatialApi } = await import("../server/ifcSpatial/api.mjs");
+    const { mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { Readable } = await import("node:stream");
+    // A stand-in for ACC Docs: the documentation folder with a few category folders.
+    const tree: Record<string, { folders: { id: string; name: string }[]; files: string[] }> = {
+      top: { folders: [{ id: "docs", name: "Asset Documentation" }], files: [] },
+      docs: { folders: [{ id: "f1", name: "01_Substations" }, { id: "f11", name: "11_Cables_480V" }], files: ["00_Asset_register.pdf"] },
+      f1: { folders: [], files: ["USS-1_Substation.pdf", "USS-1_RMU.pdf", "MSS_Substation.pdf"] },
+      f11: { folders: [], files: ["L1_Cable.pdf", "X-99_Cable.pdf"] },
+    };
+    const client = { async getAll(path: string) {
+      const id = decodeURIComponent(/folders\/([^/]+)\/contents/.exec(path)![1]);
+      const node = tree[id] ?? { folders: [], files: [] };
+      return { data: [...node.folders.map(f => ({ type: "folders", id: f.id, attributes: { displayName: f.name } })),
+        ...node.files.map(f => ({ type: "items", id: `urn:item:${f}`, attributes: { displayName: f }, relationships: { tip: { data: { id: `urn:v:${f}?version=1` } } }, links: { webView: { href: `https://acc.autodesk.com/docs/files/projects/p?entityId=${f}` } } }))],
+        included: node.files.map(f => ({ type: "versions", id: `urn:v:${f}?version=1`, attributes: { name: f, versionNumber: 1, fileType: "pdf", storageSize: 2048, lastModifiedTime: "2026-11-24T08:53:00Z" } })) };
+    } };
+    const model = readFileSync(new URL("../tests/fixtures/ifc/seagirt-compare-v2.ifc", import.meta.url));
+    const v = "urn:model?version=3";
+    const files = { hub: { id: "h" }, project: { id: "b.p", name: "Seagirt" }, topFolders: [{ id: "top", name: "Project Files" }],
+      files: [{ fileName: "seagirt_power_network.ifc", itemId: "urn:i", tipVersionId: v, versions: [{ id: v, versionNumber: 3 }] }] };
+    const streamed: string[] = [];
+    const api = createIfcSpatialApi({ aps: { dataClient: () => client, projectFiles: async () => files }, cacheDir: mkdtempSync(join(tmpdir(), "ifc-docs-e2e-")), logger: { info() {}, warn() {}, error() {} },
+      download: async () => ({ bytes: model }),
+      openStream: async (_c: unknown, _p: unknown, versionId: string) => { streamed.push(versionId); return { body: Readable.from([Buffer.from("%PDF-1.4\n%%EOF\n")]), contentLength: 15, fileName: versionId.replace(/^urn:v:/, "").replace(/\?.*$/, "") }; } });
+    await page.route(/googleapis\.com/, route => route.abort());
+    await page.route("**/api/ifc-spatial/**", async route => {
+      const u = new URL(route.request().url());
+      const body = route.request().postDataBuffer();
+      const req: any = Readable.from(body ? [body] : []);
+      Object.assign(req, { method: route.request().method(), url: u.pathname + u.search, headers: {} });
+      let status = 200, headers: any = {}; const parts: Buffer[] = [];
+      await api.handle(req, { writeHead(s: number, h: any) { status = s; headers = h; }, write(c: any) { parts.push(Buffer.from(c)); }, end(b: any) { if (b) parts.push(Buffer.from(b)); } } as any);
+      await route.fulfill({ status, headers, body: Buffer.concat(parts) });
+    });
+    await openTwin(page, "&screen=ifc-spatial");
+    await page.waitForFunction(() => (window as any).__ifcSpatial?.state().phase === "ready", null, { timeout: 180_000 });
+    // The index loads with the model (the server syncs: its index was missing).
+    await page.waitForFunction(() => (window as any).__ifcSpatial.documents.state().summary, null, { timeout: 60_000 });
+    const docsState = () => page.evaluate(() => (window as any).__ifcSpatial.documents.state());
+    expect((await docsState()).summary).toMatchObject({ total: 6, matched: 4, unmatched: 1, reference: 1, ambiguous: 0 });
+
+    // The asset panel: tabs, and USS-1's two documents.
+    await page.evaluate(() => (window as any).__ifcSpatial.selectAsset("USS-1"));
+    await expect(page.locator(".isp-net-panel .isp-tab")).toHaveText(["Overview", "Connections", "Properties", "Documents (2)"]);
+    await page.click('.isp-net-panel [data-asset-tab="documents"]');
+    await expect(page.locator(".isp-net-panel .isp-doc")).toHaveCount(2);
+    await expect(page.locator(".isp-net-panel .isp-doc").first()).toContainText("Source: Autodesk Construction Cloud");
+    await expect(page.locator('.isp-net-panel a:has-text("Open in ACC")').first()).toHaveAttribute("href", /^https:\/\/acc\.autodesk\.com\//);
+    const download = page.locator('.isp-net-panel a:has-text("Download")').first();
+    await expect(download).toHaveAttribute("href", /\/api\/ifc-spatial\/documents\/[a-f0-9]{24}\/content\?download=1$/);
+    // The tab stays when moving to another asset; one without documents says so.
+    await page.evaluate(() => (window as any).__ifcSpatial.selectAsset("AP-01"));
+    await expect(page.locator(".isp-net-panel .isp-doc-none")).toHaveText("No document linked to this asset.");
+    await page.evaluate(() => (window as any).__ifcSpatial.selectAsset("USS-1"));
+
+    // Preview: the PDF from the server's content route, inline.
+    await page.locator(".isp-net-panel [data-doc-preview]").first().click();
+    const src = (await docsState()).previewSrc;
+    expect(src).toMatch(/\/api\/ifc-spatial\/documents\/[a-f0-9]{24}\/content$/);
+    const fetched = await page.evaluate(async u => { const r = await fetch(u); return [r.status, r.headers.get("content-type"), (await r.text()).slice(0, 5)]; }, src);
+    expect(fetched).toEqual([200, "application/pdf", "%PDF-"]);
+    expect(streamed.at(-1)).toMatch(/USS-1_(Substation|RMU)\.pdf\?version=1$/);
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".isp-docview-wrap")).toBeHidden();
+
+    // Management: totals, filter, and linking the unmatched document by hand.
+    await page.click('[data-act="docs"]');
+    await expect(page.locator(".isp-docs")).toBeVisible();
+    await page.click('[data-docs-status="unmatched"]');
+    await expect(page.locator(".isp-docs-table tbody tr")).toHaveCount(1);
+    await expect(page.locator(".isp-docs-table tbody tr")).toContainText("X-99_Cable.pdf");
+    await page.click(".isp-docs-table [data-docs-assign]");
+    await page.fill(".isp-docs-assign input", "L1");
+    await page.click('.isp-docs-assign button[type="submit"]');
+    await page.waitForFunction(() => (window as any).__ifcSpatial.documents.state().summary.unmatched === 0);
+    await page.click('[data-docs-status="matched"]');
+    await expect(page.locator(".isp-docs-table tbody tr", { hasText: "X-99_Cable.pdf" })).toContainText("Matched · manual");
+    // A non-network element (the main-substation assembly) opens in the element panel with its document.
+    await page.click('.isp-docs-table [data-docs-asset="MSS"]');
+    await expect(page.locator(".isp-docs")).toBeHidden();
+    await expect(page.locator(".isp-right:not(.isp-net-panel)")).toBeVisible();
+    await expect(page.locator(".isp-right:not(.isp-net-panel)")).toContainText("MSS_Substation.pdf");
+    // Sync again: the manual link is kept.
+    await page.click('[data-act="docs"]');
+    await page.click("[data-docs-sync]");
+    await page.waitForFunction(() => !(window as any).__ifcSpatial.documents.state().loading && (window as any).__ifcSpatial.documents.state().summary.unmatched === 0);
+  });
+
+  test("11 a large comparison (the real V3 → V4, 131 changes): significant changes, groups, clusters, all changes, full network; Ask the Twin on it", async ({ page }) => {
+    test.setTimeout(900_000);
+    const { createIfcSpatialApi } = await import("../server/ifcSpatial/api.mjs");
+    const { mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { Readable } = await import("node:stream");
+    const bytes = [readFileSync(new URL("../tests/fixtures/ifc/seagirt-compare-v3.ifc", import.meta.url)), readFileSync(new URL("../tests/fixtures/ifc/seagirt-compare-v4.ifc", import.meta.url))];
+    const ids = ["urn:v?version=3", "urn:v?version=4"];
+    const files = { hub: { id: "h" }, project: { id: "p", name: "Seagirt" }, topFolders: [], files: [{ fileName: "seagirt_power_network.ifc", itemId: "urn:item", tipVersionId: ids[1],
+      versions: [{ id: ids[1], versionNumber: 4, createTime: "2026-11-24T10:19:00Z" }, { id: ids[0], versionNumber: 3, createTime: "2026-11-24T08:28:00Z" }] }] };
+    const api = createIfcSpatialApi({ aps: { dataClient: () => ({ getAll: async () => ({ data: [], included: [] }) }), projectFiles: async () => files }, cacheDir: mkdtempSync(join(tmpdir(), "ifc-e2e-large-")),
+      logger: { info() {}, warn() {}, error() {} }, download: async (_c: unknown, _p: unknown, versionId: string) => ({ bytes: bytes[ids.indexOf(versionId)] }) });
+    await page.route(/googleapis\.com/, route => route.abort());
+    await page.route("**/api/ifc-spatial/**", async route => {
+      const u = new URL(route.request().url());
+      const req: any = Readable.from([]);
+      Object.assign(req, { method: route.request().method(), url: u.pathname + u.search, headers: {} });
+      let status = 200, headers: any = {}; const parts: Buffer[] = [];
+      await api.handle(req, { writeHead(s: number, h: any) { status = s; headers = h; }, write(c: any) { parts.push(Buffer.from(c)); }, end(b: any) { if (b) parts.push(Buffer.from(b)); } } as any);
+      await route.fulfill({ status, headers, body: Buffer.concat(parts) });
+    });
+    await openTwin(page, "&screen=ifc-spatial");
+    await page.waitForFunction(() => (window as any).__ifcSpatial?.state().phase === "ready", null, { timeout: 180_000 });
+    const cmp = () => page.evaluate(() => (window as any).__ifcSpatial.compare.state());
+    await page.click('[data-act="compare"]');
+    await page.click(".isp-cmp-dialog button[type=submit]");
+    await page.waitForFunction(() => { const c = (window as any).__ifcSpatial.compare.state(); return c.summary && !c.busy && c.models.every(Boolean); }, null, { timeout: 300_000 });
+    let c = await cmp();
+    // The engine's counts, untouched.
+    expect(c.summary).toMatchObject({ added: 33, moved: 0, modified: 98, removed: 0, unchanged: 97, total: 131 });
+    // Large: Significant Changes by default; property-only changes not on the map.
+    expect([c.density, c.mode, c.significant, c.shownOnMap]).toEqual(["large", "significant", 35, 35]);
+    expect(c.groups.map((g: any) => [g.label, g.count])).toEqual([["New Circuit Breakers", 33], ["Modified Network", 2], ["Modified Properties", 96]]);
+    expect(c.groups.reduce((n: number, g: any) => n + g.count, 0)).toBe(131);
+    await expect(page.locator(".isp-dc-total")).toHaveText("131 changes");
+    await expect(page.locator(".isp-dc-group")).toHaveCount(3);
+    await expect(page.locator('.isp-cmp-modes [data-cmp-mode="significant"]')).toHaveAttribute("aria-pressed", "true");
+    await page.waitForTimeout(2500);
+    // Clusters, not 131 labels: a handful of labels in the updated view.
+    const labels = c.labels[1].length ? c.labels[1] : (await cmp()).labels[1];
+    expect(labels.length).toBeLessThanOrEqual(8);
+    expect(labels.some((l: string) => /New Circuit Breakers/.test(l))).toBe(true);
+
+    // A group: its assets only, framed; expanded, its elements, searchable; one of them in focus.
+    await page.click('[data-cmp-group="added-breaker"]');
+    c = await cmp();
+    expect([c.group, c.shownOnMap]).toEqual(["added-breaker", 33]);
+    await page.click('[data-cmp-group-open="added-breaker"]');
+    await expect(page.locator(".isp-dc-group.is-open .isp-dc-row")).toHaveCount(33);
+    await page.fill("[data-cmp-group-search]", "CB-STS");
+    await expect(page.locator(".isp-dc-group.is-open .isp-dc-row")).toHaveCount(12);
+    await page.click('.isp-dc-group.is-open .isp-dc-row >> text=CB-STS-05');
+    c = await cmp();
+    expect([c.mode, c.selectedStatus]).toEqual(["focus", "ADDED"]);
+    await expect(page.locator(".isp-dc-detail")).toContainText("New Circuit Breaker CB-STS-05");
+    await page.click('[data-cmp="back"]');
+    expect((await cmp()).mode).toBe("significant");
+    await page.click('[data-cmp-group="added-breaker"]');
+
+    // Hiding a group; All Changes; Full Network.
+    await page.locator('[data-cmp-group-toggle="added-breaker"]').uncheck();
+    expect((await cmp()).shownOnMap).toBe(2);
+    await page.locator('[data-cmp-group-toggle="added-breaker"]').check();
+    await page.click('[data-cmp-mode="all"]');
+    c = await cmp();
+    expect([c.mode, c.shownOnMap]).toEqual(["all", 131]);
+    await page.waitForTimeout(1500);
+    expect((await cmp()).labels[1].length).toBeLessThanOrEqual(10);
+    await page.click('[data-cmp-mode="full"]');
+    expect((await cmp()).mode).toBe("full");
+    // Every change stays reachable in the flat list.
+    await page.click('[data-cmp-view="list"]');
+    await page.fill("[data-cmp-list-search]", "AP-");
+    expect(await page.locator(".isp-dc-row").count()).toBeGreaterThan(10);
+    await page.click('[data-cmp="exit"]');
+    expect((await cmp()).active).toBe(false);
+
+    // Ask the Twin on the same versions: a comparison answer, follow-ups, and the viewer opened on the answer.
+    await openAsk(page);
+    const askQ = async (q: string) => { await page.fill(".isp-askbar input", q); await page.press(".isp-askbar input", "Enter"); };
+    const answer = () => page.evaluate(() => (window as any).__ifcSpatial.state().network.answer);
+    await askQ("What changed between V3 and V4?");
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().network.answer?.status === "answered", null, { timeout: 120_000 });
+    expect((await answer()).title).toBe("131 changes between V3 and V4");
+    await expect(page.locator(`${ANSWER} .tw-metric`)).toHaveCount(5);
+    await expect(page.locator(`${ANSWER} .tw-metric`).first()).toContainText("33");
+    await expect(page.locator(`${ANSWER} .tw-sources`)).toContainText("IFC comparison V3 → V4");
+    await askQ("Show me the newly added assets");
+    await page.waitForFunction(() => /added/.test((window as any).__ifcSpatial.state().network.answer?.title ?? ""));
+    await askQ("Which of those are circuit breakers?");
+    await page.waitForFunction(() => /^33 circuit breakers added/.test((window as any).__ifcSpatial.state().network.answer?.title ?? ""));
+    await askQ("What changed between V7 and V9?");
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().network.answer?.status === "error");
+    await expect(page.locator(ANSWER)).toContainText("There is no version V7 or V9");
+    await expect(page.locator(`${ANSWER} [data-ask="What changed between V7 and V9?"]`)).toHaveText("Retry");
+    // A network question still goes to the network, laid out: a short direct answer, grouped items.
+    await askQ("What is connected to USS-1?");
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().network.result?.intent === "DOWNSTREAM");
+    await expect(page.locator(`${ANSWER} .tw-result`).first()).toBeVisible();
+    const lead = page.locator(`${ANSWER} .tw-lead`);
+    expect((await lead.count()) ? await lead.innerText() : "").not.toMatch(/(\b[A-Z]+-\d+\b.*){8}/);
+    // "Show them on the map" opens the comparison with only those changes, and Ask stays usable there.
+    await askQ("How many assets were added in V4?");
+    await page.waitForFunction(() => /33 assets added/.test((window as any).__ifcSpatial.state().network.answer?.title ?? ""));
+    await askQ("Show them on the map");
+    await page.waitForFunction(() => { const c = (window as any).__ifcSpatial.compare.state(); return c.active && c.only === 33 && c.models.every(Boolean); }, null, { timeout: 300_000 });
+    await expect(page.locator(".isp-dc-only")).toContainText("Showing 33 changes from Ask the Twin");
+    await expect(page.locator(".isp-askbar")).toBeVisible();
+    await askQ("What changed in CB-STS-05?");
+    await page.waitForFunction(() => /CB-STS-05 was added in V4/.test((window as any).__ifcSpatial.state().network.answer?.title ?? ""));
+    await page.click('[data-cmp="exit"]');
+  });
+
+  test("12 Ask the Twin results on the map: highlighted, selected without losing the set, back, clustered, cleared", async ({ page }) => {
+    test.setTimeout(300_000);
+    await mockSpatial(page);
+    await openTwin(page, "&screen=ifc-spatial");
+    await ready(page);
+    const hl = () => page.evaluate(() => (window as any).__ifcSpatial.askHighlights.state());
+    const title = () => page.evaluate(() => { const n = (window as any).__ifcSpatial.state().network; return n.answer?.title ?? n.result?.title ?? ""; });
+    const askQ = async (q: string) => { await page.fill(".isp-askbar input", q); await page.press(".isp-askbar input", "Enter"); };
+    await openAsk(page);
+
+    await askQ("Show me all transformers installed across Seagirt");
+    await page.waitForFunction(() => ((window as any).__ifcSpatial.askHighlights.state()?.count ?? 0) >= 9);
+    let s = await hl();
+    const n = s.count;
+    expect(s.ids).toEqual(expect.arrayContaining(["TX-M1", "TX-M2", "TX-1", "TX-7"]));
+    expect(s.ids.every((id: string) => /^TX-/.test(id))).toBe(true);
+    expect(s.mode).toBe("individual");
+    await expect(page.locator(".isp-ask-hl")).toContainText(`${n} assets highlighted`);
+    expect(await title()).toMatch(new RegExp(`${n} transformers`));
+    // The sentence says how many and that they are on the map; the card is the rows: five, the rest folded; a ring per located result.
+    await expect(page.locator(`${ANSWER} .tw-say`)).toContainText(`I found ${n} transformers across Seagirt and highlighted`);
+    await expect(page.locator(`${ANSWER} .tw-coll > .tw-coll-rows .tw-crow`)).toHaveCount(5);
+    await expect(page.locator(`${ANSWER} .tw-coll-more summary`)).toContainText(`+ ${n - 5} more`);
+    await expect(page.locator(`${ANSWER} .tw-keys`)).toHaveCount(0);
+    expect(s.effects).toBe(s.count);
+
+    // Selecting a result keeps the set: emphasised, details open, Back to results.
+    await page.locator('.tw-crow[data-asset="TX-M1"]').first().click({ force: true });
+    await page.waitForFunction(() => (window as any).__ifcSpatial.askHighlights.state()?.selected === "TX-M1");
+    await expect(page.locator(`${ANSWER} .tw-crow.is-selected`)).toHaveAttribute("data-asset", "TX-M1");
+    s = await hl();
+    expect(s.count).toBe(n);
+    expect(s.back).toBe(true);
+    await expect(page.locator(".isp-insp-foot")).toContainText(`Back to Results (${n})`);
+    await expect(page.locator(".isp-net-panel")).toContainText("Main transformer TX-M1");
+    await expect(page.locator(".isp-net-panel")).toContainText("illustrative, not surveyed");
+    await page.click('.isp-insp-foot [data-act="askBack"]', { force: true });
+    await expect.poll(title).toMatch(new RegExp(`${n} transformers`));
+    expect((await hl()).selected).toBe(null);
+    expect((await hl()).count).toBe(n);
+
+    // A new question replaces the set; many results cluster.
+    await askQ("What is downstream of TX-M1?");
+    await page.waitForFunction(() => ((window as any).__ifcSpatial.askHighlights.state()?.ids.length ?? 0) > 50);
+    s = await hl();
+    expect(s.ids).not.toContain("TX-7");
+    expect(s.mode).toBe("cluster");
+    expect(s.labels.length).toBeLessThan(s.count);
+
+    await askQ("Which cables connect USS-1 to the main substation?");
+    await page.waitForFunction(() => /connects? USS-1 and the main substation/.test((window as any).__ifcSpatial.state().network.answer?.title ?? ""));
+    expect((await hl()).ids).toContain("USS-1");
+
+    await page.click('.isp-ask-hl [data-act="askClear"]', { force: true });
+    await page.waitForFunction(() => (window as any).__ifcSpatial.askHighlights.state()?.ids.length === 0);
+    await expect(page.locator(".isp-ask-hl")).toBeHidden();
+
+    // Power status comes from the screen's own statuses (the engine alone cannot answer it).
+    await askQ("Which assets have no power?");
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().network.answer?.kind === "Power status");
+    expect(await title()).toMatch(/no power/);
+  });
+
+  test("13 the Ask the Twin panel: docked left, welcome and suggested questions, the conversation in the panel, collapse and reopen", async ({ page }) => {
+    test.setTimeout(300_000);
+    await mockSpatial(page);
+    await openTwin(page, "&screen=ifc-spatial");
+    await ready(page);
+    const panel = page.locator(".isp-askp");
+    // Collapsed to its launcher at first; Labels off; Power Status in the header only.
+    await expect(page.locator(".isp-ask")).toHaveClass(/is-collapsed/);
+    await expect(page.locator('[data-toggle="labels"]')).toHaveAttribute("aria-pressed", "false");
+    await openAsk(page);
+    await expect(panel).toBeVisible();
+    const box = (await panel.boundingBox())!;
+    expect(box.x).toBeLessThan(120);
+    expect(box.width).toBeGreaterThanOrEqual(360);
+    await expect(page.locator(".isp-askp-head h2")).toContainText("Ask the Twin");
+    await expect(page.locator(".isp-askp-welcome h3")).toHaveText("Welcome to Ask the Twin");
+    await expect(page.locator(".isp-askp-card")).toHaveText(["Show all transformers", "Which assets have no power?", "What does TX-M1 supply?", "Compare IFC versions"]);
+    await expect(page.locator(".isp-askbar input")).toHaveAttribute("placeholder", "Ask about your twin...");
+    // Decorative graphics are hidden from assistive technology.
+    expect(await page.locator(".isp-askp svg:not([aria-hidden='true'])").count()).toBe(0);
+
+    // An empty question is not sent.
+    await page.press(".isp-askbar input", "Enter");
+    await expect(page.locator(".isp-turn")).toHaveCount(0);
+
+    // A suggested question goes through the same flow; the answer is in the panel, not in a card on the right.
+    await page.click(".isp-askp-card >> nth=0", { force: true });
+    await expect(page.locator(".isp-askp-welcome")).toBeHidden();
+    await expect(page.locator(".isp-turn .isp-msg-user")).toHaveText("Show me all transformers installed across Seagirt.");
+    await expect(page.locator(`${ANSWER} .tw-say`)).toContainText("transformers");
+    await expect(page.locator(".isp-net-panel")).toBeHidden();
+    await page.fill(".isp-askbar input", "What does TX-M1 supply?");
+    await page.press(".isp-askbar input", "Enter");
+    await expect(page.locator(".isp-turn")).toHaveCount(2);
+    await expect(page.locator(".isp-askbar input")).toHaveValue("");
+
+    // Collapse to the launcher and back: the conversation is kept.
+    await page.click('[data-act="askCollapse"]');
+    await expect(page.locator(".isp-askp-launcher")).toBeVisible();
+    await expect(page.locator(".isp-ask")).toHaveClass(/is-collapsed/);
+    await page.click('[data-act="askExpand"]');
+    await expect(page.locator(".isp-ask")).not.toHaveClass(/is-collapsed/);
+    await expect(page.locator(".isp-turn")).toHaveCount(2);
+    await expect(page.locator(".isp-askbar input")).toBeFocused();
+  });
+
+  test("14 document intelligence: a tabbed review read from the asset's ACC PDFs, numbered citations that open the cited page", async ({ page }) => {
+    test.setTimeout(300_000);
+    const { createIfcSpatialApi } = await import("../server/ifcSpatial/api.mjs");
+    const { specSheet, inspectionReport } = await import("../tests/pdfFixtures.mjs");
+    const { mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { Readable } = await import("node:stream");
+    // ACC Docs with TX-M1's asset sheet and three inspection reports (controlled contents), and TX-M2's sheet only.
+    const pdfs: Record<string, Uint8Array> = {
+      "TX-M1_Transformer.pdf": specSheet({ assetId: "TX-M1", fields: [["Rating", "34.5/13.8 kV, 12 MVA"], ["PrimaryVoltage", "34,500 V"], ["SecondaryVoltage", "13,800 V"], ["MaximumApparentPower", "12,000,000 VA"],
+        ["Overall size L x W x H (m)", "8.40 x 4.50 x 4.20"], ["CapacitykW", "11,000"]] }),
+      "TX-M1_Transformer_Inspection-2024-001_2024-03-14.pdf": inspectionReport({ assetId: "TX-M1", date: "2024-03-14", number: "INS-M1-2024", condition: "GOOD (4/5)",
+        summary: ["Transformer in good condition. A light weep at radiator 3 was noted for monitoring."], findings: [["Radiators and cooling fans", "Attention", "Light weep at radiator 3 lower flange."], ["Bushings (HV and LV)", "OK", "Clean."]],
+        measures: [["Test", "Result", "Previous"], ["Moisture in oil (ppm)", "12", "11"]], actions: [["Re-check radiator 3 flange at next inspection", "Low", "2025-03-14"]] }),
+      "TX-M1_Transformer_Inspection-2025-001_2025-04-10.pdf": inspectionReport({ assetId: "TX-M1", date: "2025-04-10", number: "INS-M1-2025", condition: "FAIR (3/5)", conditions: "Overcast, 14 deg C",
+        summary: ["Condition Fair. Radiator 3 flange dripping and fan 4 has failed."], findings: [["Radiators and cooling fans", "Attention", "Radiator 3 flange dripping. Fan 4 motor seized."], ["Bushings (HV and LV)", "OK", "Clean."]],
+        measures: [["Test", "Result", "Previous (2024-03-14)"], ["Moisture in oil (ppm)", "18", "12"], ["Dielectric breakdown (kV, 2 mm gap)", "44", "52"]],
+        actions: [["Repair radiator 3 flange gasket", "Medium", "2025-06-30"], ["Replace cooling fan 4 motor", "Medium", "2025-06-30"]] }),
+      "TX-M1_Transformer_Inspection-2026-001_2026-10-28.pdf": inspectionReport({ assetId: "TX-M1", date: "2026-10-28", number: "INS-M1-2026", condition: "POOR (2/5)", conditions: "Clear, 12 deg C",
+        summary: ["Condition Poor. The radiator 3 valve is still leaking and fan 4 is still out of service.", "The 2025 repair actions were not completed."],
+        findings: [["Radiators and cooling fans", "Defect", "Radiator 3 valve still leaking. Fan 4 still failed."], ["Bushings (HV and LV)", "Defect", "Discolouration on LV X2 connector."]],
+        measures: [["Test", "Result", "Previous (2025-04-10)"], ["Moisture in oil (ppm)", "27", "18"], ["Dielectric breakdown (kV, 2 mm gap)", "33", "44"]],
+        actions: [["Prepare switching plan to carry Bus A loads during the outage", "High", "2026-11-27"]] }),
+      "TX-M2_Transformer.pdf": specSheet({ assetId: "TX-M2", fields: [["Rating", "34.5/13.8 kV, 12 MVA"]] }),
+    };
+    const tree: Record<string, { folders: { id: string; name: string }[]; files: string[] }> = {
+      top: { folders: [{ id: "docs", name: "Asset Documentation" }], files: [] },
+      docs: { folders: [{ id: "f2", name: "02_Transformers" }], files: [] },
+      f2: { folders: [], files: Object.keys(pdfs) },
+    };
+    const client = {
+      async getAll(path: string) {
+        const id = decodeURIComponent(/folders\/([^/]+)\/contents/.exec(path)![1]);
+        const node = tree[id] ?? { folders: [], files: [] };
+        return { data: [...node.folders.map(f => ({ type: "folders", id: f.id, attributes: { displayName: f.name } })),
+          ...node.files.map(f => ({ type: "items", id: `urn:item:${f}`, attributes: { displayName: f }, relationships: { tip: { data: { id: `urn:v:${f}?version=1` } } }, links: { webView: { href: `https://acc.autodesk.com/docs/files/projects/p?entityId=${f}` } } }))],
+          included: node.files.map(f => ({ type: "versions", id: `urn:v:${f}?version=1`, attributes: { name: f, versionNumber: 1, fileType: "pdf", storageSize: pdfs[f].length, lastModifiedTime: "2026-11-25T08:00:00Z" } })) };
+      },
+      async get() { return { data: {} }; },
+    };
+    const model = readFileSync(new URL("../tests/fixtures/ifc/seagirt-compare-v2.ifc", import.meta.url));
+    const v = "urn:model?version=3";
+    const files = { hub: { id: "h" }, project: { id: "b.p", name: "Seagirt" }, topFolders: [{ id: "top", name: "Project Files" }],
+      files: [{ fileName: "seagirt_power_network.ifc", itemId: "urn:i", tipVersionId: v, versions: [{ id: v, versionNumber: 3 }] }] };
+    const streamed: string[] = [];
+    const analyses: string[] = [];
+    const api = createIfcSpatialApi({ aps: { dataClient: () => client, projectFiles: async () => files }, cacheDir: mkdtempSync(join(tmpdir(), "ifc-docintel-e2e-")), logger: { info() {}, warn() {}, error() {} },
+      download: async () => ({ bytes: model }),
+      openStream: async (_c: unknown, _p: unknown, versionId: string) => {
+        streamed.push(versionId);
+        const name = versionId.replace(/^urn:v:/, "").replace(/\?.*$/, "");
+        return { body: Readable.from([Buffer.from(pdfs[name])]), contentLength: pdfs[name].length, fileName: name };
+      } });
+    await page.route(/googleapis\.com/, route => route.abort());
+    await page.route("**/api/ifc-spatial/**", async route => {
+      const u = new URL(route.request().url());
+      if (u.pathname.endsWith("/documents/analysis")) analyses.push(u.searchParams.get("asset")!);
+      const body = route.request().postDataBuffer();
+      const req: any = Readable.from(body ? [body] : []);
+      Object.assign(req, { method: route.request().method(), url: u.pathname + u.search, headers: {} });
+      let status = 200, headers: any = {}; const parts: Buffer[] = [];
+      await api.handle(req, { writeHead(s: number, h: any) { status = s; headers = h; }, write(c: any) { parts.push(Buffer.from(c)); }, end(b: any) { if (b) parts.push(Buffer.from(b)); } } as any);
+      await route.fulfill({ status, headers, body: Buffer.concat(parts) });
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openTwin(page, "&screen=ifc-spatial");
+    await page.waitForFunction(() => (window as any).__ifcSpatial?.state().phase === "ready", null, { timeout: 180_000 });
+    await page.waitForFunction(() => (window as any).__ifcSpatial.documents.state().summary, null, { timeout: 60_000 });
+
+    await openAsk(page);
+    await page.fill(".isp-askbar input", "Before we replace TX-M1, summarize its inspection history and technical specifications.");
+    await page.press(".isp-askbar input", "Enter");
+    const rev = page.locator(`${ANSWER} .tw-rev`);
+    await expect(rev).toBeVisible({ timeout: 60_000 });
+    // Only TX-M1's four documents were downloaded, each once (the citation preview below streams one again).
+    expect(streamed.filter(x => /TX-M1_/.test(x))).toHaveLength(4);
+    // No generic sentence before it: a compact sources row, one header, the demo-data notice, four tabs, Overview open.
+    await expect(page.locator(`${ANSWER} .tw-say`)).toHaveCount(0);
+    await expect(rev.locator(".tw-rev-src > summary")).toContainText("4 ACC documents analyzed");
+    await expect(rev.locator(".tw-rev-h")).toContainText("TX-M1");
+    await expect(rev.locator(".tw-rev-h")).toContainText("Transformer · Replacement review");
+    await expect(rev.locator(".tw-rev-tab")).toHaveText(["Overview", "Inspections", "Specifications"]);
+    await expect(rev.locator('.tw-rev-tab[aria-selected="true"]')).toHaveText("Overview");
+    const overview = rev.locator('[data-doc-panel="overview"]');
+    await expect(overview.locator(".tw-concl h4")).toHaveText("Engineering review required");
+    await expect(overview.locator(".tw-ct svg")).toHaveAttribute("aria-label", "Documented condition rating: 2024-03-14: Good 4/5, 2025-04-10: Fair 3/5, 2026-10-28: Poor 2/5");
+    await expect(overview.locator(".tw-rmetric")).toHaveCount(3);
+    await expect(overview.locator(".tw-rmetric").first()).toContainText("2Latest defects");
+    expect(await overview.locator(".tw-concern").count()).toBeLessThanOrEqual(3);
+    // Recommended next steps: one row named for the question, collapsed until it is clicked.
+    await expect(overview.locator(".tw-rnext h5")).toHaveText("Recommended next steps");
+    const steps = overview.locator(".tw-rstep");
+    await expect(steps.locator(":scope > summary span")).toHaveText("Before replacement");
+    await expect(steps.locator(".tw-rstep-b")).toBeHidden();
+    await steps.locator(":scope > summary").click();
+    await expect(steps.locator(".tw-rstep-b")).toBeVisible();
+    await expect(steps.locator(".tw-rgroup").first()).toHaveText("Electrical compatibility");
+    await expect(steps).toContainText("Match the replacement to the documented ratings");
+    await steps.locator(":scope > summary").click();
+    await expect(overview.locator(".tw-rnext")).toContainText("Electrical compatibility");
+    await expect(overview.locator(".tw-rnext")).toContainText("not an authorization to replace");
+    await expect(overview).not.toContainText(/\bClose [A-Z]+-\d|Isolate upstream at/);
+    // At 1440 × 900 the conclusion, the trend and the metrics are in view without scrolling the panel.
+    const body = page.locator(".isp-askp-body");
+    const bodyBox = (await body.boundingBox())!;
+    const metricsBox = (await overview.locator(".tw-rmetrics").boundingBox())!;
+    expect(metricsBox.y + metricsBox.height).toBeLessThanOrEqual(bodyBox.y + bodyBox.height + 1);
+    const trendBox = (await overview.locator(".tw-ct").boundingBox())!;
+    expect(trendBox.height).toBeLessThanOrEqual(140);
+    // The footer never covers the answer: the scroll area ends where the input area starts.
+    const footBox = (await page.locator(".isp-askp-foot").boundingBox())!;
+    expect(bodyBox.y + bodyBox.height).toBeLessThanOrEqual(footBox.y + 1);
+    await expect(page.locator(".isp-ask-hl")).toContainText("TX-M1 selected");
+    await page.screenshot({ path: test.info().outputPath("review-1440-overview.png") });
+
+    // Tabs: another panel, nothing re-requested, the asset still selected.
+    const requestsBefore = analyses.length, streamedBefore = streamed.length;
+    for (const [tab, name] of [["Inspections", "inspections"], ["Specifications", "specifications"], ["Overview", "overview"]]) {
+      await rev.locator(".tw-rev-tab", { hasText: tab }).click();
+      await expect(rev.locator(`[data-doc-panel="${name}"]`)).toBeVisible();
+      await expect(rev.locator('[data-doc-panel]:visible')).toHaveCount(1);
+      await page.screenshot({ path: test.info().outputPath(`review-1440-${name}.png`) });
+    }
+    expect(analyses.length).toBe(requestsBefore);
+    expect(streamed.length).toBe(streamedBefore);
+    expect((await spatial(page)).network.selected ?? (await spatial(page)).network.selectedId).toBe("TX-M1");
+
+    // Inspections: latest first, collapsed; a card opens to its findings.
+    await rev.locator(".tw-rev-tab", { hasText: "Inspections" }).click();
+    const insp = rev.locator('[data-doc-panel="inspections"]');
+    await expect(insp.locator(".tw-insp").first()).toContainText("2026-10-28");
+    await expect(insp.locator(".tw-insp[open]")).toHaveCount(0);
+    await insp.locator(".tw-insp > summary").first().click();
+    await expect(insp.locator(".tw-insp").first().locator(".tw-insp-b")).toContainText("Discolouration on LV X2 connector");
+    await expect(insp.locator(".tw-comp", { hasText: "Radiators and cooling fans" }).locator(".tw-rtag")).toHaveText("Worsening");
+    await expect(insp.locator(".tw-rsec > summary")).toContainText("deteriorated");
+    await expect(insp).toContainText("Without verified closure");
+    await expect(insp).not.toContainText("moved the usual way");
+    // Specifications: engineering units, the missing fields grouped.
+    await rev.locator(".tw-rev-tab", { hasText: "Specifications" }).click();
+    const spec = rev.locator('[data-doc-panel="specifications"]');
+    await expect(spec.locator(".tw-rspec-hl")).toContainText("12 MVA");
+    await expect(spec.locator(".tw-rspec-hl")).toContainText("34.5 / 13.8 kV");
+    await expect(spec.locator(".tw-rmiss > summary")).toContainText(/\d+ key specifications missing/);
+    // Back to the Overview: its next steps hold the replacement checks and the electrical model.
+    await rev.locator(".tw-rev-tab", { hasText: "Overview" }).click();
+    const repl = overview;
+    // A citation number: the source card, then the existing preview at that page; the tab and the conversation stay.
+    const turns = await page.locator(".isp-turn").count();
+    const ref = repl.locator(".tw-ref[data-ref-page]").first();
+    const refPage = await ref.getAttribute("data-ref-page");
+    await ref.click();
+    const pop = rev.locator(".tw-cpop");
+    await expect(pop).toBeVisible();
+    await expect(pop).toContainText(`page ${refPage}`);
+    await expect(pop.locator("a", { hasText: "Open in ACC" })).toHaveAttribute("href", /acc\.autodesk\.com/);
+    await pop.locator("[data-doc-cite]").click();
+    const frame = page.locator(".isp-docview-frame");
+    await expect(frame).toBeVisible();
+    expect(await frame.getAttribute("src")).toMatch(new RegExp(`/content#page=${refPage}$`));
+    await page.click("[data-doc-close]");
+    await expect(page.locator(".isp-turn")).toHaveCount(turns);
+    await expect(rev.locator('.tw-rev-tab[aria-selected="true"]')).toHaveText("Overview");
+
+    // Open outage simulation (Before replacement): the existing panel on the right; the review stays as it was.
+    const sim = repl.locator('[data-act="docSimulate"]');
+    if (await sim.count()) {
+      await repl.locator(".tw-rstep > summary").click();
+      await sim.click();
+      await expect(page.locator(".isp-sim")).toBeVisible({ timeout: 15_000 });
+      await expect(rev).toBeVisible();
+      await expect(rev.locator('.tw-rev-tab[aria-selected="true"]')).toHaveText("Overview");
+      await page.screenshot({ path: test.info().outputPath("review-simulation.png") });
+      await page.locator('.isp-sim .isp-sim-reset').click();
+      await expect(page.locator('.isp-sim')).toHaveCount(0);
+      await expect(rev.locator('.tw-rev-tab[aria-selected="true"]')).toHaveText("Overview");
+    }
+
+    // Other desktop sizes and a smaller window: the review fits the panel, nothing overflows sideways.
+    for (const [w, h] of [[1920, 1080], [1280, 720]]) {
+      await page.setViewportSize({ width: w, height: h });
+      await rev.locator(".tw-rev-tab", { hasText: "Overview" }).click();
+      const card = (await rev.locator(".tw-rev-card").boundingBox())!;
+      const panel = (await page.locator(".isp-askp").boundingBox())!;
+      expect(card.x + card.width).toBeLessThanOrEqual(panel.x + panel.width);
+      await page.screenshot({ path: test.info().outputPath(`review-${w}-overview.png`) });
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    // Only TX-M1's documents were downloaded, each once; TX-M2's sheet was not used.
+    expect(streamed.some(x => /TX-M2_/.test(x))).toBe(false);
+    const downloaded = streamed.length;
+    const asked = analyses.length;
+
+    // Follow-ups on the same asset reuse the analysis already read: no new request, the right tab open.
+    await page.fill(".isp-askbar input", "What specifications are missing?");
+    await page.press(".isp-askbar input", "Enter");
+    await expect(page.locator(`${ANSWER} .tw-rev-tab[aria-selected="true"]`)).toHaveText("Specifications", { timeout: 30_000 });
+    await expect(page.locator(`${ANSWER} .tw-rmiss[open]`)).toBeVisible();
+    await page.fill(".isp-askbar input", "Which actions are not verified closed?");
+    await page.press(".isp-askbar input", "Enter");
+    await expect(page.locator(`${ANSWER} .tw-rev-tab[aria-selected="true"]`)).toHaveText("Overview", { timeout: 30_000 });
+    await expect(page.locator(`${ANSWER} .tw-rstep > summary span`)).toHaveText("Maintenance considerations");
+    await expect(page.locator(ANSWER)).toContainText("Not according to the documents");
+    await page.fill(".isp-askbar input", "Has TX-M1's condition deteriorated over time?");
+    await page.press(".isp-askbar input", "Enter");
+    await expect(page.locator(`${ANSWER} .tw-rstep > summary span`)).toHaveText("Condition assessment", { timeout: 30_000 });
+    await page.fill(".isp-askbar input", "Show the evidence for the cooling system issue.");
+    await page.press(".isp-askbar input", "Enter");
+    await expect(page.locator(`${ANSWER} .tw-comp[open]`)).toContainText("Radiators and cooling fans", { timeout: 30_000 });
+    await page.fill(".isp-askbar input", "What is the rated capacity?");
+    await page.press(".isp-askbar input", "Enter");
+    await expect(page.locator(`${ANSWER} .tw-say`)).toHaveText("TX-M1's rated power: 12,000,000 VA.", { timeout: 30_000 });
+    expect(analyses.length).toBe(asked);
+    await page.fill(".isp-askbar input", "Summarize TX-M2's inspection history.");
+    await page.press(".isp-askbar input", "Enter");
+    await expect(page.locator(`${ANSWER} .tw-say`)).toHaveText("No inspection reports were found among TX-M2's linked documents.", { timeout: 30_000 });
+    await page.fill(".isp-askbar input", "Which downstream assets would be affected during replacement of TX-M1?");
+    await page.press(".isp-askbar input", "Enter");
+    await expect(page.locator(ANSWER)).toContainText("If TX-M1 shuts down", { timeout: 30_000 });
+    expect(streamed.slice(downloaded).filter(x => /TX-M1_/.test(x))).toEqual([]);
+    expect(streamed.slice(downloaded)).toEqual(["urn:v:TX-M2_Transformer.pdf?version=1"]);
+  });
+
+  test("15 generated report: transformers requiring inspection, a PDF, an Excel register and an email draft from one snapshot", async ({ page }) => {
+    test.setTimeout(300_000);
+    const { createIfcSpatialApi } = await import("../server/ifcSpatial/api.mjs");
+    const { specSheet, inspectionReport } = await import("../tests/pdfFixtures.mjs");
+    const { extractPdfText } = await import("../server/ifcSpatial/docExtract.mjs");
+    const ExcelJS = (await import("exceljs")).default;
+    const { mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { Readable } = await import("node:stream");
+    // Controlled ACC records: TX-M1 has an inspection action in its latest report, TX-M2 is past its documented due date,
+    // TX-1 has a clean record, TX-3 is in poor condition only (a review candidate); the other transformers have none.
+    const pdfs: Record<string, Uint8Array> = {
+      "TX-M1_Transformer.pdf": specSheet({ assetId: "TX-M1", fields: [["Rating", "34.5/13.8 kV, 12 MVA"]] }),
+      "TX-M1_Transformer_Inspection-2026-001_2026-10-28.pdf": inspectionReport({ assetId: "TX-M1", date: "2026-10-28", number: "M1-26", condition: "POOR (2/5)", findings: [["Radiators and cooling fans", "Defect", "Leaking."]],
+        actions: [["Thermographic inspection of LV connections", "High", "2026-12-15"]] }),
+      "TX-M2_Transformer_Inspection-2025-001_2025-06-01.pdf": inspectionReport({ assetId: "TX-M2", date: "2025-06-01", number: "M2-25", condition: "GOOD (4/5)", findings: [["Bushings (HV and LV)", "OK", "Clean."]], nextDue: "2026-06-01" }),
+      "TX-1_Transformer_Inspection-2026-001_2026-09-01.pdf": inspectionReport({ assetId: "TX-1", date: "2026-09-01", number: "T1-26", condition: "GOOD (4/5)", findings: [["Bushings (HV and LV)", "OK", "Clean."]] }),
+      "TX-3_Transformer_Inspection-2026-001_2026-08-01.pdf": inspectionReport({ assetId: "TX-3", date: "2026-08-01", number: "T3-26", condition: "POOR (2/5)", findings: [["Tank, welds and gaskets", "Attention", "Staining."]] }),
+    };
+    const tree: Record<string, { folders: { id: string; name: string }[]; files: string[] }> = {
+      top: { folders: [{ id: "docs", name: "Asset Documentation" }], files: [] }, docs: { folders: [{ id: "f2", name: "02_Transformers" }], files: [] }, f2: { folders: [], files: Object.keys(pdfs) } };
+    const client = {
+      async getAll(path: string) {
+        const id = decodeURIComponent(/folders\/([^/]+)\/contents/.exec(path)![1]);
+        const node = tree[id] ?? { folders: [], files: [] };
+        return { data: [...node.folders.map(f => ({ type: "folders", id: f.id, attributes: { displayName: f.name } })),
+          ...node.files.map(f => ({ type: "items", id: `urn:item:${f}`, attributes: { displayName: f }, relationships: { tip: { data: { id: `urn:v:${f}?version=1` } } }, links: { webView: { href: `https://acc.autodesk.com/docs/files/projects/p?entityId=${f}` } } }))],
+          included: node.files.map(f => ({ type: "versions", id: `urn:v:${f}?version=1`, attributes: { name: f, versionNumber: 1, fileType: "pdf", storageSize: pdfs[f].length, lastModifiedTime: "2026-11-25T08:00:00Z" } })) };
+      },
+      async get() { return { data: {} }; },
+    };
+    const model = readFileSync(new URL("../tests/fixtures/ifc/seagirt-compare-v2.ifc", import.meta.url));
+    const v = "urn:model?version=3";
+    const files = { hub: { id: "h" }, project: { id: "b.p", name: "Seagirt Electrical Digital Twin POC" }, topFolders: [{ id: "top", name: "Project Files" }],
+      files: [{ fileName: "seagirt_power_network.ifc", itemId: "urn:i", tipVersionId: v, versions: [{ id: v, versionNumber: 3 }] }] };
+    const posts: string[] = [];
+    const cancels: string[] = [];
+    // Holds report creation until the test releases it (so a Stop lands while the answer is still running).
+    let gate: Promise<void> | null = null;
+    let release = () => {};
+    const api = createIfcSpatialApi({ aps: { dataClient: () => client, projectFiles: async () => files, sessionId: () => "browser-session" }, cacheDir: mkdtempSync(join(tmpdir(), "ifc-report-e2e-")),
+      logger: { info() {}, warn() {}, error() {} }, download: async () => ({ bytes: model }), now: () => Date.parse("2026-11-26T09:00:00Z"),
+      openStream: async (_c: unknown, _p: unknown, versionId: string) => {
+        const name = versionId.replace(/^urn:v:/, "").replace(/\?.*$/, "");
+        return { body: Readable.from([Buffer.from(pdfs[name])]), contentLength: pdfs[name].length, fileName: name };
+      } });
+    await page.route(/googleapis\.com/, route => route.abort());
+    await page.route("**/api/ifc-spatial/**", async route => {
+      const u = new URL(route.request().url());
+      if (u.pathname.endsWith("/reports") && route.request().method() === "POST") { posts.push(u.pathname); if (gate) await gate; }
+      if (u.pathname.endsWith("/cancel")) cancels.push(u.pathname);
+      const body = route.request().postDataBuffer();
+      const req: any = Readable.from(body ? [body] : []);
+      Object.assign(req, { method: route.request().method(), url: u.pathname + u.search, headers: {} });
+      let status = 200, headers: any = {}; const parts: Buffer[] = [];
+      await api.handle(req, { writeHead(s: number, h: any) { status = s; headers = h; }, write(c: any) { parts.push(Buffer.from(c)); }, end(b: any) { if (b) parts.push(Buffer.from(b)); } } as any);
+      await route.fulfill({ status, headers, body: Buffer.concat(parts) });
+    });
+    const bytesOf = async (url: string) => Buffer.from(await page.evaluate(async u => { const r = await fetch(u); const b = new Uint8Array(await r.arrayBuffer()); let s = ""; for (const x of b) s += String.fromCharCode(x); return btoa(s); }, url), "base64");
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openTwin(page, "&screen=ifc-spatial");
+    await page.waitForFunction(() => (window as any).__ifcSpatial?.state().phase === "ready", null, { timeout: 180_000 });
+    await page.waitForFunction(() => (window as any).__ifcSpatial.documents.state().summary, null, { timeout: 60_000 });
+    await openAsk(page);
+
+    await page.fill(".isp-askbar input", "Prepare a report of all transformers requiring inspection and draft an email to the electrical maintenance team.");
+    await page.press(".isp-askbar input", "Enter");
+    // Real progress first (the server's steps), then the answer.
+    await expect(page.locator(`${ANSWER} .tw-pg li`).first()).toContainText("Identifying matching assets", { timeout: 30_000 });
+    const card = page.locator(`${ANSWER} .tw-report[data-report]`);
+    await expect(card).toBeVisible({ timeout: 120_000 });
+    await expect(page.locator(`${ANSWER} .tw-say`)).toHaveText("I found 2 transformers requiring inspection.");
+    await expect(page.locator(`${ANSWER} .tw-say2`)).toContainText("I've prepared an inspection report, an Excel register and a draft email for your review.");
+    await expect(page.locator(`${ANSWER} .tw-say2`)).toContainText("1 more is recommended for review.");
+    // The fixture asset sheet calls itself "Illustrative mock network": the notice says so.
+    await expect(card.locator(".tw-rdemo")).toHaveText("Illustrative demo data — not actual inspection records.");
+    await expect(card.locator(".tw-rmatch-h b")).toHaveText("2 transformers");
+    await expect(card.locator(".tw-art")).toHaveCount(2);
+    await expect(card.locator(".tw-art").nth(0)).toContainText("Transformer Inspection Report");
+    await expect(card.locator(".tw-art").nth(1)).toContainText("Transformer Inspection Register");
+    await expect(card.locator(".tw-mail-f")).toContainText("Electrical Maintenance Team");
+    await expect(card.locator(".tw-mail-f")).toContainText("Seagirt — Transformers requiring inspection");
+    await expect(card.locator(".tw-mail-att")).toContainText("2 attachments");
+    await expect(card.locator(".tw-mail-note")).toContainText("Email has not been sent.");
+    await expect(card.locator("button", { hasText: /^Send/ })).toHaveCount(0);
+    // The matching assets are highlighted in Cesium, and only they.
+    const s = await spatial(page);
+    expect([...s.network.askIds].sort()).toEqual(["TX-3", "TX-M1", "TX-M2"]);
+    await page.screenshot({ path: test.info().outputPath("report-1440.png") });
+    const tall = page.viewportSize()!;
+    await page.setViewportSize({ width: tall.width, height: 1500 });
+    await page.locator(`${ANSWER}`).screenshot({ path: test.info().outputPath("report-answer.png") });
+    await page.setViewportSize(tall);
+
+    // The files are real and agree: the same two assets in the PDF, the register and the draft.
+    const pdfUrl = await card.locator(".tw-art").nth(0).locator("a.tw-art-dl").getAttribute("href");
+    const xlsxUrl = await card.locator(".tw-art").nth(1).locator("a.tw-art-dl").getAttribute("href");
+    const pdfBytes = await bytesOf(pdfUrl!);
+    expect(pdfBytes.subarray(0, 5).toString()).toBe("%PDF-");
+    const text = (await extractPdfText(pdfBytes)).pages.flatMap((p: any) => p.lines.map((l: any) => l.cells.map((c: any) => c.text).join(" "))).join("\n");
+    for (const id of ["TX-M1", "TX-M2", "TX-3"]) expect(text).toContain(id);
+    expect(text).toContain("Thermographic inspection of LV connections");
+    expect(text).toMatch(/overdue: the latest report set the next inspection for 2026-06-01/i);
+    expect(text).toContain("Source references");
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await bytesOf(xlsxUrl!));
+    const reg = wb.getWorksheet("Inspection Register")!;
+    const rows: string[][] = [];
+    reg.eachRow((r: any, n: number) => { if (n > 1) rows.push([r.getCell(1).value, r.getCell(10).value]); });
+    expect(rows.filter(r => r[1] === "Inspection required").map(r => r[0]).sort()).toEqual(["TX-M1", "TX-M2"]);
+    expect(rows.find(r => r[0] === "TX-3")![1]).toBe("Review recommended");
+    await card.locator('[data-report-act="email"]').first().click();
+    const body = await card.locator(".tw-mail-b").textContent();
+    expect(body).toMatch(/2 transformers have been identified as requiring inspection: TX-M1, TX-M2|2 transformers have been identified as requiring inspection: TX-M2, TX-M1/);
+
+    // Preview: the PDF in the existing preview dialog; the register's rows.
+    await card.locator('[data-report-act="preview"]').nth(0).click();
+    await expect(page.locator(".isp-docview-frame")).toHaveAttribute("src", /\/reports\/RPT-\d{8}-[a-z0-9]{8}\/artifacts\//);
+    await page.click("[data-doc-close]");
+    await card.locator('[data-report-act="preview"]').nth(1).click();
+    await expect(page.locator(".isp-xlsx-prev tbody tr")).toHaveCount(3);
+    await page.click("[data-doc-close]");
+    // Sources & criteria: the rules, coverage and missing records.
+    await card.locator('[data-report-act="criteria"]').click();
+    await expect(card.locator(".tw-rcrit-b")).toContainText("9 transformers evaluated");
+    await expect(card.locator(".tw-rcrit-b")).toContainText("Missing records");
+    // Edit the draft: the edit is kept; nothing is sent.
+    await card.locator('[data-report-act="emailEdit"]').click();
+    await card.locator('[data-mail="subject"]').fill("Seagirt — transformer inspections to schedule");
+    await card.locator('[data-report-act="emailSave"]').click();
+    await expect(card.locator(".tw-mail-f")).toContainText("Seagirt — transformer inspections to schedule");
+    await expect(card.locator(".tw-mail-note")).toContainText("Edited.");
+    const artifactIds = await card.locator('[data-report-act="preview"]').evaluateAll(els => els.map(e => (e as HTMLElement).dataset.reportArtifact));
+
+    // A row opens the asset (its inspector) and the report stays.
+    await card.locator('[data-report-act="assets"]').click();
+    await card.locator('.tw-crow[data-asset="TX-M1"]').click();
+    await expect(page.locator(".isp-insp, .isp-ops-detail").first()).toBeVisible();
+    await expect(card).toBeVisible();
+
+    // "Make the email shorter": only the draft changes; the same files, no new report job.
+    const postsBefore = posts.length;
+    await page.fill(".isp-askbar input", "Make the email shorter.");
+    await page.press(".isp-askbar input", "Enter");
+    await expect(page.locator(`${ANSWER} .tw-say`)).toHaveText("I've shortened the email draft.", { timeout: 30_000 });
+    const after = page.locator(`${ANSWER} .tw-report`);
+    expect(await after.locator('[data-report-act="preview"]').evaluateAll(els => els.map(e => (e as HTMLElement).dataset.reportArtifact))).toEqual(artifactIds);
+    expect(posts.length).toBe(postsBefore);
+
+    // Stop: while an answer runs the send button is a Stop button; stopping says so, drops the late result and
+    // cancels the report job on the server. Esc does the same. Then the button sends again.
+    gate = new Promise<void>(r => { release = r; });
+    const send = page.locator(".isp-askp .isp-send");
+    await page.fill(".isp-askbar input", "Prepare a report of all transformers requiring inspection.");
+    await page.press(".isp-askbar input", "Enter");
+    await expect(send).toHaveAttribute("aria-label", "Stop the answer");
+    await expect(send).toHaveClass(/is-busy/);
+    await page.screenshot({ path: test.info().outputPath("stop-button.png") });
+    await send.click();
+    // Stopped before the job exists ("Stopped."), or a running job cancelled on the server.
+    await expect(page.locator(`${ANSWER} .tw-say`)).toHaveText(/^(Stopped\.|Report generation was cancelled\.)$/);
+    await expect(send).toHaveAttribute("aria-label", "Send question");
+    release();
+    await expect.poll(() => cancels.length, { timeout: 10_000 }).toBe(1);
+    await page.waitForTimeout(800);
+    await expect(page.locator(`${ANSWER} .tw-say`)).toHaveText(/^(Stopped\.|Report generation was cancelled\.)$/);
+    await expect(page.locator(`${ANSWER} .tw-art`)).toHaveCount(0);
+    gate = new Promise<void>(r => { release = r; });
+    await page.fill(".isp-askbar input", "Prepare a report of all cranes requiring inspection.");
+    await page.press(".isp-askbar input", "Enter");
+    await expect(send).toHaveClass(/is-busy/);
+    await page.keyboard.press("Escape");
+    await expect(page.locator(`${ANSWER} .tw-say`)).toHaveText("Stopped.");
+    await expect(send).not.toHaveClass(/is-busy/);
+    release();
+    gate = null;
+    await expect.poll(() => cancels.length, { timeout: 10_000 }).toBe(2);
+
+    // A plain question is an evaluation, not a report; other categories go through the same workflow.
+    await page.fill(".isp-askbar input", "Which transformers require inspection?");
+    await page.press(".isp-askbar input", "Enter");
+    await expect(page.locator(`${ANSWER} .tw-say`)).toHaveText("I found 2 transformers requiring inspection.", { timeout: 60_000 });
+    await expect(page.locator(`${ANSWER} .tw-art`)).toHaveCount(0);
+    await expect(page.locator(`${ANSWER} .tw-mail`)).toHaveCount(0);
+    await expect(page.locator(`${ANSWER} .tw-crow`)).toHaveCount(3);
+    for (const [q, say] of [["Prepare a report of all circuit breakers requiring inspection.", "No circuit breakers meet the available inspection-required criteria."],
+      ["Prepare a report of all cranes requiring inspection.", "No cranes meet the available inspection-required criteria."]]) {
+      await page.fill(".isp-askbar input", q);
+      await page.press(".isp-askbar input", "Enter");
+      await expect(page.locator(`${ANSWER} .tw-say`)).toHaveText(say, { timeout: 60_000 });
+      await expect(page.locator(`${ANSWER} .tw-say2`)).toContainText("No files were generated");
+    }
+    await page.fill(".isp-askbar input", "Create an Excel register of all lighting assets.");
+    await page.press(".isp-askbar input", "Enter");
+    await expect(page.locator(`${ANSWER} .tw-art`)).toHaveCount(1, { timeout: 60_000 });
+    await expect(page.locator(`${ANSWER} .tw-art`)).toContainText("XLSX");
+    await expect(page.locator(`${ANSWER} .tw-say`)).toContainText(/^I found \d+ (high-mast lights|lighting circuits)\.$/);
+    await page.screenshot({ path: test.info().outputPath("report-lighting.png") });
+  });
+});
