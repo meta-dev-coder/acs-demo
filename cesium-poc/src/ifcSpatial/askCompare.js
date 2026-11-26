@@ -107,8 +107,13 @@ const DOT = { ADDED: 'ok', REMOVED: 'bad', MOVED: 'warn', MODIFIED: 'warn' };
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const article = (word, capital = false) => { const a = /^[aeiou]/i.test(word) ? 'an' : 'a'; return capital ? a[0].toUpperCase() + a.slice(1) : a; };
 
-/** An item for a change: selecting it opens the comparison focused on that change. */
-const changeItem = (c, base, target) => ({ id: idOf(c), label: idOf(c), dot: DOT[c.status], attrs: { 'data-cmp-open': `${base}:${target}`, 'data-cmp-focus': c.globalId } });
+/**
+ * An item for a change: selecting it focuses that asset on the map (the comparison screen opens only from
+ * "Open version comparison").
+ */
+const changeItem = c => ({ id: idOf(c), label: idOf(c), dot: DOT[c.status], attrs: { 'data-cmp-asset': idOf(c), 'data-cmp-gid': c.globalId } });
+/** A set of changes shown on the current map (not in the comparison screen). */
+const showOnMap = (label, list, primary = false) => ({ label, ...(primary ? { primary: true } : {}), attrs: { 'data-cmp-show': list.map(idOf).join(',') } });
 
 /**
  * The answer for a parsed question and its comparison `result` (the server's record: summary,
@@ -158,7 +163,7 @@ export function compareAnswer(parsed, result, { question, fileName, base, target
     return { ids: [c.globalId], view: { question, kind: kindLabel, status: 'answered', title, lead, sources,
       bullets: (c.modifications ?? []).filter(m => m.kind !== 'properties').map(m => m.label),
       details: rows.length ? [{ title: `What changed · ${rows.length}`, markdown: `| | V${base} | V${target} |\n|---|---|---|\n${rows.join('\n')}` }, { title: 'Identity', items: [`IFC GlobalId ${c.globalId}`, `IFC class ${c.ifcClass}`, `Matched by ${c.match?.by === 'SECONDARY' ? `NetworkID/name (${Math.round(c.match.confidence * 100)}%)` : 'GlobalId'}`] }] : [],
-      actions: [{ label: 'Show in the comparison', primary: true, attrs: { 'data-cmp-open': `${base}:${target}`, 'data-cmp-focus': c.globalId } }] } };
+      actions: [{ label: 'Show on map', primary: true, attrs: { 'data-cmp-asset': id, 'data-cmp-gid': c.globalId } }, { ...openAll, primary: false }] } };
   }
 
   // Lists: by status, by category, or the last answer's set.
@@ -180,11 +185,10 @@ export function compareAnswer(parsed, result, { question, fileName, base, target
       const k = new Map(); for (const c of others) k.set(categoryOf(c).many, (k.get(categoryOf(c).many) ?? 0) + 1);
       lead = others.length ? `The ${statusWord} assets are: ${[...k].map(([n, v]) => `${v} ${n.toLowerCase()}`).join(', ')}.` : '';
     }
-    const groups = buildGroups(pool).map(g => ({ label: g.label, tone: TONE[g.status], total: g.members.length, items: g.members.map(c => changeItem(c, base, target)) }));
-    const focusIds = pool.map(c => c.globalId).join(',');
+    const groups = buildGroups(pool).map(g => ({ label: g.label, tone: TONE[g.status], total: g.members.length, items: g.members.map(changeItem) }));
     const title = pool.length ? `${plural(pool.length, one, many)} ${statusWord} between V${base} and V${target}` : `No ${many} ${statusWord} between V${base} and V${target}`;
     return { ids: pool.map(c => c.globalId), view: { question, kind: kindLabel, status: 'answered', title, lead: `${lead}${resolved && pool.length ? ` Compared${resolved}.` : ''}`, groups: parsed.kind === 'count' && pool.length > 8 ? groups.map(g => ({ ...g, items: g.items })) : groups, sources,
-      actions: pool.length ? [{ label: 'Show on map', primary: true, attrs: { 'data-cmp-open': `${base}:${target}`, 'data-cmp-ids': focusIds } }, openAll] : [openAll],
+      actions: pool.length ? [showOnMap('Show on map', pool, true), { ...openAll, primary: false }] : [openAll],
       followUps: pool.length > 1 ? [{ label: 'One of them in detail', question: 'What changed in one of them?' }] : [] } };
   }
 
@@ -198,12 +202,12 @@ export function compareAnswer(parsed, result, { question, fileName, base, target
   return { ids: changes.map(c => c.globalId), view: { question, kind: kindLabel, status: 'answered',
     title: s.total ? `${plural(s.total, 'change')} between V${base} and V${target}` : `No changes between V${base} and V${target}`, lead, sources,
     metrics: [{ label: 'Added', value: s.added, tone: 'ok' }, { label: 'Moved', value: s.moved, tone: 'info' }, { label: 'Modified', value: s.modified, tone: 'warn' }, { label: 'Removed', value: s.removed, tone: 'bad' }, { label: 'Unchanged', value: s.unchanged, tone: 'neutral' }],
-    groups: groups.map(g => ({ label: `${g.label}${g.significant ? '' : ' (properties only)'}`, tone: TONE[g.status], total: g.members.length, items: g.members.map(c => changeItem(c, base, target)) })),
+    groups: groups.map(g => ({ label: `${g.label}${g.significant ? '' : ' (properties only)'}`, tone: TONE[g.status], total: g.members.length, items: g.members.map(changeItem) })),
     details: [
       { title: 'Notes from the comparison', items: [...(result.notes ?? []), ...(result.warnings ?? []), ...(result.modelWide ?? []).map(g => `Model-wide: ${g.label}.`)] },
       { title: 'Operational updates (not counted)', items: (result.statusUpdates ?? []).map(u => `${u.networkId ?? u.name}: ${u.changes.map(p => `${p.key.split('.').pop()} ${p.before ?? '—'} → ${p.after ?? '—'}`).join('; ')}`) },
     ],
-    actions: [openAll, ...(s.added ? [{ label: 'Show added assets', attrs: { 'data-cmp-open': `${base}:${target}`, 'data-cmp-status': 'ADDED' } }] : []),
-      ...(s.modified ? [{ label: 'Show modified assets', attrs: { 'data-cmp-open': `${base}:${target}`, 'data-cmp-status': 'MODIFIED' } }] : [])],
+    actions: [openAll, ...(s.added ? [showOnMap('Show added assets', changes.filter(c => c.status === 'ADDED'))] : []),
+      ...(s.modified ? [showOnMap('Show modified assets', changes.filter(c => c.status === 'MODIFIED'))] : [])],
     followUps: [s.added && { label: 'Which were added?', question: `Which assets were added in V${target}?` }, s.moved && { label: 'What moved?', question: `Which equipment moved between V${base} and V${target}?` }].filter(Boolean) } };
 }

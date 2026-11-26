@@ -45,6 +45,10 @@ const ICON = {
   down: glyph('<path d="M12 5v14M6 13l6 6 6-6"/>'),
   home: glyph('<path d="M4 11.5 12 5l8 6.5"/><path d="M6.5 10v9h11v-9"/><path d="M10 19v-5h4v5"/>'),
   reset: glyph('<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4.5h4.5"/>'),
+  google3d: glyph('<path d="M3 20h18"/><path d="M5 20V10l4-2v12M9 20V5l5-2v17M14 20v-9l5 1.5V20"/>'),
+  simple: glyph('<path d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z"/><path d="M9 4v13.5M15 6.5V20"/>'),
+  labels: glyph('<path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1 1 0 0 1 0 1.4l-7.3 7.3a1 1 0 0 1-1.4 0z"/><circle cx="8" cy="8" r="1.4"/>'),
+  dim: glyph('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17" /><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/>'),
 };
 /** A category for the details panel, from the same rules as the IFC Model Explorer. */
 const categoryOf = element => CATEGORIES.find(category => category.test({ ...element, name: element.name ?? '' }))?.label ?? 'Other';
@@ -56,6 +60,17 @@ async function request(path, { method = 'GET', body } = {}) {
   } catch (error) { throw new ApsRequestError('NETWORK', 0, `The app server could not be reached (${error?.message ?? error}).`); }
   const json = await response.json().catch(() => ({}));
   if (!response.ok) throw new ApsRequestError(json?.error?.code ?? `HTTP_${response.status}`, response.status, json?.error?.message ?? `The server answered ${response.status}.`, json?.error?.hint, json);
+  return json;
+}
+
+/** /api/gmail/* (server/gmail/): the same error shape as the IFC Spatial routes. */
+async function gmailRequest(path, { method = 'GET', body } = {}) {
+  let response;
+  try {
+    response = await fetch(`/api/gmail${path}`, { method, credentials: 'same-origin', headers: { accept: 'application/json', ...(body ? { 'content-type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  } catch (error) { throw new ApsRequestError('NETWORK', 0, `The app server could not be reached (${error?.message ?? error}).`); }
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok) throw new ApsRequestError(json?.error?.code ?? `HTTP_${response.status}`, response.status, json?.error?.message ?? `The server answered ${response.status}.`, null, json);
   return json;
 }
 
@@ -76,30 +91,31 @@ export function mountIfcSpatial({ host = document.body, syncIntervalMs = 60_000,
         <button type="button" class="isp-hicon isp-ws" data-ws="assets" aria-label="Assets" data-tip="Assets">${glyph('<path d="m12 3.5 8.5 4.5-8.5 4.5L3.5 8z"/><path d="m3.5 12 8.5 4.5 8.5-4.5"/><path d="m3.5 16 8.5 4.5 8.5-4.5"/>')}</button>
         <span class="isp-hsep"></span>
         <div class="isp-seg" role="group" aria-label="Base map">
-          <button type="button" class="isp-hbtn" data-base="google" aria-pressed="true" data-tip="Google Photorealistic 3D map">Google 3D</button>
-          <button type="button" class="isp-hbtn" data-base="simple" aria-pressed="false" data-tip="Simple satellite map">Simple</button>
+          <button type="button" class="isp-hbtn isp-hbtn-ic" data-base="google" aria-pressed="true" aria-label="Google 3D" data-tip="Google Photorealistic 3D map">${ICON.google3d}</button>
+          <button type="button" class="isp-hbtn isp-hbtn-ic" data-base="simple" aria-pressed="false" aria-label="Simple map" data-tip="Simple satellite map">${ICON.simple}</button>
         </div>
-        <button type="button" class="isp-hbtn" data-toggle="labels" aria-pressed="false">Labels</button>
-        <button type="button" class="isp-hbtn" data-toggle="dim" aria-pressed="true">Dim imagery</button>
+        <button type="button" class="isp-hbtn isp-hbtn-ic" data-toggle="labels" aria-pressed="false" aria-label="Labels" data-tip="Labels">${ICON.labels}</button>
+        <button type="button" class="isp-hbtn isp-hbtn-ic" data-toggle="dim" aria-pressed="true" aria-label="Dim imagery" data-tip="Dim imagery">${ICON.dim}</button>
         <!-- Hidden from the header on request; the settings stay (wireframe model shown, SCADA fibre drawn). -->
         <button type="button" class="isp-hbtn" data-toggle="wireframe" aria-pressed="true" hidden>Wireframe</button>
         <button type="button" class="isp-hbtn" data-toggle="show" aria-pressed="true" hidden>3D model</button>
         <button type="button" class="isp-hbtn" data-toggle="control" aria-pressed="true" hidden>SCADA</button>
         <span class="isp-hsep"></span>
-        <button type="button" class="isp-hicon" data-cam="in" title="Zoom in" aria-label="Zoom in">${ICON.zoomIn}</button>
-        <button type="button" class="isp-hicon" data-cam="out" title="Zoom out" aria-label="Zoom out">${ICON.zoomOut}</button>
-        <button type="button" class="isp-hicon" data-cam="left" title="Rotate left" aria-label="Rotate left">${ICON.left}</button>
-        <button type="button" class="isp-hicon" data-cam="right" title="Rotate right" aria-label="Rotate right">${ICON.right}</button>
-        <button type="button" class="isp-hicon" data-cam="up" title="Tilt up" aria-label="Tilt up">${ICON.up}</button>
-        <button type="button" class="isp-hicon" data-cam="down" title="Tilt down" aria-label="Tilt down">${ICON.down}</button>
-        <button type="button" class="isp-hicon" data-cam="home" title="Reset view" aria-label="Reset view">${ICON.home}</button>
-        <button type="button" class="isp-hicon" data-cam="fit" title="Fit to the network" aria-label="Fit to the network">${ICON.fit}</button>
+        <button type="button" class="isp-hicon" data-cam="in" data-tip="Zoom in" aria-label="Zoom in">${ICON.zoomIn}</button>
+        <button type="button" class="isp-hicon" data-cam="out" data-tip="Zoom out" aria-label="Zoom out">${ICON.zoomOut}</button>
+        <button type="button" class="isp-hicon" data-cam="left" data-tip="Rotate left" aria-label="Rotate left">${ICON.left}</button>
+        <button type="button" class="isp-hicon" data-cam="right" data-tip="Rotate right" aria-label="Rotate right">${ICON.right}</button>
+        <button type="button" class="isp-hicon" data-cam="up" data-tip="Tilt up" aria-label="Tilt up">${ICON.up}</button>
+        <button type="button" class="isp-hicon" data-cam="down" data-tip="Tilt down" aria-label="Tilt down">${ICON.down}</button>
+        <button type="button" class="isp-hicon" data-cam="home" data-tip="Reset view" aria-label="Reset view">${ICON.home}</button>
+        <button type="button" class="isp-hicon" data-cam="fit" data-tip="Fit to the network" aria-label="Fit to the network">${ICON.fit}</button>
       </div>
       <div class="isp-hstatus">
         <button type="button" class="isp-chip isp-sync" data-act="syncNow" title="Checks Autodesk ACC for a new version of the IFC model every minute. Click to check now.">ACC</button>
       </div>
       <button type="button" class="isp-chip isp-scenario-pill" data-act="netReset" title="Reset the simulation" hidden></button>
-      <div class="isp-more-wrap">
+      <!-- The More menu is hidden for now (?more=1 shows it); its panel stays wired. -->
+      <div class="isp-more-wrap"${new URLSearchParams(location.search).get('more') === '1' ? '' : ' hidden'}>
         <button type="button" class="isp-hbtn" data-act="more" aria-expanded="false">More ▾</button>
         <div class="isp-more-panel isp-card" hidden>
           <div class="isp-chips isp-status-chips">
@@ -289,6 +305,14 @@ export function mountIfcSpatial({ host = document.body, syncIntervalMs = 60_000,
           retry: (id, type) => request(`/reports/${encodeURIComponent(id)}/retry?file=${encodeURIComponent(st.fileName)}&type=${encodeURIComponent(type)}`, { method: 'POST' }),
           email: (id, body) => request(`/reports/${encodeURIComponent(id)}/email?file=${encodeURIComponent(st.fileName)}`, { method: 'PUT', body }),
           snapshot: id => request(`/reports/${encodeURIComponent(id)}/snapshot?file=${encodeURIComponent(st.fileName)}`),
+        },
+        // The user's Gmail (server/gmail/): status, sign-in in a popup, an explicit send, history. No tokens here.
+        gmail: {
+          loginUrl: '/api/gmail/auth/login',
+          status: () => gmailRequest('/status'),
+          disconnect: () => gmailRequest('/disconnect', { method: 'POST' }),
+          send: body => gmailRequest('/send', { method: 'POST', body: { fileName: st.fileName, ...body } }),
+          history: reportId => gmailRequest(`/history?file=${encodeURIComponent(st.fileName)}&reportId=${encodeURIComponent(reportId)}`),
         },
       },
       onArtifact: spec => docs.openArtifact(spec),
@@ -856,6 +880,25 @@ export function mountIfcSpatial({ host = document.body, syncIntervalMs = 60_000,
 
   // ---- events ----
 
+
+  // Header tooltips: one floating tip (the toolbar scrolls sideways, so a CSS ::after inside it would be clipped).
+  const tip = document.createElement('div');
+  tip.className = 'isp-tip'; tip.setAttribute('role', 'tooltip'); tip.hidden = true;
+  root.append(tip);
+  const showTip = el => {
+    const text = el?.dataset.tip;
+    if (!text) { tip.hidden = true; return; }
+    tip.textContent = text; tip.hidden = false;
+    const r = el.getBoundingClientRect(), host = root.getBoundingClientRect(), w = tip.offsetWidth;
+    tip.style.left = `${Math.max(4, Math.min(host.width - w - 4, r.left - host.left + r.width / 2 - w / 2))}px`;
+    tip.style.top = `${r.bottom - host.top + 6}px`;
+  };
+  const top = $('.isp-top');
+  top.addEventListener('pointerover', e => showTip(e.target.closest('[data-tip]')));
+  top.addEventListener('pointerleave', () => { tip.hidden = true; });
+  top.addEventListener('focusin', e => showTip(e.target.closest('[data-tip]')));
+  top.addEventListener('focusout', () => { tip.hidden = true; });
+  top.addEventListener('click', () => { tip.hidden = true; });
 
   root.addEventListener('click', event => {
     const target = event.target.closest('button, a');

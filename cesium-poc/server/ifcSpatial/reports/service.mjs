@@ -19,6 +19,7 @@ import { buildSnapshot, REPORT_KIND } from './snapshot.mjs';
 import { renderReportPdf } from './pdfReport.mjs';
 import { renderRegisterXlsx } from './xlsxRegister.mjs';
 import { draftEmail, toEml } from './emailDraft.mjs';
+import { emailHtmlToText, sanitizeEmailHtml } from './emailHtml.mjs';
 
 export const JOB = Object.freeze({ PENDING: 'PENDING', ANALYZING: 'ANALYZING', GENERATING: 'GENERATING', COMPLETED: 'COMPLETED', PARTIALLY_COMPLETED: 'PARTIALLY_COMPLETED', FAILED: 'FAILED', CANCELLED: 'CANCELLED' });
 const MIME = { PDF: 'application/pdf', XLSX: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', EML: 'message/rfc822' };
@@ -54,7 +55,19 @@ export function validateReportBody(body) {
   return { request, assets: [...new Map(assets.map(a => [a.id, a])).values()], context, revisionOf: REPORT_ID.test(body.revisionOf ?? '') ? body.revisionOf : null, regenerate: Boolean(body.regenerate) };
 }
 
-export function createReportService({ dir, aps, analyzeAsset, listing, now = () => Date.now(), logger = console, retentionDays = Number(process.env.IFC_REPORT_RETENTION_DAYS ?? 7), concurrency = 3, policyPath = null }) {
+/**
+ * Recipient groups → addresses, only as configured (EMAIL_RECIPIENT_GROUPS, JSON: {"Electrical Maintenance Team": ["a@x.com"]}).
+ * Without it a group stays a label and the user enters the addresses.
+ */
+export function recipientDirectory(env = process.env) {
+  let map = {};
+  try { map = JSON.parse(env.EMAIL_RECIPIENT_GROUPS || '{}'); } catch { map = {}; }
+  const norm = s => String(s).toLowerCase().replace(/^the\s+/, '').replace(/\s+/g, ' ').trim();
+  const entries = new Map(Object.entries(map).map(([k, v]) => [norm(k), (Array.isArray(v) ? v : [v]).map(String).filter(a => /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(a))]));
+  return group => entries.get(norm(group)) ?? null;
+}
+
+export function createReportService({ dir, aps, analyzeAsset, listing, now = () => Date.now(), logger = console, retentionDays = Number(process.env.IFC_REPORT_RETENTION_DAYS ?? 7), concurrency = 3, policyPath = null, directory = recipientDirectory() }) {
   const jobs = new Map();
   const stats = { created: 0, reused: 0, pdf: 0, xlsx: 0 };
   const metaPath = id => join(dir, id, 'meta.json');
@@ -113,7 +126,17 @@ export function createReportService({ dir, aps, analyzeAsset, listing, now = () 
     purge();
     if (!input.regenerate) {
       const same = [...jobs.values()].find(j => j.key === key && j.owner === owner && ![JOB.FAILED, JOB.CANCELLED].includes(j.status));
-      if (same) { stats.reused += 1; return view(same, { reused: true }); }
+      if (same) {
+        stats.reused += 1;
+        // The same question again reuses the report and its files, but asks for a new email: a draft that was
+        // already sent (or tried) stays in the report's history, and the user gets a fresh draft to send.
+        if (input.request.outputs.email && same.snapshot && !same.running && same.emailDraft && same.emailDraft.sendState !== 'DRAFT') {
+          same.emailSent = [...(same.emailSent ?? []), ...(same.emailDraft.sent ? [same.emailDraft.sent] : [])];
+          same.emailDraft = draftEmail(same.snapshot, { attachments: same.artifacts.filter(a => a.status === 'COMPLETED'), directory });
+          persist(same);
+        }
+        return view(same, { reused: true });
+      }
     }
     const prev = input.revisionOf ? load(input.revisionOf) : null;
     const reportId = `RPT-${new Date(now()).toISOString().slice(0, 10).replace(/-/g, '')}-${randomBytes(6).toString('base64url').toLowerCase().replace(/[^a-z0-9]/g, '0').slice(0, 8)}`;
@@ -176,7 +199,7 @@ export function createReportService({ dir, aps, analyzeAsset, listing, now = () 
     if (want.xlsx && generate) await artifact(job, 'XLSX');
     if (want.email) {
       step(job, 'email', { state: 'running' });
-      job.emailDraft = draftEmail(job.snapshot, { attachments: job.artifacts.filter(a => a.status === 'COMPLETED') });
+      job.emailDraft = draftEmail(job.snapshot, { attachments: job.artifacts.filter(a => a.status === 'COMPLETED'), directory });
       step(job, 'email', { state: 'done' });
     }
     const failed = job.artifacts.some(a => a.status === 'FAILED');
@@ -223,7 +246,7 @@ export function createReportService({ dir, aps, analyzeAsset, listing, now = () 
       evaluated: s?.evaluated ?? [], sources: s ? s.sources.length : 0, documentsRead: s ? s.documentVersions.filter(d => ['SUCCESS', 'PARTIAL'].includes(d.status)).length : 0,
       artifacts: job.artifacts.map(a => ({ artifactId: a.artifactId, type: a.type, title: a.title ?? null, filename: a.filename, size: a.size, status: a.status, error: a.error, createdAt: a.createdAt ?? null,
         url: a.status === 'COMPLETED' ? `/api/ifc-spatial/reports/${job.reportId}/artifacts/${a.artifactId}?file=${encodeURIComponent(job.fileName)}` : null })),
-      emailDraft: job.emailDraft, emlUrl: job.emailDraft ? `/api/ifc-spatial/reports/${job.reportId}/email.eml?file=${encodeURIComponent(job.fileName)}` : null,
+      emailDraft: job.emailDraft, emailSent: job.emailSent ?? [], emlUrl: job.emailDraft ? `/api/ifc-spatial/reports/${job.reportId}/email.eml?file=${encodeURIComponent(job.fileName)}` : null,
     };
   }
 
@@ -255,15 +278,36 @@ export function createReportService({ dir, aps, analyzeAsset, listing, now = () 
   async function updateEmail(req, id, body) {
     const job = await owned(req, id);
     if (!job.snapshot) throw new ApsError('REPORT_NOT_READY', 409, 'The report is not ready yet.');
+    const state = job.emailDraft?.sendState;
+    // A sent (or possibly sent) draft is a record: it is not edited; a new draft can be made from it.
+    if (body.newDraft) {
+      if (!job.emailDraft) throw new ApsError('NO_DRAFT', 404, 'This report has no email draft.');
+      if (state === 'SENDING') throw new ApsError('SEND_IN_PROGRESS', 409, 'The email is being sent.');
+      job.emailSent = [...(job.emailSent ?? []), ...(job.emailDraft.sent ? [job.emailDraft.sent] : [])];
+      job.emailDraft = { ...job.emailDraft, sendState: 'DRAFT', sent: null, lastAttempt: null, edited: true, draftId: randomBytes(9).toString('base64url'), updatedAt: new Date(now()).toISOString() };
+      persist(job);
+      return view(job);
+    }
+    if (['SENT', 'SENDING', 'SEND_STATUS_UNKNOWN'].includes(state)) throw new ApsError(state === 'SENDING' ? 'SEND_IN_PROGRESS' : 'DRAFT_LOCKED', 409,
+      state === 'SENDING' ? 'The email is being sent.' : 'This draft was sent (or its send status is unknown). Create a new draft from it to change it.');
+    const list = v => (v === undefined ? undefined : (Array.isArray(v) ? v : String(v ?? '').split(/[,;\s]+/)).map(x => String(x).trim()).filter(Boolean).slice(0, 50).map(x => x.slice(0, 254)));
+    const [to, cc, bcc] = [list(body.to), list(body.cc), list(body.bcc)];
     const files = job.artifacts.filter(a => a.status === 'COMPLETED');
     const attachmentIds = Array.isArray(body.attachmentIds) ? body.attachmentIds.filter(x => files.some(f => f.artifactId === x)) : job.emailDraft?.attachmentIds ?? files.map(f => f.artifactId);
     const attachments = files.filter(f => attachmentIds.includes(f.artifactId));
     const recipientGroup = body.recipientGroup !== undefined ? str(body.recipientGroup, 120) : job.emailDraft?.recipientGroup ?? job.request.recipientGroup;
     if (body.regenerate || !job.emailDraft) {
-      job.emailDraft = draftEmail(job.snapshot, { recipientGroup, style: body.style === 'short' ? 'short' : body.style === 'standard' ? 'standard' : job.emailDraft?.style ?? 'standard', attachments });
+      job.emailDraft = draftEmail(job.snapshot, { recipientGroup, style: body.style === 'short' ? 'short' : body.style === 'standard' ? 'standard' : job.emailDraft?.style ?? 'standard', attachments,
+        to: to ?? job.emailDraft?.to ?? [], cc: cc ?? job.emailDraft?.cc ?? [], bcc: bcc ?? job.emailDraft?.bcc ?? [], directory });
     } else {
-      job.emailDraft = { ...job.emailDraft, recipientGroup, subject: body.subject !== undefined ? str(body.subject, 300) ?? '' : job.emailDraft.subject, body: body.body !== undefined ? str(body.body, 20_000) ?? '' : job.emailDraft.body,
-        attachmentIds: attachments.map(a => a.artifactId), attachments: attachments.map(a => ({ artifactId: a.artifactId, filename: a.filename })), edited: true, updatedAt: new Date(now()).toISOString() };
+      // A formatted body is kept only as sanitized HTML; its plain text is derived from it.
+      const html = body.bodyHtml !== undefined ? sanitizeEmailHtml(body.bodyHtml) : null;
+      job.emailDraft = { ...job.emailDraft, recipientGroup, subject: body.subject !== undefined ? str(body.subject, 300) ?? '' : job.emailDraft.subject,
+        body: html !== null ? emailHtmlToText(html) : body.body !== undefined ? str(body.body, 20_000) ?? '' : job.emailDraft.body,
+        bodyHtml: html !== null ? html : body.body !== undefined ? null : job.emailDraft.bodyHtml ?? null,
+        attachmentIds: attachments.map(a => a.artifactId), attachments: attachments.map(a => ({ artifactId: a.artifactId, filename: a.filename })),
+        to: to ?? job.emailDraft.to ?? [], cc: cc ?? job.emailDraft.cc ?? [], bcc: bcc ?? job.emailDraft.bcc ?? [],
+        edited: body.subject !== undefined || body.body !== undefined ? true : job.emailDraft.edited ?? false, updatedAt: new Date(now()).toISOString() };
     }
     if (!job.request.outputs.email) { job.request.outputs.email = true; if (!job.steps.some(s => s.id === 'email')) job.steps.push({ id: 'email', label: 'Preparing email draft', state: 'done' }); }
     persist(job);
@@ -289,8 +333,33 @@ export function createReportService({ dir, aps, analyzeAsset, listing, now = () 
       'content-disposition': `attachment; filename="${job.snapshot.names.emlFile}"` });
     res.end(bytes);
   }
+  /**
+   * For sending (server/gmail/): this user's report, its saved draft and the files the draft attaches, read
+   * from the report's own store by artifact id. Missing files are named, never skipped silently.
+   */
+  async function sendContext(req, fileName, id, { history = false } = {}) {
+    const job = await owned(req, id);
+    if (fileName && job.fileName !== fileName) throw new ApsError('REPORT_NOT_FOUND', 404, 'This report does not exist or belongs to another session.');
+    if (!history && !job.emailDraft) throw new ApsError('NO_DRAFT', 404, 'This report has no email draft.');
+    const files = [], missing = [];
+    for (const aid of job.emailDraft?.attachmentIds ?? []) {
+      const a = job.artifacts.find(x => x.artifactId === aid);
+      const path = a ? join(dir, job.reportId, `${a.artifactId}.${a.type.toLowerCase()}`) : null;
+      if (!a || a.status !== 'COMPLETED' || !existsSync(path)) { missing.push(a?.filename ?? aid); continue; }
+      files.push({ artifactId: a.artifactId, filename: a.filename, mime: a.mime, bytes: readFileSync(path) });
+    }
+    return { owner: job.owner, projectId: job.projectId, reportId: job.reportId, revision: job.revision, fileName: job.fileName, draft: job.emailDraft, files, missing, illustrative: Boolean(job.snapshot?.illustrative) };
+  }
+  /** A send attempt's outcome on the draft: its state, and the sent record (kept as it was sent). */
+  async function recordSend(req, fileName, id, { state, attemptId, sent = null, failure = null }) {
+    const job = await owned(req, id);
+    if (!job.emailDraft) return;
+    job.emailDraft = { ...job.emailDraft, sendState: state, lastAttempt: { attemptId, state, failure, at: new Date(now()).toISOString() }, ...(sent ? { sent } : {}) };
+    persist(job);
+  }
+
   /** The snapshot itself (for the register preview), owner only. */
   async function snapshotOf(req, id) { const job = await owned(req, id); return job.snapshot ? { ...job.snapshot, context: undefined } : null; }
 
-  return { create, get, cancel, retry, updateEmail, sendArtifact, sendEml, snapshotOf, stats: () => ({ ...stats }), _jobs: jobs };
+  return { create, get, cancel, retry, updateEmail, sendArtifact, sendEml, snapshotOf, sendContext, recordSend, stats: () => ({ ...stats }), _jobs: jobs };
 }

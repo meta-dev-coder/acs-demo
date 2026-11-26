@@ -596,5 +596,7 @@ export function createIfcSpatialApi({ aps, cacheDir = fileURLToPath(new URL('../
     return true;
   }
 
-  return { handle, middleware: (req, res, next) => { handle(req, res).then(handled => { if (!handled) next(); }, next); }, documentStats: () => ({ ...docStats }), reportStats: () => reports.stats() };
+  return { handle, middleware: (req, res, next) => { handle(req, res).then(handled => { if (!handled) next(); }, next); }, documentStats: () => ({ ...docStats }), reportStats: () => reports.stats(),
+    /** For server/gmail/: this user's report draft and its files, and the send outcome. Nothing else. */
+    reportAccess: { sendContext: reports.sendContext, recordSend: reports.recordSend } };
 }

@@ -26,6 +26,9 @@ export const ASK_ICONS = Object.freeze({
   layers: svg('<path d="M12 3.5 3 8.2l9 4.7 9-4.7-9-4.7Z"/><path d="m3 12.3 9 4.7 9-4.7"/><path d="m3 16.4 9 4.7 9-4.7"/>'),
   chevron: svg('<path d="m9.5 6 6 6-6 6"/>', { size: 18 }),
   collapse: svg('<path d="m12.5 7-5 5 5 5"/><path d="m18 7-5 5 5 5"/>', { size: 20 }),
+  // Panel width: Maximize 2 / Minimize 2 (the Lucide shapes, drawn like the other icons here).
+  maximize: svg('<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/>', { size: 18 }),
+  minimize: svg('<path d="M4 14h6v6"/><path d="M20 10h-6V4"/><path d="m14 10 7-7"/><path d="m3 21 7-7"/>', { size: 18 }),
   chat: svg('<path d="M5.5 5h13A2.5 2.5 0 0 1 21 7.5v7a2.5 2.5 0 0 1-2.5 2.5H10l-4.6 3.4V17h0A2.5 2.5 0 0 1 3 14.5v-7A2.5 2.5 0 0 1 5.5 5Z"/><path d="M8.5 11h.01M12 11h.01M15.5 11h.01" stroke-width="2.4"/>', { size: 22 }),
   send: svg('<path d="M20.5 3.5 3.8 10.4c-.7.3-.6 1.3.1 1.5l6.3 1.9 1.9 6.3c.2.7 1.2.8 1.5.1L20.5 3.5Z"/><path d="m10.2 13.8 10.3-10.3"/>', { size: 21 }),
   target: svg('<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.6"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/>', { size: 20 }),
@@ -109,6 +112,7 @@ export function askPanelHtml({ bankHtml = '' } = {}) {
       <span class="isp-askp-card-ic">${ASK_ICONS[s.icon]}</span><span class="isp-askp-card-l">${esc(s.label)}</span><span class="isp-askp-card-ch">${ASK_ICONS.chevron}</span></button>`;
   return `<div class="isp-askp" id="isp-askp" role="complementary" aria-label="Ask the Twin">
     <div class="isp-askp-head">${sparkleSvg()}<h2>Ask the Twin <span class="isp-askp-ai">AI</span></h2>
+      <button type="button" class="isp-askp-width" data-act="askWidth" aria-pressed="false" aria-controls="isp-askp" aria-label="Expand panel width" title="Expand panel width">${ASK_ICONS.maximize}</button>
       <button type="button" class="isp-askp-collapse" data-act="askCollapse" aria-label="Collapse Ask the Twin" aria-controls="isp-askp" aria-expanded="true" title="Collapse">${ASK_ICONS.collapse}</button></div>
     <div class="isp-askp-body">
       <div class="isp-askp-welcome">

@@ -79,32 +79,200 @@ function artifactHtml(r, a) {
       <a class="tw-rlink is-plain" href="${esc(a.url)}&download=1" download="${esc(a.filename)}">Download ${pdf ? 'PDF' : 'Excel'}</a></div></div>`;
 }
 
-function emailHtml(r, u) {
+const EMAIL_RE = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
+/** "a@x.com; b@y.org" → the addresses and what is not one (the same rule the server applies). */
+export function splitAddresses(value) {
+  const list = (Array.isArray(value) ? value : String(value ?? '').split(/[,;\s]+/)).map(x => String(x).trim()).filter(Boolean);
+  return { valid: list.filter(x => EMAIL_RE.test(x)), invalid: list.filter(x => !EMAIL_RE.test(x)) };
+}
+const allowedTo = (a, list) => list.some(x => (x.startsWith('@') ? a.toLowerCase().endsWith(x) : a.toLowerCase() === x));
+
+/**
+ * Can this draft be sent now, and if not, why (the first reason is shown under the button). The server checks
+ * all of it again; this only keeps the button honest.
+ */
+export function sendReadiness(r, gmail) {
+  const d = r.emailDraft;
+  const why = [];
+  if (!d) return { ready: false, why: ['No draft.'] };
+  if (['SENT', 'SENDING', 'SEND_STATUS_UNKNOWN'].includes(d.sendState)) return { ready: false, why: [] };
+  if (!gmail) why.push('Checking the Gmail connection…');
+  else if (!gmail.configured) why.push('Gmail sending is not set up on the server.');
+  else if (gmail.reconnectRequired) why.push('Reconnect Gmail to send.');
+  else if (!gmail.canSend) why.push('Connect Gmail to send.');
+  const to = splitAddresses(d.to), cc = splitAddresses(d.cc), bcc = splitAddresses(d.bcc);
+  const bad = [...to.invalid, ...cc.invalid, ...bcc.invalid];
+  if (bad.length) why.push(`Not an email address: ${bad.slice(0, 2).join(', ')}${bad.length > 2 ? '…' : ''}`);
+  else if (!to.valid.length) why.push(`Enter ${d.recipientGroup ? `the ${d.recipientGroup}'s` : 'a recipient'} email address.`);
+  if (!String(d.subject ?? '').trim()) why.push('Add a subject.');
+  if (!String(d.body ?? '').trim()) why.push('Add a message.');
+  const files = r.artifacts.filter(a => d.attachmentIds.includes(a.artifactId));
+  if (files.some(a => a.status !== 'COMPLETED')) why.push('A selected attachment is not available.');
+  if (r.illustrative && gmail?.testRecipients?.length) {
+    const outside = [...to.valid, ...cc.valid, ...bcc.valid].filter(a => !allowedTo(a, gmail.testRecipients));
+    if (outside.length) why.push(`Demo data can be sent only to approved test recipients (${gmail.testRecipients.join(', ')}).`);
+  }
+  return { ready: !why.length, why };
+}
+
+const GMAIL_MARK = '<svg width="22" height="22" viewBox="0 0 48 48" aria-hidden="true"><path fill="#4285f4" d="M6 38h7V22l-9-6.5V36a2 2 0 0 0 2 2Z"/><path fill="#34a853" d="M35 38h7a2 2 0 0 0 2-2V15.5L35 22Z"/><path fill="#fbbc04" d="M35 12v10l9-6.5V13c0-3.3-3.8-5.2-6.4-3.2Z"/><path fill="#ea4335" d="M13 22V12l11 8 11-8v10l-11 8Z"/><path fill="#c5221f" d="M4 13v2.5l9 6.5V12l-2.6-2.2C7.8 7.8 4 9.7 4 13Z"/></svg>';
+const STATE_BADGE = { DRAFT: ['Needs review', 'warn'], READY_TO_SEND: ['Ready to send', 'ok'], SENDING: ['Sending…', 'info'], SENT: ['Sent', 'ok'], FAILED: ['Not sent', 'bad'], SEND_STATUS_UNKNOWN: ['Status unknown', 'bad'] };
+const when = iso => (iso ? new Date(iso).toLocaleString([], { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
+
+function gmailRowHtml(r, g, u) {
+  const id = esc(r.reportId);
+  if (!g) return `<div class="tw-gm"><span class="tw-gm-ic">${GMAIL_MARK}</span><div><b>Gmail account</b><small>Checking…</small></div></div>`;
+  if (!g.configured) return `<div class="tw-gm"><span class="tw-gm-ic">${GMAIL_MARK}</span><div><b>Gmail account</b><small>Sending is not set up on the server (${esc(g.missing.join(', '))}).</small></div><span class="tw-gm-st">Unavailable</span></div>`;
+  const connected = g.connected && g.email;
+  return `<div class="tw-gm"><span class="tw-gm-ic">${GMAIL_MARK}</span><div><b>${connected ? esc(g.email) : 'Gmail account'}</b><small>${connected ? 'Connected · send only' : g.reconnectRequired ? 'Authorization expired or revoked' : 'Connect your Google account'}</small></div>
+    <span class="tw-gm-st${connected ? ' is-on' : ''}">${connected ? 'Connected' : g.reconnectRequired ? 'Reconnect' : 'Not connected'}</span>
+    <div class="tw-gm-acts">${connected ? `<button type="button" class="tw-rlink is-plain" data-report-act="gmailDisconnect" data-report-id="${id}">Disconnect</button>`
+      : `<button type="button" class="tw-btn is-primary" data-report-act="gmailConnect" data-report-id="${id}">${g.reconnectRequired ? 'Reconnect Gmail' : 'Connect Gmail'}</button>`}</div>
+    ${u.gmailNote ? `<p class="tw-gm-note">${esc(u.gmailNote)}</p>` : ''}</div>`;
+}
+
+function confirmHtml(r, g, u) {
+  const d = r.emailDraft;
+  const files = r.artifacts.filter(a => d.attachmentIds.includes(a.artifactId) && a.status === 'COMPLETED');
+  const to = splitAddresses(d.to).valid, cc = splitAddresses(d.cc).valid, bcc = splitAddresses(d.bcc).valid;
+  const ack = r.illustrative && !(g?.testRecipients?.length);
+  return `<div class="tw-mconf" role="dialog" aria-modal="true" aria-label="Confirm sending">
+    <h5>Send this email?</h5>
+    <dl><dt>From</dt><dd>${esc(g?.email ?? '')}</dd><dt>To</dt><dd>${esc(to.join(', '))}</dd>${cc.length ? `<dt>Cc</dt><dd>${esc(cc.join(', '))}</dd>` : ''}${bcc.length ? `<dt>Bcc</dt><dd>${esc(bcc.join(', '))}</dd>` : ''}
+      <dt>Subject</dt><dd>${esc(d.subject)}</dd><dt>Attachments</dt><dd>${files.length} · ${files.map(a => esc(a.filename)).join('<br>') || 'none'}</dd></dl>
+    ${r.illustrative ? `<p class="tw-mconf-warn">This report is based on illustrative demo data, not actual inspection records${g?.testRecipients?.length ? '. It can be sent only to the approved test recipients.' : '.'}</p>` : ''}
+    ${ack ? `<label class="tw-mconf-ack"><input type="checkbox" data-mail-ack> I confirm the recipients know this is illustrative demo data.</label>` : ''}
+    ${u.sendError ? `<p class="tw-rwarn">${esc(u.sendError)}</p>` : ''}
+    <div class="tw-mail-acts"><button type="button" class="tw-btn" data-report-act="sendCancel" data-report-id="${esc(r.reportId)}"${u.sending ? ' disabled' : ''}>Cancel</button>
+      <button type="button" class="tw-btn is-primary" data-report-act="sendConfirm" data-report-id="${esc(r.reportId)}"${u.sending || ack ? ' disabled' : ''} data-needs-ack="${ack}">${u.sending ? '<span class="tw-spin" aria-hidden="true"></span> Sending…' : 'Send now'}</button></div></div>`;
+}
+
+function sentHtml(r, s) {
+  return `<div class="tw-msent"><p class="tw-msent-h">✓ Email sent successfully</p>
+    <dl><dt>From</dt><dd>${esc(s.sender)}</dd><dt>To</dt><dd>${esc([...s.to].join(', '))}</dd>${s.cc?.length ? `<dt>Cc</dt><dd>${esc(s.cc.join(', '))}</dd>` : ''}${s.bcc?.length ? `<dt>Bcc</dt><dd>${esc(s.bcc.join(', '))}</dd>` : ''}
+      <dt>Subject</dt><dd>${esc(s.subject)}</dd><dt>Sent</dt><dd>${esc(when(s.sentAt))}</dd><dt>Attachments</dt><dd>${s.attachmentCount}</dd></dl>
+    <p class="tw-mail-note">Submitted to Gmail. Delivery to the recipients and whether they read it are not confirmed here.</p>
+    <div class="tw-mail-acts"><button type="button" class="tw-btn" data-report-act="emailNew" data-report-id="${esc(r.reportId)}">New draft from this email</button></div></div>`;
+}
+
+function historyHtml(r, u) {
+  const list = u.history;
+  return `<div class="tw-mhist"><button type="button" class="tw-rlink is-plain" data-report-act="sendHistory" data-report-id="${esc(r.reportId)}" aria-expanded="${Boolean(u.historyOpen)}">Send history${list ? ` (${list.length})` : ''}</button>
+    ${u.historyOpen ? (list ? (list.length ? `<ul class="tw-rlist">${list.map(x => `<li><i class="tw-rdot is-${x.status === 'SENT' ? 'ok' : x.status === 'SENDING' ? 'info' : 'bad'}" aria-hidden="true"></i><span>${esc(when(x.sentAt ?? x.createdAt))} · ${esc(x.status === 'SENT' ? 'Sent' : x.status === 'SEND_STATUS_UNKNOWN' ? 'Status unknown' : x.status === 'SENDING' ? 'Sending' : 'Not sent')} to ${esc(x.to.join(', '))}${x.failure ? `<br><small>${esc(x.failure.message)}</small>` : ''}</span></li>`).join('')}</ul>` : '<p class="tw-rmuted">No send attempts yet.</p>') : '<p class="tw-rmuted">Loading…</p>') : ''}</div>`;
+}
+
+const ICON = {
+  user: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 20c.9-3.8 3.9-5.6 7.5-5.6s6.6 1.8 7.5 5.6"/></svg>',
+  tag: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9Z"/><circle cx="8" cy="8" r="1.5"/></svg>',
+  clip: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m21 11-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.3 3.3 0 0 1 4.7 4.7l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l8-8"/></svg>',
+  eye: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>',
+  down: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
+  x: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>',
+  dots: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>',
+  fileDown: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7Z"/><path d="M14 3v4h4M12 11v6M9.5 14.5 12 17l2.5-2.5"/></svg>',
+  refresh: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20v-4h-4"/></svg>',
+  history: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>',
+  copy: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>',
+  send: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M21 3 3 10.5l7 2.5 2.5 7Z"/><path d="m10 13 11-10"/></svg>',
+  warn: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5h.01"/></svg>',
+  bold: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M7 5h6a3.5 3.5 0 0 1 0 7H7Zm0 7h7a3.5 3.5 0 0 1 0 7H7Z"/></svg>',
+  italic: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 5h5M5 19h5M15 5 9 19"/></svg>',
+  underline: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 4v7a5 5 0 0 0 10 0V4M5 20h14"/></svg>',
+  ul: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/></svg>',
+  ol: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M10 6h10M10 12h10M10 18h10M4 5h1.5v4M4 9h3M4 14.5c0-1 2.8-1 2.8.5 0 1-2.8 2-2.8 3h3"/></svg>',
+  link: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>',
+};
+const escHtmlBody = t => esc(t).replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br>');
+
+/** Addresses as chips (an address that is not one is shown as such), and the input for more. */
+export function chipsHtml(field, list, { id, placeholder = '' } = {}) {
+  const chips = (list ?? []).map(a => { const ok = EMAIL_RE.test(a); return `<span class="tw-chip2${ok ? '' : ' is-bad'}" title="${esc(ok ? a : `Not an email address: ${a}`)}">${esc(a)}<button type="button" data-chip-remove="${field}" data-chip-value="${esc(a)}" data-report-id="${esc(id)}" aria-label="Remove ${esc(a)}">${ICON.x}</button></span>`; }).join('');
+  return `${chips}<input class="tw-chip-in" data-chip-input="${field}" data-report-id="${esc(id)}" placeholder="${list?.length ? '' : esc(placeholder)}" aria-label="${field === 'to' ? 'To' : field === 'cc' ? 'Cc' : 'Bcc'} email addresses" autocomplete="off" inputmode="email">`;
+}
+
+function gmailBarHtml(r, g, u) {
+  const id = esc(r.reportId);
+  if (!g) return `<div class="tw-cmp-gm"><span class="tw-gm-ic">${GMAIL_MARK}</span><span class="tw-cmp-gm-t"><b>Gmail</b><small>Checking the connection…</small></span></div>`;
+  if (!g.configured) return `<div class="tw-cmp-gm"><span class="tw-gm-ic">${GMAIL_MARK}</span><span class="tw-cmp-gm-t"><b>Gmail sending is not set up</b><small>The server needs ${esc(g.missing.join(', '))}.</small></span></div>`;
+  if (g.connected && g.email) {
+    return `<div class="tw-cmp-gm is-on"><span class="tw-gm-ic">${GMAIL_MARK}</span><span class="tw-cmp-gm-t"><b title="${esc(g.email)}">${esc(g.email)}</b><small><i class="tw-dot-on" aria-hidden="true"></i>Connected · send only</small></span>
+      <button type="button" class="tw-cmp-link" data-report-act="gmailDisconnect" data-report-id="${id}">Disconnect</button></div>`;
+  }
+  return `<div class="tw-cmp-gm"><span class="tw-gm-ic">${GMAIL_MARK}</span><span class="tw-cmp-gm-t"><b>${g.reconnectRequired ? 'Gmail authorization expired' : 'Gmail not connected'}</b><small>${u.gmailNote ? esc(u.gmailNote) : 'Authorization is required to send from your account.'}</small></span>
+    <button type="button" class="tw-cmp-btn is-gm" data-report-act="gmailConnect" data-report-id="${id}">${g.reconnectRequired ? 'Reconnect Gmail' : 'Connect Gmail'}</button></div>`;
+}
+
+function editorHtml(d, id, locked) {
+  const tb = (fmt, icon, label, extra = '') => `<button type="button" class="tw-ed-b${extra}" data-fmt="${fmt}" data-report-id="${id}" aria-label="${label}" title="${label}"${locked ? ' disabled' : ''}>${icon}</button>`;
+  return `<div class="tw-ed">
+    <div class="tw-ed-tb" role="toolbar" aria-label="Formatting">
+      <select class="tw-ed-sel is-wide" data-fmt-block data-report-id="${id}" aria-label="Paragraph style"${locked ? ' disabled' : ''}><option value="p">Paragraph</option><option value="h3">Heading</option><option value="blockquote">Quote</option></select>
+      <span class="tw-ed-sep is-wide"></span>${tb('bold', ICON.bold, 'Bold')}${tb('italic', ICON.italic, 'Italic')}${tb('underline', ICON.underline, 'Underline')}
+      <span class="tw-ed-sep"></span>${tb('insertUnorderedList', ICON.ul, 'Bulleted list')}${tb('insertOrderedList', ICON.ol, 'Numbered list', ' is-wide')}
+      <span class="tw-ed-sep"></span>${tb('link', ICON.link, 'Insert link')}</div>
+    <div class="tw-ed-body" contenteditable="${locked ? 'false' : 'true'}" role="textbox" aria-multiline="true" aria-label="Message" data-mail-editor data-report-id="${id}" spellcheck="true">${d.bodyHtml ?? `<p>${escHtmlBody(d.body ?? '')}</p>`}</div></div>`;
+}
+
+function attachmentsHtml(r, d, id, locked) {
+  const files = r.artifacts.filter(a => a.status === 'COMPLETED');
+  const on = files.filter(a => d.attachmentIds.includes(a.artifactId));
+  const off = files.filter(a => !d.attachmentIds.includes(a.artifactId));
+  const total = on.reduce((n, a) => n + (a.size ?? 0), 0);
+  const card = a => `<div class="tw-att"><span class="tw-att-ic is-${a.type === 'PDF' ? 'pdf' : a.type === 'XLSX' ? 'xlsx' : 'doc'}">${a.type === 'PDF' ? 'PDF' : a.type === 'XLSX' ? 'XLS' : 'FILE'}</span>
+      <span class="tw-att-m"><b title="${esc(a.filename)}">${esc(a.filename)}</b><small>${esc(size(a.size))}</small></span>
+      <button type="button" class="tw-att-b" data-report-act="preview" data-report-artifact="${esc(a.artifactId)}" data-report-id="${id}" aria-label="Preview ${esc(a.filename)}" title="Preview">${ICON.eye}</button>
+      <a class="tw-att-b" href="${esc(a.url)}&download=1" download="${esc(a.filename)}" aria-label="Download ${esc(a.filename)}" title="Download">${ICON.down}</a>
+      ${locked ? '' : `<button type="button" class="tw-att-b" data-mail-att-remove="${esc(a.artifactId)}" data-report-id="${id}" aria-label="Remove ${esc(a.filename)} from the email" title="Remove from the email">${ICON.x}</button>`}</div>`;
+  return `<section class="tw-atts" aria-label="Attachments"><header>${ICON.clip}<b>Attachments (${on.length})</b>${total ? `<small>Total ${esc(size(total))}</small>` : ''}</header>
+    ${on.length ? `<div class="tw-atts-grid">${on.map(card).join('')}</div>` : '<p class="tw-rmuted">No files attached.</p>'}
+    ${off.length && !locked ? `<p class="tw-atts-off">${off.map(a => `<button type="button" class="tw-cmp-link" data-mail-att-add="${esc(a.artifactId)}" data-report-id="${id}">+ Attach ${esc(a.filename)}</button>`).join(' ')}</p>` : ''}</section>`;
+}
+
+function emailHtml(r, u, g) {
   const d = r.emailDraft;
   if (!d) return '';
   const id = esc(r.reportId);
-  const files = r.artifacts.filter(a => a.status === 'COMPLETED');
-  const attached = files.filter(a => d.attachmentIds.includes(a.artifactId));
-  const head = `<header class="tw-mail-h"><span>${MAIL_ICON}<b>Draft email</b></span><span class="tw-mail-st">Needs review</span>
-      <button type="button" class="tw-mail-tg" data-report-act="email" data-report-id="${id}" aria-expanded="${Boolean(u.emailOpen)}" aria-label="${u.emailOpen ? 'Collapse' : 'Expand'} the email">${u.emailOpen ? '⌃' : '⌄'}</button></header>`;
-  if (u.editing) {
-    return `<section class="tw-card tw-mail is-edit">${head}
-      <label>To<input class="tw-mail-in" data-mail="recipientGroup" value="${esc(d.recipientGroup ?? '')}" placeholder="Recipient group or names"></label>
-      <label>Subject<input class="tw-mail-in" data-mail="subject" value="${esc(d.subject)}"></label>
-      <label>Message<textarea class="tw-mail-in" data-mail="body" rows="10">${esc(d.body)}</textarea></label>
-      <fieldset class="tw-mail-att"><legend>Attachments</legend>${files.map(a => `<label><input type="checkbox" data-mail-att="${esc(a.artifactId)}"${d.attachmentIds.includes(a.artifactId) ? ' checked' : ''}> ${esc(a.filename)}</label>`).join('') || '<small>No files were generated.</small>'}</fieldset>
-      <div class="tw-mail-acts"><button type="button" class="tw-btn is-primary" data-report-act="emailSave" data-report-id="${id}">Save draft</button><button type="button" class="tw-btn" data-report-act="emailCancel" data-report-id="${id}">Cancel</button></div></section>`;
-  }
-  const lines = d.body.split('\n');
-  const preview = u.emailOpen ? d.body : lines.filter(Boolean).slice(0, 3).join('\n');
-  return `<section class="tw-card tw-mail">${head}
-    <dl class="tw-mail-f"><dt>To</dt><dd>${esc(d.recipientGroup ?? 'Recipient to be confirmed')}${d.recipientAddresses?.length ? ` <small>${esc(d.recipientAddresses.join(', '))}</small>` : ''}</dd><dt>Subject</dt><dd><b>${esc(d.subject)}</b></dd></dl>
-    <div class="tw-mail-b${u.emailOpen ? ' is-open' : ''}">${esc(preview)}${!u.emailOpen && lines.filter(Boolean).length > 3 ? '<span class="tw-mail-more">…</span>' : ''}</div>
-    ${!u.emailOpen ? `<button type="button" class="tw-rlink is-plain" data-report-act="email" data-report-id="${id}">Show full email</button>` : ''}
-    <div class="tw-mail-att"><span>📎 ${plural(attached.length, 'attachment', 'attachments')}${d.attachmentIds.length && r.revision > 1 ? ` · report revision ${r.revision}` : ''}</span>${attached.map(a => `<small>${esc(a.filename)}</small>`).join('')}</div>
-    <div class="tw-mail-acts"><button type="button" class="tw-btn" data-report-act="emailEdit" data-report-id="${id}">Edit draft</button><button type="button" class="tw-btn" data-report-act="emailCopy" data-report-id="${id}">Copy email</button>
-      <a class="tw-btn" href="${esc(r.emlUrl)}" download>Download draft (.eml)</a><button type="button" class="tw-btn" data-report-act="emailRegen" data-report-id="${id}">Regenerate</button></div>
-    <p class="tw-mail-note">${u.copied ? 'Copied to the clipboard. ' : ''}${d.edited ? 'Edited. ' : ''}Email has not been sent.</p></section>`;
+  const state = d.sendState ?? 'DRAFT';
+  const ready = sendReadiness(r, g);
+  const badge = STATE_BADGE[state === 'DRAFT' && ready.ready ? 'READY_TO_SEND' : state] ?? STATE_BADGE.DRAFT;
+  const locked = ['SENDING', 'SEND_STATUS_UNKNOWN', 'SENT'].includes(state);
+  const secondary = [
+    `<a class="tw-cmp-sec" href="${esc(r.emlUrl)}" download>${ICON.fileDown}<span>Download .eml</span></a>`,
+    locked ? '' : `<button type="button" class="tw-cmp-sec" data-report-act="emailRegenAsk" data-report-id="${id}">${ICON.refresh}<span>Regenerate text</span></button>`,
+    `<button type="button" class="tw-cmp-sec" data-report-act="sendHistory" data-report-id="${id}" aria-expanded="${Boolean(u.historyOpen)}">${ICON.history}<span>Send history</span></button>`].filter(Boolean);
+  const head = `<header class="tw-cmp-h"><span class="tw-cmp-ic">${MAIL_ICON.replace('width="16" height="16"', 'width="18" height="18"')}</span>
+      <span class="tw-cmp-ht"><b>Email Draft</b><small>Review, edit and send the report to your team.</small></span>
+      <span class="tw-cmp-st is-${badge[1]}"><i aria-hidden="true"></i>${badge[0]}</span>
+      <span class="tw-cmp-menu"><button type="button" class="tw-cmp-dots" data-report-act="mailMenu" data-report-id="${id}" aria-haspopup="menu" aria-expanded="${Boolean(u.menuOpen)}" aria-label="More email actions" title="More actions">${ICON.dots}</button>
+        ${u.menuOpen ? `<span class="tw-cmp-pop" role="menu">${secondary.join('')}</span>` : ''}</span></header>`;
+  const history = u.historyOpen ? historyHtml(r, u).replace('<div class="tw-mhist">', '<div class="tw-mhist is-open">') : '';
+  if (state === 'SENT' && d.sent) return `<section class="tw-card tw-mail tw-cmp" data-mail-card="${id}">${head}${sentHtml(r, d.sent)}${history}</section>`;
+  const why = ready.why[0] ?? '';
+  const footStatus = state === 'SEND_STATUS_UNKNOWN' ? '<span class="is-bad">Send status could not be confirmed. Check Gmail before retrying.</span>'
+    : state === 'FAILED' && d.lastAttempt?.failure ? `<span class="is-bad">Not sent: ${esc(d.lastAttempt.failure.message)}</span>`
+      : state === 'SENDING' ? 'Sending…' : u.copied ? 'Copied to the clipboard.' : u.saveError ? `<span class="is-bad">${esc(u.saveError)}</span>` : ready.ready ? 'Ready to send · not sent yet' : `Not sent · ${esc(why)}`;
+  const showCc = u.ccOpen || d.cc?.length || d.bcc?.length;
+  const row = (field, label, icon, list, placeholder, extra = '') => `<div class="tw-cmp-row"><span class="tw-cmp-lab">${icon}<span>${label}</span></span>
+      <div class="tw-chips" data-chips="${field}" data-report-id="${id}">${chipsHtml(field, list, { id: r.reportId, placeholder })}</div>${extra}</div>`;
+  return `<section class="tw-card tw-mail tw-cmp${u.confirming ? ' is-confirming' : ''}" data-mail-card="${id}">${head}
+    ${gmailBarHtml(r, g, u)}
+    <div class="tw-cmp-fields">
+      ${row('to', 'To', ICON.user, d.to ?? [], d.recipientGroup ? `${d.recipientGroup} — enter email address` : 'Recipient email address', showCc ? '' : `<button type="button" class="tw-cmp-link tw-cmp-cc" data-report-act="mailCc" data-report-id="${id}">Cc / Bcc</button>`)}
+      ${showCc ? `${row('cc', 'Cc', ICON.user, d.cc ?? [], 'Optional')}${row('bcc', 'Bcc', ICON.user, d.bcc ?? [], 'Optional')}` : ''}
+      <div class="tw-cmp-row"><span class="tw-cmp-lab">${ICON.tag}<span>Subject</span></span><input class="tw-cmp-in" data-mail="subject" data-report-id="${id}" value="${esc(d.subject)}" aria-label="Subject"${locked ? ' readonly' : ''}></div>
+    </div>
+    ${editorHtml(d, id, locked)}
+    ${attachmentsHtml(r, d, id, locked)}
+    ${r.illustrative ? `<p class="tw-cmp-demo">${ICON.warn}<span>Demo data — send only to approved test recipients.</span></p>` : ''}
+    ${state === 'SEND_STATUS_UNKNOWN' ? `<div class="tw-mail-acts"><button type="button" class="tw-cmp-btn" data-report-act="emailNew" data-report-id="${id}">Not sent? Create a new draft</button></div>` : ''}
+    <div class="tw-cmp-secbar">${secondary.join('')}</div>
+    ${u.regenConfirm ? `<div class="tw-cmp-confirm"><span>Replace your edited text with a newly generated message? The report and register are not regenerated.</span>
+      <button type="button" class="tw-cmp-btn" data-report-act="emailRegenCancel" data-report-id="${id}">Keep my text</button><button type="button" class="tw-cmp-btn is-primary" data-report-act="emailRegen" data-report-id="${id}">Replace</button></div>` : ''}
+    ${history}
+    <footer class="tw-cmp-f"><p class="tw-cmp-fs" data-mail-why>${footStatus}</p>
+      <button type="button" class="tw-cmp-btn" data-report-act="emailCopy" data-report-id="${id}">${ICON.copy}<span>Copy draft</span></button>
+      <button type="button" class="tw-cmp-btn is-primary" data-report-act="sendStart" data-report-id="${id}" data-send-btn${ready.ready ? '' : ' disabled'}>${ICON.send}<span>${state === 'SENDING' ? 'Sending…' : 'Send Email'}</span></button></footer>
+    ${u.confirming ? confirmHtml(r, g, u) : ''}</section>`;
 }
 
 function criteriaHtml(r, u) {
@@ -120,15 +288,15 @@ function criteriaHtml(r, u) {
 }
 
 /** The answer's body (below the sentences). */
-export function reportHtml(r, u = {}) {
+export function reportHtml(r, u = {}, { gmail = null } = {}) {
   if (RUNNING.has(r.status) || (!r.summary && r.status !== 'FAILED')) return `<div class="tw-report">${progressHtml(r)}</div>`;
   if (!r.summary) return `<div class="tw-report">${progressHtml(r)}</div>`;
   const files = r.artifacts;
   return `<div class="tw-report" data-report="${esc(r.reportId)}">
     ${r.illustrative ? '<p class="tw-rdemo">Illustrative demo data — not actual inspection records.</p>' : ''}
     ${matchingHtml(r, u)}
-    ${files.length ? `<h5 class="tw-rh-up">Generated documents</h5>${files.map(a => artifactHtml(r, a)).join('')}` : ''}
-    ${emailHtml(r, u)}
+    ${files.length ? `<h5 class="tw-rh-up">Generated documents</h5><div class="tw-arts">${files.map(a => artifactHtml(r, a)).join('')}</div>` : ''}
+    ${emailHtml(r, u, gmail)}
     ${criteriaHtml(r, u)}
     ${r.status === 'PARTIALLY_COMPLETED' ? '<p class="tw-rwarn">Some files could not be generated; the others are ready.</p>' : ''}</div>`;
 }

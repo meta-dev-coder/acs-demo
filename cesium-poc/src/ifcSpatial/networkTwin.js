@@ -28,7 +28,7 @@ import { classifyDocumentQuestion, DOC_INTENT } from './docQuestions.js';
 import { docAnalysisHtml, docCompareAssetsHtml, docSay, fleetHtml, primaryCitation } from './docAnswer.js';
 import { citePopoverHtml, switchReviewTab } from './docReview.js';
 import { parseReportFollowUp, parseReportRequest, typeLabels } from './reportRequest.js';
-import { registerPreviewHtml, reportHtml, reportSay } from './reportAnswer.js';
+import { chipsHtml, registerPreviewHtml, reportHtml, reportSay, sendReadiness, splitAddresses } from './reportAnswer.js';
 import { classifyQuestion } from './intentRouter.js';
 import { approxMetres, bufferOutline, buildSpatialIndex, parseSpatialQuestion, querySpatial } from './spatialIndex.js';
 import { answerFacilityQuestion, buildFacilities } from './facilities.js';
@@ -300,9 +300,10 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
   };
   const alerts = activeAlerts(network, statuses, { zoneOf });
   const degradedIds = new Set(summary.ids.DEGRADED);
-  // No power is shown by the asset's own pulsing tile, without a text pill; degraded (and offline)
-  // equipment gets a pill only while Power Status is open.
-  const shownAlerts = () => (ui.opsCollapsed ? [] : alerts.filter(a => a.status !== STATUS.NO_POWER));
+  // Status on the map is the asset's own tile: no power pulses always; while Power Status is open, degraded
+  // (and offline) assets pulse too and every alert asset is named by its id (no text pills).
+  const shownAlerts = () => [];
+  const alertTone = new Map(alerts.map(a => [a.id, a.status === STATUS.DEGRADED ? 'warn' : 'bad']));
   let markerIds = new Set();
   /** The status pills on the map: no power always; degraded only while Power Status is open. */
   function applyAlertMarkers() {
@@ -349,7 +350,8 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
       // Cables in an Ask the Twin result glow in its colour (equipment keeps its status tile; its halo is the highlight).
       highlight: ui.ask ? new Map(ui.ask.ids.filter(id => network.assets.get(id)?.route?.length >= 2 && view.nodeState.get(id) !== 'dead').map(id => [id, ASK_COLOR])) : null,
       // Outside a simulation, what the model leaves without power is flagged and pulses on the map.
-      alert: st.active ? null : unpowered,
+      alert: st.active ? null : ui.opsCollapsed ? unpowered : new Set([...unpowered, ...alertTone.keys()]),
+      alertNames: st.active || ui.opsCollapsed ? null : alertTone,
       investigation: investigationView(ui.investigation), markerIds: st.active ? null : markerIds, degraded: ui.opsCollapsed ? null : degradedIds });
     markers.setVisible(!st.active);
     markers.setSelected(ui.selectedId);
@@ -369,13 +371,17 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
   const warn = (size = 20) => `<svg viewBox="0 0 20 20" width="${size}" height="${size}" aria-hidden="true"><path d="M10 2 19 18H1z" fill="${STATUS_COLOR.DEGRADED}"/><path d="M10 7.5v5" stroke="#2a1a00" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="15.2" r="1.1" fill="#2a1a00"/></svg>`;
   const statusIcon = key => (key === 'DEGRADED' ? warn() : key === 'UNKNOWN' ? '<i class="isp-ops-q">?</i>' : bolt(STATUS_COLOR[key]));
   const fmtDay = d => { const t = new Date(`${d}T00:00:00`); return Number.isNaN(t.getTime()) ? d : t.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }); };
-  function donut(pct) {
-    const r = 52, c = 2 * Math.PI * r, f = pct === null ? 0 : Math.max(0, Math.min(1, pct / 100));
-    return `<svg class="isp-ops-donut" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="${pct === null ? 'Unknown' : `${pct}% powered`}">
-      <circle cx="64" cy="64" r="${r}" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="11"/>
-      <circle cx="64" cy="64" r="${r}" fill="none" stroke="${STATUS_COLOR.POWERED}" stroke-width="11" stroke-dasharray="${(c * f).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 64 64)"/>
-      <text x="64" y="66" text-anchor="middle" font-size="27" font-weight="800" fill="#ffffff">${pct === null ? '—' : `${Math.round(pct)}%`}</text>
-      <text x="64" y="86" text-anchor="middle" font-size="13" fill="#d7e0ea">Powered</text></svg>`;
+  /** Powered share as a ring: powered (green) and degraded (amber, still energised) — one asset counted once. */
+  function donut(pct, counts) {
+    const r = 46, c = 2 * Math.PI * r;
+    const known = Object.entries(counts).filter(([k]) => k !== 'UNKNOWN').reduce((n, [, v]) => n + v, 0);
+    const pw = known ? counts.POWERED / known : 0, dg = known ? counts.DEGRADED / known : 0;
+    return `<svg class="isp-ops-donut" viewBox="0 0 112 112" width="112" height="112" role="img" aria-label="${pct === null ? 'Powered share unknown' : `${pct}% powered${counts.DEGRADED ? `, including ${counts.DEGRADED} degraded` : ''}`}">
+      <circle cx="56" cy="56" r="${r}" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="10"/>
+      <circle cx="56" cy="56" r="${r}" fill="none" stroke="${STATUS_COLOR.POWERED}" stroke-width="10" stroke-dasharray="${(c * pw).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 56 56)"/>
+      ${dg ? `<circle cx="56" cy="56" r="${r}" fill="none" stroke="${STATUS_COLOR.DEGRADED}" stroke-width="10" stroke-dasharray="${(c * dg).toFixed(1)} ${c.toFixed(1)}" stroke-dashoffset="${(-c * pw).toFixed(1)}" transform="rotate(-90 56 56)"/>` : ''}
+      <text x="56" y="58" text-anchor="middle" font-size="23" font-weight="800" fill="#ffffff">${pct === null ? '—' : `${Math.round(pct)}%`}</text>
+      <text x="56" y="76" text-anchor="middle" font-size="11.5" fill="#c9d4e2">Powered</text></svg>`;
   }
   /** The header's Power Status chip: powered share, no power and degraded counts; it shows and hides the cards. */
   function renderPowerChip() {
@@ -392,30 +398,90 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
       <span class="isp-power-chev" aria-hidden="true">${ui.opsCollapsed ? '▾' : '▴'}</span>`;
   }
 
-  function renderOps() {
+  // Active Alerts: grouped by status (most severe first), compact rows, paged to fit the window (never a scrollbar).
+  ui.alertPage = 0;
+  ui.alertPageSize = 8;
+  ui.alertGroups = { NO_POWER: true, DEGRADED: true, OFFLINE: true };
+  const ALERT_GROUPS = ['NO_POWER', 'DEGRADED', 'OFFLINE'];
+  const GROUP_LABEL = { NO_POWER: 'No Power', DEGRADED: 'Degraded', OFFLINE: 'Offline' };
+  const shortDay = d => { const t = new Date(`${d}T00:00:00`); return Number.isNaN(t.getTime()) ? d : t.toLocaleDateString([], { day: 'numeric', month: 'short' }); };
+  function renderOps({ fit = true } = {}) {
     if (!opsHost) return;
     opsHost.hidden = ui.opsCollapsed;
     renderPowerChip();
     const rows = ['POWERED', 'NO_POWER', 'DEGRADED', 'OFFLINE', ...(summary.counts.UNKNOWN ? ['UNKNOWN'] : [])];
     const row = key => `<button type="button" class="isp-ops-row${ui.statusFilter === key ? ' is-on' : ''}" data-ops-status="${key}" aria-pressed="${ui.statusFilter === key}"${summary.counts[key] ? '' : ' disabled'}
-      title="${summary.counts[key] ? `Show only ${STATUS_LABEL[key].toLowerCase()} assets on the map` : ''}">${statusIcon(key)}<span>${STATUS_LABEL[key]}</span><b>${summary.counts[key]}</b></button>`;
-    const card = a => `<button type="button" class="isp-ops-alert is-${a.status.toLowerCase()}${ui.selectedId === a.id ? ' is-selected' : ''}" data-ops-alert="${esc(a.id)}" title="${esc(a.name)}">
-      <span class="isp-ops-alert-icon">${a.status === STATUS.DEGRADED ? warn(18) : bolt('#ffffff', 18)}</span>
-      <span class="isp-ops-alert-text"><b>${esc(a.id)} – ${esc(STATUS_LABEL[a.status].replace(/\bpower\b/, 'Power'))}</b><small>${esc(a.zone ?? a.name)}</small>${a.date ? `<small>Status: <em>${esc(fmtDay(a.date))}</em></small>` : ''}</span>
-      <span class="isp-ops-chev" aria-hidden="true">›</span></button>`;
-    const keep = null;
-    opsHost.innerHTML = `<section class="isp-ops-card" aria-label="Power status">
-        <h3 title="${esc(`${summary.total} monitored assets (equipment and loads; cables not counted)${summary.asOf ? `, status date ${summary.asOf}` : ''}. From the IFC model in ACC and its connectivity; no live SCADA feed.`)}">Power Status
+      title="${summary.counts[key] ? `Show only ${STATUS_LABEL[key].toLowerCase()} assets on the map${ALERT_GROUPS.includes(key) ? ' and in Active Alerts' : ''}` : ''}">${statusIcon(key)}<span>${STATUS_LABEL[key]}</span><b>${summary.counts[key]}</b></button>`;
+    // A status filter on an alert status narrows the alerts too.
+    const filter = ALERT_GROUPS.includes(ui.statusFilter) ? ui.statusFilter : null;
+    const groups = ALERT_GROUPS.filter(g => !filter || g === filter).map(g => ({ key: g, list: alerts.filter(a => a.status === g) })).filter(g => g.list.length);
+    const visible = groups.flatMap(g => (ui.alertGroups[g.key] ? g.list : []));
+    const size = Math.max(1, ui.alertPageSize);
+    const pages = Math.max(1, Math.ceil(visible.length / size));
+    ui.alertPage = Math.min(ui.alertPage, pages - 1);
+    const page = visible.slice(ui.alertPage * size, ui.alertPage * size + size);
+    const alertRow = a => `<li><button type="button" class="isp-ops-alert is-${a.status.toLowerCase()}${ui.selectedId === a.id ? ' is-selected' : ''}" data-ops-alert="${esc(a.id)}" title="${esc(`${a.name ?? a.id} — ${a.text}`)}">
+      <span class="isp-ops-alert-icon">${a.status === STATUS.DEGRADED ? warn(13) : a.status === STATUS.OFFLINE ? bolt(STATUS_COLOR.OFFLINE, 13) : bolt(STATUS_COLOR.NO_POWER, 13)}</span>
+      <span class="isp-ops-alert-text"><b>${esc(a.id)}</b><small>${esc(a.zone ?? a.name ?? '')}</small></span>
+      ${a.date ? `<time datetime="${esc(a.date)}">${esc(shortDay(a.date))}</time>` : ''}<span class="isp-ops-chev" aria-hidden="true">›</span></button></li>`;
+    const group = g => {
+      const open = ui.alertGroups[g.key];
+      const shown = page.filter(a => a.status === g.key);
+      return `<section class="isp-ops-group is-${g.key.toLowerCase()}" aria-label="${GROUP_LABEL[g.key]} alerts">
+        <button type="button" class="isp-ops-ghead" data-ops-group="${g.key}" aria-expanded="${open}">${statusIcon(g.key)}<span>${GROUP_LABEL[g.key]}</span><b>${g.list.length}</b><i aria-hidden="true">${open ? '▾' : '▸'}</i></button>
+        ${open && shown.length ? `<ul>${shown.map(alertRow).join('')}</ul>` : ''}</section>`;
+    };
+    // Group headers stay for every non-empty group; rows of a group not on this page are on another page.
+    const pager = visible.length > size ? `<div class="isp-ops-pager"><span>Showing ${ui.alertPage * size + 1}–${Math.min(visible.length, (ui.alertPage + 1) * size)} of ${visible.length} alerts</span>
+      <button type="button" data-ops-page="-1" aria-label="Previous alerts"${ui.alertPage ? '' : ' disabled'}>‹</button><button type="button" data-ops-page="1" aria-label="Next alerts"${ui.alertPage < pages - 1 ? '' : ' disabled'}>›</button></div>` : '';
+    opsHost.innerHTML = `<div class="isp-opsp">
+      <section class="isp-ops-sec" aria-label="Power status">
+        <h3 title="${esc(`${summary.total} monitored assets (equipment and loads; cables not counted), each counted once${summary.asOf ? `; status date ${summary.asOf}` : ''}. Powered includes degraded assets (still energised). From the IFC model in ACC and its connectivity; no live SCADA feed.`)}">Power Status
           <button type="button" class="isp-ops-toggle" data-act="opsCollapse" aria-expanded="true" aria-label="Hide to the header" title="Hide to the header">▴</button></h3>
-        <div class="isp-ops-status">${donut(summary.poweredPct)}<div class="isp-ops-rows">${rows.map(row).join('')}</div></div>
+        <div class="isp-ops-status">${donut(summary.poweredPct, summary.counts)}<div class="isp-ops-rows">${rows.map(row).join('')}</div></div>
         ${ui.statusFilter ? `<button type="button" class="isp-ops-clear" data-act="opsClear">Clear filter · ${esc(STATUS_LABEL[ui.statusFilter])}</button>` : ''}</section>
-      <section class="isp-ops-card isp-ops-alerts" aria-label="Active alerts"><h3>Active Alerts (${alerts.length})</h3>
-        <div class="isp-ops-list">${alerts.length ? alerts.map(card).join('') : '<p class="isp-ops-none">No alerts: every monitored asset is powered.</p>'}</div></section>`;
-    // The one details panel (asset, answer or investigation) opens as its own card beside the two
-    // status cards, so Power Status and Active Alerts stay in view.
-    const slot = keep ?? opsHost.parentElement?.querySelector(':scope > .isp-ops-detail') ?? Object.assign(document.createElement('div'), { className: 'isp-ops-detail' });
+      <section class="isp-ops-sec isp-ops-alerts" aria-label="Active alerts"><h3>Active Alerts <small>${filter ? `${visible.length} of ${alerts.length}` : alerts.length}</small></h3>
+        ${groups.length ? groups.map(group).join('') : `<p class="isp-ops-none">${filter ? `No ${GROUP_LABEL[filter].toLowerCase()} alerts.` : 'No alerts: every monitored asset is powered.'}</p>`}
+        ${pager}</section></div>`;
+    // The one details panel (asset, answer or investigation) opens as its own card beside this one.
+    const slot = opsHost.parentElement?.querySelector(':scope > .isp-ops-detail') ?? Object.assign(document.createElement('div'), { className: 'isp-ops-detail' });
     if (slot.previousElementSibling !== opsHost) opsHost.after(slot);
+    if (fit && !opsHost.hidden) fitAlerts(visible.length);
   }
+  /**
+   * As many alert rows as fit between the panel's top and the bottom of the window (up to 8): the panel never
+   * runs past the screen, so it never needs a scrollbar; the rest is a page away.
+   */
+  function fitAlerts(total) {
+    // The room: to the bottom of the window, and never more than the panel's own maximum height.
+    const maxH = parseFloat(getComputedStyle(opsHost).maxHeight);
+    const room = Math.min(window.innerHeight - opsHost.getBoundingClientRect().top - 16, Number.isFinite(maxH) ? maxH : Infinity) - 2;
+    const want = Math.min(8, Math.max(1, total));
+    // A few passes: a page with fewer rows can drop or add a group's rows, which changes the height again.
+    for (let pass = 0; pass < 4; pass += 1) {
+      const panel = opsHost.querySelector('.isp-opsp');
+      if (!panel) return;
+      const h = panel.getBoundingClientRect().height;
+      const rowH = opsHost.querySelector('.isp-ops-alert')?.getBoundingClientRect().height || 46;
+      let size = ui.alertPageSize;
+      if (h > room) size = Math.max(1, size - Math.max(1, Math.ceil((h - room) / rowH)));
+      else if (size < want && room - h > rowH + 4) size = Math.min(want, size + Math.floor((room - h - 4) / rowH));
+      if (size === ui.alertPageSize) return;
+      ui.alertPageSize = size;
+      renderOps({ fit: false });
+    }
+  }
+  // On a resize: start from the full page again, then fit once the new layout has settled.
+  let resizeFrame = 0;
+  const onOpsResize = () => {
+    if (ui.opsCollapsed) return;
+    ui.alertPageSize = 8; ui.alertPage = 0;
+    renderOps();
+    cancelAnimationFrame(resizeFrame);
+    resizeFrame = requestAnimationFrame(() => renderOps());
+  };
+  window.addEventListener('resize', onOpsResize);
+
 
   function investigationHtml(inv) {
     const a = network.assets.get(inv.id);
@@ -472,6 +538,7 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
       ${islands.length ? `<div class="isp-sub">Supply capacity (modelled demand)</div>${islands.map(i => `<div class="isp-bar-row"><span>${esc(i.id)}</span><span>${kw(i.loadKw)} / ${kw(i.capacityKw)}</span></div>
         <div class="isp-bar"><i class="${i.loadKw > i.capacityKw ? 'is-crit' : i.loadKw > 0.85 * i.capacityKw ? 'is-warn' : ''}" style="width:${Math.min(100, Math.round(i.loadKw / i.capacityKw * 100))}%"></i></div>`).join('')}` : ''}`;
   }
+
   /** The simulation pill: only while a simulation runs; clicking it resets. */
   function renderHeader(st) {
     // The simulation panel says it all; no banner beside it.
@@ -1282,8 +1349,9 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
       // The changes that are assets of this model version (an added or kept one) go on the map here too.
       setAskResults((result.changes ?? []).filter(c => ids?.includes(c.globalId)).map(c => c.networkId ?? built.assetByGlobalId.get(c.globalId)?.id).filter(Boolean), question);
       render();
-      if (ui.ask && !parsed.wantsMap && ui.ask.ids.length <= 400) frame(ui.ask.ids, { pitch: -55, minRange: 300 });
-      if (parsed.wantsMap && ids?.length) compareTools.open(v.base, v.target, ids.length === 1 ? { focus: ids[0] } : { ids });
+      // On the current map (the comparison screen opens only from "Open version comparison").
+      if (ui.ask && ui.ask.ids.length <= 400) frame(ui.ask.ids, { pitch: -55, minRange: 300 });
+      else if (parsed.wantsMap && ids?.length && !ui.ask) { ui.view = { ...ui.view, say2: 'None of them is in the loaded model version; open the version comparison to see them.' }; render(); }
     } catch (error) {
       if (mine !== askToken) return;
       ui.view = { question, kind: 'Version comparison', status: 'error', title: error.code === 'VERSIONS' ? error.message : 'The comparison could not be run',
@@ -1458,11 +1526,12 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
     const r = rec.data;
     const { say, say2 } = rec.say ? { say: rec.say, say2: rec.say2 ?? null } : reportSay(r);
     return { question: rec.question, kind: r.request.outputs.pdf || r.request.outputs.xlsx || r.request.outputs.email ? 'Generated report' : 'Inspection evaluation', status: 'answered', say, say2,
-      extraHtml: reportHtml(r, rec.ui) };
+      extraHtml: reportHtml(r, rec.ui, { gmail: ui.gmail }) };
   }
   function renderReport(id) {
     const rec = ui.reports.get(id);
     if (!rec) return;
+    if (rec.data.emailDraft && ui.gmail === null && !gmailLoading) void refreshGmail();
     const view = reportView(rec);
     if (rec.turn === ui.turn) { ui.view = view; render(); return; }
     // An earlier turn: redrawn in place; the current answer is left alone.
@@ -1574,6 +1643,211 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
       await startReport(question, req, { revisionOf: r.reportId, regenerate });
     }
   }
+  // ---- the email draft: Gmail connection, edits saved as they are made, an explicit confirmed send ----
+  ui.gmail = null;
+  let gmailLoading = false;
+  async function refreshGmail() {
+    if (!docTools?.gmail) return;
+    gmailLoading = true;
+    try { ui.gmail = await docTools.gmail.status(); } catch { ui.gmail = { configured: false, missing: ['server unreachable'], connected: false, canSend: false, testRecipients: [] }; }
+    gmailLoading = false;
+    for (const [id, rec] of ui.reports) if (rec.data.emailDraft) renderReport(id);
+  }
+  // The Google sign-in popup tells the conversation how it went; the conversation itself was never reloaded.
+  const onGmailMessage = event => {
+    if (event.origin !== window.location.origin || event.data?.type !== 'gmail-auth') return;
+    for (const rec of ui.reports.values()) rec.ui.gmailNote = event.data.ok ? null : event.data.message ?? 'Gmail was not connected.';
+    void refreshGmail();
+  };
+  window.addEventListener('message', onGmailMessage);
+  const draftOf = id => ui.reports.get(id)?.data.emailDraft ?? null;
+  /** Save the draft's fields (no re-render, so the caret stays where it is). */
+  function saveDraft(id) {
+    const rec = ui.reports.get(id);
+    const d = rec?.data.emailDraft;
+    if (!d || ['SENT', 'SENDING', 'SEND_STATUS_UNKNOWN'].includes(d.sendState)) return Promise.resolve();
+    const body = { to: d.to, cc: d.cc, bcc: d.bcc, subject: d.subject, ...(d.bodyHtml != null ? { bodyHtml: d.bodyHtml } : { body: d.body }), attachmentIds: d.attachmentIds, recipientGroup: d.recipientGroup };
+    rec.saving = (rec.saving ?? Promise.resolve()).then(() => docTools.report.email(id, body)).then(data => {
+      // Keep what the user typed since; take the server's record for everything else.
+      rec.data = { ...data, emailDraft: { ...data.emailDraft, to: d.to, cc: d.cc, bcc: d.bcc, subject: d.subject, body: d.body, bodyHtml: d.bodyHtml ?? data.emailDraft.bodyHtml } };
+      rec.ui.saveError = null;
+    }).catch(error => { rec.ui.saveError = `The draft could not be saved (${error?.message ?? error}).`; renderReport(id); });
+    return rec.saving;
+  }
+  /** The Send button and its reason, updated in place while typing. */
+  function updateSendState(card, id) {
+    const rec = ui.reports.get(id);
+    if (!card || !rec) return;
+    const ready = sendReadiness(rec.data, ui.gmail);
+    const btn = card.querySelector('[data-send-btn]');
+    if (btn) btn.disabled = !ready.ready;
+    const why = card.querySelector('[data-mail-why]');
+    if (why && !['SENDING', 'SEND_STATUS_UNKNOWN', 'FAILED'].includes(rec.data.emailDraft?.sendState)) why.textContent = ready.ready ? 'Ready to send · not sent yet' : `Not sent · ${ready.why[0] ?? ''}`;
+  }
+  // Recipients as chips: typed, pasted or left in the field, each address becomes a chip (an address that is
+  // not one is kept and shown as such, so nothing typed disappears).
+  function commitChips(input) {
+    const id = input.dataset.reportId, field = input.dataset.chipInput;
+    const d = draftOf(id);
+    const text = input.value.trim();
+    if (!d || !text) return false;
+    const add = text.split(/[,;\s]+/).map(x => x.trim()).filter(Boolean);
+    d[field] = [...new Set([...(d[field] ?? []), ...add])];
+    input.value = '';
+    redrawChips(input.closest('.tw-chips'), id, field, { focus: true });
+    return true;
+  }
+  /** Redraw one chip box (the card being edited: the same report can be shown in an earlier turn too). */
+  function redrawChips(box, id, field, { focus = false } = {}) {
+    const d = draftOf(id);
+    if (!box || !d) return;
+    const ph = box.querySelector('[data-chip-input]')?.getAttribute('placeholder') || (field === 'to' && d.recipientGroup ? `${d.recipientGroup} — enter email address` : 'Optional');
+    box.innerHTML = chipsHtml(field, d[field] ?? [], { id, placeholder: ph });
+    if (focus) box.querySelector('[data-chip-input]')?.focus();
+    updateSendState(box.closest('.tw-mail'), id);
+    void saveDraft(id);
+  }
+  askHost.addEventListener('keydown', event => {
+    const el = event.target;
+    if (el.dataset?.chipInput) {
+      if (['Enter', ',', ';'].includes(event.key) || (event.key === ' ' && el.value.trim()) || (event.key === 'Tab' && el.value.trim())) {
+        if (commitChips(el)) event.preventDefault();
+        else if (event.key === 'Enter') event.preventDefault();
+      } else if (event.key === 'Backspace' && !el.value) {
+        const d = draftOf(el.dataset.reportId);
+        if (d?.[el.dataset.chipInput]?.length) { d[el.dataset.chipInput] = d[el.dataset.chipInput].slice(0, -1); redrawChips(el.closest('.tw-chips'), el.dataset.reportId, el.dataset.chipInput, { focus: true }); }
+      }
+    }
+  });
+  askHost.addEventListener('paste', event => {
+    const el = event.target;
+    if (!el.dataset?.chipInput) return;
+    const text = event.clipboardData?.getData('text') ?? '';
+    if (!/[,;\s]/.test(text.trim())) return;
+    event.preventDefault();
+    el.value = `${el.value} ${text}`;
+    commitChips(el);
+  });
+  askHost.addEventListener('focusout', event => { if (event.target.dataset?.chipInput) commitChips(event.target); });
+  // The message: rich text in a contenteditable editor; the toolbar uses the browser's editing commands.
+  let editorSave = 0;
+  function onEditorInput(el) {
+    const d = draftOf(el.dataset.reportId);
+    if (!d) return;
+    d.bodyHtml = el.innerHTML;
+    d.body = el.innerText;
+    d.edited = true;
+    updateSendState(el.closest('.tw-mail'), el.dataset.reportId);
+    clearTimeout(editorSave);
+    editorSave = setTimeout(() => void saveDraft(el.dataset.reportId), 600);
+  }
+  function format(btn) {
+    const card = btn.closest('.tw-mail');
+    const editor = card?.querySelector('[data-mail-editor]');
+    if (!editor || editor.getAttribute('contenteditable') !== 'true') return;
+    editor.focus();
+    if (btn.dataset.fmt === 'link') {
+      const url = window.prompt('Link address (https:// or mailto:)', 'https://');
+      if (!url || !/^(https?:\/\/|mailto:)\S+$/i.test(url.trim())) return;
+      document.execCommand('createLink', false, url.trim());
+    } else document.execCommand(btn.dataset.fmt, false, null);
+    onEditorInput(editor);
+  }
+  askHost.addEventListener('input', event => {
+    const el = event.target;
+    if ('mailEditor' in (el.dataset ?? {})) { onEditorInput(el); return; }
+    if (el.dataset?.mail && el.dataset.reportId) {
+      const d = draftOf(el.dataset.reportId);
+      if (!d) return;
+      d[el.dataset.mail] = el.value;
+      if (el.dataset.mail === 'subject') d.edited = true;
+      updateSendState(el.closest('.tw-mail'), el.dataset.reportId);
+    } else if ('mailAck' in (el.dataset ?? {})) {
+      const btn = el.closest('.tw-mconf')?.querySelector('[data-report-act="sendConfirm"]');
+      if (btn) btn.disabled = !el.checked;
+    }
+  });
+  askHost.addEventListener('change', event => {
+    const el = event.target;
+    if (el.dataset?.mail && el.dataset.reportId) void saveDraft(el.dataset.reportId);
+    if ('fmtBlock' in (el.dataset ?? {})) {
+      const editor = el.closest('.tw-mail')?.querySelector('[data-mail-editor]');
+      if (editor) { editor.focus(); document.execCommand('formatBlock', false, el.value); onEditorInput(editor); el.value = 'p'; }
+    }
+    if (el.dataset?.mailAtt && el.dataset.reportId) {
+      const id = el.dataset.reportId;
+      const d = draftOf(id);
+      if (!d) return;
+      d.attachmentIds = [...el.closest('.tw-matt').querySelectorAll('[data-mail-att]')].filter(x => x.checked).map(x => x.dataset.mailAtt);
+      void saveDraft(id).then(() => renderReport(id));
+    }
+  });
+  const newKey = () => (crypto.randomUUID?.() ?? `${Date.now()}${Math.random()}`).replace(/[^A-Za-z0-9]/g, '').slice(0, 40).padEnd(20, '0');
+  async function sendAction(t, rec, id) {
+    const u = rec.ui;
+    const act = t.dataset.reportAct;
+    if (act === 'gmailConnect') {
+      // A popup: the conversation, the report, the draft and the map stay exactly as they are.
+      const w = window.open(docTools.gmail.loginUrl, 'gmail-auth', 'popup,width=520,height=680');
+      u.gmailNote = w ? 'Finish connecting in the Google window.' : 'The browser blocked the Google window: allow pop-ups for this site and try again.';
+      renderReport(id);
+      return;
+    }
+    if (act === 'gmailDisconnect') { try { ui.gmail = await docTools.gmail.disconnect(); } catch (error) { u.gmailNote = error?.message ?? String(error); } for (const k of ui.reports.keys()) renderReport(k); return; }
+    if (act === 'mailCc') { u.ccOpen = true; renderReport(id); [...askHost.querySelectorAll(`.tw-chips[data-chips="cc"][data-report-id="${CSS.escape(id)}"] [data-chip-input]`)].at(-1)?.focus(); return; }
+    if (act === 'mailMenu') { u.menuOpen = !u.menuOpen; renderReport(id); return; }
+    if (act === 'emailRegenAsk') {
+      u.menuOpen = false;
+      // Edited text is replaced only after the user says so; the files are never regenerated.
+      if (rec.data.emailDraft?.edited) { u.regenConfirm = true; renderReport(id); return; }
+      await saveDraft(id);
+      try { rec.data = await docTools.report.email(id, { regenerate: true }); } catch (error) { u.saveError = error?.message ?? String(error); }
+      renderReport(id);
+      return;
+    }
+    if (act === 'emailRegenCancel') { u.regenConfirm = false; renderReport(id); return; }
+    if (act === 'mailAtt') { u.attOpen = !u.attOpen; renderReport(id); return; }
+    if (act === 'sendHistory') {
+      u.menuOpen = false;
+      u.historyOpen = !u.historyOpen;
+      renderReport(id);
+      if (u.historyOpen) { try { u.history = (await docTools.gmail.history(id)).attempts; } catch (error) { u.history = []; u.saveError = error?.message ?? String(error); } renderReport(id); }
+      return;
+    }
+    if (act === 'emailNew') { u.history = null; u.historyOpen = false; try { rec.data = await docTools.report.email(id, { newDraft: true }); } catch (error) { u.saveError = error?.message ?? String(error); } renderReport(id); return; }
+    if (act === 'sendStart') {
+      await saveDraft(id);
+      if (!sendReadiness(rec.data, ui.gmail).ready) { renderReport(id); return; }
+      // One key per confirmed send: a double click or a retried request cannot send twice.
+      u.sendKey = newKey();
+      u.confirming = true; u.sendError = null;
+      renderReport(id);
+      // Into view and focused, wherever the user had scrolled the conversation.
+      const dlg = [...askHost.querySelectorAll(`[data-mail-card="${CSS.escape(id)}"] .tw-mconf`)].at(-1);
+      dlg?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      (dlg?.querySelector('[data-mail-ack]') ?? dlg?.querySelector('[data-report-act="sendConfirm"]'))?.focus({ preventScroll: true });
+      return;
+    }
+    if (act === 'sendCancel') { u.confirming = false; u.sendError = null; renderReport(id); return; }
+    if (act === 'sendConfirm') {
+      if (u.sending) return;
+      const ack = Boolean(t.closest('.tw-mconf')?.querySelector('[data-mail-ack]')?.checked);
+      u.sending = true; u.sendError = null;
+      renderReport(id);
+      let result = null;
+      try { result = await docTools.gmail.send({ reportId: id, idempotencyKey: u.sendKey, acknowledgeIllustrative: ack }); }
+      catch (error) {
+        // Refused before sending (it says why), or our own request failed (which may have reached Gmail).
+        u.sendError = error?.code === 'NETWORK' ? 'Send status could not be confirmed. Check Gmail before retrying.' : error?.message ?? String(error);
+        if (['ALREADY_SENT', 'SEND_STATUS_UNKNOWN'].includes(error?.code)) u.confirming = false;
+      }
+      u.sending = false;
+      try { rec.data = await docTools.report.get(id); } catch { /* the card keeps what it had */ }
+      if (result) { u.confirming = false; u.history = null; if (result.status === 'FAILED') u.sendKey = null; }
+      renderReport(id);
+    }
+  }
+
   /** The report card's buttons. */
   async function reportAction(t) {
     const id = t.dataset.reportId;
@@ -1594,19 +1868,21 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
     }
     if (act === 'cancel') { await save(() => docTools.report.cancel(id)); return; }
     if (act === 'retry') { await save(() => docTools.report.retry(id, t.dataset.reportType)); return; }
-    if (act === 'emailRegen') { await save(() => docTools.report.email(id, { regenerate: true })); return; }
-    if (act === 'emailSave') {
-      const card = t.closest('.tw-mail');
-      const val = k => card.querySelector(`[data-mail="${k}"]`)?.value ?? '';
-      const attachmentIds = [...card.querySelectorAll('[data-mail-att]')].filter(x => x.checked).map(x => x.dataset.mailAtt);
-      u.editing = false;
-      await save(() => docTools.report.email(id, { recipientGroup: val('recipientGroup'), subject: val('subject'), body: val('body'), attachmentIds }));
-      return;
-    }
+    // Regenerate the text only (confirmed first when edited): the report and the register are not regenerated.
+    if (act === 'emailRegen') { u.regenConfirm = false; u.menuOpen = false; await save(() => docTools.report.email(id, { regenerate: true })); return; }
+    if (['gmailConnect', 'gmailDisconnect', 'mailCc', 'mailAtt', 'mailMenu', 'emailRegenAsk', 'emailRegenCancel', 'sendHistory', 'emailNew', 'sendStart', 'sendCancel', 'sendConfirm'].includes(act)) { await sendAction(t, rec, id); return; }
     if (act === 'emailCopy') {
       const d = rec.data.emailDraft;
-      const text = `To: ${d.recipientGroup ?? ''}\nSubject: ${d.subject}\n\n${d.body}`;
-      try { await navigator.clipboard.writeText(text); u.copied = true; } catch { u.copied = false; }
+      const to = splitAddresses(d.to).valid.join(', ') || d.recipientGroup || '';
+      const text = `To: ${to}${d.cc?.length ? `\nCc: ${d.cc.join(', ')}` : ''}\nSubject: ${d.subject}\n\n${d.body}`;
+      // Formatted where the clipboard takes HTML, plain text otherwise.
+      try {
+        if (d.bodyHtml && window.ClipboardItem) {
+          const html = `<p><b>To:</b> ${esc(to)}<br><b>Subject:</b> ${esc(d.subject)}</p>${d.bodyHtml}`;
+          await navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })]);
+        } else await navigator.clipboard.writeText(text);
+        u.copied = true;
+      } catch { u.copied = false; }
       renderReport(id);
       return;
     }
@@ -1854,8 +2130,19 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
     return true;
   }
 
+  /**
+   * The asset that is offline in the running simulation opens the Outage Simulation panel (the same one the
+   * asset card's "Simulate outage" opens), also when the simulation was started from Ask the Twin.
+   */
+  function openSimulationFor(id) {
+    if (!ui.sim || !session.state().active || !simulationOf()?.failed.includes(id)) return false;
+    ui.sim.inChat = false;
+    ui.inspector = null;
+    return true;
+  }
   function selectAsset(id, { zoom = false } = {}) {
     if (!network.assets.has(id)) return false;
+    if (openSimulationFor(id)) { ui.selectedId = id; render(); frameSimulation(); return true; }
     // A result of the current answer: keep the answer to come back to, emphasise this one.
     if (ui.ask && ui.ask.ids.includes(id)) {
       // A result of the current answer: the answer stays (its row shows the selection), the asset is focused.
@@ -2090,6 +2377,7 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
   function focusAsset(id, { recenter = false, sound = true } = {}) {
     const a = network.assets.get(id);
     if (!a) return false;
+    if (openSimulationFor(id)) { ui.selectedId = id; render(); frameSimulation(); return true; }
     ui.lastAssets = [id];
     const g = geometryOf(a);
     const same = ui.focus?.id === id && ui.focus.state === 'ok' && focusFx.active();
@@ -2117,7 +2405,8 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
     };
     const { free, width } = freeArea();
     const fit = free ? Math.min(width / free, 2) : 1;
-    const range = Math.min(Math.max(g.radius * 8, 150), 900) * fit;
+    // One zoom-in step (the header's +, 35 %) closer than a plain fit.
+    const range = Math.min(Math.max(g.radius * 8, 150), 900) * fit * 0.65;
     viewer.camera.flyToBoundingSphere(g.sphere, { duration: reduceMotion() ? 0 : 2, easingFunction: EasingFunction.QUADRATIC_IN_OUT,
       offset: new HeadingPitchRange(CMath.toRadians(heading), CMath.toRadians(-38), range), complete: done, cancel: done });
     return true;
@@ -2171,6 +2460,37 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
   askHost.querySelector('.isp-askp-collapse').setAttribute('aria-expanded', String(remembered.askOpen));
   askHost.querySelector('.isp-askp-launcher').hidden = remembered.askOpen;
   const chat = askHost.querySelector('.isp-askp-chat');
+  // Panel width: the default, or expanded for long answers (documents, reports, the email draft). Kept per browser
+  // and apart from collapsing; only the width changes (the conversation, the map and its camera stay as they are).
+  const WIDTH_KEY = 'ifcSpatial.askWidth';
+  let askWide = false;
+  try { askWide = localStorage.getItem(WIDTH_KEY) === 'expanded'; } catch { /* first visit, or storage off */ }
+  function setAskWidth(wide, { persist = true } = {}) {
+    askWide = wide;
+    const root = askHost.parentElement;
+    // Keep the conversation where the reader was: the turn at the top of the view stays at the top once text reflows.
+    const top = chatBody.getBoundingClientRect().top;
+    const anchor = [...chat.querySelectorAll('.isp-turn')].find(t => t.getBoundingClientRect().bottom > top + 4) ?? null;
+    const offset = anchor ? anchor.getBoundingClientRect().top - top : 0;
+    root?.classList.toggle('is-ask-wide', wide);
+    const btn = askHost.querySelector('.isp-askp-width');
+    const label = wide ? 'Restore original width' : 'Expand panel width';
+    btn.setAttribute('aria-pressed', String(wide));
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+    btn.innerHTML = wide ? ASK_ICONS.minimize : ASK_ICONS.maximize;
+    if (persist) { try { localStorage.setItem(WIDTH_KEY, wide ? 'expanded' : 'default'); } catch { /* not kept */ } }
+    const settle = () => {
+      if (anchor && !followChat) chatBody.scrollTop += (anchor.getBoundingClientRect().top - chatBody.getBoundingClientRect().top) - offset;
+      renderFocusBar();
+    };
+    let done = false;
+    const end = () => { if (!done) { done = true; settle(); } };
+    // The toolbar under the map is centred in the free map area: again when the width has really finished changing.
+    askHost.addEventListener('transitionend', function onEnd(e) { if (e.propertyName === 'width') { askHost.removeEventListener('transitionend', onEnd); end(); renderFocusBar(); } });
+    setTimeout(end, 400);
+  }
+  setAskWidth(askWide, { persist: false });
   // Follow the newest answer unless the reader has scrolled up to an earlier one.
   let followChat = true;
   chatBody.addEventListener('scroll', () => { followChat = chatBody.scrollHeight - chatBody.scrollTop - chatBody.clientHeight < 48; }, { passive: true });
@@ -2249,15 +2569,48 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
     // The document review: tabs, citation numbers and its actions change only that answer's own DOM —
     // no request, no re-render, the map and the selection as they are.
     if (t.dataset.reportAct) { void reportAction(t); return true; }
+    if (t.dataset.fmt) { format(t); return true; }
+    if (t.dataset.chipRemove) {
+      const d = draftOf(t.dataset.reportId);
+      if (d) { d[t.dataset.chipRemove] = (d[t.dataset.chipRemove] ?? []).filter(x => x !== t.dataset.chipValue); redrawChips(t.closest('.tw-chips'), t.dataset.reportId, t.dataset.chipRemove, { focus: true }); }
+      return true;
+    }
+    if (t.dataset.mailAttRemove || t.dataset.mailAttAdd) {
+      const id = t.dataset.reportId;
+      const d = draftOf(id);
+      if (d) {
+        d.attachmentIds = t.dataset.mailAttRemove ? d.attachmentIds.filter(x => x !== t.dataset.mailAttRemove) : [...new Set([...d.attachmentIds, t.dataset.mailAttAdd])];
+        void saveDraft(id).then(() => renderReport(id));
+      }
+      return true;
+    }
     if (t.dataset.docTab) { event.preventDefault(); switchReviewTab(t.closest('.tw-rev'), t.dataset.docTab, { open: t.dataset.docOpen ?? null, item: t.dataset.docItem ?? null }); return true; }
     if (t.dataset.refDoc) { event.preventDefault(); showCitation(t); return true; }
     if (t.dataset.act === 'refClose') { t.closest('.tw-cpop')?.remove(); return true; }
     if (t.dataset.act === 'docSimulate') { simulateFromReview(t.dataset.assetId); return true; }
     // A citation: the existing document preview, at the cited page; the conversation stays as it is.
     if (t.dataset.docCite) { onDocument(t.dataset.docCite, { page: Number(t.dataset.docPage) || null }); return true; }
-    if (t.dataset.opsStatus) { ui.statusFilter = ui.statusFilter === t.dataset.opsStatus ? null : t.dataset.opsStatus; draw(); if (ui.statusFilter) frame(summary.ids[ui.statusFilter], { pitch: -55, minRange: 400 }); return true; }
+    if (t.dataset.opsStatus) { ui.statusFilter = ui.statusFilter === t.dataset.opsStatus ? null : t.dataset.opsStatus; ui.alertPage = 0; ui.alertPageSize = 8; draw(); if (ui.statusFilter) frame(summary.ids[ui.statusFilter], { pitch: -55, minRange: 400 }); return true; }
+    if (t.dataset.opsGroup) { ui.alertGroups[t.dataset.opsGroup] = !ui.alertGroups[t.dataset.opsGroup]; ui.alertPage = 0; ui.alertPageSize = 8; renderOps(); return true; }
+    if (t.dataset.opsPage) { ui.alertPage = Math.max(0, ui.alertPage + Number(t.dataset.opsPage)); renderOps({ fit: false }); opsHost.querySelector(`[data-ops-page="${t.dataset.opsPage}"]:not(:disabled)`)?.focus(); return true; }
     if (t.dataset.opsAlert) { selectAsset(t.dataset.opsAlert); frame([t.dataset.opsAlert], { pitch: -50, minRange: 300 }); return true; }
     if (t.dataset.opsInvestigate) { investigateAsset(t.dataset.opsInvestigate); return true; }
+    // A change in a comparison answer: that asset, focused on the current map (as any asset row does).
+    if (t.dataset.cmpAsset) {
+      if (network.assets.has(t.dataset.cmpAsset)) selectAsset(t.dataset.cmpAsset, { zoom: true });
+      else if (ui.view && Number(t.closest('.isp-turn')?.dataset.turn) === ui.turn) {
+        // Not in the loaded version (removed, for example): said on this answer, nothing else opens.
+        ui.view = { ...ui.view, say2: `${t.dataset.cmpAsset} is not in the loaded model version; open the version comparison to see it.` };
+        render();
+      }
+      return true;
+    }
+    // A set of changes on the current map: highlighted and framed (no comparison screen).
+    if (t.dataset.cmpShow !== undefined) {
+      const ids = t.dataset.cmpShow.split(',').filter(id => network.assets.has(id));
+      if (ids.length) { setAskResults(ids, ui.question, { noun: 'assets' }); render(); frame(ids, { pitch: -55, minRange: 300 }); }
+      return true;
+    }
     if (t.dataset.cmpOpen && compareTools) {
       const [base, target] = t.dataset.cmpOpen.split(':').map(Number);
       compareTools.open(base, target, { focus: t.dataset.cmpFocus ?? null, ids: t.dataset.cmpIds ? t.dataset.cmpIds.split(',') : null, status: t.dataset.cmpStatus ?? null });
@@ -2284,6 +2637,7 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
       case 'bank': { const bank = askHost.querySelector('.isp-bank'); bank.hidden = !bank.hidden; t.setAttribute('aria-expanded', String(!bank.hidden)); return true; }
       case 'askCollapse': expandAsk(false); askHost.querySelector('.isp-askp-launcher').focus(); return true;
       case 'askExpand': expandAsk(true); form.q.focus(); return true;
+      case 'askWidth': setAskWidth(!askWide); return true;
       case 'netClear': ui.result = null; ui.view = null; ui.selectedId = null; ui.question = null; ui.inspector = null; render(); return true;
       case 'focusRecenter': if (ui.focus) focusAsset(ui.focus.id, { recenter: true, sound: false }); else if (ui.sim) frameSimulation(); return true;
       case 'focusRetry': if (t.dataset.assetId) focusAsset(t.dataset.assetId); return true;
@@ -2348,7 +2702,8 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
         ui.opsCollapsed = !ui.opsCollapsed;
         remembered.opsCollapsed = ui.opsCollapsed;
         applyAlertMarkers();
-        renderOps();
+        // The map follows: alert assets pulse and are named only while the panel is open.
+        draw();
         return true;
       case 'resetInvestigation': ui.investigation = null; render(); return true;
       case 'zoomAsset': if (ui.selectedId) frame([ui.selectedId], { pitch: -50, minRange: 420 }); return true;
@@ -2406,9 +2761,9 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
     focusState: () => ({ id: ui.focus?.id ?? null, state: ui.focus?.state ?? null, inspector: ui.inspector, effects: focusFx.state(), sound: soundOn, bar: !focusBar.hidden }),
     state: () => ({ answer: ui.view && { kind: ui.view.kind, status: ui.view.status, title: ui.view.title },
       sim: ui.sim && session.state().active ? { id: ui.sim.id, tab: ui.sim.tab, view: ui.sim.view, consumers: simulationOf()?.consumers ?? [] } : null, cmp: ui.cmp && { base: ui.cmp.base, target: ui.cmp.target, lastIds: ui.cmp.lastIds?.length ?? 0 }, workspace: ui.workspace, selectedId: ui.selectedId, result: ui.result && { intent: ui.result.intent, title: ui.result.answer.title, status: ui.result.status, targets: ui.result.targetAssetIds },
-      askIds: ui.ask?.ids ?? [], report: ui.lastReport ? { id: ui.lastReport, status: ui.reports.get(ui.lastReport)?.data.status ?? null } : null,
+      alertNames: ui.opsCollapsed || session.state().active ? [] : [...alertTone.keys()], askIds: ui.ask?.ids ?? [], askWidth: askWide ? 'expanded' : 'default', report: ui.lastReport ? { id: ui.lastReport, status: ui.reports.get(ui.lastReport)?.data.status ?? null } : null,
       scenario: session.state().active ? session.state().label : null, preset: ui.preset, counts: overlay.counts(), unpowered: [...unpowered],
       nodeStates: Object.fromEntries(networkState(network, session.state().active ? session.state().scenario : null).nodeState) }),
-    destroy() { overlay.destroy(); markers.destroy(); askHl.destroy(); focusFx.destroy(); locator.stop(); focusBar.remove(); },
+    destroy() { window.removeEventListener('message', onGmailMessage); window.removeEventListener('resize', onOpsResize); overlay.destroy(); markers.destroy(); askHl.destroy(); focusFx.destroy(); locator.stop(); focusBar.remove(); },
   };
 }

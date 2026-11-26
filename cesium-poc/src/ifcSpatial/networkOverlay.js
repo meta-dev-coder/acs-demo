@@ -31,6 +31,8 @@ const OPS_COLOR = { hv: '#b48cff', mv: '#3fc8ff', lv: '#58c9a6' };
 const reducedMotion = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 /** Symbols whose labels appear only closer in, as the mock shows them only when zoomed. */
 const MINOR = new Set(['vault', 'mast', 'tx', 'ats']);
+/** Closer than this (m), a main transformer with IFC 3D geometry shows its model, not its icon. */
+const MODEL_NEAR_M = 260;
 const SHORT = { R1: 'Reefers W', R2: 'Reefers E', GATE: 'Gate', OPS: 'Ops / SCADA', 'ICTF-OFF': 'ICTF office', WS: 'M&R shop' };
 
 export function createNetworkOverlay(viewer, { built, modelToLonLat, scadaRoutes = [], baseHeight = 0 }) {
@@ -78,7 +80,9 @@ export function createNetworkOverlay(viewer, { built, modelToLonLat, scadaRoutes
     const entity = source.entities.add({
       id: `node:${asset.id}`, position: position(asset),
       billboard: { image: imageFor(kind, { state: 'live', kv: voltageClass(asset) ?? 'mv' }), width: size, height: size,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY, scaleByDistance: new NearFarScalar(300, 1.35, 6000, 0.85) },
+        disableDepthTestDistance: Number.POSITIVE_INFINITY, scaleByDistance: new NearFarScalar(300, 1.35, 6000, 0.85),
+        // A main transformer the IFC model draws in 3D: its icon gives way to the model when the camera is close.
+        distanceDisplayCondition: kind === 'mtx' && asset.featureId != null ? new DistanceDisplayCondition(MODEL_NEAR_M, Number.MAX_VALUE) : undefined },
       label: { text: SHORT[asset.id] ?? asset.id, font: '500 12px "IBM Plex Mono", ui-monospace, monospace', fillColor: Color.fromCssColorString('#edf3f8'),
         outlineColor: color('#071019'), outlineWidth: 3.5, style: LabelStyle.FILL_AND_OUTLINE,
         horizontalOrigin: kind === 'sts' ? HorizontalOrigin.CENTER : HorizontalOrigin.LEFT, verticalOrigin: kind === 'sts' ? VerticalOrigin.TOP : VerticalOrigin.CENTER,
@@ -88,6 +92,36 @@ export function createNetworkOverlay(viewer, { built, modelToLonLat, scadaRoutes
     });
     nodes.set(asset.id, { entity, kind, kv: voltageClass(asset) ?? 'mv', size, text: SHORT[asset.id] ?? asset.id, ddc: entity.label.distanceDisplayCondition });
   }
+
+  // Alert assets without a tile of their own (a cable, a breaker, a unit transformer inside its RMU): while
+  // Power Status names alerts, they get an id label too, at the cable's midpoint or the asset's location.
+  const assetById = new Map(built.assets.map(a => [a.id, a]));
+  const alertLabels = new Map();
+  function midpoint(r) {
+    let left = r.lengthM / 2;
+    for (let i = 0; i < r.forward.length - 1; i++) {
+      const d = Cartesian3.distance(r.forward[i], r.forward[i + 1]);
+      if (left <= d) return Cartesian3.lerp(r.forward[i], r.forward[i + 1], d ? left / d : 0, new Cartesian3());
+      left -= d;
+    }
+    return r.forward.at(-1);
+  }
+  function alertLabelFor(id) {
+    if (alertLabels.has(id)) return alertLabels.get(id);
+    const asset = assetById.get(id);
+    const r = routes.get(id);
+    const at = r ? midpoint(r) : Number.isFinite(asset?.location?.longitude) ? position(asset) : null;
+    const entity = at ? source.entities.add({ id: `alert-label:${id}`, position: at,
+      label: { text: SHORT[id] ?? id, font: '500 12px "IBM Plex Mono", ui-monospace, monospace', fillColor: Color.WHITE,
+        outlineColor: color('#071019'), outlineWidth: 3.5, style: LabelStyle.FILL_AND_OUTLINE, showBackground: true,
+        horizontalOrigin: HorizontalOrigin.CENTER, verticalOrigin: VerticalOrigin.BOTTOM, pixelOffset: new Cartesian2(0, r ? -6 : -18),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY, scaleByDistance: new NearFarScalar(300, 1.15, 6000, 0.85), show: false,
+        // No tile to pulse: the label itself pulses gently, as alert tiles do.
+        scale: reducedMotion ? 1 : new CallbackProperty(() => 1 + 0.12 * (0.5 + 0.5 * Math.sin(performance.now() / 260)), false) } }) : null;
+    alertLabels.set(id, entity);
+    return entity;
+  }
+  const pulseWidth = base => reducedMotion ? new ConstantProperty(base + 4) : new CallbackProperty(() => base + 3 + 3 * (0.5 + 0.5 * Math.sin(performance.now() / 260)), false);
 
   // The SCADA fibre: control, not power, dashed as the mock draws it.
   for (const route of scadaRoutes) {
@@ -129,20 +163,33 @@ export function createNetworkOverlay(viewer, { built, modelToLonLat, scadaRoutes
       // During a simulation, what lost power says so on the map, as on the electrical twin.
       // Outside one, what the IFC model itself leaves unpowered (view.alert) is flagged and pulses.
       const alerted = Boolean(view.alert?.has(id));
-      const flagged = (view.stateLabels || alerted) && (raw === 'dead' || raw === 'off') && !['vault'].includes(n.kind);
+      // A simulation names what lost power ("STS-06 · NO POWER"); outside one, Power Status (when open) names
+      // its alert assets by id only (view.alertNames: id → 'bad' | 'warn').
+      const simFlag = Boolean(view.stateLabels) && (raw === 'dead' || raw === 'off') && !['vault'].includes(n.kind);
+      const tone = view.alertNames?.get(id) ?? null;
+      const flagged = simFlag || Boolean(tone);
       if (alerted !== Boolean(n.pulsing)) {
         n.pulsing = alerted;
         n.entity.billboard.scale = alerted && !reducedMotion
           ? new CallbackProperty(() => 1 + 0.22 * (0.5 + 0.5 * Math.sin(performance.now() / 260)), false)
           : new ConstantProperty(alerted ? 1.2 : 1);
       }
-      n.entity.label.text = new ConstantProperty(flagged ? `${n.text} · ${raw === 'off' ? 'OFFLINE' : 'NO POWER'}` : n.text);
+      n.entity.label.text = new ConstantProperty(simFlag ? `${n.text} · ${raw === 'off' ? 'OFFLINE' : 'NO POWER'}` : n.text);
       n.entity.label.showBackground = new ConstantProperty(flagged);
-      n.entity.label.backgroundColor = new ConstantProperty(color('#7a1626', 0.92));
+      n.entity.label.backgroundColor = new ConstantProperty(color(!simFlag && tone === 'warn' ? '#7a4e05' : '#7a1626', 0.92));
       n.entity.label.distanceDisplayCondition = flagged || id === selectedId ? undefined : n.ddc;
       // An asset with an alert marker carries its id on the marker instead.
-      n.entity.label.show = new ConstantProperty(labelsOn && !view.markerIds?.has(id));
+      // Alert names show while Power Status is open even with the Labels toggle off.
+      n.entity.label.show = new ConstantProperty((labelsOn || Boolean(tone)) && !view.markerIds?.has(id));
       n.entity.label.fillColor = new ConstantProperty(color(flagged ? '#ffffff' : '#edf3f8', dim(id) && !flagged ? Math.min(0.35, faint + 0.1) : 1));
+    }
+    for (const id of new Set([...alertLabels.keys(), ...(view.alertNames?.keys() ?? [])])) {
+      if (nodes.has(id)) continue;
+      const tone = view.alertNames?.get(id) ?? null;
+      const e = tone ? alertLabelFor(id) : alertLabels.get(id);
+      if (!e) continue;
+      e.label.show = new ConstantProperty(Boolean(tone));
+      if (tone) e.label.backgroundColor = new ConstantProperty(color(tone === 'warn' ? '#7a4e05' : '#7a1626', 0.92));
     }
     for (const [id, r] of routes) {
       const state = nodeState.get(id) ?? 'live';
@@ -163,6 +210,15 @@ export function createNetworkOverlay(viewer, { built, modelToLonLat, scadaRoutes
         r.entity.polyline.width = new ConstantProperty(WIDTH[r.kv] + (strong ? 4 : 1));
         r.entity.polyline.material = new PolylineGlowMaterialProperty({ color: color(hl, strong ? 0.95 : 0.5), glowPower: strong ? 0.2 : 0.1, taperPower: 1 });
         r.entity.polyline.depthFailMaterial = color(hl, 0.5);
+        continue;
+      }
+      // A cable named by Power Status: glows in its alert colour and pulses, as alert tiles do.
+      const tone = view.alertNames?.get(id) ?? null;
+      if (tone && !inv) {
+        const hex = tone === 'warn' ? '#ffb020' : COLORS.fault;
+        r.entity.polyline.width = pulseWidth(WIDTH[r.kv]);
+        r.entity.polyline.material = new PolylineGlowMaterialProperty({ color: color(hex, 0.95), glowPower: 0.22, taperPower: 1 });
+        r.entity.polyline.depthFailMaterial = color(hex, 0.55);
         continue;
       }
       if (inv) { drawOps(id, r, state, alpha, inv, selectedId); continue; }

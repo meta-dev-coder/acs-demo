@@ -21,7 +21,7 @@ test.beforeAll(async () => {
   converted = await convertIfc(IFC, { sourceFile: "minimal-georef.ifc", versionId: "v1", versionNumber: 1 });
 });
 
-async function mockSpatial(page: Page, { prepareError = null as null | { status: number; code: string; message: string }, signedIn = true } = {}) {
+async function mockSpatial(page: Page, { prepareError = null as null | { status: number; code: string; message: string }, signedIn = true, status = {} as Record<string, Record<string, string>> } = {}) {
   const saved: Record<string, any> = {};
   // `version` is the tip version in ACC; a test raises it to publish a new version.
   const calls = { prepare: [] as string[], put: [] as any[], del: 0, viewerSdk: 0, version: 1, refreshes: 0 };
@@ -52,7 +52,8 @@ async function mockSpatial(page: Page, { prepareError = null as null | { status:
     if (asset) {
       return asset[2] === "model.glb" ? route.fulfill({ status: 200, contentType: "model/gltf-binary", body: converted.glb })
         // The network's own geometry is not in this GLB, so its elements carry no feature ids here.
-        : json(200, { elements: [...converted.elements, ...NETWORK.elements.map((e: any) => ({ ...e, featureId: null }))], connections: [...(converted.connections ?? []), ...networkConnections(calls.version)] });
+        // `status`: SuperDNA_AssetStatus for chosen network ids (a test's own reported states).
+        : json(200, { elements: [...converted.elements, ...NETWORK.elements.map((e: any) => ({ ...e, featureId: null, ...(status[e.networkId] ? { properties: { ...e.properties, SuperDNA_AssetStatus: status[e.networkId] } } : {}) }))], connections: [...(converted.connections ?? []), ...networkConnections(calls.version)] });
     }
     if (path === "/placement") {
       const key = url.searchParams.get("key")!;
@@ -84,7 +85,7 @@ const spatial = (page: Page) => page.evaluate(() => (window as any).__ifcSpatial
 const ready = (page: Page) => page.waitForFunction(() => ["ready", "error"].includes((window as any).__ifcSpatial?.state().phase), null, { timeout: 60_000 });
 
 async function openTwin(page: Page, query = "") {
-  await page.goto(`/?demo=seagirt${query}`);
+  await page.goto(`/?demo=seagirt${query}${query.includes("screen=ifc-spatial") ? "&more=1" : ""}`);   // the More menu is hidden unless ?more=1
   await page.waitForFunction(() => (window as any).__seagirt, null, { timeout: 90_000 });
 }
 
@@ -360,7 +361,7 @@ test.describe("IFC Spatial Twin", () => {
     // Power Status starts collapsed in the header; open it.
     await expect(page.locator(".isp-ops")).toBeHidden();
     await page.click(".isp-power");
-    await expect(page.locator(".isp-ops-alerts h3")).toHaveText("Active Alerts (1)");
+    await expect(page.locator(".isp-ops-alerts h3")).toHaveText(/^Active Alerts\s*1$/);
 
     // Nothing new: the check re-reads ACC and keeps the model.
     await page.evaluate(() => (window as any).__ifcSpatial.checkForUpdate());
@@ -704,16 +705,29 @@ test.describe("IFC Spatial Twin", () => {
     await expect(page.locator(`${ANSWER} .tw-result`).first()).toBeVisible();
     const lead = page.locator(`${ANSWER} .tw-lead`);
     expect((await lead.count()) ? await lead.innerText() : "").not.toMatch(/(\b[A-Z]+-\d+\b.*){8}/);
-    // "Show them on the map" opens the comparison with only those changes, and Ask stays usable there.
+    // "Show them on the map" stays on the current map; an asset row focuses that asset; only the button opens the comparison.
     await askQ("How many assets were added in V4?");
     await page.waitForFunction(() => /33 assets added/.test((window as any).__ifcSpatial.state().network.answer?.title ?? ""));
     await askQ("Show them on the map");
-    await page.waitForFunction(() => { const c = (window as any).__ifcSpatial.compare.state(); return c.active && c.only === 33 && c.models.every(Boolean); }, null, { timeout: 300_000 });
-    await expect(page.locator(".isp-dc-only")).toContainText("Showing 33 changes from Ask the Twin");
-    await expect(page.locator(".isp-askbar")).toBeVisible();
+    await page.waitForFunction(() => /added/.test((window as any).__ifcSpatial.state().network.answer?.title ?? "") && (window as any).__ifcSpatial.state().network.answer?.status === "answered");
+    expect((await page.evaluate(() => (window as any).__ifcSpatial.compare.state())).active).toBe(false);
     await askQ("What changed in CB-STS-05?");
     await page.waitForFunction(() => /CB-STS-05 was added in V4/.test((window as any).__ifcSpatial.state().network.answer?.title ?? ""));
+    await askQ("What changed between V3 and V4?");
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().network.answer?.title === "131 changes between V3 and V4");
+    const row = page.locator(`${ANSWER} [data-cmp-asset]`).first();
+    const rowId = await row.getAttribute("data-cmp-asset");
+    await row.click();
+    await page.waitForTimeout(500);
+    expect((await page.evaluate(() => (window as any).__ifcSpatial.compare.state())).active).toBe(false);
+    if ((await spatial(page)).network.assetIds?.includes?.(rowId)) expect((await spatial(page)).network.selectedId).toBe(rowId);
+    await page.click(`${ANSWER} [data-cmp-show]`);
+    expect((await page.evaluate(() => (window as any).__ifcSpatial.compare.state())).active).toBe(false);
+    await page.locator(`${ANSWER} [data-cmp-open]`).click();
+    await page.waitForFunction(() => (window as any).__ifcSpatial.compare.state().active, null, { timeout: 300_000 });
+    await expect(page.locator(".isp-ask")).toBeHidden();
     await page.click('[data-cmp="exit"]');
+    await expect(page.locator(".isp-askp")).toBeVisible();
   });
 
   test("12 Ask the Twin results on the map: highlighted, selected without losing the set, back, clustered, cleared", async ({ page }) => {
@@ -1097,6 +1111,31 @@ test.describe("IFC Spatial Twin", () => {
         return { body: Readable.from([Buffer.from(pdfs[name])]), contentLength: pdfs[name].length, fileName: name };
       } });
     await page.route(/googleapis\.com/, route => route.abort());
+    // Gmail: the real /api/gmail module with fake Google clients. The fake consent URL is the app's own callback,
+    // so the popup, the state check, the cookie and the postMessage back to the conversation all really run.
+    const { createGmailApi, SEND_SCOPE } = await import("../server/gmail/api.mjs");
+    const gmailSent: string[] = [];
+    const google = {
+      oauth: () => ({ credentials: {}, async generateCodeVerifierAsync() { return { codeVerifier: "v".repeat(43), codeChallenge: "c" }; },
+        generateAuthUrl: (o: any) => `http://localhost:5188/api/gmail/auth/callback?state=${o.state}&code=consent-ok`,
+        async getToken() { return { tokens: { access_token: "at", refresh_token: "rt", expiry_date: Date.now() + 3600e3, scope: `${SEND_SCOPE} openid email`, id_token: "i" } }; },
+        async verifyIdToken() { return { getPayload: () => ({ email: "inspections.demo@gmail.com" }) }; }, setCredentials() {}, on() {}, async getAccessToken() { return { token: "at" }; }, async revokeToken() {} }),
+      gmail: () => ({ users: { messages: { async send({ requestBody }: any) { gmailSent.push(requestBody.raw); return { data: { id: "18c0f2a9d1e3b7aa", threadId: "t1" } }; } } } }),
+    };
+    const gmailApi = createGmailApi({ env: { GOOGLE_CLIENT_ID: "c", GOOGLE_CLIENT_SECRET: "s", GOOGLE_REDIRECT_URI: "http://localhost:5188/api/gmail/auth/callback" }, google, reports: api.reportAccess,
+      dataDir: mkdtempSync(join(tmpdir(), "gmail-e2e-")), logger: { info() {}, warn() {}, error() {} } });
+    const forward = (handler: any) => async (route: any) => {
+      const u = new URL(route.request().url());
+      const body = route.request().postDataBuffer();
+      const req: any = Readable.from(body ? [body] : []);
+      Object.assign(req, { method: route.request().method(), url: u.pathname + u.search, headers: { cookie: (await route.request().allHeaders()).cookie ?? "" } });
+      let status = 200, headers: any = {}; const parts: Buffer[] = [];
+      await handler.handle(req, { writeHead(s: number, h: any) { status = s; headers = h ?? {}; }, write(c: any) { parts.push(Buffer.from(c)); }, end(b: any) { if (b) parts.push(Buffer.from(b)); } } as any);
+      // Playwright does not keep a Set-Cookie on a fulfilled 302: the redirect is replayed as a page that navigates.
+      if (status === 302) return route.fulfill({ status: 200, headers: { ...headers, "content-type": "text/html", location: undefined }, body: `<script>location.replace(${JSON.stringify(headers.location)})</script>` });
+      await route.fulfill({ status, headers, body: Buffer.concat(parts) });
+    };
+    await page.context().route("**/api/gmail/**", forward(gmailApi));
     await page.route("**/api/ifc-spatial/**", async route => {
       const u = new URL(route.request().url());
       if (u.pathname.endsWith("/reports") && route.request().method() === "POST") { posts.push(u.pathname); if (gate) await gate; }
@@ -1130,11 +1169,16 @@ test.describe("IFC Spatial Twin", () => {
     await expect(card.locator(".tw-art")).toHaveCount(2);
     await expect(card.locator(".tw-art").nth(0)).toContainText("Transformer Inspection Report");
     await expect(card.locator(".tw-art").nth(1)).toContainText("Transformer Inspection Register");
-    await expect(card.locator(".tw-mail-f")).toContainText("Electrical Maintenance Team");
-    await expect(card.locator(".tw-mail-f")).toContainText("Seagirt — Transformers requiring inspection");
-    await expect(card.locator(".tw-mail-att")).toContainText("2 attachments");
-    await expect(card.locator(".tw-mail-note")).toContainText("Email has not been sent.");
-    await expect(card.locator("button", { hasText: /^Send/ })).toHaveCount(0);
+    // The draft: no address invented for the group; the files attached; Send waits for Gmail and a recipient.
+    await expect(card.locator('[data-chips="to"] .tw-chip2')).toHaveCount(0);
+    await expect(card.locator('[data-chip-input="to"]')).toHaveAttribute("placeholder", "Electrical Maintenance Team — enter email address");
+    await expect(card.locator('[data-mail="subject"]')).toHaveValue("Seagirt — Transformers requiring inspection");
+    await expect(card.locator(".tw-atts > header")).toContainText("Attachments (2)");
+    await expect(card.locator(".tw-att")).toHaveCount(2);
+    await expect(card.locator(".tw-cmp-gm")).toContainText("Gmail not connected");
+    await expect(card.locator("[data-send-btn]")).toBeDisabled();
+    await expect(card.locator("[data-mail-why]")).toHaveText("Not sent · Connect Gmail to send.");
+    await expect(card.locator(".tw-cmp-demo")).toHaveText("Demo data — send only to approved test recipients.");
     // The matching assets are highlighted in Cesium, and only they.
     const s = await spatial(page);
     expect([...s.network.askIds].sort()).toEqual(["TX-3", "TX-M1", "TX-M2"]);
@@ -1161,9 +1205,9 @@ test.describe("IFC Spatial Twin", () => {
     reg.eachRow((r: any, n: number) => { if (n > 1) rows.push([r.getCell(1).value, r.getCell(10).value]); });
     expect(rows.filter(r => r[1] === "Inspection required").map(r => r[0]).sort()).toEqual(["TX-M1", "TX-M2"]);
     expect(rows.find(r => r[0] === "TX-3")![1]).toBe("Review recommended");
-    await card.locator('[data-report-act="email"]').first().click();
-    const body = await card.locator(".tw-mail-b").textContent();
-    expect(body).toMatch(/2 transformers have been identified as requiring inspection: TX-M1, TX-M2|2 transformers have been identified as requiring inspection: TX-M2, TX-M1/);
+    const body = await card.locator("[data-mail-editor]").innerText();
+    expect(body).toMatch(/2 transformers require inspection across Seagirt: (TX-M1, TX-M2|TX-M2, TX-M1)\./);
+    expect(body.split(/\s+/).length).toBeLessThanOrEqual(150);
 
     // Preview: the PDF in the existing preview dialog; the register's rows.
     await card.locator('[data-report-act="preview"]').nth(0).click();
@@ -1176,12 +1220,6 @@ test.describe("IFC Spatial Twin", () => {
     await card.locator('[data-report-act="criteria"]').click();
     await expect(card.locator(".tw-rcrit-b")).toContainText("9 transformers evaluated");
     await expect(card.locator(".tw-rcrit-b")).toContainText("Missing records");
-    // Edit the draft: the edit is kept; nothing is sent.
-    await card.locator('[data-report-act="emailEdit"]').click();
-    await card.locator('[data-mail="subject"]').fill("Seagirt — transformer inspections to schedule");
-    await card.locator('[data-report-act="emailSave"]').click();
-    await expect(card.locator(".tw-mail-f")).toContainText("Seagirt — transformer inspections to schedule");
-    await expect(card.locator(".tw-mail-note")).toContainText("Edited.");
     const artifactIds = await card.locator('[data-report-act="preview"]').evaluateAll(els => els.map(e => (e as HTMLElement).dataset.reportArtifact));
 
     // A row opens the asset (its inspector) and the report stays.
@@ -1198,6 +1236,109 @@ test.describe("IFC Spatial Twin", () => {
     const after = page.locator(`${ANSWER} .tw-report`);
     expect(await after.locator('[data-report-act="preview"]').evaluateAll(els => els.map(e => (e as HTMLElement).dataset.reportArtifact))).toEqual(artifactIds);
     expect(posts.length).toBe(postsBefore);
+
+    // Gmail: connect in a popup (the conversation stays), then an edited draft, an explicit confirmation, a real send.
+    const mail = page.locator(`${ANSWER} .tw-mail`);
+    const askW = () => page.locator(".isp-ask").boundingBox().then(b => b!.width);
+    const toggleWidth = async (to: number) => { await page.locator(".isp-askp-width").click(); await expect.poll(askW, { timeout: 60_000 }).toBe(to); };
+    await mail.scrollIntoViewIfNeeded();
+    await mail.screenshot({ path: test.info().outputPath("composer-1-default-disconnected.png") });
+    await toggleWidth(616);
+    await mail.screenshot({ path: test.info().outputPath("composer-3-expanded-disconnected.png") });
+    await toggleWidth(396);
+    const turnsBefore = await page.locator(".isp-turn").count();
+    const [popup] = await Promise.all([page.waitForEvent("popup"), mail.locator('[data-report-act="gmailConnect"]').click()]);
+    await popup.waitForEvent("close", { timeout: 15_000 }).catch(() => {});
+    await expect(mail.locator(".tw-cmp-gm")).toContainText("inspections.demo@gmail.com", { timeout: 15_000 });
+    await expect(mail.locator(".tw-cmp-gm")).toContainText("Connected");
+    await expect(page.locator(".isp-turn")).toHaveCount(turnsBefore);
+    expect([...(await spatial(page)).network.askIds].sort()).toEqual(["TX-3", "TX-M1", "TX-M2"]);
+    await expect(mail.locator("[data-mail-why]")).toHaveText("Not sent · Enter the Electrical Maintenance Team's email address.");
+    // Recipient chips: a team name is not an address (shown as invalid); Backspace removes; a real address is a chip.
+    await mail.locator('[data-chip-input="to"]').fill("maintenance-team");
+    await mail.locator('[data-chip-input="to"]').press("Enter");
+    await expect(mail.locator('[data-chips="to"] .tw-chip2.is-bad')).toHaveText("maintenance-team");
+    await expect(mail.locator("[data-send-btn]")).toBeDisabled();
+    await expect(mail.locator("[data-mail-why]")).toContainText("Not an email address");
+    await mail.locator('[data-chip-input="to"]').press("Backspace");
+    await expect(mail.locator('[data-chips="to"] .tw-chip2')).toHaveCount(0);
+    await mail.locator('[data-chip-input="to"]').fill("maint.lead@test.example");
+    await mail.locator('[data-chip-input="to"]').press("Enter");
+    await expect(mail.locator('[data-chips="to"] .tw-chip2:not(.is-bad)')).toHaveText("maint.lead@test.example");
+    await mail.locator('[data-mail="subject"]').fill("Seagirt — transformer inspections to schedule");
+    await mail.locator('[data-mail="subject"]').press("Tab");
+    // Formatting works: the greeting made bold is kept as <b> in the saved body.
+    const editor = mail.locator("[data-mail-editor]");
+    await editor.click();
+    await editor.evaluate(el => { const r = document.createRange(); r.selectNodeContents(el.querySelector("p")!); const sel = getSelection()!; sel.removeAllRanges(); sel.addRange(r); });
+    await mail.locator('[data-fmt="bold"]').click();
+    await expect(editor.locator("b, strong").first()).toHaveText("Hi Team,");
+    await expect(mail.locator("[data-send-btn]")).toBeEnabled();
+    await expect(mail.locator(".tw-att")).toHaveCount(2);
+    // Switching widths while editing keeps everything (no remount, no request).
+    const draftHtml = await editor.innerHTML();
+    await toggleWidth(616);
+    await mail.screenshot({ path: test.info().outputPath("composer-4-expanded-connected.png") });
+    await toggleWidth(396);
+    await toggleWidth(616);
+    await toggleWidth(396);
+    expect(await editor.innerHTML()).toBe(draftHtml);
+    await expect(mail.locator('[data-chips="to"] .tw-chip2')).toHaveText(["maint.lead@test.example"]);
+    await expect(mail.locator('[data-mail="subject"]')).toHaveValue("Seagirt — transformer inspections to schedule");
+    await mail.screenshot({ path: test.info().outputPath("composer-2-default-connected.png") });
+    await mail.locator("[data-send-btn]").click();
+    const dialog = mail.locator(".tw-mconf");
+    // It opens where the user is: on screen, next to the Send button.
+    await expect(dialog).toBeInViewport();
+    await expect(dialog).toContainText("inspections.demo@gmail.com");
+    await expect(dialog).toContainText("maint.lead@test.example");
+    await expect(dialog).toContainText("Seagirt — transformer inspections to schedule");
+    await expect(dialog).toContainText("2 · Transformer_Inspection_Report_2026-11-26.pdf");
+    await expect(dialog).toContainText("illustrative demo data");
+    await expect(dialog.locator('[data-report-act="sendConfirm"]')).toBeDisabled();
+    expect(gmailSent).toHaveLength(0);
+    await dialog.locator("[data-mail-ack]").check();
+    await page.screenshot({ path: test.info().outputPath("gmail-3-confirm.png") });
+    await dialog.locator('[data-report-act="sendConfirm"]').click();
+    await expect(mail.locator(".tw-msent-h")).toHaveText("✓ Email sent successfully", { timeout: 15_000 });
+    // The Gmail message id is kept in the audit record, not shown.
+    await expect(mail.locator(".tw-msent")).not.toContainText("18c0f2a9d1e3b7aa");
+    await expect(mail.locator(".tw-msent")).not.toContainText("Gmail ID");
+    await expect(mail.locator(".tw-msent")).toContainText("maint.lead@test.example");
+    await expect(mail.locator(".tw-cmp-st")).toHaveText("Sent");
+    await page.screenshot({ path: test.info().outputPath("gmail-4-sent.png") });
+    // One message, with the report's own files as attachments.
+    expect(gmailSent).toHaveLength(1);
+    const mime = Buffer.from(gmailSent[0], "base64url").toString("latin1");
+    expect(mime).toMatch(/^From: inspections\.demo@gmail\.com$/m);
+    expect(mime).toMatch(/^To: maint\.lead@test\.example$/m);
+    const pdfAgain = await bytesOf((await page.locator(`${ANSWER} .tw-art`).nth(0).locator("a.tw-art-dl").getAttribute("href"))!);
+    expect(mime.replace(/\r\n/g, "")).toContain(pdfAgain.toString("base64").slice(0, 200));
+    expect(mime).toMatch(/filename=.?Transformer_Inspection_Register_2026-11-26\.xlsx/);
+    // The formatted body and its plain-text alternative.
+    expect(mime).toMatch(/Content-Type: text\/html/);
+    expect(mime).toMatch(/Content-Type: text\/plain/);
+    // Send history: in the ⋯ menu at the default width.
+    await mail.locator('[data-report-act="mailMenu"]').click();
+    await mail.locator('.tw-cmp-pop [data-report-act="sendHistory"]').click();
+    await expect(mail.locator(".tw-mhist")).toContainText("Sent to maint.lead@test.example");
+
+    // The expanded panel: the report and the email use the room (the files side by side); nothing is regenerated.
+    const reportPosts = posts.length;
+    await page.locator(".isp-askp-width").click();
+    await expect(page.locator(".isp-askp-width")).toHaveAttribute("aria-pressed", "true");
+    // (Frames are sparse here with the inspector's focus effect running: the transition can take a while to finish.)
+    await expect.poll(async () => (await page.locator(".isp-ask").boundingBox())!.width, { timeout: 60_000 }).toBe(616);
+    const arts = page.locator(`${ANSWER} .tw-art`);
+    const [b0, b1] = [(await arts.nth(0).boundingBox())!, (await arts.nth(1).boundingBox())!];
+    expect(Math.abs(b0.y - b1.y)).toBeLessThan(2);
+    expect(b1.x).toBeGreaterThan(b0.x + b0.width - 1);
+    await expect(mail.locator(".tw-msent-h")).toHaveText("✓ Email sent successfully");
+    await page.locator(`${ANSWER} .tw-report`).scrollIntoViewIfNeeded();
+    await page.screenshot({ path: test.info().outputPath("width-3-expanded-report.png") });
+    expect(posts.length).toBe(reportPosts);
+    await page.locator(".isp-askp-width").click();
+    await expect.poll(async () => (await page.locator(".isp-ask").boundingBox())!.width, { timeout: 60_000 }).toBe(396);
 
     // Stop: while an answer runs the send button is a Stop button; stopping says so, drops the late result and
     // cancels the report job on the server. Esc does the same. Then the button sends again.
@@ -1248,5 +1389,209 @@ test.describe("IFC Spatial Twin", () => {
     await expect(page.locator(`${ANSWER} .tw-art`)).toContainText("XLSX");
     await expect(page.locator(`${ANSWER} .tw-say`)).toContainText(/^I found \d+ (high-mast lights|lighting circuits)\.$/);
     await page.screenshot({ path: test.info().outputPath("report-lighting.png") });
+    await page.context().unroute("**/api/gmail/**");
+  });
+
+  test("16 Ask the Twin width: expand and restore, kept apart from collapsing, remembered; nothing else changes", async ({ page }) => {
+    test.setTimeout(300_000);
+    await mockSpatial(page);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openTwin(page, "&screen=ifc-spatial");
+    await ready(page);
+    await page.evaluate(() => localStorage.removeItem("ifcSpatial.askWidth"));
+    await openAsk(page);
+    const ask = page.locator(".isp-ask");
+    const btn = page.locator(".isp-askp-width");
+    const width = async () => (await ask.boundingBox())!.width;
+    // First visit: the existing default width, the expand button before the collapse button.
+    const original = await width();
+    expect(original).toBe(396);
+    await expect(btn).toHaveAttribute("aria-pressed", "false");
+    await expect(btn).toHaveAttribute("aria-label", "Expand panel width");
+    await expect(btn).toHaveAttribute("title", "Expand panel width");
+    expect(await page.locator(".isp-askp-head button").evaluateAll(b => b.map(x => x.className))).toEqual(["isp-askp-width", "isp-askp-collapse"]);
+    // A conversation with results on the map.
+    await page.fill(".isp-askbar input", "Show me all transformers installed across Seagirt.");
+    await page.press(".isp-askbar input", "Enter");
+    await expect(page.locator(".isp-turn")).toHaveCount(1);
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().network.askIds.length > 0);
+    await page.waitForTimeout(1500);
+    const before = await spatial(page);
+    const answer = await page.locator(".isp-turn .isp-msg-ans").innerHTML();
+    const gid = NETWORK.elements.find((e: any) => e.networkId === "TX-M1").globalId;
+    // The camera has finished its flight to the results before anything is compared.
+    const pos = () => page.evaluate(g => JSON.stringify((window as any).__ifcSpatial.screenPositionOf(g)), gid);
+    let at = await pos();
+    // (At SwiftShader's frame rate two close readings can match mid-flight: three equal readings 1.5 s apart.)
+    for (let i = 0, same = 0; i < 40 && same < 2; i += 1) { await page.waitForTimeout(1500); const now = await pos(); same = now === at ? same + 1 : 0; at = now; }
+    await page.screenshot({ path: test.info().outputPath("width-1-default.png") });
+    // (The flight's last frames can be seconds apart here: wait it out, then take the reference.)
+    await page.waitForTimeout(6000);
+    at = await pos();
+    // Expand: wider, smoothly; the icon and label change; no request; the conversation, highlights and camera stay.
+    const requests: string[] = [];
+    // (The periodic ACC version check, /models?refresh=1 every 60 s, is the app's own timer, not the toggle.)
+    page.on("request", r => { if (/\/api\//.test(r.url()) && !/\/models\?refresh=1$/.test(r.url())) requests.push(r.url()); });
+    // A 250 ms transition on the width (checked as a running CSS transition: frames are too sparse under SwiftShader to sample).
+    await btn.click();
+    const anim = await page.evaluate(() => document.querySelector(".isp-ask")!.getAnimations().map((a: any) => ({ prop: a.transitionProperty, duration: a.effect.getTiming().duration })));
+    expect(anim).toContainEqual({ prop: "width", duration: 250 });
+    await expect(btn).toHaveAttribute("aria-pressed", "true");
+    await expect(btn).toHaveAttribute("aria-label", "Restore original width");
+    await expect(btn).toHaveAttribute("title", "Restore original width");
+    await expect.poll(width).toBe(616);
+    const panel = (await ask.boundingBox())!;
+    expect(panel.x).toBe(76);
+    expect((await page.locator(".isp-askp").boundingBox())!.height).toBeCloseTo((await page.locator(".isp-askp").boundingBox())!.height, 0);
+    await page.screenshot({ path: test.info().outputPath("width-2-expanded.png") });
+    expect(requests).toEqual([]);
+    const after = await spatial(page);
+    expect(after.network.askIds).toEqual(before.network.askIds);
+    expect(after.network.askWidth).toBe("expanded");
+    expect(await page.locator(".isp-turn .isp-msg-ans").innerHTML()).toBe(answer);
+    expect(await pos()).toBe(at);
+    // Collapse and reopen: the width mode is kept; collapsing does not change the preference.
+    await page.click('[data-act="askCollapse"]');
+    await expect(ask).toHaveClass(/is-collapsed/);
+    expect(await page.evaluate(() => localStorage.getItem("ifcSpatial.askWidth"))).toBe("expanded");
+    await page.click(".isp-askp-launcher");
+    await expect(ask).not.toHaveClass(/is-collapsed/);
+    await expect.poll(width).toBe(616);
+    await expect(page.locator(".isp-turn")).toHaveCount(1);
+    // Restored after a reload.
+    await page.reload();
+    await ready(page);
+    await openAsk(page);
+    await expect(btn).toHaveAttribute("aria-pressed", "true");
+    await expect.poll(width).toBe(616);
+    // Restore, by keyboard: exactly the original width.
+    await btn.focus();
+    await page.keyboard.press("Enter");
+    await expect(btn).toHaveAttribute("aria-pressed", "false");
+    await expect.poll(width).toBe(original);
+    expect(await page.evaluate(() => localStorage.getItem("ifcSpatial.askWidth"))).toBe("default");
+    await page.screenshot({ path: test.info().outputPath("width-4-restored.png") });
+    // A wide screen: about 800px.
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await btn.click();
+    await expect.poll(width).toBe(800);
+    await btn.click();
+    await expect.poll(width).toBe(420);
+  });
+
+  test("17 Power Status and Active Alerts: one compact panel, alerts grouped, no scrollbar, paged to the window", async ({ page }) => {
+    test.setTimeout(300_000);
+    // Seven alerts like the reference model: three reported without power, four degraded.
+    const status: Record<string, Record<string, string>> = {};
+    for (const id of ["STS-01", "STS-02", "HM-1"]) status[id] = { PowerStatus: "No power", StatusDate: "2026-11-24" };
+    for (const id of ["TX-1", "TX-2", "TX-3", "TX-4"]) status[id] = { PowerStatus: "Powered", StatusFlag: "Overheating", StatusDate: "2026-11-23" };
+    await mockSpatial(page, { status });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openTwin(page, "&screen=ifc-spatial");
+    await ready(page);
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().ops?.summary);
+    await page.click(".isp-power");
+    const ops = page.locator(".isp-ops");
+    await expect(ops).toBeVisible();
+    const summary = (await spatial(page)).ops.summary;
+    // Counts from the model's statuses (each asset once; degraded counted as powered in the share, not twice).
+    // (The 3D fixture's own test transformer is connected to nothing, so it is a fourth asset without power.)
+    expect(summary.counts.DEGRADED).toBe(4);
+    expect(summary.counts.NO_POWER).toBeGreaterThanOrEqual(3);
+    const total = summary.counts.NO_POWER + summary.counts.DEGRADED + summary.counts.OFFLINE;
+    for (const key of ["POWERED", "NO_POWER", "DEGRADED", "OFFLINE"]) await expect(page.locator(`.isp-ops-row[data-ops-status="${key}"] b`)).toHaveText(String(summary.counts[key]));
+    await expect(page.locator(".isp-ops-donut text").first()).toHaveText(`${Math.round(summary.poweredPct)}%`);
+    expect((await page.locator(".isp-ops-donut").boundingBox())!.width).toBe(112);
+    // Grouped, most severe first; the status is in the group heading, not repeated on each row.
+    await expect(page.locator(".isp-ops-ghead span")).toHaveText(["No Power", "Degraded"]);
+    await expect(page.locator(".isp-ops-ghead b")).toHaveText([String(summary.counts.NO_POWER), "4"]);
+    await expect(page.locator(".isp-ops-group.is-no_power .isp-ops-alert")).toHaveCount(summary.counts.NO_POWER);
+    await expect(page.locator(".isp-ops-group.is-degraded .isp-ops-alert")).toHaveCount(4);
+    // On the map: alert assets pulse and are named by id only while the panel is open.
+    const named = (await spatial(page)).network.alertNames as string[];
+    expect(named).toHaveLength(total);
+    for (const id of ["STS-01", "STS-02", "HM-1", "TX-1", "TX-2", "TX-3", "TX-4"]) expect(named).toContain(id);
+    await expect(page.locator(".isp-ops-alert").first()).not.toContainText("No Power");
+    await expect(page.locator(".isp-ops-alert").first()).not.toContainText("Status:");
+    const rowH = (await page.locator(".isp-ops-alert").first().boundingBox())!.height;
+    expect(rowH).toBeGreaterThanOrEqual(44);
+    expect(rowH).toBeLessThanOrEqual(52);
+    // All seven on screen, no pager, no scrollbar: the panel ends above the bottom of the window.
+    const noScroll = () => ops.evaluate(el => el.scrollHeight <= el.clientHeight + 1);
+    const inView = async () => { const b = (await ops.boundingBox())!; return b.y >= 56 && b.y + b.height <= page.viewportSize()!.height; };
+    await expect(page.locator(".isp-ops-pager")).toHaveCount(0);
+    expect(await noScroll()).toBe(true);
+    expect(await inView()).toBe(true);
+    const w = (await ops.boundingBox())!.width;
+    expect(w).toBeGreaterThanOrEqual(336);
+    expect(w).toBeLessThanOrEqual(400);
+    await page.screenshot({ path: test.info().outputPath("ops-1440x900.png") });
+    await ops.screenshot({ path: test.info().outputPath("ops-panel-1440.png") });
+    // A group collapses on its own; a status row filters the alerts (and the map).
+    await page.click('.isp-ops-ghead[data-ops-group="DEGRADED"]');
+    await expect(page.locator(".isp-ops-group.is-degraded .isp-ops-alert")).toHaveCount(0);
+    await expect(page.locator('.isp-ops-ghead[data-ops-group="DEGRADED"]')).toHaveAttribute("aria-expanded", "false");
+    await page.click('.isp-ops-ghead[data-ops-group="DEGRADED"]');
+    await page.click('.isp-ops-row[data-ops-status="DEGRADED"]');
+    await expect(page.locator(".isp-ops-ghead span")).toHaveText(["Degraded"]);
+    await expect(page.locator(".isp-ops-alerts h3 small")).toHaveText(`4 of ${total}`);
+    await page.click('.isp-ops-row[data-ops-status="DEGRADED"]');
+    await expect(page.locator(".isp-ops-alert")).toHaveCount(total);
+    // A row selects its asset through the existing workflow (selection, inspector).
+    await page.click('[data-ops-alert="TX-2"]');
+    await expect.poll(async () => (await spatial(page)).network.selectedId).toBe("TX-2");
+    await expect(page.locator('[data-ops-alert="TX-2"]')).toHaveClass(/is-selected/);
+    // Other desktop sizes: on screen, no scrollbar; a short window pages the alerts and every alert stays reachable.
+    for (const [vw, vh] of [[1920, 1080], [1366, 768], [1288, 624], [1280, 520]]) {
+      await page.setViewportSize({ width: vw, height: vh });
+      // The resize event comes with a frame (sparse under SwiftShader): let two frames pass first.
+      await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+      await expect.poll(noScroll, { message: `${vw}x${vh} scroll` }).toBe(true);
+      expect(await inView(), `${vw}x${vh} in view`).toBe(true);
+      const seen = new Set<string>();
+      for (let i = 0; i < 8; i += 1) {
+        for (const id of await page.locator(".isp-ops-alert").evaluateAll(els => els.map(e => (e as HTMLElement).dataset.opsAlert!))) seen.add(id);
+        const next = page.locator('.isp-ops-pager [data-ops-page="1"]');
+        if (!(await next.count()) || await next.isDisabled()) break;
+        await next.click();
+        expect(await noScroll()).toBe(true);
+      }
+      expect(seen.size, `${vw}x${vh}: every alert reachable`).toBe(total);
+      if (await page.locator(".isp-ops-pager").count()) await expect(page.locator(".isp-ops-pager span")).toHaveText(new RegExp(`^Showing \\d+–\\d+ of ${total} alerts$`));
+      await page.screenshot({ path: test.info().outputPath(`ops-${vw}x${vh}.png`) });
+    }
+    // Collapsed: only no-power assets pulse, and nothing is named.
+    await page.click(".isp-power");
+    expect((await spatial(page)).network.alertNames).toEqual([]);
+    // Ask the Twin's welcome fits the panel at 100% zoom on a laptop (no scrollbar).
+    await page.setViewportSize({ width: 1288, height: 624 });
+    await openAsk(page);
+    await page.waitForTimeout(300);
+    expect(await page.locator(".isp-askp-body").evaluate(el => el.scrollHeight <= el.clientHeight + 1)).toBe(true);
+    await page.screenshot({ path: test.info().outputPath("ask-1288x624.png") });
+  });
+
+  test("18 a simulated outage started from Ask the Twin: selecting the offline asset opens the Outage Simulation panel", async ({ page }) => {
+    test.setTimeout(300_000);
+    await mockSpatial(page);
+    await openTwin(page, "&screen=ifc-spatial");
+    await ready(page);
+    await openAsk(page);
+    await page.fill(".isp-askbar input", "What happens if TX-M1 fails?");
+    await page.press(".isp-askbar input", "Enter");
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().network.sim?.id === "TX-M1");
+    // Answered in the conversation: no panel yet.
+    await expect(page.locator(".isp-sim")).toHaveCount(0);
+    await page.click('[data-act="askCollapse"]');
+    // The offline asset, selected (as a click on its map symbol does): the simulation panel, not "Simulate outage".
+    await page.evaluate(() => (window as any).__ifcSpatial.selectAsset("TX-M1"));
+    await expect(page.locator(".isp-sim")).toBeVisible();
+    await expect(page.locator(".isp-sim")).toContainText("TX-M1");
+    await expect(page.locator(".isp-sim")).toContainText("Reset Simulation");
+    await expect(page.locator('[data-ops-investigate], [data-act="simulateAsset"]').filter({ hasText: /Simulate outage/ })).toHaveCount(0);
+    await page.screenshot({ path: test.info().outputPath("sim-from-ask-panel.png") });
+    // Reset ends the simulation and closes its panel.
+    await page.locator(".isp-sim .isp-sim-reset").click();
+    await expect(page.locator(".isp-sim")).toHaveCount(0);
   });
 });

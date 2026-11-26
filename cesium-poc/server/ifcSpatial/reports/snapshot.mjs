@@ -20,17 +20,28 @@ export function typePhrase(request) {
 }
 
 /** The report's title and file stem, from what was asked: "Transformer Inspection Report", "Transformer_Inspection_Report_2026-11-26". */
+/**
+ * Titles and file names from what was asked, built once here so the PDF, the register, the attachments and the
+ * email subject agree: "Transformer Inspection Report", "Degraded Electrical Assets Report", "Lighting Circuit
+ * Register", "Electrical Asset Inventory Report". One noun per title (never "Asset Asset").
+ */
 export function reportNames(request, generatedAt) {
   const labels = request.typeLabels ?? [];
-  const subject = labels.length === 1 ? titleCase(labels[0].singular) : labels.length ? 'Asset' : 'Asset';
+  const one = labels.length === 1;
+  const noun = one ? titleCase(labels[0].singular) : 'Electrical Asset';
+  const nouns = one ? titleCase(labels[0].plural) : 'Electrical Assets';
   const day = String(generatedAt).slice(0, 10);
-  const kind = request.kind === REPORT_KIND.INSPECTION ? 'Inspection' : request.filters?.status === 'DEGRADED' ? 'Degraded Asset' : request.filters?.status === 'NO_POWER' ? 'No Power' : request.options?.includeSpecs ? 'Specification' : 'Asset';
+  const f = request.filters ?? {};
+  let report, register;
+  if (request.kind === REPORT_KIND.INSPECTION) { report = `${noun} Inspection Report`; register = `${noun} Inspection Register`; }
+  else if (f.status === 'DEGRADED') { report = `Degraded ${nouns} Report`; register = `Degraded ${nouns} Register`; }
+  else if (f.status === 'NO_POWER') { report = `${nouns} Without Power Report`; register = `${nouns} Without Power Register`; }
+  else if (f.status === 'OFFLINE') { report = `Offline ${nouns} Report`; register = `Offline ${nouns} Register`; }
+  else if (f.recurring) { report = `${noun} Recurring Findings Report`; register = `${noun} Recurring Findings Register`; }
+  else if (request.options?.includeSpecs) { report = `${noun} Specification Report`; register = `${noun} Specification Register`; }
+  else { report = `${noun} Inventory Report`; register = `${noun} Register`; }
   const stem = s => s.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '');
-  return {
-    reportTitle: `${subject} ${kind} Report`, registerTitle: `${subject} ${kind === 'Inspection' ? 'Inspection' : kind} Register`,
-    pdfFile: `${stem(`${subject} ${kind} Report`)}_${day}.pdf`, xlsxFile: `${stem(`${subject} ${kind === 'Inspection' ? 'Inspection' : kind} Register`)}_${day}.xlsx`,
-    emlFile: `${stem(`${subject} ${kind} Email Draft`)}_${day}.eml`,
-  };
+  return { reportTitle: report, registerTitle: register, pdfFile: `${stem(report)}_${day}.pdf`, xlsxFile: `${stem(register)}_${day}.xlsx`, emlFile: `${stem(report)}_Email_Draft_${day}.eml` };
 }
 
 function historyRows(analysis, depth) {

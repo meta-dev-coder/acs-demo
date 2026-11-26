@@ -171,19 +171,43 @@ test('email: written from the snapshot, a draft only; .eml with the real attachm
   assert.deepEqual(d.recipientAddresses, [], 'no address invented');
   assert.equal(d.subject, 'Seagirt — Transformers requiring inspection');
   assert.match(d.body, /^Hi Team,/);
-  assert.match(d.body, /1 transformer has been identified as requiring inspection: TX-A\./);
-  assert.match(d.body, /attached report and register/);
-  assert.match(d.body, /Inspection history could not be established for 2 assets/);
+  assert.match(d.body, /1 transformer requires inspection across Seagirt: TX-A\./);
+  assert.match(d.body, /Please review the attached report and register/);
+  assert.match(d.body, /Inspection history could not be established for 2 assets from the available records; this does not by itself mean they require inspection\./);
+  assert.ok(d.body.split(/\s+/).length <= 150, 'a short email, not the report');
+  assert.match(d.body, /Regards,$/);
+  assert.match(d.bodyHtml, /^<p>Hi Team,<\/p><p>Based on/);
+  // A configured group resolves to addresses; an unknown group stays a label.
+  const { recipientDirectory } = await import('../server/ifcSpatial/reports/service.mjs');
+  const dir = recipientDirectory({ EMAIL_RECIPIENT_GROUPS: JSON.stringify({ 'Electrical Maintenance Team': ['maint@example.com', 'not an address'] }) });
+  assert.deepEqual(draftEmail(s, { attachments: files, directory: dir }).to, ['maint@example.com']);
+  assert.deepEqual(draftEmail(s, { attachments: files, recipientGroup: 'Operations Manager', directory: dir }).to, []);
   assert.deepEqual(d.attachmentIds, ['aaaaaaaaaaaa', 'bbbbbbbbbbbb']);
   const short = draftEmail(s, { attachments: files, style: 'short' });
   assert.ok(short.body.length < d.body.length);
-  assert.match(short.body, /1 transformer has been identified/);
+  assert.match(short.body, /1 transformer requires inspection/);
   const pdf = Buffer.from('%PDF-1.4 test');
   const eml = toEml(d, [{ filename: s.names.pdfFile, mime: 'application/pdf', bytes: pdf }], { now: NOW }).toString();
   assert.match(eml, /^To: Electrical Maintenance Team:;\r\n/);
   assert.match(eml, /X-Unsent: 1/);
   assert.match(eml, /Content-Disposition: attachment; filename="Transformer_Inspection_Report_2026-11-26.pdf"/);
   assert.ok(eml.includes(pdf.toString('base64')));
+  assert.match(eml, /Content-Type: multipart\/alternative/);
+  assert.match(eml, /Content-Type: text\/html; charset=UTF-8/);
+});
+
+test('email names and HTML: one noun per title; the formatted body is sanitized', async () => {
+  const { reportNames } = await import('../server/ifcSpatial/reports/snapshot.mjs');
+  const { sanitizeEmailHtml, emailHtmlToText } = await import('../server/ifcSpatial/reports/emailHtml.mjs');
+  const L = t => t.map(([a, b]) => ({ singular: a, plural: b }));
+  const many = reportNames({ kind: 'ASSET_LIST', typeLabels: L([['transformer', 'transformers'], ['crane', 'cranes']]), filters: {} }, '2026-11-26T00:00Z');
+  assert.deepEqual([many.reportTitle, many.pdfFile, many.xlsxFile], ['Electrical Asset Inventory Report', 'Electrical_Asset_Inventory_Report_2026-11-26.pdf', 'Electrical_Asset_Register_2026-11-26.xlsx']);
+  assert.equal(reportNames({ kind: 'ASSET_LIST', typeLabels: L([['crane', 'cranes'], ['switch', 'switches']]), filters: { status: 'DEGRADED' } }, '2026-11-26').reportTitle, 'Degraded Electrical Assets Report');
+  assert.equal(reportNames({ kind: 'INSPECTION', typeLabels: L([['transformer', 'transformers']]) }, '2026-11-26').reportTitle, 'Transformer Inspection Report');
+  for (const r of [many]) assert.doesNotMatch(JSON.stringify(r), /Asset[ _]Asset/);
+  const html = sanitizeEmailHtml('<p onclick="x()">Hi <b>Team</b></p><script>alert(1)</script><a href="javascript:alert(1)">x</a><a href="https://example.com">site</a><img src=x onerror=alert(1)><ul><li>one<li>two</ul>');
+  assert.equal(html, '<p>Hi <b>Team</b></p>x<a href="https://example.com" target="_blank" rel="noopener noreferrer">site</a><ul><li>one</li><li>two</li></ul>');
+  assert.equal(emailHtmlToText(html), 'Hi Team\n\nxsite (https://example.com)\n- one\n- two');
 });
 
 // ---- the endpoint: one job, real ACC reads through the document cache, owner-only files ----
@@ -269,7 +293,7 @@ test('endpoint: a report job reads the documents once, writes a PDF, an XLSX and
   const wb = new ExcelJS.Workbook(); await wb.xlsx.load(xRes.buf);
   assert.equal(wb.getWorksheet('Inspection Register').rowCount - 1, r.summary.included);
   assert.equal(wb.getWorksheet('Inspection Register').getRow(2).getCell(1).value, 'TX-M1');
-  assert.match(r.emailDraft.body, /1 transformer has been identified as requiring inspection: TX-M1\./);
+  assert.match(r.emailDraft.body, /1 transformer requires inspection across Seagirt: TX-M1\./);
   assert.deepEqual(r.emailDraft.attachmentIds, [pdf.artifactId, xlsx.artifactId]);
   // Another session (or none) cannot see the report or its files.
   assert.equal((await h.call('GET', `/api/ifc-spatial/reports/${r.reportId}?file=net.ifc`, null, 's2')).status, 404);
@@ -310,7 +334,7 @@ test('endpoint: no matching assets: no empty files are generated; a draft says s
   assert.equal(r.summary.inspectionRequired, 0);
   assert.deepEqual(r.artifacts, []);
   assert.deepEqual(r.steps.filter(s => ['pdf', 'xlsx'].includes(s.id)).map(s => s.state), ['skipped', 'skipped']);
-  assert.match(r.emailDraft.body, /no transformers meet the inspection-required criteria/);
+  assert.match(r.emailDraft.body, /no transformers across Seagirt meet the inspection-required criteria/);
   assert.equal(r.coverage.insufficientEvidence, 1);
   // Not signed in: refused.
   assert.equal((await h.call('POST', '/api/ifc-spatial/reports?file=net.ifc', { request: { types: ['TRANSFORMER'] }, assets: [] }, null)).status, 401);
@@ -348,4 +372,65 @@ test('requests: compound intents and categories from the question; plain questio
   assert.deepEqual(g('Show me the assets included in the report.'), { show: true });
   assert.deepEqual(g('Regenerate using the latest IFC version.'), { revise: { regenerate: true } });
   assert.equal(g('What does TX-M1 supply?'), null);
+});
+
+test('gmail with the real report store: addresses saved in the draft, real files attached, other users refused, a sent draft locked', async () => {
+  const { createGmailApi, SEND_SCOPE } = await import('../server/gmail/api.mjs');
+  const h = harness({
+    'TX-M1_Transformer_Inspection-2026-001_2026-10-28.pdf': inspectionReport({ assetId: 'TX-M1', date: '2026-10-28', number: 'M1-26', condition: 'POOR (2/5)', findings: [['Radiators and cooling fans', 'Defect', 'Leaking.']],
+      actions: [['Thermographic inspection of LV connections', 'High', '2026-12-15']] }),
+  });
+  await h.call('POST', '/api/ifc-spatial/prepare?file=net.ifc');
+  const created = await h.call('POST', '/api/ifc-spatial/reports?file=net.ifc', { request: { question: 'q', kind: 'INSPECTION', types: ['TRANSFORMER'], typeLabels: [{ singular: 'transformer', plural: 'transformers' }],
+    outputs: { pdf: true, xlsx: true, email: true }, recipientGroup: 'Electrical Maintenance Team' }, assets: [input('TX-M1')] });
+  const r = await until(h, created.json.reportId);
+  const sent = [];
+  const google = {
+    oauth: () => ({ credentials: {}, async generateCodeVerifierAsync() { return { codeVerifier: 'v'.repeat(43), codeChallenge: 'c' }; }, generateAuthUrl: o => `https://accounts.google.com/x?state=${o.state}`,
+      async getToken() { return { tokens: { access_token: 'at', refresh_token: 'rt', expiry_date: Date.now() + 3600e3, scope: `${SEND_SCOPE} openid email`, id_token: 'i' } }; },
+      async verifyIdToken() { return { getPayload: () => ({ email: 'me@example.com' }) }; }, setCredentials() {}, on() {}, async getAccessToken() { return { token: 'at' }; }, async revokeToken() {} }),
+    gmail: () => ({ users: { messages: { async send({ requestBody }) { sent.push(requestBody.raw); return { data: { id: 'gm-1', threadId: 't' } }; } } } }),
+  };
+  const gmail = createGmailApi({ env: { GOOGLE_CLIENT_ID: 'c', GOOGLE_CLIENT_SECRET: 's', GOOGLE_REDIRECT_URI: 'http://localhost:5188/api/gmail/auth/callback' }, google, reports: h.api.reportAccess,
+    dataDir: mkdtempSync(join(tmpdir(), 'gmail-int-')), logger: { info() {}, warn() {}, error() {} } });
+  const gcall = async (method, path, body = null, headers = {}) => {
+    const req = Readable.from(body ? [Buffer.from(JSON.stringify(body))] : []);
+    Object.assign(req, { method, url: path, headers: { sid: 's1', ...headers } });
+    let status, hd; const parts = [];
+    await gmail.handle(req, { writeHead(s, x) { status = s; hd = x ?? {}; }, write(c) { parts.push(Buffer.from(c)); }, end(b) { if (b) parts.push(Buffer.from(b)); } });
+    const text = Buffer.concat(parts).toString();
+    return { status, headers: hd, json: /json/.test(hd['content-type'] ?? '') ? JSON.parse(text) : null, text };
+  };
+  const login = await gcall('GET', '/api/gmail/auth/login');
+  const cookie = login.headers['set-cookie'].split(';')[0];
+  await gcall('GET', `/api/gmail/auth/callback?state=${new URL(login.headers.location).searchParams.get('state')}&code=x`, null, { cookie });
+  // The draft keeps the addresses the user typed; nothing is invented for the group name.
+  assert.deepEqual(r.emailDraft.to, []);
+  const saved = await h.call('PUT', `/api/ifc-spatial/reports/${r.reportId}/email?file=net.ifc`, { to: 'maint@example.com; ops@example.com', cc: 'lead@example.com' });
+  assert.deepEqual([saved.json.emailDraft.to, saved.json.emailDraft.cc], [['maint@example.com', 'ops@example.com'], ['lead@example.com']]);
+  // Another APS session cannot send (or read) this report's draft and files.
+  assert.equal((await gcall('POST', '/api/gmail/send', { fileName: 'net.ifc', reportId: r.reportId, idempotencyKey: 'k'.repeat(20), acknowledgeIllustrative: true }, { cookie, sid: 's2' })).json.error.code, 'REPORT_NOT_FOUND');
+  const res = (await gcall('POST', '/api/gmail/send', { fileName: 'net.ifc', reportId: r.reportId, idempotencyKey: 'k'.repeat(20), acknowledgeIllustrative: true }, { cookie })).json;
+  assert.deepEqual([res.status, res.messageId, res.to, res.attachmentCount], ['SENT', 'gm-1', ['maint@example.com', 'ops@example.com'], 2]);
+  // The attachments are the report's own files, byte for byte.
+  const raw = Buffer.from(sent[0], 'base64url').toString('latin1');
+  const pdfFile = (await h.call('GET', r.artifacts[0].url)).buf;
+  assert.ok(raw.includes(pdfFile.toString('base64').slice(0, 76)), 'the generated PDF is attached');
+  // The report now shows the sent record; the draft is locked; a new draft can be made from it.
+  const after = (await h.call('GET', `/api/ifc-spatial/reports/${r.reportId}?file=net.ifc`)).json;
+  assert.deepEqual([after.emailDraft.sendState, after.emailDraft.sent.messageId], ['SENT', 'gm-1']);
+  assert.equal((await h.call('PUT', `/api/ifc-spatial/reports/${r.reportId}/email?file=net.ifc`, { subject: 'x' })).json.error.code, 'DRAFT_LOCKED');
+  const fresh = (await h.call('PUT', `/api/ifc-spatial/reports/${r.reportId}/email?file=net.ifc`, { newDraft: true })).json;
+  assert.deepEqual([fresh.emailDraft.sendState, fresh.emailDraft.sent, fresh.emailDraft.to, fresh.emailSent.length], ['DRAFT', null, ['maint@example.com', 'ops@example.com'], 1]);
+  const hist = (await gcall('GET', `/api/gmail/history?file=net.ifc&reportId=${r.reportId}`, null, { cookie })).json.attempts;
+  assert.deepEqual(hist.map(x => [x.status, x.messageId]), [['SENT', 'gm-1']]);
+  // Send it, then ask the same question again: the same report and files, but a fresh draft (the sent one kept).
+  await gcall('POST', '/api/gmail/send', { fileName: 'net.ifc', reportId: r.reportId, idempotencyKey: 'n'.repeat(20), acknowledgeIllustrative: true }, { cookie });
+  assert.equal((await h.call('GET', `/api/ifc-spatial/reports/${r.reportId}?file=net.ifc`)).json.emailDraft.sendState, 'SENT');
+  const again = (await h.call('POST', '/api/ifc-spatial/reports?file=net.ifc', { request: { question: 'q', kind: 'INSPECTION', types: ['TRANSFORMER'], typeLabels: [{ singular: 'transformer', plural: 'transformers' }],
+    outputs: { pdf: true, xlsx: true, email: true }, recipientGroup: 'Electrical Maintenance Team' }, assets: [input('TX-M1')] })).json;
+  assert.deepEqual([again.reportId, again.reused], [r.reportId, true]);
+  assert.deepEqual([again.emailDraft.sendState, again.emailDraft.sent, again.emailDraft.to], ['DRAFT', null, []]);
+  assert.deepEqual(again.artifacts.map(a => a.artifactId), r.artifacts.map(a => a.artifactId), 'the files are not regenerated');
+  assert.equal(again.emailSent.length, 2, 'both sent drafts stay in the report');
 });
