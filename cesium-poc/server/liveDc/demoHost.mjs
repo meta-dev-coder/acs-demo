@@ -14,6 +14,7 @@ import { extname, join, resolve, sep } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { createLoginLimiter, createSessionSigner, parseCookies, verifyPassword } from './demoAuth.mjs';
 import { PORTMIAMI_API_PREFIX, PORTMIAMI_ASK, PORTMIAMI_PATH } from './portMiami.mjs';
+import { SEAGIRT_API, SEAGIRT_CALLBACKS, SEAGIRT_HOME, SEAGIRT_PATH } from './seagirt.mjs';
 
 export const SESSION_COOKIE = 'live_dc_session';
 const MAX_LOGIN_BODY = 4096;
@@ -79,7 +80,7 @@ function readBody(req, limit) {
 }
 
 export function createDemoHost({
-  passwordHash, webDir, apiHandlers = [], ask = null, status = {}, logger = console, now = Date.now, sessionKey, edgeGate = null, portMiami = null,
+  passwordHash, webDir, apiHandlers = [], ask = null, status = {}, logger = console, now = Date.now, sessionKey, edgeGate = null, portMiami = null, seagirt = null,
   sessionTtlMs = 8 * 3600_000, maxFailures = 5, lockoutMs = 15 * 60_000, home = '/?demo=i595',
 }) {
   if (!passwordHash) throw new Error('LIVE_DEMO_PASSWORD_HASH is required for the HTTP host');
@@ -184,6 +185,13 @@ export function createDemoHost({
       return ask.handle(req, res);
     }
 
+    // Seagirt's OAuth callbacks come back from Autodesk / Google without the SameSite=Strict session cookie;
+    // they carry their own state and PKCE checks (seagirt.mjs).
+    if (seagirt && read && SEAGIRT_CALLBACKS.includes(pathname)) {
+      if (await seagirt.handle(req, res)) return;
+      return send(req, res, 404, { error: 'Not found.' });
+    }
+
     if (!signer.verify(parseCookies(req.headers.cookie)[SESSION_COOKIE])) {
       if (!pathname.startsWith('/api/') && read) {
         return send(req, res, 302, { error: 'Sign in first.' }, { location: `/login?next=${encodeURIComponent(pathname + url.search)}` });
@@ -193,6 +201,13 @@ export function createDemoHost({
 
     // PortMiami: /portmiami needs its trailing slash, because its data URLs are relative to the page.
     if (pathname === PORTMIAMI_PATH && read) return send(req, res, 301, { error: 'Moved.' }, { location: `${PORTMIAMI_PATH}/${url.search}` });
+    // Seagirt: /seagirt opens the IFC Spatial Twin; its APIs read and write (behind the session).
+    if ((pathname === SEAGIRT_PATH || pathname === `${SEAGIRT_PATH}/`) && read) return send(req, res, 302, { error: 'Moved.' }, { location: SEAGIRT_HOME });
+    if (SEAGIRT_API.test(pathname)) {
+      if (!seagirt) return send(req, res, 404, { error: 'Not found.' });
+      if (await seagirt.handle(req, res)) return;
+      return send(req, res, 404, { error: 'Not found.' });
+    }
     if (pathname.startsWith(PORTMIAMI_API_PREFIX)) {
       if (!portMiami) return send(req, res, 404, { error: 'Not found.' });
       if (!read && !(method === 'POST' && pathname === PORTMIAMI_ASK)) return send(req, res, 405, { error: 'This deployment is read-only.' });

@@ -4,7 +4,7 @@
  * "latest" pointer, then prints (never runs) the `aws s3 cp` upload commands. Secret-looking files
  * (.env*, token files, .dc-*, keys) are left out, and a secret-looking value anywhere refuses the release.
  *
- *   node tools/release-live-dc.mjs [--skip-build] [--no-env-files] [--skip-portmiami]
+ *   node tools/release-live-dc.mjs [--skip-build] [--no-env-files] [--skip-portmiami] [--skip-seagirt]
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -31,6 +31,13 @@ const SECRET_VALUE = [
 const TEXT = new Set(['.mjs', '.js', '.json', '.geojson', '.html', '.css', '.sh', '.service', '.example', '.txt', '.map', '.svg', '']);
 
 export const isExcludedName = name => EXCLUDED_NAME.test(name);
+// Third-party package code shipped with the Seagirt APIs (seagirt/node_modules): file names such as Token.js or
+// idtokenclient.js are library code, not secrets, so only the "token" word rule is relaxed there; key files,
+// .env and the like are still left out, and every text file is still searched for secret-looking values.
+const PACKAGE_CODE = /^seagirt[\\/]node_modules[\\/]/;
+const EXCLUDED_IN_PACKAGES = /^\.env|^\.dc-|\.(pem|key|p12|pfx)$|^id_(rsa|ed25519|ecdsa)|^\.git$|^\.DS_Store$|^\._/i;
+/** Whether a file of the bundle (path relative to it) is left out of the release. */
+export const isExcludedPath = rel => (PACKAGE_CODE.test(rel) ? EXCLUDED_IN_PACKAGES : EXCLUDED_NAME).test(basename(rel));
 
 function walk(dir, base = dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -43,10 +50,10 @@ function walk(dir, base = dir, out = []) {
 const stamp = ms => new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
 
 export async function releaseLiveDc({
-  distDir = DEFAULT_OUT_DIR, outDir = DEFAULT_RELEASE_DIR, build = true, envFiles = true, portmiami = true, now = Date.now, logger = console,
+  distDir = DEFAULT_OUT_DIR, outDir = DEFAULT_RELEASE_DIR, build = true, envFiles = true, portmiami = true, seagirt = true, now = Date.now, logger = console,
   bucket = RELEASE_BUCKET, prefix = RELEASE_PREFIX,
 } = {}) {
-  if (build) await buildLiveDcBundle({ outDir: distDir, envFiles, portmiami, logger });
+  if (build) await buildLiveDcBundle({ outDir: distDir, envFiles, portmiami, seagirt, logger });
   for (const entry of REQUIRED_ENTRIES) {
     if (!existsSync(join(distDir, entry))) throw new Error(`${join(distDir, entry)} is missing: build first (npm run live-dc:bundle)`);
   }
@@ -57,7 +64,7 @@ export async function releaseLiveDc({
     cpSync(distDir, staging, {
       recursive: true,
       filter: source => {
-        if (source === distDir || !isExcludedName(basename(source))) return true;
+        if (source === distDir || !isExcludedPath(relative(distDir, source))) return true;
         excluded.push(relative(distDir, source));
         return false;
       },
@@ -73,7 +80,11 @@ export async function releaseLiveDc({
     const tarball = join(outDir, `${version}.tar.gz`);
     execFileSync('tar', ['--no-xattrs', '-czf', tarball, '-C', staging, '.'], { env: { ...process.env, COPYFILE_DISABLE: '1' } });
     const entries = execFileSync('tar', ['-tzf', tarball]).toString().split('\n').filter(Boolean);
-    const leaked = entries.filter(entry => entry.split('/').some(part => part && part !== '.' && isExcludedName(part)));
+    // Every path segment, judged as the copy judged it (package code under seagirt/node_modules by its own rule).
+    const leaked = entries.filter(entry => {
+      const parts = entry.split('/').filter(part => part && part !== '.');
+      return parts.some((part, i) => isExcludedPath(parts.slice(0, i + 1).join('/')));
+    });
     if (leaked.length) { rmSync(tarball, { force: true }); throw new Error(`refusing to release: ${leaked.join(', ')}`); }
 
     const sha256 = createHash('sha256').update(readFileSync(tarball)).digest('hex');
@@ -99,7 +110,7 @@ export async function releaseLiveDc({
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const argv = process.argv.slice(2);
-  releaseLiveDc({ build: !argv.includes('--skip-build'), envFiles: !argv.includes('--no-env-files'), portmiami: !argv.includes('--skip-portmiami') }).catch(error => {
+  releaseLiveDc({ build: !argv.includes('--skip-build'), envFiles: !argv.includes('--no-env-files'), portmiami: !argv.includes('--skip-portmiami'), seagirt: !argv.includes('--skip-seagirt') }).catch(error => {
     console.error(`release-live-dc: ${error.message}`);
     process.exitCode = 1;
   });

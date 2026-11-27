@@ -14,13 +14,15 @@ import { createConstructionApi } from './construction/api.mjs';
 import { createApsApi } from './aps/api.mjs';
 import { createIfcSpatialApi } from './ifcSpatial/api.mjs';
 import { createGmailApi } from './gmail/api.mjs';
+import { createInterpretApi } from './ifcSpatial/interpret.mjs';
 
 /** The Autodesk sign-in and the IFC Spatial Twin routes that use its session. */
 function apsHandlers({ env, logger }) {
   const aps = createApsApi({ env, logger });
   const ifcSpatial = createIfcSpatialApi({ aps, logger });
   // Report emails through the user's Gmail: its own Google sign-in (server/gmail/), independent of APS.
-  return [aps, ifcSpatial, createGmailApi({ env, logger, reports: ifcSpatial.reportAccess })];
+  // Seagirt questions its rules did not understand, read by Claude (off unless SEAGIRT_ASK_LLM=on); before ifcSpatial.
+  return [aps, createInterpretApi({ env, logger }), ifcSpatial, createGmailApi({ env, logger, reports: ifcSpatial.reportAccess })];
 }
 
 export function createApiServer({ config = loadConfig(), env = process.env, logger = console,

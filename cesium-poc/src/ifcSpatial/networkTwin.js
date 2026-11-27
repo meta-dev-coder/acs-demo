@@ -44,6 +44,7 @@ import { buildMaintenanceAssessment } from './maintenance.js';
 import { maintenanceHtml, maintenanceSayFor, maintenanceSuggestions } from './maintenanceAnswer.js';
 import { areaIntentOf, areaScopeOf, distanceIn, isInArea, mentionsArea, polygonOf, validateAreaGeometry } from './areaQuery.js';
 import { alternateCoverage, changesInArea, constructionScreen, dependentsOutside, inventoryOf, outageByArea, statusOfArea, supplyOfArea } from './areaIntel.js';
+import { acceptedRewrite, interpretRequest, isWeakAreaInventory, understoodNote } from './askInterpret.js';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
 const typeLabel = type => (TYPE_LABEL[type]?.[0] ?? String(type ?? '').toLowerCase().replaceAll('_', ' '));
@@ -215,7 +216,7 @@ export function restoreOptions(network, scenario) {
 const remembered = { opsCollapsed: true, askOpen: false, area: null };
 
 export function createNetworkTwin({ viewer, elements, connections, modelToLonLat, panel, left, askHost, header, alertHost = null, assetsHost, chainHost, sourceLabel = '',
-  opsHost = null, powerHost = null, onDocument = () => {}, onArtifact = () => false, compareTools = null, docTools = null, areaTools = null, heading = 0, baseHeight = 0, onSelectElement = () => {}, onFocusElement = () => {}, onWorkspace = () => {} }) {
+  opsHost = null, powerHost = null, onDocument = () => {}, onArtifact = () => false, compareTools = null, docTools = null, areaTools = null, interpretTools = null, heading = 0, baseHeight = 0, onSelectElement = () => {}, onFocusElement = () => {}, onWorkspace = () => {} }) {
   const scadaRoutes = elements.filter(e => /scada|fibre/i.test(e.networkRole ?? '') && e.route?.length >= 2)
     .map(e => ({ id: e.networkId ?? e.globalId, points: e.route.map(p => modelToLonLat(...p)) }));
   const built = buildIfcNetwork({ elements, connections, toLonLat: modelToLonLat });
@@ -241,6 +242,14 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
   // The answer being worked on (a request to the server, a report job): Stop ends it. Late results of a stopped
   // answer are dropped by the token; `cancel` also ends work that runs on the server (a report job).
   let working = null;
+  // Question reading by Claude (server/ifcSpatial/interpret.mjs): known to be on only once the server said so. Until
+  // then, and whenever it is off, every question is answered by the rules alone, as before.
+  let llmOn = false;
+  if (interpretTools) void interpretTools.status().then(st => { llmOn = Boolean(st?.enabled); }, () => { llmOn = false; });
+  // True while a question rewritten by Claude is being routed: it is never sent to Claude again.
+  let viaLlm = false;
+  // The rewrite the next turn answers, shown above its answer.
+  let nextInterpretedAs = null;
   /** Track an answer started just now (its function has already taken a new askToken). */
   function tracked(promise, { cancel = null } = {}) {
     const token = askToken;
@@ -2110,7 +2119,8 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
     if (ui.ask && !r.primaryAssetId) frame(ui.ask.ids, { pitch: -55, minRange: 300 });
     else if (r.cameraTargetAssetIds?.length) frame(r.cameraTargetAssetIds);
   }
-  function askQuestion(asked) {
+  function askQuestion(asked, { fromLlm = false } = {}) {
+    viaLlm = fromLlm;
     // A new question while an answer is still running: that answer is stopped first (and says so).
     if (working || ui.view?.status === 'loading') stopAsk();
     beginTurn(asked);
@@ -2187,9 +2197,42 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
     ui.view = null;
     // The selected asset (or the one under investigation) is what "it" / "this" refers to.
     const out = ask(question, { network, session, context: { ...ui.context, selectedAssetId: ui.investigation?.id ?? ui.selectedId ?? null }, today: new Date().toISOString().slice(0, 10) });
-    ui.context = out.context;
-    ui.preset = session.state().active ? null : 'normal';
-    show(out.answer, question, { newTurn: false });
+    const showEngine = () => {
+      ui.context = out.context;
+      ui.preset = session.state().active ? null : 'normal';
+      show(out.answer, question, { newTurn: false });
+    };
+    // Not understood by any rule: Claude reads it (when on); its rewrite is asked of the same rules, else this answer.
+    if (llmOn && !viaLlm && out.parsed?.intent === 'UNKNOWN') { tracked(interpretAndAsk(question, showEngine)); return; }
+    showEngine();
+  }
+  /**
+   * A question the rules did not understand, read by Claude on the server. A rewrite that passes the checks is
+   * asked again (the conversation keeps what was typed, with "Understood as" above the answer); otherwise, or
+   * when the model is unreachable, over budget or unsure, `fallback` shows the rules' own answer.
+   */
+  async function interpretAndAsk(question, fallback) {
+    const mine = ++askToken;
+    const turnIndex = ui.turn;
+    ui.result = null; ui.question = question;
+    ui.view = { question, kind: 'Ask the Twin', status: 'loading', say: 'Reading the question…' };
+    render();
+    let reply = null;
+    try {
+      reply = await interpretTools.interpret(interpretRequest({ question, assets: network.assets.values(), previousQuestion: ui.turns[turnIndex - 1]?.question ?? null,
+        lastAssets: ui.lastAssets, selectedAssetId: ui.investigation?.id ?? ui.selectedId ?? ui.focus?.id ?? null, area: ui.area ? { label: areaScopeLabel(ui.area) } : null,
+        typeLabel: t => TYPE_LABEL[t]?.[0] ?? String(t).toLowerCase().replace(/_/g, ' ') }));
+    } catch { reply = null; }
+    // A newer question, or Stop: this reading is dropped.
+    if (mine !== askToken || ui.turn !== turnIndex) return;
+    const rewritten = acceptedRewrite(reply, { question, knownIds: new Set(network.assets.keys()) });
+    ui.lastInterpret = { question, rewritten, reason: reply?.reason ?? null, model: reply?.model ?? null };
+    // The rewritten question (or the fallback) is the answer now; this reading is no longer "in progress".
+    if (working?.token === mine) { working = null; renderAskBusy(); }
+    ui.view = null;
+    if (!rewritten) { fallback(); return; }
+    nextInterpretedAs = rewritten;
+    askQuestionAs(rewritten, question, { fromLlm: true });
   }
   function runScenario(id) {
     const s = SCENARIOS.find(x => x.id === id);
@@ -2594,7 +2637,8 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
 
   /** A new turn in the conversation; the welcome state gives way to it. */
   function beginTurn(question, { fromMap = false } = {}) {
-    ui.turns.push({ question: question ?? null, html: '' });
+    ui.turns.push({ question: question ?? null, html: '', interpretedAs: nextInterpretedAs });
+    nextInterpretedAs = null;
     ui.turn = ui.turns.length - 1;
     askHost.querySelector('.isp-askp-welcome').hidden = true;
     chat.hidden = false;
@@ -2608,9 +2652,11 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
     expandAsk(true);
   }
   /** The current answer into its turn (only when it changed, so open sections and scroll stay). */
-  function renderTurn(html) {
+  function renderTurn(answerHtml) {
     const turn = ui.turns[ui.turn];
     const el = chat.querySelector(`[data-turn="${ui.turn}"] .isp-msg-ans`);
+    // A question Claude rewrote: what the twin understood, above the answer.
+    const html = turn?.interpretedAs ? `<p class="isp-understood">${esc(understoodNote(turn.interpretedAs))}</p>${answerHtml}` : answerHtml;
     if (!turn || !el || turn.html === html) return;
     turn.html = html;
     el.innerHTML = html;
@@ -2703,11 +2749,11 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
     return map[plan.primaryIntent] ?? null;
   }
   /** Ask a rewritten question in the current turn (the turn keeps what the user typed). */
-  function askQuestionAs(rewritten, typed) {
+  function askQuestionAs(rewritten, typed, opts = {}) {
     const turn = ui.turns[ui.turn];
     ui.turns.pop(); ui.turn = ui.turns.length - 1;
     chat.querySelector('.isp-turn:last-child')?.remove();
-    askQuestion(rewritten);
+    askQuestion(rewritten, { fromLlm: viaLlm || opts.fromLlm });
     const el = chat.querySelector('.isp-turn:last-child .isp-msg-user p');
     if (el) el.textContent = typed;
     if (ui.turns[ui.turn]) ui.turns[ui.turn].question = typed;
@@ -3288,6 +3334,11 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
       default:
         // Inventory only for questions about assets (a category, "assets", "equipment", "how many").
         if (!categoriesIn(question, spatial()) && !/\b(how many|count|list|show|which|what|any)\b/i.test(question)) return false;
+        // Matched only by "what" / "which": Claude reads it first (when on); the inventory answers if it cannot.
+        if (llmOn && !viaLlm && isWeakAreaInventory(question, { hasCategory: Boolean(categoriesIn(question, spatial())) })) {
+          tracked(interpretAndAsk(question, () => askAreaInventory(question, a, { scope: scopeInfo.scope })));
+          return true;
+        }
         askAreaInventory(question, a, { scope: scopeInfo.scope });
         return true;
     }
@@ -3520,6 +3571,7 @@ export function createNetworkTwin({ viewer, elements, connections, modelToLonLat
       areaState: ui.areaState?.kind ?? null, areaDrawing: Boolean(areaDraw?.drawing()),
       plan: ui.lastPlan ? { primaryIntent: ui.lastPlan.primaryIntent, supportingIntents: ui.lastPlan.supportingIntents, target: ui.lastPlan.target, scope: ui.lastPlan.scope.type } : null,
       investigation: ui.lastInvestigation ? { ids: ui.lastInvestigation.ids } : null,
+      interpret: { on: llmOn, last: ui.lastInterpret ?? null },
       alertNames: ui.opsCollapsed || session.state().active ? [] : [...alertTone.keys()], askIds: ui.ask?.ids ?? [], askWidth: askWide ? 'expanded' : 'default', report: ui.lastReport ? { id: ui.lastReport, status: ui.reports.get(ui.lastReport)?.data.status ?? null } : null,
       scenario: session.state().active ? session.state().label : null, preset: ui.preset, counts: overlay.counts(), unpowered: [...unpowered],
       nodeStates: Object.fromEntries(networkState(network, session.state().active ? session.state().scenario : null).nodeState) }),

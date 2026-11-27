@@ -5,7 +5,7 @@
  * DataConnect on) and the ops files (install.sh, livedc.sh, live-dc.service, env.example). The bundle
  * defaults LIVE_DC_DATA_DIR and LIVE_DC_WEB_DIR to its sibling data/ and web/.
  *
- *   node tools/build-live-dc-bundle.mjs [--out <dir>] [--skip-web | --web-from <dir>] [--no-env-files] [--skip-portmiami]
+ *   node tools/build-live-dc-bundle.mjs [--out <dir>] [--skip-web | --web-from <dir>] [--no-env-files] [--skip-portmiami] [--skip-seagirt]
  *
  * The web build runs `vite build` in a child process with a larger heap (LIVE_DC_WEB_BUILD_HEAP_MB, default
  * 6144: the default ~2 GB heap runs out of memory) and a clean environment: only the fixed same-origin
@@ -80,6 +80,7 @@ const BANNER = [
   "process.env.LIVE_DC_DATA_DIR ||= __liveDcJoin(__liveDcHere, 'data');",
   "process.env.LIVE_DC_WEB_DIR ||= __liveDcJoin(__liveDcHere, 'web');",
   "process.env.LIVE_DC_PORTMIAMI_DIR ||= __liveDcJoin(__liveDcHere, 'portmiami');",
+  "process.env.LIVE_DC_SEAGIRT_DIR ||= __liveDcJoin(__liveDcHere, 'seagirt');",
 ].join('\n');
 
 // ---- PortMiami Digital Twin ----------------------------------------------------------------------------------
@@ -230,8 +231,63 @@ export async function buildPortMiami({ outDir, web = true, envFiles = true, logg
   return { web: true };
 }
 
+/**
+ * The Seagirt IFC Spatial Twin's server APIs (server/liveDc/seagirtApi.mjs → seagirt/api.mjs, loaded by
+ * server/liveDc/seagirt.mjs). Its frontend is part of the main web build. The packages it needs are not
+ * bundled into the file (web-ifc loads its WASM, pdfkit its font files, pdfjs its worker from their package
+ * folders): they are copied into seagirt/node_modules from this checkout's installed tree, at the versions
+ * installed here, with the dependencies they need at run time (no dev dependencies, no .yarn/ releases).
+ */
+// @anthropic-ai/sdk: question reading by Claude (server/ifcSpatial/interpret.mjs), off unless SEAGIRT_ASK_LLM=on.
+export const SEAGIRT_PACKAGES = Object.freeze(['web-ifc', 'pdfkit', 'pdfjs-dist', 'exceljs', 'nodemailer', '@googleapis/gmail', 'google-auth-library', '@anthropic-ai/sdk']);
+const SEAGIRT_SKIP_OPTIONAL = /^@napi-rs\//;
+/** A package's folder as Node would find it from `fromDir` (its own node_modules, then each parent's). */
+function packageDir(name, fromDir) {
+  for (let dir = fromDir; ; dir = dirname(dir)) {
+    const candidate = join(dir, 'node_modules', name);
+    if (existsSync(join(candidate, 'package.json'))) return candidate;
+    if (dir === ROOT || dirname(dir) === dir) return null;
+  }
+}
+/** Every package folder the runtime needs, from the named packages through their dependencies. */
+export function seagirtPackageDirs(names = SEAGIRT_PACKAGES) {
+  const seen = new Set();
+  const queue = names.map(name => { const d = packageDir(name, ROOT); if (!d) throw new Error(`Seagirt needs ${name}: run npm ci`); return d; });
+  while (queue.length) {
+    const dir = queue.shift();
+    if (seen.has(dir)) continue;
+    seen.add(dir);
+    const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+    for (const [dep, optional] of [...Object.keys(pkg.dependencies ?? {}).map(d => [d, false]), ...Object.keys(pkg.optionalDependencies ?? {}).map(d => [d, true])]) {
+      // Optional native packages are platform-specific (built here for this machine, not the server): left out.
+      // pdfjs-dist's @napi-rs/canvas only draws pages; the document reader extracts text.
+      if (optional && SEAGIRT_SKIP_OPTIONAL.test(dep)) continue;
+      const found = packageDir(dep, dir);
+      if (found) queue.push(found);
+      else if (!optional && !(pkg.peerDependenciesMeta?.[dep]?.optional)) throw new Error(`Seagirt: ${pkg.name} needs ${dep}, which is not installed`);
+    }
+  }
+  return [...seen].map(d => relative(ROOT, d)).sort();
+}
+export async function buildSeagirt({ outDir, logger = console } = {}) {
+  const dir = join(outDir, 'seagirt');
+  rmSync(dir, { recursive: true, force: true });
+  await build({
+    entryPoints: [join(ROOT, 'server', 'liveDc', 'seagirtApi.mjs')],
+    outfile: join(dir, 'api.mjs'), bundle: true, platform: 'node', target: 'node20', format: 'esm', packages: 'external', legalComments: 'none', logLevel: 'warning',
+  });
+  const dirs = seagirtPackageDirs();
+  for (const rel of dirs) {
+    // Nested copies (a/node_modules/b) are copied with their parent; each top-level folder once, without .yarn/.
+    cpSync(join(ROOT, rel), join(dir, rel), { recursive: true, dereference: true, filter: src => !/[\\/]\.yarn([\\/]|$)/.test(src) && !src.endsWith('.map') });
+  }
+  writeFileSync(join(dir, 'package.json'), `${JSON.stringify({ name: 'live-dc-seagirt', private: true, type: 'module' }, null, 2)}\n`);
+  logger.log?.(`seagirt: API bundled with ${dirs.length} packages (${SEAGIRT_PACKAGES.join(', ')} and their dependencies)`);
+  return { packages: dirs.length };
+}
+
 // `portmiami` is off unless asked for: the CLI (parseBundleArgs) and the release ask for it by default.
-export async function buildLiveDcBundle({ outDir = DEFAULT_OUT_DIR, web = 'build', envFiles = true, portmiami = false, logger = console } = {}) {
+export async function buildLiveDcBundle({ outDir = DEFAULT_OUT_DIR, web = 'build', envFiles = true, portmiami = false, seagirt = false, logger = console } = {}) {
   if (web && typeof web === 'object' && !existsSync(join(web.from ?? '', 'index.html'))) {
     throw new Error(`web: ${web.from} has no index.html`);
   }
@@ -260,10 +316,11 @@ export async function buildLiveDcBundle({ outDir = DEFAULT_OUT_DIR, web = 'build
   else if (web) cpSync(web.from, join(outDir, 'web'), { recursive: true });
   // After the I-595 web build, which empties web/.
   if (portmiami) await buildPortMiami({ outDir, web: Boolean(web), envFiles, logger });
+  if (seagirt) await buildSeagirt({ outDir, logger });
   const bytes = statSync(outfile).size;
   logger.log?.(`live-dc bundle: ${outfile} (${Math.round(bytes / 1024)} KiB) + ${RUNTIME_DATA_FILES.length} data files + ${DICTIONARY_FILE} + ${SNAPSHOT_CLASSES.length} snapshot files`
-    + `${web ? ' + web/' : ' (no web/)'}${portmiami ? ' + portmiami/' : ''} + ops files`);
-  return { outfile, bytes, dataFiles: [...RUNTIME_DATA_FILES, DICTIONARY_FILE], web: Boolean(web), portmiami: Boolean(portmiami) };
+    + `${web ? ' + web/' : ' (no web/)'}${portmiami ? ' + portmiami/' : ''}${seagirt ? ' + seagirt/' : ''} + ops files`);
+  return { outfile, bytes, dataFiles: [...RUNTIME_DATA_FILES, DICTIONARY_FILE], web: Boolean(web), portmiami: Boolean(portmiami), seagirt: Boolean(seagirt) };
 }
 
 export function parseBundleArgs(argv) {
@@ -274,6 +331,7 @@ export function parseBundleArgs(argv) {
     web: argv.includes('--skip-web') ? false : webFrom ? { from: webFrom } : 'build',
     envFiles: !argv.includes('--no-env-files'),
     portmiami: !argv.includes('--skip-portmiami'),
+    seagirt: !argv.includes('--skip-seagirt'),
   };
 }
 

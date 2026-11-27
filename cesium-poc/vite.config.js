@@ -6,6 +6,7 @@ import { createConstructionApi } from './server/construction/api.mjs';
 import { createApsApi } from './server/aps/api.mjs';
 import { createIfcSpatialApi } from './server/ifcSpatial/api.mjs';
 import { createGmailApi } from './server/gmail/api.mjs';
+import { createInterpretApi } from './server/ifcSpatial/interpret.mjs';
 
 // Before any plugin reads process.env: Vite only exposes VITE_-prefixed variables, and the
 // server-side credentials are deliberately not prefixed, so nothing else would load them. The EC2 web
@@ -119,8 +120,11 @@ const constructionApi = () => {
 // The IFC Spatial Twin's routes (/api/ifc-spatial/*) use the same APS instance, so the same session
 // downloads the IFC files; converted geometry is cached under .data/ifc-spatial/ (git-ignored).
 const apsApi = aps => {
-  const api = { middleware: (req, res, next) => aps.middleware(req, res, () => ifcSpatial.middleware(req, res, () => gmail.middleware(req, res, next))) };
+  const api = { middleware: (req, res, next) => aps.middleware(req, res, () => interpret.middleware(req, res, () => ifcSpatial.middleware(req, res, () => gmail.middleware(req, res, next)))) };
   const ifcSpatial = createIfcSpatialApi({ aps });
+  // Seagirt Ask the Twin: questions its rules did not understand, read by Claude (off unless SEAGIRT_ASK_LLM=on).
+  // Before the IFC Spatial routes, which answer every other /api/ifc-spatial/* path.
+  const interpret = createInterpretApi({});
   // Sending a report's email through the user's Gmail (server/gmail/): its own Google sign-in, independent of APS.
   const gmail = createGmailApi({ reports: ifcSpatial.reportAccess });
   return { name: 'aps-oauth-api',

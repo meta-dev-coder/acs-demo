@@ -184,8 +184,13 @@ Example report files are produced by a script from the same fixture records:
   inspection reports.
 - **No status history.** The model holds the current status and its record date only, so "since when" cannot be
   answered beyond that.
-- **No LLM step.** Questions are read by deterministic rules, which tolerate one-letter typos in key words. Wording
-  far from the rules falls back to the existing handlers.
+- **LLM only for unclear questions, and off by default.** Questions are read by deterministic rules, which tolerate
+  one-letter typos in key words. With `SEAGIRT_ASK_LLM=on`, a question the rules do not understand is sent to Claude
+  Haiku 5.5 (server/ifcSpatial/interpret.mjs, src/ifcSpatial/askInterpret.js) and rewritten into a form the rules
+  support. The rewrite must name only assets in the open model; answers still come from the twin's services and show
+  "Understood as: …". Claude is called at two points: the network engine's "not understood" answer, and an area
+  question that only matched the generic inventory. Off, unreachable or over budget, the existing handlers answer as
+  before (browser test 21, tests/seagirtInterpret.test.mjs).
 - **Gmail during an investigation.** Sign-in and sending are covered by the existing report test (15) with the same
   composer. The maintenance flow was not separately signed in to Gmail in tests.
 - **Headless preview.** Headless Chromium does not render PDFs inline, so the source preview screenshot shows the

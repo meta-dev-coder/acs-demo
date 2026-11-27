@@ -221,7 +221,7 @@ describe('EC2 deploy files', () => {
     const unit = read('live-dc.service');
     for (const line of ['User=livedc', 'Group=livedc', 'WorkingDirectory=/opt/live-dc/current', 'EnvironmentFile=/etc/live-dc/env',
       'ExecStart=/opt/live-dc/bin/node --max-old-space-size=384 /opt/live-dc/current/live-dc-sync.mjs', 'Restart=always', 'RestartSec=30',
-      'MemoryMax=512M', 'CPUQuota=50%', 'NoNewPrivileges=yes', 'ProtectSystem=strict', 'ProtectHome=yes', 'PrivateTmp=yes',
+      'MemoryMax=1536M', 'CPUQuota=50%', 'NoNewPrivileges=yes', 'ProtectSystem=strict', 'ProtectHome=yes', 'PrivateTmp=yes',
       'PrivateDevices=yes', 'KillSignal=SIGINT']) {
       assert.ok(unit.split('\n').includes(line), line);
     }

@@ -322,6 +322,8 @@ export function mountIfcSpatial({ host = document.body, syncIntervalMs = 60_000,
           history: reportId => gmailRequest(`/history?file=${encodeURIComponent(st.fileName)}&reportId=${encodeURIComponent(reportId)}`),
         },
       },
+      // Questions the rules did not understand, read by Claude on the server (off unless SEAGIRT_ASK_LLM=on).
+      interpretTools: { status: () => request('/interpret/status'), interpret: body => request('/interpret', { method: 'POST', body }) },
       onArtifact: spec => docs.openArtifact(spec),
       heading: st.placement?.headingDeg ?? 0, baseHeight: st.terrainHeight + (st.placement?.heightOffset ?? 0), onSelectElement: globalId => { st.selected = null; right.hidden = true; st.netGlobalId = globalId; applyStyle(); },
       onFocusElement: globalId => { st.focusGlobalId = globalId; applyStyle(); } });

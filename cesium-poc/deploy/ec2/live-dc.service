@@ -16,7 +16,9 @@ KillSignal=SIGINT
 TimeoutStopSec=30
 Restart=always
 RestartSec=30
-MemoryMax=512M
+# 1536M: the Seagirt IFC Spatial Twin converts IFC models and reads PDFs in this process (about 300 MB at peak
+# for the test model); 512M left no room beside the sync and Ask the Twin. Check the host has the memory: free -m.
+MemoryMax=1536M
 CPUQuota=50%
 StateDirectory=live-dc
 StateDirectoryMode=0750

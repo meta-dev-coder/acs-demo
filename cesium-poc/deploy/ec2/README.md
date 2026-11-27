@@ -18,6 +18,11 @@ One Node process (`live-dc-sync.mjs`, systemd unit `live-dc`) on an EC2 instance
 - the live sync loop (FL511 -> DataConnect Live classes) every `LIVE_DC_INTERVAL_SECONDS` (300),
 - the built I-595 frontend (`web/`) on `http://<host>:8095/?demo=i595`, using same-origin API paths with live
   DataConnect on,
+- the Seagirt IFC Spatial Twin on `http://<host>:8095/seagirt/` (part of the main web build; its server APIs
+  `/api/aps`, `/api/ifc-spatial`, `/api/gmail` are bundled into `seagirt/api.mjs` with their packages in
+  `seagirt/node_modules`, loaded in the same process by `server/liveDc/seagirt.mjs`). Unlike the rest it writes
+  (model conversions, placements, reports, email drafts), behind the same password; its stores are in
+  `/var/lib/live-dc/seagirt/`. See "Seagirt IFC Spatial Twin" below for its settings and callback URLs,
 - the PortMiami Digital Twin (`../portmiami-digital-twin`, a separate project) on `http://<host>:8095/portmiami/`,
   built into `web/portmiami/` with its API (`/api/portmiami/...`) mounted in the same process from `portmiami/`
   (`server/liveDc/portMiami.mjs`). Same password, same port. Read-only: its design and geometry stores are
@@ -140,6 +145,35 @@ sudo /opt/live-dc/livedc.sh start
 The hash can also be produced on a laptop with `node tools/live-dc-sync.mjs --hash-password`. Only the hash goes
 into `/etc/live-dc/env` (root:livedc 640), and the password itself is never stored or logged. Changing the hash and
 restarting signs everyone out. With `LIVE_DC_HTTP_PORT` set and no valid hash, the service refuses to start (exit 2).
+
+## Seagirt IFC Spatial Twin (/seagirt/)
+
+Open `http://ec2-34-237-187-140.compute-1.amazonaws.com:8095/seagirt/` (sign in with the demo password, then
+"Sign in to Autodesk" in the app). Use that one host name for the page and both callbacks: the sign-in cookies only
+come back to the host that set them, and Google refuses a bare IP address as a redirect host.
+
+Register the callbacks:
+- Autodesk APS app → Callback URL: `http://ec2-34-237-187-140.compute-1.amazonaws.com:8095/api/aps/callback`
+- Google Cloud OAuth client (Web application) → Authorized redirect URI:
+  `http://ec2-34-237-187-140.compute-1.amazonaws.com:8095/api/gmail/auth/callback` (Google may refuse a plain-HTTP
+  redirect; Gmail sending then needs HTTPS, which is not set up on this host)
+
+Add to `/etc/live-dc/env` (each key once; template in `env.example`): `APS_CLIENT_ID`, `APS_CLIENT_SECRET`,
+`APS_CALLBACK_URL`, `APS_SESSION_ENCRYPTION_KEY`, and for Gmail `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+`GOOGLE_REDIRECT_URI`, `GMAIL_TOKEN_ENCRYPTION_KEY` (optional `GMAIL_TEST_RECIPIENTS`, `EMAIL_RECIPIENT_GROUPS`).
+`livedc.sh logs` shows `live-dc seagirt: on at /seagirt/ (… Autodesk sign-in configured …)`.
+
+**Question reading by Claude (optional).** With `SEAGIRT_ASK_LLM=on` in `/etc/live-dc/env`, questions the Seagirt
+rules do not understand are rewritten by Claude Haiku 5.5 (`SEAGIRT_ASK_MODEL`) into a form the rules know, using I-595's
+key (`ASK_TWIN_ANTHROPIC_SECRET_NAME`). Only the question, asset ids, types and names, and the area label are sent; never the
+IFC model or documents. The answer shows "Understood as: …". Off, over the daily budget (`SEAGIRT_ASK_DAILY_TOKENS`, default
+2,000,000) or failing, the rules answer alone. `livedc.sh logs` shows `question reading by Claude on: claude-haiku-5-5 …`, and one
+`seagirt_interpret` line per question (no question text).
+
+The callbacks are answered without the demo session (the browser does not send the SameSite=Strict session cookie
+on a redirect from Autodesk or Google; they have their own state and PKCE checks), and the Autodesk return into the
+app is a page that navigates by script, so the demo session is kept. `--skip-seagirt` releases without it. The unit
+caps the process at 1536M (IFC conversion and PDF reading run in it): check the host has the memory (`free -m`).
 
 ## 6. Operate
 

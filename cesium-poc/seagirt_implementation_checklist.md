@@ -74,3 +74,12 @@ involved in Seagirt Ask the Twin routing (all routing is deterministic in the br
 - [x] Regression: unit suite (only the earlier road-structure failure); IFC Spatial browser suite 20/20 (test 19 once timed out under a slow full run, passes alone, wait raised to 20 s); Seagirt and smoke suites 11/11; no ACS, I-595 or PortMiami code changed
 - [x] §30 Deliverables: seagirt_implementation_report.md, screenshots m1–m9, example PDF, register and email
 - [ ] Verification against the live ACC project (needs your sign-in and real documents)
+
+## Addition: question reading by Claude (done; off by default)
+
+- [x] §6 "Use the existing LLM integration for semantic interpretation where necessary": I-595's model setup and key,
+  Claude Haiku 5.5, only for questions the rules do not understand (`SEAGIRT_ASK_LLM=on`)
+- [x] §10 "Do not allow the LLM to invent asset identifiers": rewrites naming an asset outside the open model are
+  rejected on the server and again in the page; execution stays with the twin's services
+- [x] Off, unreachable, over budget or unsure: the rules' own answer, unchanged
+- [x] Tests: tests/seagirtInterpret.test.mjs (16), browser test 21

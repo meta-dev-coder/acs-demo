@@ -676,6 +676,8 @@ details.isp-fold > summary { margin-bottom: 8px; font-size: 14px; font-weight: 6
 .isp-msg-user { align-self: flex-end; max-width: 86%; padding: 10px 14px; border: 1px solid #2c5a92; border-radius: 16px 16px 4px 16px; background: linear-gradient(180deg, #17407a, #12345f);
   color: #fff; font-size: 14.5px; line-height: 1.45; overflow-wrap: anywhere; }
 .isp-msg-ans { display: flex; flex-direction: column; gap: 10px; }
+/* A question Claude rewrote for the rules (askInterpret.js): what the twin understood, quiet, above the answer. */
+.isp-understood { margin: 0; font-size: 12px; line-height: 1.4; color: var(--ui-text-secondary); font-style: italic; }
 .isp-msg-ans:empty { display: none; }
 .isp-msg-ans .isp-head { display: none; }
 .isp-turn.is-from-map .isp-msg-user { align-self: stretch; max-width: none; padding: 0 2px; border: 0; background: none; color: var(--ask-text-2); font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }

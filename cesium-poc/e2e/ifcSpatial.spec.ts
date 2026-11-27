@@ -21,10 +21,11 @@ test.beforeAll(async () => {
   converted = await convertIfc(IFC, { sourceFile: "minimal-georef.ifc", versionId: "v1", versionNumber: 1 });
 });
 
-async function mockSpatial(page: Page, { prepareError = null as null | { status: number; code: string; message: string }, signedIn = true, status = {} as Record<string, Record<string, string>> } = {}) {
+async function mockSpatial(page: Page, { prepareError = null as null | { status: number; code: string; message: string }, signedIn = true, status = {} as Record<string, Record<string, string>>,
+  interpret = null as null | ((body: any) => any) } = {}) {
   const saved: Record<string, any> = {};
   // `version` is the tip version in ACC; a test raises it to publish a new version.
-  const calls = { prepare: [] as string[], put: [] as any[], del: 0, viewerSdk: 0, version: 1, refreshes: 0, area: [] as any[] };
+  const calls = { prepare: [] as string[], put: [] as any[], del: 0, viewerSdk: 0, version: 1, refreshes: 0, area: [] as any[], interpret: [] as any[] };
   await page.route("https://developer.api.autodesk.com/**", route => { calls.viewerSdk += 1; return route.abort(); });
   // No Google requests from tests: the Google 3D base map is refused, so the screen falls back to the simple map.
   await page.route(/googleapis\.com/, route => route.abort());
@@ -65,6 +66,10 @@ async function mockSpatial(page: Page, { prepareError = null as null | { status:
         return json(200, resolveAreaFor({ elements: [...converted.elements, ...NETWORK.elements], georef: converted.diagnostics.placement, placement: body.placement, body, key: body.key, fileName: file.fileName, versionNumber: calls.version }));
       } catch (error: any) { return json(400, { error: { code: error.code ?? "INVALID_AREA", message: error.message } }); }
     }
+    // Question reading by Claude (server/ifcSpatial/interpret.mjs): only when a test supplies the model's replies;
+    // otherwise these answer 404, as an unconfigured server would leave the page with the rules alone.
+    if (interpret && path === "/interpret/status") return json(200, { enabled: true, model: "claude-haiku-5-5" });
+    if (interpret && path === "/interpret") { const body = route.request().postDataJSON(); calls.interpret.push(body); return json(200, { model: "claude-haiku-5-5", ...interpret(body) }); }
     if (path === "/placement") {
       const key = url.searchParams.get("key")!;
       if (route.request().method() === "PUT") { saved[key] = route.request().postDataJSON(); calls.put.push(saved[key]); return json(200, { key, saved: saved[key] }); }
@@ -2031,5 +2036,70 @@ test.describe("IFC Spatial Twin", () => {
     await expect(page.locator(`${ANSWER} .tw-scope`)).toHaveCount(0);
     await expect(page.locator(`${ANSWER} .tw-say`)).toContainText(/^I found one degraded transformer, TX-M2\. /);
     void answer;
+  });
+
+  test("21 questions the rules did not understand: read by Claude, asked again in a form the rules know; unchanged otherwise", async ({ page }) => {
+    test.setTimeout(240_000);
+    // The model's replies, keyed by the question it is sent (a fake: no network, no key).
+    const replies: Record<string, any> = {
+      "who keeps crane five going?": { understood: true, rewritten: "Which transformer supplies power to STS-05?", assetIds: ["STS-05"], reason: "supply of a named crane" },
+      "tell me a joke about cranes": { understood: false, rewritten: "", assetIds: [], reason: "outside the twin" },
+      "who keeps crane ninety nine going?": { understood: true, rewritten: "Which transformer supplies power to STS-99?", assetIds: ["STS-99"], reason: "invented id" },
+    };
+    const calls = await mockSpatial(page, { interpret: body => replies[body.question] ?? { understood: false, rewritten: "", assetIds: [], reason: "no reply" } });
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await openTwin(page, "&screen=ifc-spatial");
+    await ready(page);
+    await openAsk(page);
+    await page.waitForFunction(() => (window as any).__ifcSpatial.state().network.interpret?.on === true, null, { timeout: 30_000 });
+    const answer = () => page.evaluate(() => (window as any).__ifcSpatial.state().network.answer);
+    const last = () => page.evaluate(() => (window as any).__ifcSpatial.state().network.interpret.last);
+    const askQ = async (q: string) => { await page.fill(".isp-askbar input", q); await page.press(".isp-askbar input", "Enter"); };
+    // The newest turn answered: the typed question shown, an answer rendered, nothing still loading (engine answers
+    // render from the result, with no view state).
+    const settled = (q: string) => page.waitForFunction(typed => {
+      const turn = document.querySelector(".isp-askp-chat .isp-turn:last-child");
+      const a = (window as any).__ifcSpatial.state().network.answer;
+      return turn?.querySelector(".isp-msg-user p")?.textContent === typed && turn.querySelector(".isp-msg-ans .tw-say") && a?.status !== "loading";
+    }, q, { timeout: 60_000 });
+
+    // A question the rules understand never reaches the model.
+    await askQ("Which transformer supplies power to STS-05?");
+    await settled("Which transformer supplies power to STS-05?");
+    const direct = await answer();
+    const directText = await page.locator(`${ANSWER} .tw-say`).first().innerText();
+    expect(calls.interpret.length).toBe(0);
+    await expect(page.locator(`${ANSWER} .isp-understood`)).toHaveCount(0);
+
+    // A paraphrase the rules did not understand: Claude's rewrite is asked of the same rules, and says so.
+    await askQ("who keeps crane five going?");
+    await settled("who keeps crane five going?");
+    expect(calls.interpret.length).toBe(1);
+    await expect(page.locator(`${ANSWER} .isp-understood`)).toHaveText("Understood as: “Which transformer supplies power to STS-05?”");
+    await expect(page.locator(".isp-askp-chat .isp-turn:last-child .isp-msg-user p")).toHaveText("who keeps crane five going?");
+    expect((await answer())?.kind ?? null).toBe(direct?.kind ?? null);
+    await expect(page.locator(`${ANSWER} .tw-say`).first()).toHaveText(directText);
+    expect((await last()).rewritten).toBe("Which transformer supplies power to STS-05?");
+    // Only the question and the small context are sent: ids, types and names; no geometry, documents or model.
+    const sent = calls.interpret[0];
+    expect(Object.keys(sent).sort()).toEqual(["assets", "context", "question"]);
+    expect(Object.keys(sent.assets[0]).sort()).toEqual(["id", "name", "type"]);
+    expect(sent.assets.map((a: any) => a.id)).toContain("STS-05");
+    expect(sent.context.previousQuestion).toBe("Which transformer supplies power to STS-05?");
+
+    // Not understood by Claude either: the rules' own answer, as before (no note).
+    await askQ("tell me a joke about cranes");
+    await settled("tell me a joke about cranes");
+    expect(calls.interpret.length).toBe(2);
+    await expect(page.locator(`${ANSWER} .isp-understood`)).toHaveCount(0);
+    await expect(page.locator(`${ANSWER}`)).toContainText("Questions this model can answer");
+    expect((await last()).rewritten).toBeNull();
+
+    // A rewrite naming an asset the model does not have is never used.
+    await askQ("who keeps crane ninety nine going?");
+    await settled("who keeps crane ninety nine going?");
+    expect(calls.interpret.length).toBe(3);
+    await expect(page.locator(`${ANSWER} .isp-understood`)).toHaveCount(0);
+    expect((await last()).rewritten).toBeNull();
   });
 });

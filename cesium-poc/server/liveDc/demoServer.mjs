@@ -22,6 +22,7 @@ import { dictionarySummary, loadDataDictionary } from './dataDictionary.mjs';
 import { enrichmentDataPath } from './eventEnrichment.mjs';
 import { fetchEventWeather } from './eventWeather.mjs';
 import { loadPortMiami } from './portMiami.mjs';
+import { loadSeagirt } from './seagirt.mjs';
 
 /** The committed snapshot, for runs outside the bundle (the bundle ships it under data/dataconnect-data). */
 const DEFAULT_SNAPSHOT_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'public', 'dataconnect-data');
@@ -142,7 +143,13 @@ export async function startDemoHttp({ env = process.env, httpConfig, service, ne
     return null;
   });
   if (!portMiami) logger.log?.('live-dc portmiami: off (no portmiami/ bundle in this release)');
-  const { server } = createDemoHost({ passwordHash: httpConfig.passwordHash, webDir: httpConfig.webDir, apiHandlers: handlers, ask, status, logger, edgeGate, portMiami });
+  // The Seagirt IFC Spatial Twin's APIs, when the release carries them. A failure to load them never stops the I-595 host.
+  const seagirt = await loadSeagirt({ env, logger }).catch(error => {
+    logger.error?.(`live-dc seagirt: not loaded: ${error?.message ?? error}`);
+    return null;
+  });
+  if (!seagirt) logger.log?.('live-dc seagirt: off (no seagirt/ bundle in this release)');
+  const { server } = createDemoHost({ passwordHash: httpConfig.passwordHash, webDir: httpConfig.webDir, apiHandlers: handlers, ask, status, logger, edgeGate, portMiami, seagirt });
   await new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(httpConfig.port, httpConfig.host, () => { server.off('error', reject); resolve(); });
